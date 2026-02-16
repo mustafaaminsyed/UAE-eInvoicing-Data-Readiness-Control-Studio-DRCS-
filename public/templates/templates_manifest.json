@@ -1,0 +1,94 @@
+{
+  "spec_version": "PINT-AE 2025-Q2",
+  "dr_version": "UAE DR v1.0.1",
+  "use_case": "UAE B2B Standard Invoice (UC1)",
+  "generated_timestamp": "2025-06-01T00:00:00Z",
+  "schema_hash": "sha256:b3f8c2a1d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9",
+  "templates": [
+    {
+      "file": "buyers_template.csv",
+      "dataset": "Buyers",
+      "description": "Buyer master data",
+      "column_count": 8,
+      "join_keys": ["buyer_id"],
+      "columns": [
+        { "name": "buyer_id", "dr_ids": [], "mandatory": true, "asp_derived": false, "type": "String", "format": "Free text identifier", "description": "Internal join key (system primary key)", "responsibility": "ERP (Corner 1)" },
+        { "name": "buyer_name", "dr_ids": ["IBT-044"], "mandatory": true, "asp_derived": false, "type": "String", "format": "Free text", "description": "Buyer legal or trading name", "responsibility": "ERP (Corner 1)" },
+        { "name": "buyer_trn", "dr_ids": ["IBT-048"], "mandatory": false, "asp_derived": false, "type": "String", "format": "15-digit; starts with 1, ends with 03", "description": "Buyer Tax Registration Number", "responsibility": "ERP (Corner 1)" },
+        { "name": "buyer_address", "dr_ids": ["IBT-050"], "mandatory": true, "asp_derived": false, "type": "String", "format": "Free text", "description": "Buyer street address line 1", "responsibility": "ERP (Corner 1)" },
+        { "name": "buyer_country", "dr_ids": ["IBT-055"], "mandatory": true, "asp_derived": false, "type": "Code", "format": "ISO 3166-1 alpha-2", "description": "Buyer country code", "responsibility": "ERP (Corner 1)" },
+        { "name": "buyer_city", "dr_ids": ["IBT-052"], "mandatory": true, "asp_derived": false, "type": "String", "format": "Free text", "description": "Buyer city name", "responsibility": "ERP (Corner 1)" },
+        { "name": "buyer_subdivision", "dr_ids": ["IBT-054"], "mandatory": false, "asp_derived": false, "type": "Code", "format": "AE-AZ, AE-DU, AE-SH, etc.", "description": "UAE emirate code", "responsibility": "ERP (Corner 1)" },
+        { "name": "buyer_electronic_address", "dr_ids": ["IBT-049"], "mandatory": true, "asp_derived": false, "type": "String", "format": "Electronic address identifier", "description": "Buyer PEPPOL or email endpoint", "responsibility": "ERP (Corner 1)" }
+      ]
+    },
+    {
+      "file": "invoice_headers_template.csv",
+      "dataset": "Invoice Headers",
+      "description": "Invoice header facts",
+      "column_count": 25,
+      "join_keys": ["invoice_id", "buyer_id"],
+      "columns": [
+        { "name": "invoice_id", "dr_ids": [], "mandatory": true, "asp_derived": false, "type": "String", "format": "Unique identifier", "description": "Internal join key (system primary key)", "responsibility": "ERP (Corner 1)" },
+        { "name": "invoice_number", "dr_ids": ["IBT-001"], "mandatory": true, "asp_derived": false, "type": "String", "format": "Free text, unique per seller", "description": "Invoice number", "responsibility": "ERP (Corner 1)" },
+        { "name": "issue_date", "dr_ids": ["IBT-002"], "mandatory": true, "asp_derived": false, "type": "Date", "format": "YYYY-MM-DD", "description": "Invoice issue date", "responsibility": "ERP (Corner 1)" },
+        { "name": "invoice_type", "dr_ids": ["IBT-003"], "mandatory": true, "asp_derived": false, "type": "Code", "format": "UN/CEFACT 1001 (380, 381, 383)", "description": "Invoice type code", "responsibility": "ERP (Corner 1)" },
+        { "name": "seller_trn", "dr_ids": ["IBT-031"], "mandatory": true, "asp_derived": false, "type": "String", "format": "15-digit; starts with 1", "description": "Seller Tax Registration Number", "responsibility": "ERP (Corner 1)" },
+        { "name": "seller_name", "dr_ids": ["IBT-027"], "mandatory": true, "asp_derived": false, "type": "String", "format": "Free text", "description": "Seller legal name", "responsibility": "ERP (Corner 1)" },
+        { "name": "seller_address", "dr_ids": ["IBT-035"], "mandatory": true, "asp_derived": false, "type": "String", "format": "Free text", "description": "Seller street address", "responsibility": "ERP (Corner 1)" },
+        { "name": "seller_city", "dr_ids": ["IBT-037"], "mandatory": true, "asp_derived": false, "type": "String", "format": "Free text", "description": "Seller city", "responsibility": "ERP (Corner 1)" },
+        { "name": "seller_country", "dr_ids": ["IBT-040"], "mandatory": true, "asp_derived": false, "type": "Code", "format": "ISO 3166-1 alpha-2", "description": "Seller country code", "responsibility": "ERP (Corner 1)" },
+        { "name": "seller_subdivision", "dr_ids": ["IBT-039"], "mandatory": false, "asp_derived": false, "type": "Code", "format": "AE-AZ, AE-DU, AE-SH, etc.", "description": "Seller emirate code", "responsibility": "ERP (Corner 1)" },
+        { "name": "seller_electronic_address", "dr_ids": ["IBT-034"], "mandatory": true, "asp_derived": false, "type": "String", "format": "Electronic address identifier", "description": "Seller PEPPOL or email endpoint", "responsibility": "ERP (Corner 1)" },
+        { "name": "seller_legal_reg_id", "dr_ids": ["IBT-030"], "mandatory": true, "asp_derived": false, "type": "String", "format": "Trade license or ID", "description": "Seller legal registration ID", "responsibility": "ERP (Corner 1)" },
+        { "name": "seller_legal_reg_id_type", "dr_ids": ["BTUAE-15"], "mandatory": true, "asp_derived": false, "type": "Code", "format": "TL, EID, PAS, CD", "description": "Nature of seller registration ID", "responsibility": "ERP (Corner 1)" },
+        { "name": "buyer_id", "dr_ids": [], "mandatory": true, "asp_derived": false, "type": "String", "format": "FK → buyers.buyer_id", "description": "Foreign key to buyers dataset", "responsibility": "ERP (Corner 1)" },
+        { "name": "currency", "dr_ids": ["IBT-005"], "mandatory": true, "asp_derived": false, "type": "Code", "format": "ISO 4217 alpha-3", "description": "Document currency code", "responsibility": "ERP (Corner 1)" },
+        { "name": "transaction_type_code", "dr_ids": ["BTUAE-02"], "mandatory": true, "asp_derived": false, "type": "Code", "format": "8-char binary string", "description": "UAE transaction type code", "responsibility": "ERP (Corner 1)" },
+        { "name": "payment_due_date", "dr_ids": ["IBT-009"], "mandatory": false, "asp_derived": false, "type": "Date", "format": "YYYY-MM-DD", "description": "Payment due date", "responsibility": "ERP (Corner 1)" },
+        { "name": "payment_means_code", "dr_ids": ["IBT-081"], "mandatory": false, "asp_derived": false, "type": "Code", "format": "UNTDID 4461", "description": "Payment means code", "responsibility": "ERP (Corner 1)" },
+        { "name": "fx_rate", "dr_ids": ["IBT-007"], "mandatory": false, "asp_derived": false, "type": "Number", "format": "Decimal (6dp)", "description": "Exchange rate to AED", "responsibility": "ERP (Corner 1)" },
+        { "name": "total_excl_vat", "dr_ids": ["IBT-109"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Decimal (2dp)", "description": "Total amount without tax", "responsibility": "ERP (Corner 1)" },
+        { "name": "vat_total", "dr_ids": ["IBT-110"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Decimal (2dp)", "description": "Total tax amount", "responsibility": "ERP (Corner 1)" },
+        { "name": "total_incl_vat", "dr_ids": ["IBT-112"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Decimal (2dp)", "description": "Total amount with tax", "responsibility": "ERP (Corner 1)" },
+        { "name": "amount_due", "dr_ids": ["IBT-115"], "mandatory": false, "asp_derived": false, "type": "Number", "format": "Decimal (2dp)", "description": "Amount due for payment", "responsibility": "ERP (Corner 1)" },
+        { "name": "tax_category_code", "dr_ids": ["IBT-118"], "mandatory": true, "asp_derived": false, "type": "Code", "format": "S, Z, E, RC", "description": "Tax category code", "responsibility": "ERP (Corner 1)" },
+        { "name": "tax_category_rate", "dr_ids": ["IBT-119"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Percentage (e.g. 5.00)", "description": "Tax category rate", "responsibility": "ERP (Corner 1)" }
+      ]
+    },
+    {
+      "file": "invoice_lines_template.csv",
+      "dataset": "Invoice Lines",
+      "description": "Invoice line item facts",
+      "column_count": 12,
+      "join_keys": ["line_id", "invoice_id"],
+      "columns": [
+        { "name": "line_id", "dr_ids": ["IBT-126"], "mandatory": true, "asp_derived": false, "type": "String", "format": "Unique sequential identifier", "description": "Line identifier", "responsibility": "ERP (Corner 1)" },
+        { "name": "invoice_id", "dr_ids": [], "mandatory": true, "asp_derived": false, "type": "String", "format": "FK → headers.invoice_id", "description": "Foreign key to invoice headers", "responsibility": "ERP (Corner 1)" },
+        { "name": "line_number", "dr_ids": ["IBT-126"], "mandatory": true, "asp_derived": false, "type": "Integer", "format": "Sequential number", "description": "Line sequence number within invoice", "responsibility": "ERP (Corner 1)" },
+        { "name": "description", "dr_ids": ["IBT-153"], "mandatory": true, "asp_derived": false, "type": "String", "format": "Free text", "description": "Item name / description", "responsibility": "ERP (Corner 1)" },
+        { "name": "quantity", "dr_ids": ["IBT-129"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Decimal", "description": "Invoiced quantity", "responsibility": "ERP (Corner 1)" },
+        { "name": "unit_of_measure", "dr_ids": ["IBT-130"], "mandatory": true, "asp_derived": false, "type": "Code", "format": "UN/ECE Rec 20 (EA, KGM, MTR…)", "description": "Unit of measure code", "responsibility": "ERP (Corner 1)" },
+        { "name": "unit_price", "dr_ids": ["IBT-146"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Decimal", "description": "Item net price", "responsibility": "ERP (Corner 1)" },
+        { "name": "line_discount", "dr_ids": [], "mandatory": false, "asp_derived": false, "type": "Number", "format": "Decimal (2dp)", "description": "Line-level allowance/discount amount", "responsibility": "ERP (Corner 1)" },
+        { "name": "line_total_excl_vat", "dr_ids": ["IBT-131"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Decimal (2dp)", "description": "Line net amount", "responsibility": "ERP (Corner 1)" },
+        { "name": "vat_rate", "dr_ids": ["IBT-152"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Percentage (e.g. 5.00)", "description": "VAT rate", "responsibility": "ERP (Corner 1)" },
+        { "name": "vat_amount", "dr_ids": ["BTUAE-08"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Decimal (2dp)", "description": "VAT line amount", "responsibility": "ERP (Corner 1)" },
+        { "name": "tax_category_code", "dr_ids": ["IBT-151"], "mandatory": true, "asp_derived": false, "type": "Code", "format": "S, Z, E, RC", "description": "Item tax category code", "responsibility": "ERP (Corner 1)" }
+      ]
+    }
+  ],
+  "asp_derived_fields": [
+    { "dr_id": "IBT-023", "business_term": "Business process type", "default_value": "urn:peppol:bis:billing", "asp_derived": true },
+    { "dr_id": "IBT-024", "business_term": "Specification identifier", "default_value": "urn:peppol:pint:billing-1@ae-1", "asp_derived": true },
+    { "dr_id": "IBT-031-1", "business_term": "Seller tax scheme code", "default_value": "VAT", "asp_derived": true },
+    { "dr_id": "IBT-034-1", "business_term": "Seller electronic address scheme", "default_value": "0235", "asp_derived": true },
+    { "dr_id": "IBT-048-1", "business_term": "Buyer tax scheme code", "default_value": "VAT", "asp_derived": true },
+    { "dr_id": "IBT-049-1", "business_term": "Buyer electronic address scheme", "default_value": "0235", "asp_derived": true },
+    { "dr_id": "IBT-149", "business_term": "Price base quantity", "default_value": "1", "asp_derived": true }
+  ],
+  "data_relationships": [
+    { "from": "invoice_headers.buyer_id", "to": "buyers.buyer_id", "type": "Many-to-One", "description": "Each invoice header references exactly one buyer" },
+    { "from": "invoice_lines.invoice_id", "to": "invoice_headers.invoice_id", "type": "Many-to-One", "description": "Each invoice line belongs to exactly one invoice header" }
+  ]
+}
