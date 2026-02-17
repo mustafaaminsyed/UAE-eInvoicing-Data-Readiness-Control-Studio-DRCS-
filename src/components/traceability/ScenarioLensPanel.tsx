@@ -57,6 +57,7 @@ const DISTRIBUTION_GROUPS: DistributionGroup[] = [
   { title: "VAT Treatment Distribution", dimension: "vatTreatments" },
   { title: "Business Scenario Distribution", dimension: "businessScenarios" },
 ];
+const DISTRIBUTION_PREVIEW_LIMIT = 5;
 
 export function ScenarioLensPanel({
   isDataLoaded,
@@ -69,6 +70,9 @@ export function ScenarioLensPanel({
   onResetFilters,
 }: ScenarioLensPanelProps) {
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const [expandedDistributions, setExpandedDistributions] = useState<
+    Partial<Record<ScenarioDistributionDimension, boolean>>
+  >({});
 
   const coverage = useMemo(
     () => computeScenarioCoverage(selectedInvoices),
@@ -79,10 +83,17 @@ export function ScenarioLensPanel({
     () =>
       DISTRIBUTION_GROUPS.map((group) => ({
         ...group,
-        rows: computeDistribution(selectedInvoices, group.dimension).slice(0, 5),
+        rows: computeDistribution(selectedInvoices, group.dimension),
       })),
     [selectedInvoices]
   );
+
+  const toggleDistributionExpansion = (dimension: ScenarioDistributionDimension) => {
+    setExpandedDistributions((current) => ({
+      ...current,
+      [dimension]: !current[dimension],
+    }));
+  };
 
   return (
     <>
@@ -201,7 +212,11 @@ export function ScenarioLensPanel({
                 <DistributionList
                   key={distribution.dimension}
                   title={distribution.title}
+                  dimension={distribution.dimension}
                   rows={distribution.rows}
+                  isExpanded={Boolean(expandedDistributions[distribution.dimension])}
+                  previewLimit={DISTRIBUTION_PREVIEW_LIMIT}
+                  onToggleExpand={toggleDistributionExpansion}
                 />
               ))}
             </div>
@@ -333,11 +348,22 @@ function MiniStatCard({ label, value }: { label: string; value: string }) {
 
 function DistributionList({
   title,
+  dimension,
   rows,
+  isExpanded,
+  previewLimit,
+  onToggleExpand,
 }: {
   title: string;
+  dimension: ScenarioDistributionDimension;
   rows: { key: string; count: number; percentage: number }[];
+  isExpanded: boolean;
+  previewLimit: number;
+  onToggleExpand: (dimension: ScenarioDistributionDimension) => void;
 }) {
+  const shouldTruncate = rows.length > previewLimit;
+  const visibleRows = shouldTruncate && !isExpanded ? rows.slice(0, previewLimit) : rows;
+
   return (
     <div className="rounded-lg border p-3">
       <h3 className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1">
@@ -348,7 +374,7 @@ function DistributionList({
         <p className="text-xs text-muted-foreground">No categories present.</p>
       ) : (
         <div className="space-y-2">
-          {rows.map((row) => (
+          {visibleRows.map((row) => (
             <div key={row.key}>
               <div className="flex items-center justify-between text-[11px] mb-1">
                 <span className="text-foreground">{row.key}</span>
@@ -364,6 +390,24 @@ function DistributionList({
               </div>
             </div>
           ))}
+          {shouldTruncate && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-[11px]"
+              onClick={() => onToggleExpand(dimension)}
+              aria-label={
+                isExpanded
+                  ? `Show fewer categories for ${title}`
+                  : `Show all categories for ${title}`
+              }
+            >
+              {isExpanded
+                ? `Show less (${rows.length - previewLimit} hidden when collapsed)`
+                : `Show all ${rows.length} categories`}
+            </Button>
+          )}
         </div>
       )}
     </div>
