@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { FileDropZone, FileSummaryCard, analyzeFile, FileStats } from '@/components/upload/FileAnalysis';
 import { SampleScenario } from '@/lib/sampleData';
+import { addUploadAuditLog } from '@/lib/uploadAudit';
 
 type StepKey = 'upload' | 'validation' | 'mapping';
 
@@ -126,6 +127,50 @@ export default function UploadPage() {
         parseLinesFile(files.lines!),
       ]);
       setData({ buyers, headers, lines });
+
+      if (stats.buyers && stats.headers && stats.lines) {
+        addUploadAuditLog({
+          buyersCount: buyers.length,
+          headersCount: headers.length,
+          linesCount: lines.length,
+          datasets: [
+            {
+              dataset: 'buyers',
+              fileName: stats.buyers.fileName,
+              fileSize: stats.buyers.fileSize,
+              rowCount: stats.buyers.rowCount,
+              columnCount: stats.buyers.columnCount,
+              requiredMissing: stats.buyers.requiredMissing,
+              nullWarnings: stats.buyers.nullWarnings,
+            },
+            {
+              dataset: 'headers',
+              fileName: stats.headers.fileName,
+              fileSize: stats.headers.fileSize,
+              rowCount: stats.headers.rowCount,
+              columnCount: stats.headers.columnCount,
+              requiredMissing: stats.headers.requiredMissing,
+              nullWarnings: stats.headers.nullWarnings,
+            },
+            {
+              dataset: 'lines',
+              fileName: stats.lines.fileName,
+              fileSize: stats.lines.fileSize,
+              rowCount: stats.lines.rowCount,
+              columnCount: stats.lines.columnCount,
+              requiredMissing: stats.lines.requiredMissing,
+              nullWarnings: stats.lines.nullWarnings,
+            },
+          ],
+          relationalChecks: relationalChecks.map((check) => ({
+            label: check.label,
+            matchPct: check.matchPct,
+            unmatchedCount: check.unmatchedCount,
+            total: check.total,
+          })),
+        });
+      }
+
       toast({
         title: 'Data loaded successfully',
         description: `${buyers.length} buyers, ${headers.length} invoices, ${lines.length} line items`,

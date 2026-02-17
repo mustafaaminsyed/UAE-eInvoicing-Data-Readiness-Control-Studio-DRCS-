@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Upload, Play, LayoutDashboard, AlertTriangle, Wand2, BarChart3, Briefcase, XCircle, Home, Shield, FileDown } from 'lucide-react';
+import { Upload, Play, LayoutDashboard, AlertTriangle, Wand2, BarChart3, Briefcase, XCircle, Home, Shield, FileDown, BookCheck, FileClock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCompliance } from '@/context/ComplianceContext';
 import daribaLogo from '@/assets/dariba-logo.png';
@@ -8,9 +8,11 @@ import { FEATURE_FLAGS } from '@/config/features';
 const navItems = [
   { path: '/', label: 'Home', icon: Home },
   { path: '/upload', label: 'Upload', icon: Upload },
+  { path: '/upload-audit', label: 'Upload Audit', icon: FileClock },
   { path: '/mapping', label: 'Mapping', icon: Wand2 },
   { path: '/traceability', label: 'Traceability', icon: Shield },
   { path: '/run', label: 'Run Checks', icon: Play },
+  { path: '/check-registry', label: 'Check Registry', icon: BookCheck },
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/exceptions', label: 'Exceptions', icon: AlertTriangle },
   { path: '/cases', label: 'Cases', icon: Briefcase },

@@ -12,6 +12,8 @@ import DashboardPage from "./pages/DashboardPage";
 import ExceptionsPage from "./pages/ExceptionsPage";
 import InvoiceDetailPage from "./pages/InvoiceDetailPage";
 import CheckBuilderPage from "./pages/CheckBuilderPage";
+import CheckRegistryPage from "./pages/CheckRegistryPage";
+import UploadAuditPage from "./pages/UploadAuditPage";
 import ControlsDashboardPage from "./pages/ControlsDashboardPage";
 import CasesPage from "./pages/CasesPage";
 import RejectionsPage from "./pages/RejectionsPage";
@@ -42,6 +44,8 @@ const App = () => (
                 <Route path="/exceptions" element={<ExceptionsPage />} />
                 <Route path="/invoice/:invoiceId" element={<InvoiceDetailPage />} />
                 <Route path="/check-builder" element={<CheckBuilderPage />} />
+                <Route path="/check-registry" element={<CheckRegistryPage />} />
+                <Route path="/upload-audit" element={<UploadAuditPage />} />
                 <Route path="/controls" element={<ControlsDashboardPage />} />
                 <Route path="/cases" element={<CasesPage />} />
                 <Route path="/rejections" element={<RejectionsPage />} />

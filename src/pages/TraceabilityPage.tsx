@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Search, AlertTriangle, CheckCircle2, XCircle, Shield,
   Database, Info, Download, Lock, FileWarning
@@ -15,10 +15,72 @@ import { computeTraceabilityMatrix, TraceabilityRow, GapsSummary, CoverageStatus
 import { computeAllDatasetPopulations } from '@/lib/coverage/populationCoverage';
 import { CONFORMANCE_CONFIG } from '@/config/conformance';
 import { DrillDownDialog } from '@/components/traceability/DrillDownDialog';
+import { ScenarioLensPanel } from '@/components/traceability/ScenarioLensPanel';
 import { exportTraceabilityReport } from '@/lib/coverage/regulatoryExport';
-import { runConsistencyChecks, ConsistencyReport } from '@/lib/coverage/consistencyValidator';
+import { runConsistencyChecks } from '@/lib/coverage/consistencyValidator';
+import { FEATURE_FLAGS } from '@/config/features';
+import {
+  BUSINESS_SCENARIO_OPTIONS,
+  CONFIDENCE_OPTIONS,
+  DEFAULT_SCENARIO_FILTERS,
+  DOCUMENT_TYPE_OPTIONS,
+  VAT_TREATMENT_OPTIONS,
+  type ScenarioLensFilters,
+} from '@/modules/scenarioLens/types';
+import { buildScenarioLensInvoices, filterInvoicesByScenario } from '@/modules/scenarioLens/selectors';
+import { getScenarioLensMockInvoices } from '@/modules/scenarioLens/mockInvoices';
+import {
+  getScenarioApplicabilityBadgeClass,
+  getScenarioApplicabilityForDR,
+} from '@/modules/scenarioLens/drScenarioApplicability';
 
 type FilterType = 'all' | 'mandatory' | 'pint-new' | 'pint-legacy' | 'unmapped' | 'not-ingestible' | 'low-population' | 'no-rules' | 'no-controls' | 'covered';
+
+const SCENARIO_PARAM_KEYS: Record<keyof ScenarioLensFilters, string> = {
+  documentType: 'slDoc',
+  vatTreatment: 'slVat',
+  businessScenario: 'slBiz',
+  confidence: 'slConf',
+};
+
+function readScenarioFilters(searchParams: URLSearchParams): ScenarioLensFilters {
+  return {
+    documentType: readOption(
+      searchParams,
+      SCENARIO_PARAM_KEYS.documentType,
+      DOCUMENT_TYPE_OPTIONS,
+      DEFAULT_SCENARIO_FILTERS.documentType
+    ),
+    vatTreatment: readOption(
+      searchParams,
+      SCENARIO_PARAM_KEYS.vatTreatment,
+      VAT_TREATMENT_OPTIONS,
+      DEFAULT_SCENARIO_FILTERS.vatTreatment
+    ),
+    businessScenario: readOption(
+      searchParams,
+      SCENARIO_PARAM_KEYS.businessScenario,
+      BUSINESS_SCENARIO_OPTIONS,
+      DEFAULT_SCENARIO_FILTERS.businessScenario
+    ),
+    confidence: readOption(
+      searchParams,
+      SCENARIO_PARAM_KEYS.confidence,
+      CONFIDENCE_OPTIONS,
+      DEFAULT_SCENARIO_FILTERS.confidence
+    ),
+  };
+}
+
+function readOption<T extends readonly string[]>(
+  searchParams: URLSearchParams,
+  key: string,
+  options: T,
+  fallback: T[number]
+): T[number] {
+  const value = searchParams.get(key);
+  return value && (options as readonly string[]).includes(value) ? (value as T[number]) : fallback;
+}
 
 function CoverageStatusBadge({ status }: { status: CoverageStatus }) {
   const config: Record<CoverageStatus, { label: string; cls: string }> = {
@@ -124,12 +186,41 @@ function DatasetBadge({ dataset }: { dataset: string | null }) {
 
 export default function TraceabilityPage() {
   const { buyers, headers, lines, isDataLoaded, pintAEExceptions } = useCompliance();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
   const [drillDownRow, setDrillDownRow] = useState<TraceabilityRow | null>(null);
   const [showConsistency, setShowConsistency] = useState(false);
 
   const consistencyReport = useMemo(() => runConsistencyChecks(), []);
+  const scenarioFilters = useMemo(() => readScenarioFilters(searchParams), [searchParams]);
+
+  const baseScenarioInvoices = useMemo(
+    () => buildScenarioLensInvoices(headers, lines, buyers),
+    [headers, lines, buyers]
+  );
+
+  const usingMockScenarioData = FEATURE_FLAGS.scenarioLensMockData && baseScenarioInvoices.length === 0;
+
+  const scenarioInvoices = useMemo(
+    () => (usingMockScenarioData ? getScenarioLensMockInvoices() : baseScenarioInvoices),
+    [baseScenarioInvoices, usingMockScenarioData]
+  );
+
+  const scenarioInvoicesInSelection = useMemo(
+    () => filterInvoicesByScenario(scenarioInvoices, scenarioFilters),
+    [scenarioInvoices, scenarioFilters]
+  );
+
+  const showScenarioConfidenceFilter = useMemo(
+    () => scenarioInvoices.some((invoice) => typeof invoice.classification.confidence === 'number'),
+    [scenarioInvoices]
+  );
+
+  const showScenarioApplicabilityColumn =
+    FEATURE_FLAGS.scenarioLens && FEATURE_FLAGS.scenarioApplicabilityColumn;
+
+  const tableMinWidthClass = showScenarioApplicabilityColumn ? 'min-w-[1340px]' : 'min-w-[1180px]';
 
   const populations = useMemo(() => {
     if (!isDataLoaded) return [];
@@ -210,6 +301,26 @@ export default function TraceabilityPage() {
     { key: 'low-population', label: 'Low Pop.', count: rows.filter(r => r.populationPct !== null && r.populationPct < CONFORMANCE_CONFIG.populationWarningThreshold).length },
   ];
 
+  const handleScenarioFilterChange = <K extends keyof ScenarioLensFilters>(
+    key: K,
+    value: ScenarioLensFilters[K]
+  ) => {
+    const next = new URLSearchParams(searchParams);
+    const paramKey = SCENARIO_PARAM_KEYS[key];
+    if (value === 'All') {
+      next.delete(paramKey);
+    } else {
+      next.set(paramKey, value);
+    }
+    setSearchParams(next, { replace: true });
+  };
+
+  const resetScenarioFilters = () => {
+    const next = new URLSearchParams(searchParams);
+    Object.values(SCENARIO_PARAM_KEYS).forEach((paramKey) => next.delete(paramKey));
+    setSearchParams(next, { replace: true });
+  };
+
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-background">
       <div className="container py-8 max-w-7xl">
@@ -228,6 +339,21 @@ export default function TraceabilityPage() {
         <div className="mb-6 animate-slide-up">
           <GapsPanel gaps={gaps} specVersion={specVersion} />
         </div>
+
+        {FEATURE_FLAGS.scenarioLens && (
+          <div className="mb-6 animate-slide-up">
+            <ScenarioLensPanel
+              isDataLoaded={isDataLoaded}
+              usingMockData={usingMockScenarioData}
+              invoices={scenarioInvoices}
+              selectedInvoices={scenarioInvoicesInSelection}
+              filters={scenarioFilters}
+              showConfidenceFilter={showScenarioConfidenceFilter}
+              onFilterChange={handleScenarioFilterChange}
+              onResetFilters={resetScenarioFilters}
+            />
+          </div>
+        )}
 
         {/* Consistency Report Banner */}
         {consistencyReport.failed > 0 && (
@@ -302,7 +428,7 @@ export default function TraceabilityPage() {
         {/* Table */}
         <div className="bg-card rounded-xl border shadow-sm overflow-hidden animate-slide-up">
           <div className="overflow-x-auto border-b bg-card">
-            <table className="w-full min-w-[1180px] text-sm">
+            <table className={cn('w-full text-sm', tableMinWidthClass)}>
               <thead>
                 <tr className="border-b bg-card">
                   <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-12">#</th>
@@ -317,6 +443,11 @@ export default function TraceabilityPage() {
                   <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-16">Pop.</th>
                   <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-16">Rules</th>
                   <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-16">Controls</th>
+                  {showScenarioApplicabilityColumn && (
+                    <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-28">
+                      Scenario Applicability
+                    </th>
+                  )}
                   <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-24">Coverage</th>
                 </tr>
               </thead>
@@ -324,9 +455,13 @@ export default function TraceabilityPage() {
           </div>
 
           <div className="max-h-[68vh] overflow-auto">
-            <table className="w-full min-w-[1180px] text-sm">
+            <table className={cn('w-full text-sm', tableMinWidthClass)}>
               <tbody className="[&_tr:last-child]:border-0">
-                {filteredRows.map(row => (
+                {filteredRows.map(row => {
+                  const scenarioApplicability = showScenarioApplicabilityColumn
+                    ? getScenarioApplicabilityForDR(row.dr_id, scenarioFilters)
+                    : null;
+                  return (
                   <tr
                     key={row.dr_id}
                     className="border-b transition-colors hover:bg-muted/30 cursor-pointer"
@@ -462,14 +597,36 @@ export default function TraceabilityPage() {
                         <span className="text-xs text-muted-foreground">0</span>
                       )}
                     </td>
+                    {showScenarioApplicabilityColumn && scenarioApplicability && (
+                      <td className="p-4 align-middle text-center w-28">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger onClick={(e) => e.stopPropagation()}>
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  'text-xs',
+                                  getScenarioApplicabilityBadgeClass(scenarioApplicability.status)
+                                )}
+                              >
+                                {scenarioApplicability.status}
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent className="text-xs max-w-xs">
+                              {scenarioApplicability.notes}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </td>
+                    )}
                     <td className="p-4 align-middle text-center w-24">
                       <CoverageStatusBadge status={row.coverageStatus} />
                     </td>
                   </tr>
-                ))}
+                )})}
                 {filteredRows.length === 0 && (
                   <tr className="border-b">
-                    <td colSpan={13} className="p-4 align-middle text-center text-muted-foreground py-12">
+                    <td colSpan={showScenarioApplicabilityColumn ? 14 : 13} className="p-4 align-middle text-center text-muted-foreground py-12">
                       No matching DRs found
                     </td>
                   </tr>
@@ -483,6 +640,9 @@ export default function TraceabilityPage() {
           Showing {filteredRows.length} of {rows.length} data requirements | 
           Population threshold: {CONFORMANCE_CONFIG.populationWarningThreshold}% | 
           Consistency: {consistencyReport.passed} passed, {consistencyReport.failed} issues
+          {FEATURE_FLAGS.scenarioLens && (
+            <> | Scenario selection: {scenarioInvoicesInSelection.length} invoice(s)</>
+          )}
         </div>
       </div>
 

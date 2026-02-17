@@ -7,6 +7,7 @@ import {
   Briefcase,
   CheckCircle2,
   FileDown,
+  FileClock,
   FileText,
   LayoutDashboard,
   Orbit,
@@ -30,7 +31,9 @@ import type { MappingTemplate } from "@/types/fieldMapping";
 import type { Case } from "@/types/cases";
 
 const quickActions = [
+  { label: "Upload Audit", icon: FileClock, path: "/upload-audit" },
   { label: "Exceptions", icon: AlertTriangle, path: "/exceptions" },
+  { label: "Check Registry", icon: FileText, path: "/check-registry" },
   { label: "Cases", icon: Briefcase, path: "/cases" },
   { label: "Controls", icon: BarChart3, path: "/controls" },
   { label: "Builder", icon: Wand2, path: "/check-builder" },
