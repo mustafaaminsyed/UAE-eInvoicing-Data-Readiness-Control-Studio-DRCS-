@@ -62,7 +62,7 @@ describe("ScenarioLensPanel", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: /show all categories for vat treatment distribution/i,
+        name: /view all categories for vat treatment distribution/i,
       })
     );
 
@@ -70,7 +70,7 @@ describe("ScenarioLensPanel", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: /show fewer categories for vat treatment distribution/i,
+        name: /hide extra categories for vat treatment distribution/i,
       })
     );
 

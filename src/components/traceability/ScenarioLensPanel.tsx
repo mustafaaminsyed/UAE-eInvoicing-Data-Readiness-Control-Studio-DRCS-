@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { Eye, FilterX, ListFilter } from "lucide-react";
+import { ChevronDown, Eye, FilterX, ListFilter } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Select,
   SelectContent,
@@ -88,10 +89,13 @@ export function ScenarioLensPanel({
     [selectedInvoices]
   );
 
-  const toggleDistributionExpansion = (dimension: ScenarioDistributionDimension) => {
+  const setDistributionExpansion = (
+    dimension: ScenarioDistributionDimension,
+    isExpanded: boolean
+  ) => {
     setExpandedDistributions((current) => ({
       ...current,
-      [dimension]: !current[dimension],
+      [dimension]: isExpanded,
     }));
   };
 
@@ -216,7 +220,7 @@ export function ScenarioLensPanel({
                   rows={distribution.rows}
                   isExpanded={Boolean(expandedDistributions[distribution.dimension])}
                   previewLimit={DISTRIBUTION_PREVIEW_LIMIT}
-                  onToggleExpand={toggleDistributionExpansion}
+                  onSetExpanded={setDistributionExpansion}
                 />
               ))}
             </div>
@@ -352,17 +356,35 @@ function DistributionList({
   rows,
   isExpanded,
   previewLimit,
-  onToggleExpand,
+  onSetExpanded,
 }: {
   title: string;
   dimension: ScenarioDistributionDimension;
   rows: { key: string; count: number; percentage: number }[];
   isExpanded: boolean;
   previewLimit: number;
-  onToggleExpand: (dimension: ScenarioDistributionDimension) => void;
+  onSetExpanded: (dimension: ScenarioDistributionDimension, isExpanded: boolean) => void;
 }) {
   const shouldTruncate = rows.length > previewLimit;
-  const visibleRows = shouldTruncate && !isExpanded ? rows.slice(0, previewLimit) : rows;
+  const previewRows = rows.slice(0, previewLimit);
+  const hiddenRows = rows.slice(previewLimit);
+
+  const renderDistributionRow = (row: { key: string; count: number; percentage: number }) => (
+    <div key={row.key}>
+      <div className="flex items-center justify-between text-[11px] mb-1">
+        <span className="text-foreground">{row.key}</span>
+        <span className="text-muted-foreground">
+          {row.count} ({row.percentage.toFixed(0)}%)
+        </span>
+      </div>
+      <div className="h-1.5 rounded bg-muted overflow-hidden">
+        <div
+          className="h-full bg-primary/70 transition-all"
+          style={{ width: `${Math.min(100, Math.max(2, row.percentage))}%` }}
+        />
+      </div>
+    </div>
+  );
 
   return (
     <div className="rounded-lg border p-3">
@@ -374,39 +396,40 @@ function DistributionList({
         <p className="text-xs text-muted-foreground">No categories present.</p>
       ) : (
         <div className="space-y-2">
-          {visibleRows.map((row) => (
-            <div key={row.key}>
-              <div className="flex items-center justify-between text-[11px] mb-1">
-                <span className="text-foreground">{row.key}</span>
-                <span className="text-muted-foreground">
-                  {row.count} ({row.percentage.toFixed(0)}%)
-                </span>
-              </div>
-              <div className="h-1.5 rounded bg-muted overflow-hidden">
-                <div
-                  className="h-full bg-primary/70 transition-all"
-                  style={{ width: `${Math.min(100, Math.max(2, row.percentage))}%` }}
-                />
-              </div>
-            </div>
-          ))}
+          {previewRows.map((row) => renderDistributionRow(row))}
           {shouldTruncate && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-[11px]"
-              onClick={() => onToggleExpand(dimension)}
-              aria-label={
-                isExpanded
-                  ? `Show fewer categories for ${title}`
-                  : `Show all categories for ${title}`
-              }
+            <Collapsible
+              open={isExpanded}
+              onOpenChange={(nextOpen) => onSetExpanded(dimension, nextOpen)}
             >
-              {isExpanded
-                ? `Show less (${rows.length - previewLimit} hidden when collapsed)`
-                : `Show all ${rows.length} categories`}
-            </Button>
+              <CollapsibleTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-[11px] w-full justify-between"
+                  aria-label={
+                    isExpanded
+                      ? `Hide extra categories for ${title}`
+                      : `View all categories for ${title}`
+                  }
+                >
+                  {isExpanded
+                    ? "Hide extra categories"
+                    : `View all categories (${rows.length - previewLimit} more)`}
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${
+                      isExpanded ? "rotate-180" : ""
+                    }`}
+                  />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-1">
+                <div className="space-y-2 rounded-md border bg-muted/20 p-2 max-h-56 overflow-auto">
+                  {hiddenRows.map((row) => renderDistributionRow(row))}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           )}
         </div>
       )}
