@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Store Smoke Tests</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 1rem;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+    }
+
+    .ok {
+      color: #166534;
+    }
+
+    .fail {
+      color: #b91c1c;
+    }
+  </style>
+</head>
+<body>
+  <h1>Store Smoke Tests</h1>
+  <pre id="output"></pre>
+  <script src="../store.js"></script>
+  <script src="./store.smoke.test.js"></script>
+</body>
+</html>
