@@ -1,3 +1,5 @@
+import { DatasetType } from '@/types/datasets';
+
 export interface Buyer {
   buyer_id: string;
   buyer_name: string;
@@ -75,6 +77,7 @@ export interface Exception {
   checkName: string;
   severity: Severity;
   message: string;
+  datasetType?: DatasetType;
   invoiceId?: string;
   invoiceNumber?: string;
   sellerTrn?: string;

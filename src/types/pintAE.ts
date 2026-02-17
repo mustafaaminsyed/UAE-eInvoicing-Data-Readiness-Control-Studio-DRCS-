@@ -1,4 +1,5 @@
 import { Severity } from './compliance';
+import { DatasetType } from './datasets';
 
 // PINT-AE Check Scope
 export type CheckScope = 'Header' | 'Lines' | 'Party' | 'Cross';
@@ -51,6 +52,7 @@ export interface PintAEException {
   id: string;
   run_id?: string;
   timestamp: string;
+  dataset_type?: DatasetType;
   check_id: string;
   check_name: string;
   severity: Severity;

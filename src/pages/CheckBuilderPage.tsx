@@ -29,6 +29,7 @@ import {
   createCustomCheck,
   updateCustomCheck,
   deleteCustomCheck,
+  seedStarterSearchChecks,
 } from '@/lib/api/checksApi';
 
 const DATASET_SCOPES = [
@@ -46,6 +47,24 @@ const RULE_TYPES = [
   { value: 'custom_formula', label: 'Custom Formula', description: 'Write custom validation logic' },
 ];
 
+const SEARCH_RULE_TYPES = [
+  {
+    value: 'fuzzy_duplicate',
+    label: 'Possible Duplicate',
+    description: 'Vendor similarity + amount + date proximity',
+  },
+  {
+    value: 'invoice_number_variant',
+    label: 'Invoice Number Variant',
+    description: 'Normalized invoice numbers that are near matches',
+  },
+  {
+    value: 'trn_format_similarity',
+    label: 'TRN Formatting Variant',
+    description: 'Near-identical TRNs with formatting differences',
+  },
+];
+
 const FIELD_OPTIONS: Record<string, string[]> = {
   header: ['invoice_id', 'invoice_number', 'issue_date', 'seller_trn', 'buyer_id', 'currency', 'invoice_type', 'total_excl_vat', 'vat_total', 'total_incl_vat'],
   lines: ['line_id', 'invoice_id', 'line_number', 'description', 'quantity', 'unit_price', 'line_discount', 'line_total_excl_vat', 'vat_rate', 'vat_amount'],
@@ -57,6 +76,7 @@ const defaultCheck: Omit<CustomCheckConfig, 'id'> = {
   name: '',
   description: '',
   severity: 'Medium',
+  check_type: 'VALIDATION',
   dataset_scope: 'header',
   rule_type: 'missing',
   parameters: { field: '' },
@@ -74,7 +94,11 @@ export default function CheckBuilderPage() {
   const [formData, setFormData] = useState<Omit<CustomCheckConfig, 'id'>>(defaultCheck);
 
   useEffect(() => {
-    loadChecks();
+    const init = async () => {
+      await seedStarterSearchChecks();
+      await loadChecks();
+    };
+    init();
   }, []);
 
   const loadChecks = async () => {
@@ -96,6 +120,7 @@ export default function CheckBuilderPage() {
       name: check.name,
       description: check.description,
       severity: check.severity,
+      check_type: check.check_type || 'VALIDATION',
       dataset_scope: check.dataset_scope,
       rule_type: check.rule_type,
       parameters: check.parameters,
@@ -161,7 +186,85 @@ export default function CheckBuilderPage() {
 
   const renderParameterFields = () => {
     const fields = FIELD_OPTIONS[formData.dataset_scope] || [];
-    
+
+    if (formData.check_type === 'SEARCH_CHECK') {
+      switch (formData.rule_type) {
+        case 'fuzzy_duplicate':
+          return (
+            <div className="space-y-3">
+              <div>
+                <Label>Vendor Similarity Threshold (0-1)</Label>
+                <Input
+                  type="number"
+                  min="0.5"
+                  max="1"
+                  step="0.01"
+                  value={formData.parameters.vendor_similarity_threshold ?? 0.9}
+                  onChange={(e) => updateParameters('vendor_similarity_threshold', parseFloat(e.target.value) || 0.9)}
+                />
+              </div>
+              <div>
+                <Label>Amount Tolerance</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.parameters.amount_tolerance ?? 0.01}
+                  onChange={(e) => updateParameters('amount_tolerance', parseFloat(e.target.value) || 0.01)}
+                />
+              </div>
+              <div>
+                <Label>Date Window (days)</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="30"
+                  value={formData.parameters.date_window_days ?? 3}
+                  onChange={(e) => updateParameters('date_window_days', parseInt(e.target.value, 10) || 3)}
+                />
+              </div>
+            </div>
+          );
+
+        case 'invoice_number_variant':
+          return (
+            <div className="space-y-3">
+              <div>
+                <Label>Invoice Number Similarity Threshold (0-1)</Label>
+                <Input
+                  type="number"
+                  min="0.5"
+                  max="1"
+                  step="0.01"
+                  value={formData.parameters.invoice_number_similarity_threshold ?? 0.88}
+                  onChange={(e) =>
+                    updateParameters('invoice_number_similarity_threshold', parseFloat(e.target.value) || 0.88)
+                  }
+                />
+              </div>
+            </div>
+          );
+
+        case 'trn_format_similarity':
+          return (
+            <div className="space-y-3">
+              <div>
+                <Label>Max TRN Edit Distance</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={formData.parameters.trn_distance_threshold ?? 2}
+                  onChange={(e) =>
+                    updateParameters('trn_distance_threshold', parseInt(e.target.value, 10) || 2)
+                  }
+                />
+              </div>
+            </div>
+          );
+      }
+    }
+
     switch (formData.rule_type) {
       case 'missing':
         return (
@@ -348,6 +451,9 @@ export default function CheckBuilderPage() {
                     <div className="flex items-center gap-3 mb-1">
                       <span className="font-medium text-foreground">{check.name}</span>
                       <SeverityBadge severity={check.severity} />
+                      <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded">
+                        {check.check_type || 'VALIDATION'}
+                      </span>
                       <span className="text-xs px-2 py-0.5 bg-muted rounded text-muted-foreground">
                         {check.rule_type}
                       </span>
@@ -460,6 +566,34 @@ export default function CheckBuilderPage() {
                   </Select>
                 </div>
 
+                <div>
+                  <Label>Check Type</Label>
+                  <Select
+                    value={formData.check_type || 'VALIDATION'}
+                    onValueChange={(v) =>
+                      setFormData({
+                        ...formData,
+                        check_type: v as any,
+                        rule_type: v === 'SEARCH_CHECK' ? 'fuzzy_duplicate' : 'missing',
+                        parameters: {},
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="VALIDATION">Validation Check</SelectItem>
+                      <SelectItem value="SEARCH_CHECK">Search Check (Investigation)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {(formData.check_type || 'VALIDATION') === 'SEARCH_CHECK' && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Search checks run in AP (inbound) context only and produce investigation flags.
+                    </p>
+                  )}
+                </div>
+
                 <div className="col-span-2">
                   <Label>Rule Type</Label>
                   <Select
@@ -474,7 +608,7 @@ export default function CheckBuilderPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {RULE_TYPES.map(type => (
+                      {(formData.check_type === 'SEARCH_CHECK' ? SEARCH_RULE_TYPES : RULE_TYPES).map(type => (
                         <SelectItem key={type.value} value={type.value}>
                           <div>
                             <span className="font-medium">{type.label}</span>

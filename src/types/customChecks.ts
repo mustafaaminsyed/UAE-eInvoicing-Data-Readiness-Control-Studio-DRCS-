@@ -1,12 +1,28 @@
 import { Severity } from '@/types/compliance';
+import { DatasetType } from '@/types/datasets';
+
+export type CheckType = 'VALIDATION' | 'SEARCH_CHECK';
+
+export type ValidationRuleType =
+  | 'missing'
+  | 'duplicate'
+  | 'math'
+  | 'regex'
+  | 'custom_formula';
+
+export type SearchRuleType =
+  | 'fuzzy_duplicate'
+  | 'invoice_number_variant'
+  | 'trn_format_similarity';
 
 export interface CustomCheckConfig {
   id?: string;
   name: string;
   description?: string;
   severity: Severity;
+  check_type?: CheckType;
   dataset_scope: 'header' | 'lines' | 'buyers' | 'cross-file';
-  rule_type: 'missing' | 'duplicate' | 'math' | 'regex' | 'custom_formula';
+  rule_type: ValidationRuleType | SearchRuleType;
   parameters: CustomCheckParameters;
   message_template: string;
   is_active: boolean;
@@ -33,11 +49,34 @@ export interface CustomCheckParameters {
   
   // Conditional filter
   condition?: string;
+
+  // Search check parameters
+  vendor_similarity_threshold?: number;
+  invoice_number_similarity_threshold?: number;
+  trn_distance_threshold?: number;
+  date_window_days?: number;
+  amount_tolerance?: number;
+}
+
+export interface InvestigationFlag {
+  id: string;
+  checkId: string;
+  checkName: string;
+  datasetType: DatasetType;
+  invoiceId?: string;
+  invoiceNumber?: string;
+  counterpartyName?: string;
+  message: string;
+  confidenceScore?: number;
+  matchedInvoiceId?: string;
+  matchedInvoiceNumber?: string;
+  createdAt: string;
 }
 
 export interface CheckRun {
   id: string;
   run_date: string;
+  dataset_type?: DatasetType | 'ALL';
   total_invoices: number;
   total_exceptions: number;
   critical_count: number;

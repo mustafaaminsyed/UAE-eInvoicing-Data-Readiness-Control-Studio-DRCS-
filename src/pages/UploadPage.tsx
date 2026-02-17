@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { FileDropZone, FileSummaryCard, analyzeFile, FileStats } from '@/components/upload/FileAnalysis';
 import { SampleScenario } from '@/lib/sampleData';
 import { addUploadAuditLog } from '@/lib/uploadAudit';
+import { DatasetType } from '@/types/datasets';
 
 type StepKey = 'upload' | 'validation' | 'mapping';
 
@@ -46,6 +47,7 @@ export default function UploadPage() {
     lines: Record<string, string>[] | null;
   }>({ buyers: null, headers: null, lines: null });
   const [sampleScenario, setSampleScenario] = useState<SampleScenario>('positive');
+  const [datasetType, setDatasetType] = useState<DatasetType>('AR');
 
   const allFilesSelected = files.buyers && files.headers && files.lines;
   const allStats = stats.buyers && stats.headers && stats.lines;
@@ -126,10 +128,11 @@ export default function UploadPage() {
         parseHeadersFile(files.headers!),
         parseLinesFile(files.lines!),
       ]);
-      setData({ buyers, headers, lines });
+      setData({ buyers, headers, lines }, datasetType);
 
       if (stats.buyers && stats.headers && stats.lines) {
         addUploadAuditLog({
+          datasetType,
           buyersCount: buyers.length,
           headersCount: headers.length,
           linesCount: lines.length,
@@ -173,7 +176,7 @@ export default function UploadPage() {
 
       toast({
         title: 'Data loaded successfully',
-        description: `${buyers.length} buyers, ${headers.length} invoices, ${lines.length} line items`,
+        description: `${datasetType === 'AR' ? 'AR' : 'AP'}: ${buyers.length} buyers, ${headers.length} invoices, ${lines.length} line items`,
       });
       navigate('/run');
     } catch {
@@ -226,6 +229,32 @@ export default function UploadPage() {
 
         <div className="space-y-6 animate-slide-up">
           <div className="surface-glass rounded-2xl border border-white/70 shadow-sm p-4">
+            <div className="mb-4">
+              <p className="text-sm font-semibold text-foreground">Dataset Type</p>
+              <p className="text-xs text-muted-foreground mb-2">
+                Select whether these uploads are outbound AR invoices or inbound AP invoices.
+              </p>
+              <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Dataset type">
+                <Button
+                  size="sm"
+                  variant={datasetType === 'AR' ? 'default' : 'outline'}
+                  onClick={() => setDatasetType('AR')}
+                  role="radio"
+                  aria-checked={datasetType === 'AR'}
+                >
+                  Customer Invoices (AR / Outbound)
+                </Button>
+                <Button
+                  size="sm"
+                  variant={datasetType === 'AP' ? 'default' : 'outline'}
+                  onClick={() => setDatasetType('AP')}
+                  role="radio"
+                  aria-checked={datasetType === 'AP'}
+                >
+                  Vendor Invoices (AP / Inbound)
+                </Button>
+              </div>
+            </div>
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div>
                 <p className="text-sm font-semibold text-foreground">Sample Testing Mode</p>
@@ -336,7 +365,10 @@ export default function UploadPage() {
           {canProceed && blockingReasons.length === 0 && (
             <div className="flex items-center gap-2 text-sm bg-[hsl(var(--success))]/5 rounded-lg p-4 border border-[hsl(var(--success))]/20">
               <CheckCircle2 className="w-4 h-4 text-[hsl(var(--success))]" />
-              <span className="text-[hsl(var(--success))] font-medium">All files uploaded and validated. Ready to proceed.</span>
+              <span className="text-[hsl(var(--success))] font-medium">
+                All files uploaded and validated for {datasetType === 'AR' ? 'AR (Outbound)' : 'AP (Inbound)'}.
+                Ready to proceed.
+              </span>
             </div>
           )}
 

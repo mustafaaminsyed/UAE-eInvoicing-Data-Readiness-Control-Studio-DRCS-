@@ -1,12 +1,14 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BookCheck, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { checksRegistry } from "@/lib/checks/checksRegistry";
 import UAE_UC1_CHECK_PACK from "@/lib/checks/uaeUC1CheckPack";
+import { fetchAllCustomChecks } from "@/lib/api/checksApi";
+import type { CustomCheckConfig } from "@/types/customChecks";
 
-type RegistrySource = "Built-in" | "UAE UC1";
+type RegistrySource = "Built-in" | "UAE UC1" | "Custom";
 
 interface RegistryRow {
   id: string;
@@ -115,7 +117,60 @@ const builtInExamples: Record<string, { pass: string; fail: string }> = {
   },
 };
 
-function normalizeRows(): RegistryRow[] {
+function getCustomCheckExamples(
+  check: CustomCheckConfig
+): { passExample: string; failExample: string } {
+  if (check.rule_type === "missing") {
+    const field = check.parameters.field || "target field";
+    return {
+      passExample: `Field "${field}" is populated in each applicable record.`,
+      failExample: `Field "${field}" is empty or null for one or more records.`,
+    };
+  }
+  if (check.rule_type === "duplicate") {
+    return {
+      passExample: "Configured key fields are unique across the selected dataset scope.",
+      failExample: "Duplicate key combinations are found in the selected dataset scope.",
+    };
+  }
+  if (check.rule_type === "math") {
+    return {
+      passExample: "Calculated left and right expressions satisfy the configured operator/tolerance.",
+      failExample: "Math expression comparison fails for one or more records.",
+    };
+  }
+  if (check.rule_type === "regex") {
+    const field = check.parameters.field || "target field";
+    return {
+      passExample: `Field "${field}" matches the configured regex pattern.`,
+      failExample: `Field "${field}" value does not match the configured regex pattern.`,
+    };
+  }
+  if (check.rule_type === "fuzzy_duplicate") {
+    return {
+      passExample: "No highly similar vendor+amount+date combinations are found.",
+      failExample: "Potential duplicate invoice pair detected for AP investigation.",
+    };
+  }
+  if (check.rule_type === "invoice_number_variant") {
+    return {
+      passExample: "Normalized invoice numbers are distinct.",
+      failExample: "Near-matching normalized invoice numbers are found.",
+    };
+  }
+  if (check.rule_type === "trn_format_similarity") {
+    return {
+      passExample: "Vendor TRNs are consistently formatted.",
+      failExample: "Similar TRN values suggest formatting variance or possible data issue.",
+    };
+  }
+  return {
+    passExample: "Custom formula evaluates to true for each applicable record.",
+    failExample: "Custom formula evaluates to false for one or more records.",
+  };
+}
+
+function normalizeRows(customChecks: CustomCheckConfig[]): RegistryRow[] {
   const builtInRows: RegistryRow[] = checksRegistry.map((check) => ({
     id: check.id,
     name: check.name,
@@ -150,7 +205,26 @@ function normalizeRows(): RegistryRow[] {
     failExample: check.fail_condition ?? "Invoice data fails the expected condition.",
   }));
 
-  return [...builtInRows, ...uc1Rows].sort(
+  const customRows: RegistryRow[] = customChecks.map((check) => {
+    const examples = getCustomCheckExamples(check);
+    return {
+      id: check.id || `custom-${check.name}`,
+      name: check.name,
+      description: check.description ?? "User-defined custom check.",
+      severity: check.severity,
+      source: "Custom",
+      scope: check.dataset_scope.toUpperCase(),
+      ruleType: `${check.check_type || "VALIDATION"} / ${check.rule_type}`,
+      ownerTeam: "Configured via Check Builder",
+      references: [],
+      enabled: check.is_active,
+      suggestedFix: "Review this custom rule configuration and update source data accordingly.",
+      passExample: examples.passExample,
+      failExample: examples.failExample,
+    };
+  });
+
+  return [...builtInRows, ...uc1Rows, ...customRows].sort(
     (a, b) =>
       severityOrder[a.severity] - severityOrder[b.severity] || a.id.localeCompare(b.id)
   );
@@ -160,8 +234,13 @@ export default function CheckRegistryPage() {
   const [search, setSearch] = useState("");
   const [severityFilter, setSeverityFilter] = useState<"All" | RegistryRow["severity"]>("All");
   const [sourceFilter, setSourceFilter] = useState<"All" | RegistrySource>("All");
+  const [customChecks, setCustomChecks] = useState<CustomCheckConfig[]>([]);
 
-  const rows = useMemo(() => normalizeRows(), []);
+  useEffect(() => {
+    fetchAllCustomChecks().then(setCustomChecks);
+  }, []);
+
+  const rows = useMemo(() => normalizeRows(customChecks), [customChecks]);
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
@@ -183,7 +262,9 @@ export default function CheckRegistryPage() {
 
   const builtInCount = rows.filter((row) => row.source === "Built-in").length;
   const uc1Count = rows.filter((row) => row.source === "UAE UC1").length;
+  const customCount = rows.filter((row) => row.source === "Custom").length;
   const enabledUc1Count = rows.filter((row) => row.source === "UAE UC1" && row.enabled).length;
+  const enabledCustomCount = rows.filter((row) => row.source === "Custom" && row.enabled).length;
 
   return (
     <div className="min-h-[calc(100vh-4rem)]">
@@ -198,11 +279,13 @@ export default function CheckRegistryPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
           <SummaryCard label="Total Checks" value={rows.length} />
           <SummaryCard label="Built-in Checks" value={builtInCount} />
           <SummaryCard label="UAE UC1 Checks" value={uc1Count} />
+          <SummaryCard label="Custom Checks" value={customCount} />
           <SummaryCard label="Enabled UC1" value={enabledUc1Count} />
+          <SummaryCard label="Enabled Custom" value={enabledCustomCount} />
         </div>
 
         <Card className="border shadow-sm mb-6">
@@ -267,6 +350,11 @@ export default function CheckRegistryPage() {
                   active={sourceFilter === "UAE UC1"}
                   onClick={() => setSourceFilter("UAE UC1")}
                   label="UAE UC1"
+                />
+                <FilterButton
+                  active={sourceFilter === "Custom"}
+                  onClick={() => setSourceFilter("Custom")}
+                  label="Custom"
                 />
               </div>
             </div>

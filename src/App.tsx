@@ -14,6 +14,7 @@ import InvoiceDetailPage from "./pages/InvoiceDetailPage";
 import CheckBuilderPage from "./pages/CheckBuilderPage";
 import CheckRegistryPage from "./pages/CheckRegistryPage";
 import UploadAuditPage from "./pages/UploadAuditPage";
+import APInvoiceExplorerPage from "./pages/APInvoiceExplorerPage";
 import ControlsDashboardPage from "./pages/ControlsDashboardPage";
 import CasesPage from "./pages/CasesPage";
 import RejectionsPage from "./pages/RejectionsPage";
@@ -46,6 +47,7 @@ const App = () => (
                 <Route path="/check-builder" element={<CheckBuilderPage />} />
                 <Route path="/check-registry" element={<CheckRegistryPage />} />
                 <Route path="/upload-audit" element={<UploadAuditPage />} />
+                <Route path="/ap-explorer" element={<APInvoiceExplorerPage />} />
                 <Route path="/controls" element={<ControlsDashboardPage />} />
                 <Route path="/cases" element={<CasesPage />} />
                 <Route path="/rejections" element={<RejectionsPage />} />

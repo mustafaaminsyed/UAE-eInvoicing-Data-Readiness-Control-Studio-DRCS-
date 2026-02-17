@@ -60,6 +60,18 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+## AP/AR dataset notes
+
+- Uploads now require a dataset type selection:
+  - `AR` = Customer Invoices (Outbound)
+  - `AP` = Vendor Invoices (Inbound)
+- Validation runs can be scoped to `AR`, `AP`, or `ALL` from the Run Checks screen.
+- Exceptions are tagged with dataset type and can be filtered with AR/AP lenses on the Exceptions page.
+- AP investigation search checks are configured in Check Builder using `Check Type = SEARCH_CHECK`.
+  - Starter checks are auto-seeded and can be edited/deactivated like other custom checks.
+  - Add more starter checks in `src/lib/api/checksApi.ts` inside `seedStarterSearchChecks()`.
+- AP Explorer uses client-side fuzzy matching. For very large AP datasets, search remains functional but may be slower.
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.

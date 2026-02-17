@@ -133,6 +133,9 @@ export default function UploadAuditPage() {
                     <div>
                       <p className="text-xs text-muted-foreground">Uploaded</p>
                       <p className="text-sm font-semibold text-foreground">{formatDateTime(log.createdAt)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Dataset: {log.datasetType === 'AP' ? 'AP (Inbound)' : 'AR (Outbound)'}
+                      </p>
                     </div>
                     <Button
                       type="button"

@@ -117,6 +117,7 @@ export type Database = {
           check_id: string
           check_name: string
           created_at: string
+          dataset_type: string | null
           expected_value_or_rule: string | null
           field_name: string | null
           id: string
@@ -145,6 +146,7 @@ export type Database = {
           check_id: string
           check_name: string
           created_at?: string
+          dataset_type?: string | null
           expected_value_or_rule?: string | null
           field_name?: string | null
           id?: string
@@ -173,6 +175,7 @@ export type Database = {
           check_id?: string
           check_name?: string
           created_at?: string
+          dataset_type?: string | null
           expected_value_or_rule?: string | null
           field_name?: string | null
           id?: string
@@ -214,6 +217,7 @@ export type Database = {
       check_runs: {
         Row: {
           critical_count: number
+          dataset_type: string | null
           high_count: number
           id: string
           low_count: number
@@ -226,6 +230,7 @@ export type Database = {
         }
         Insert: {
           critical_count?: number
+          dataset_type?: string | null
           high_count?: number
           id?: string
           low_count?: number
@@ -238,6 +243,7 @@ export type Database = {
         }
         Update: {
           critical_count?: number
+          dataset_type?: string | null
           high_count?: number
           id?: string
           low_count?: number
@@ -347,6 +353,7 @@ export type Database = {
       }
       custom_checks: {
         Row: {
+          check_type: string | null
           created_at: string
           dataset_scope: string
           description: string | null
@@ -360,6 +367,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          check_type?: string | null
           created_at?: string
           dataset_scope: string
           description?: string | null
@@ -373,6 +381,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          check_type?: string | null
           created_at?: string
           dataset_scope?: string
           description?: string | null
@@ -478,6 +487,62 @@ export type Database = {
           status?: string
         }
         Relationships: []
+      }
+      investigation_flags: {
+        Row: {
+          check_id: string
+          check_name: string
+          confidence_score: number | null
+          counterparty_name: string | null
+          created_at: string
+          dataset_type: string
+          id: string
+          invoice_id: string | null
+          invoice_number: string | null
+          matched_invoice_id: string | null
+          matched_invoice_number: string | null
+          message: string
+          run_id: string | null
+        }
+        Insert: {
+          check_id: string
+          check_name: string
+          confidence_score?: number | null
+          counterparty_name?: string | null
+          created_at?: string
+          dataset_type: string
+          id?: string
+          invoice_id?: string | null
+          invoice_number?: string | null
+          matched_invoice_id?: string | null
+          matched_invoice_number?: string | null
+          message: string
+          run_id?: string | null
+        }
+        Update: {
+          check_id?: string
+          check_name?: string
+          confidence_score?: number | null
+          counterparty_name?: string | null
+          created_at?: string
+          dataset_type?: string
+          id?: string
+          invoice_id?: string | null
+          invoice_number?: string | null
+          matched_invoice_id?: string | null
+          matched_invoice_number?: string | null
+          message?: string
+          run_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investigation_flags_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "check_runs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       mapping_templates: {
         Row: {

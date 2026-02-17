@@ -208,6 +208,7 @@ export async function saveExceptions(runId: string, exceptions: PintAEException[
   const exceptionsToInsert = exceptions.map(e => ({
     run_id: runId,
     timestamp: e.timestamp,
+    dataset_type: e.dataset_type || 'AR',
     check_id: e.check_id,
     check_name: e.check_name,
     severity: e.severity,
@@ -259,6 +260,7 @@ export async function fetchExceptionsByRun(runId: string): Promise<PintAEExcepti
     id: row.id,
     run_id: row.run_id || undefined,
     timestamp: row.timestamp,
+    dataset_type: (row.dataset_type as any) || undefined,
     check_id: row.check_id,
     check_name: row.check_name,
     severity: row.severity as Severity,

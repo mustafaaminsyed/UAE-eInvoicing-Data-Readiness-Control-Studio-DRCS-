@@ -20,6 +20,7 @@ export interface UploadAuditRelationalMeta {
 export interface UploadAuditLogEntry {
   id: string;
   createdAt: string;
+  datasetType?: "AR" | "AP";
   buyersCount: number;
   headersCount: number;
   linesCount: number;
@@ -40,6 +41,7 @@ function isLogEntry(value: unknown): value is UploadAuditLogEntry {
   return (
     typeof obj.id === "string" &&
     typeof obj.createdAt === "string" &&
+    (obj.datasetType === undefined || obj.datasetType === "AR" || obj.datasetType === "AP") &&
     typeof obj.buyersCount === "number" &&
     typeof obj.headersCount === "number" &&
     typeof obj.linesCount === "number" &&
@@ -54,7 +56,10 @@ function readRaw(): UploadAuditLogEntry[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown[];
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isLogEntry);
+    return parsed.filter(isLogEntry).map((entry) => ({
+      ...entry,
+      datasetType: entry.datasetType || "AR",
+    }));
   } catch {
     return [];
   }

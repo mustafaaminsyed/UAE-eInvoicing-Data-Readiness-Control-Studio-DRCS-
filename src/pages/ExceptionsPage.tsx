@@ -1,6 +1,6 @@
-﻿import { useEffect, useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Download, Search, Filter, Eye } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowUpRight, Download, Eye, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -12,56 +12,80 @@ import {
 } from '@/components/ui/select';
 import { useCompliance } from '@/context/ComplianceContext';
 import { SeverityBadge } from '@/components/SeverityBadge';
-import { Exception, Severity } from '@/types/compliance';
-import { checksRegistry } from '@/lib/checks/checksRegistry';
+import { Severity } from '@/types/compliance';
+import { DatasetType } from '@/types/datasets';
 
 export default function ExceptionsPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { isChecksRun, exceptions } = useCompliance();
-  
+
   const [search, setSearch] = useState('');
   const [severityFilter, setSeverityFilter] = useState<Severity | 'all'>('all');
   const [checkFilter, setCheckFilter] = useState<string>('all');
+  const [datasetFilter, setDatasetFilter] = useState<DatasetType>(() => {
+    const value = searchParams.get('dataset');
+    return value === 'AP' ? 'AP' : 'AR';
+  });
 
   useEffect(() => {
     if (!isChecksRun) navigate('/');
   }, [isChecksRun, navigate]);
 
+  useEffect(() => {
+    if (searchParams.get('dataset') === datasetFilter) return;
+    const next = new URLSearchParams(searchParams);
+    next.set('dataset', datasetFilter);
+    setSearchParams(next, { replace: true });
+  }, [datasetFilter, searchParams, setSearchParams]);
+
   const filteredExceptions = useMemo(() => {
     return exceptions.filter((exception) => {
-      // Search filter
+      const exceptionDataset = exception.datasetType || 'AR';
+      if (exceptionDataset !== datasetFilter) return false;
+
       const searchLower = search.toLowerCase();
-      const matchesSearch = 
+      const matchesSearch =
         !search ||
         exception.invoiceNumber?.toLowerCase().includes(searchLower) ||
         exception.sellerTrn?.toLowerCase().includes(searchLower) ||
         exception.buyerId?.toLowerCase().includes(searchLower) ||
         exception.message.toLowerCase().includes(searchLower);
 
-      // Severity filter
       const matchesSeverity = severityFilter === 'all' || exception.severity === severityFilter;
-
-      // Check filter
       const matchesCheck = checkFilter === 'all' || exception.checkId === checkFilter;
-
       return matchesSearch && matchesSeverity && matchesCheck;
     });
-  }, [exceptions, search, severityFilter, checkFilter]);
+  }, [exceptions, search, severityFilter, checkFilter, datasetFilter]);
 
   const handleExport = () => {
     const csvContent = [
-      ['Check Name', 'Severity', 'Message', 'Invoice Number', 'Seller TRN', 'Buyer ID', 'Field', 'Expected', 'Actual'].join(','),
-      ...filteredExceptions.map(e => [
-        `"${e.checkName}"`,
-        e.severity,
-        `"${e.message.replace(/"/g, '""')}"`,
-        e.invoiceNumber || '',
-        e.sellerTrn || '',
-        e.buyerId || '',
-        e.field || '',
-        e.expectedValue || '',
-        e.actualValue || '',
-      ].join(','))
+      [
+        'Dataset',
+        'Check Name',
+        'Severity',
+        'Message',
+        'Invoice Number',
+        'Seller TRN',
+        'Buyer ID',
+        'Field',
+        'Expected',
+        'Actual',
+      ].join(','),
+      ...filteredExceptions.map((exception) =>
+        [
+          exception.datasetType || 'AR',
+          `"${exception.checkName}"`,
+          exception.severity,
+          `"${exception.message.replace(/"/g, '""')}"`,
+          exception.invoiceNumber || '',
+          exception.sellerTrn || '',
+          exception.buyerId || '',
+          exception.field || '',
+          exception.expectedValue || '',
+          exception.actualValue || '',
+        ].join(',')
+      ),
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -77,7 +101,20 @@ export default function ExceptionsPage() {
     navigate(`/invoice/${invoiceId}`);
   };
 
-  const uniqueChecks = [...new Set(exceptions.map(e => e.checkId))];
+  const handleOpenAPExplorer = (invoiceId?: string) => {
+    if (!invoiceId) return;
+    navigate(`/ap-explorer?invoiceId=${encodeURIComponent(invoiceId)}`);
+  };
+
+  const checkOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    exceptions
+      .filter((exception) => (exception.datasetType || 'AR') === datasetFilter)
+      .forEach((exception) => {
+        if (!map.has(exception.checkId)) map.set(exception.checkId, exception.checkName);
+      });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [exceptions, datasetFilter]);
 
   if (!isChecksRun) return null;
 
@@ -86,9 +123,7 @@ export default function ExceptionsPage() {
       <div className="container max-w-7xl py-8 md:py-10">
         <div className="flex items-center justify-between mb-8 animate-fade-in">
           <div>
-            <h1 className="font-display text-3xl font-semibold text-foreground">
-              Exceptions
-            </h1>
+            <h1 className="font-display text-3xl font-semibold text-foreground">Exceptions</h1>
             <p className="text-muted-foreground mt-1">
               {filteredExceptions.length} of {exceptions.length} exceptions shown
             </p>
@@ -99,20 +134,39 @@ export default function ExceptionsPage() {
           </Button>
         </div>
 
-        {/* Filters */}
         <div className="surface-glass rounded-2xl border border-white/70 shadow-sm p-4 mb-6 animate-slide-up">
+          <div className="flex items-center gap-2 mb-4">
+            <Button
+              size="sm"
+              variant={datasetFilter === 'AR' ? 'default' : 'outline'}
+              onClick={() => setDatasetFilter('AR')}
+            >
+              Outbound (AR)
+            </Button>
+            <Button
+              size="sm"
+              variant={datasetFilter === 'AP' ? 'default' : 'outline'}
+              onClick={() => setDatasetFilter('AP')}
+            >
+              Inbound (AP)
+            </Button>
+          </div>
+
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Search by invoice number, TRN, buyer ID..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(event) => setSearch(event.target.value)}
                 className="pl-10"
               />
             </div>
-            
-            <Select value={severityFilter} onValueChange={(v) => setSeverityFilter(v as Severity | 'all')}>
+
+            <Select
+              value={severityFilter}
+              onValueChange={(value) => setSeverityFilter(value as Severity | 'all')}
+            >
               <SelectTrigger className="w-full sm:w-40">
                 <SelectValue placeholder="Severity" />
               </SelectTrigger>
@@ -131,20 +185,16 @@ export default function ExceptionsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Checks</SelectItem>
-                {uniqueChecks.map(checkId => {
-                  const check = checksRegistry.find(c => c.id === checkId);
-                  return (
-                    <SelectItem key={checkId} value={checkId}>
-                      {check?.name || checkId}
-                    </SelectItem>
-                  );
-                })}
+                {checkOptions.map((check) => (
+                  <SelectItem key={check.id} value={check.id}>
+                    {check.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
         </div>
 
-        {/* Exceptions Table */}
         <div className="surface-glass rounded-2xl border border-white/70 shadow-sm overflow-hidden animate-slide-up">
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -156,7 +206,7 @@ export default function ExceptionsPage() {
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">Seller TRN</th>
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">Buyer ID</th>
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">Message</th>
-                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">Action</th>
+                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -172,7 +222,7 @@ export default function ExceptionsPage() {
                       <td className="p-4">
                         <SeverityBadge severity={exception.severity} />
                       </td>
-                      <td className="p-4 text-sm font-medium text-foreground max-w-[200px] truncate">
+                      <td className="p-4 text-sm font-medium text-foreground max-w-[220px] truncate">
                         {exception.checkName}
                       </td>
                       <td className="p-4 text-sm text-muted-foreground font-mono">
@@ -184,21 +234,34 @@ export default function ExceptionsPage() {
                       <td className="p-4 text-sm text-muted-foreground font-mono">
                         {exception.buyerId || '-'}
                       </td>
-                      <td className="p-4 text-sm text-muted-foreground max-w-[300px] truncate">
+                      <td className="p-4 text-sm text-muted-foreground max-w-[320px] truncate">
                         {exception.message}
                       </td>
                       <td className="p-4 text-right">
-                        {exception.invoiceId && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleViewInvoice(exception.invoiceId!)}
-                            className="gap-1"
-                          >
-                            <Eye className="w-4 h-4" />
-                            View
-                          </Button>
-                        )}
+                        <div className="flex items-center justify-end gap-1">
+                          {exception.invoiceId && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleViewInvoice(exception.invoiceId!)}
+                              className="gap-1"
+                            >
+                              <Eye className="w-4 h-4" />
+                              View
+                            </Button>
+                          )}
+                          {(exception.datasetType || 'AR') === 'AP' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleOpenAPExplorer(exception.invoiceId)}
+                              className="gap-1"
+                            >
+                              <ArrowUpRight className="w-4 h-4" />
+                              AP Explorer
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -211,5 +274,3 @@ export default function ExceptionsPage() {
     </div>
   );
 }
-
-
