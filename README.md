@@ -36,6 +36,44 @@ npm i
 npm run dev
 ```
 
+## Team setup baseline
+
+- Node version is pinned in `.nvmrc` (`22`).
+- `package.json` has `engines` for Node and npm.
+- Use `npm ci` for deterministic installs across devices.
+- Copy `.env.example` to `.env` and fill local values.
+- `.env` is intentionally local-only and not committed.
+
+## Multi-device workflow (recommended)
+
+Start of session:
+
+```sh
+git fetch --all --prune
+git checkout <your-branch>
+git pull --rebase origin <your-branch>
+nvm use
+npm ci
+```
+
+End of session:
+
+```sh
+git add -A
+git commit -m "wip: <short summary>"
+git push origin <your-branch>
+```
+
+Before merging:
+
+```sh
+git fetch origin
+git rebase origin/main
+npm run lint
+npm run test
+npm run build
+```
+
 **Edit a file directly in GitHub**
 
 - Navigate to the desired file(s).
