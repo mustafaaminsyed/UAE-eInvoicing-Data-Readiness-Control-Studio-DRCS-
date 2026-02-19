@@ -1,4 +1,5 @@
-import { DatasetType } from '@/types/datasets';
+import { Direction, ExceptionWorkflowStatus, ResolutionReasonCode } from './direction';
+import { DatasetType } from './datasets';
 
 export interface Buyer {
   buyer_id: string;
@@ -11,6 +12,9 @@ export interface Buyer {
   buyer_postcode?: string;
   buyer_subdivision?: string;
   buyer_electronic_address?: string;
+  source_row_number?: number;
+  upload_session_id?: string;
+  upload_manifest_id?: string;
 }
 
 export interface InvoiceHeader {
@@ -19,7 +23,9 @@ export interface InvoiceHeader {
   issue_date: string;
   seller_trn: string;
   buyer_id: string;
+  buyer_trn?: string;
   currency: string;
+  direction?: Direction;
   invoice_type?: string;
   total_excl_vat?: number;
   vat_total?: number;
@@ -48,6 +54,9 @@ export interface InvoiceHeader {
   rounding_amount?: number;
   spec_id?: string;
   business_process?: string;
+  source_row_number?: number;
+  upload_session_id?: string;
+  upload_manifest_id?: string;
 }
 
 export interface InvoiceLine {
@@ -67,6 +76,9 @@ export interface InvoiceLine {
   item_name?: string;
   line_allowance_amount?: number;
   line_charge_amount?: number;
+  source_row_number?: number;
+  upload_session_id?: string;
+  upload_manifest_id?: string;
 }
 
 export type Severity = 'Critical' | 'High' | 'Medium' | 'Low';
@@ -74,10 +86,19 @@ export type Severity = 'Critical' | 'High' | 'Medium' | 'Low';
 export interface Exception {
   id: string;
   checkId: string;
+  ruleId?: string;
   checkName: string;
   severity: Severity;
   message: string;
   datasetType?: DatasetType;
+  direction?: Direction;
+  uploadSessionId?: string;
+  uploadManifestId?: string;
+  validationRunId?: string;
+  mappingProfileId?: string;
+  rulesetVersion?: string;
+  status?: ExceptionWorkflowStatus;
+  reasonCode?: ResolutionReasonCode;
   invoiceId?: string;
   invoiceNumber?: string;
   sellerTrn?: string;
@@ -91,6 +112,8 @@ export interface Exception {
 
 export interface CheckResult {
   checkId: string;
+  datasetType?: DatasetType;
+  direction?: Direction;
   checkName: string;
   severity: Severity;
   passed: number;
@@ -126,6 +149,9 @@ export interface ParsedData {
   buyers: Buyer[];
   headers: InvoiceHeader[];
   lines: InvoiceLine[];
+  direction?: Direction;
+  uploadSessionId?: string;
+  uploadManifestId?: string;
 }
 
 export interface DashboardStats {

@@ -1,6 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
 import { MappingTemplate, FieldMapping } from '@/types/fieldMapping';
 import { Json } from '@/integrations/supabase/types';
+import { Direction } from '@/types/direction';
+import { parseDirectionFromDescription, withDirectionTag } from '@/lib/direction/directionUtils';
 
 // Helper to safely parse mappings from JSONB
 function parseMappings(mappings: Json | null): FieldMapping[] {
@@ -11,8 +13,28 @@ function parseMappings(mappings: Json | null): FieldMapping[] {
   return [];
 }
 
+function mapTemplateRow(row: Record<string, unknown>): MappingTemplate {
+  return {
+    id: row.id as string,
+    templateName: row.template_name as string,
+    description: row.description as string | undefined,
+    direction: parseDirectionFromDescription(row.description as string | undefined),
+    clientName: row.client_name as string | undefined,
+    tenantId: row.tenant_id as string | undefined,
+    legalEntity: row.legal_entity as string | undefined,
+    sellerTrn: row.seller_trn as string | undefined,
+    erpType: row.erp_type as string | undefined,
+    documentType: (row.document_type as string | null) || 'UC1 Standard Tax Invoice',
+    version: row.version as number,
+    isActive: row.is_active as boolean,
+    mappings: parseMappings((row.mappings as Json) || null),
+    createdAt: row.created_at as string | undefined,
+    updatedAt: row.updated_at as string | undefined,
+  };
+}
+
 // Fetch all mapping templates
-export async function fetchMappingTemplates(): Promise<MappingTemplate[]> {
+export async function fetchMappingTemplates(direction?: Direction): Promise<MappingTemplate[]> {
   const { data, error } = await supabase
     .from('mapping_templates')
     .select('*')
@@ -23,26 +45,13 @@ export async function fetchMappingTemplates(): Promise<MappingTemplate[]> {
     return [];
   }
 
-  return (data || []).map(row => ({
-    id: row.id,
-    templateName: row.template_name,
-    description: row.description,
-    clientName: row.client_name,
-    tenantId: row.tenant_id,
-    legalEntity: row.legal_entity,
-    sellerTrn: row.seller_trn,
-    erpType: row.erp_type,
-    documentType: row.document_type || 'UC1 Standard Tax Invoice',
-    version: row.version,
-    isActive: row.is_active,
-    mappings: parseMappings(row.mappings),
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }));
+  const mapped = (data || []).map((row) => mapTemplateRow(row as unknown as Record<string, unknown>));
+  if (!direction) return mapped;
+  return mapped.filter((template) => (template.direction || 'AR') === direction);
 }
 
 // Fetch active templates only
-export async function fetchActiveTemplates(): Promise<MappingTemplate[]> {
+export async function fetchActiveTemplates(direction?: Direction): Promise<MappingTemplate[]> {
   const { data, error } = await supabase
     .from('mapping_templates')
     .select('*')
@@ -54,29 +63,17 @@ export async function fetchActiveTemplates(): Promise<MappingTemplate[]> {
     return [];
   }
 
-  return (data || []).map(row => ({
-    id: row.id,
-    templateName: row.template_name,
-    description: row.description,
-    clientName: row.client_name,
-    tenantId: row.tenant_id,
-    legalEntity: row.legal_entity,
-    sellerTrn: row.seller_trn,
-    erpType: row.erp_type,
-    documentType: row.document_type || 'UC1 Standard Tax Invoice',
-    version: row.version,
-    isActive: row.is_active,
-    mappings: parseMappings(row.mappings),
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }));
+  const mapped = (data || []).map((row) => mapTemplateRow(row as unknown as Record<string, unknown>));
+  if (!direction) return mapped;
+  return mapped.filter((template) => (template.direction || 'AR') === direction);
 }
 
 // Save a new mapping template
-export async function saveMappingTemplate(template: MappingTemplate): Promise<string | null> {
+export async function saveMappingTemplate(template: MappingTemplate, direction?: Direction): Promise<string | null> {
+  const resolvedDirection = direction || template.direction || 'AR';
   const insertData = {
     template_name: template.templateName,
-    description: template.description || null,
+    description: withDirectionTag(template.description || null, resolvedDirection),
     client_name: template.clientName || null,
     tenant_id: template.tenantId || null,
     legal_entity: template.legalEntity || null,
@@ -108,7 +105,9 @@ export async function updateMappingTemplate(id: string, template: Partial<Mappin
   const updateData: Record<string, unknown> = {};
   
   if (template.templateName !== undefined) updateData.template_name = template.templateName;
-  if (template.description !== undefined) updateData.description = template.description;
+  if (template.description !== undefined) {
+    updateData.description = withDirectionTag(template.description || null, template.direction || 'AR');
+  }
   if (template.clientName !== undefined) updateData.client_name = template.clientName;
   if (template.tenantId !== undefined) updateData.tenant_id = template.tenantId;
   if (template.legalEntity !== undefined) updateData.legal_entity = template.legalEntity;

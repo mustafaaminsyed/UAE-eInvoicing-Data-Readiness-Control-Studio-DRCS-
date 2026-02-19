@@ -1,3 +1,5 @@
+import { Direction } from './direction';
+
 // Field Mapping Types for ERP → PINT-AE transformation
 
 // PINT-AE Target Field Definition
@@ -69,6 +71,7 @@ export interface MappingTemplateMetadata {
   version: number;
   effectiveDate?: string;
   notes?: string;
+  direction?: Direction;
 }
 
 // Full Mapping Template

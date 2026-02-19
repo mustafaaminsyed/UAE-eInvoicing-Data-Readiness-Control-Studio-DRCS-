@@ -1,4 +1,5 @@
 import { Buyer, InvoiceHeader, InvoiceLine } from '@/types/compliance';
+import { Direction } from '@/types/direction';
 
 export function parseCSV(text: string): Record<string, string>[] {
   const lines = text.trim().split('\n');
@@ -68,33 +69,71 @@ function num(record: Record<string, string>, ...keys: string[]): number | undefi
 }
 
 export async function parseBuyersFile(file: File): Promise<Buyer[]> {
+  return parsePartiesFile(file, { direction: 'AR' });
+}
+
+type ParseOptions = {
+  direction?: Direction;
+  uploadSessionId?: string;
+  uploadManifestId?: string;
+};
+
+function getValue(record: Record<string, string>, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (value !== undefined && value !== null && value !== '') return value;
+  }
+  return undefined;
+}
+
+export async function parsePartiesFile(file: File, options: ParseOptions = {}): Promise<Buyer[]> {
   const text = await file.text();
   const records = parseCSV(text);
+  const direction = options.direction || 'AR';
 
-  return records.map(record => ({
-    buyer_id: record.buyer_id || '',
-    buyer_name: record.buyer_name || '',
-    buyer_trn: record.buyer_trn,
-    buyer_address: record.buyer_address,
-    buyer_country: record.buyer_country,
-    buyer_city: str(record, 'buyer_city'),
-    buyer_postcode: str(record, 'buyer_postcode'),
-    buyer_subdivision: str(record, 'buyer_subdivision'),
-    buyer_electronic_address: str(record, 'buyer_electronic_address'),
+  const idKeys = direction === 'AP' ? ['supplier_id', 'vendor_id', 'buyer_id'] : ['buyer_id', 'customer_id', 'party_id'];
+  const nameKeys = direction === 'AP' ? ['supplier_name', 'vendor_name', 'buyer_name'] : ['buyer_name', 'customer_name', 'party_name'];
+  const trnKeys = direction === 'AP' ? ['supplier_trn', 'vendor_trn', 'buyer_trn'] : ['buyer_trn', 'customer_trn', 'party_trn'];
+  const addressKeys = direction === 'AP' ? ['supplier_address', 'vendor_address', 'buyer_address'] : ['buyer_address', 'customer_address', 'party_address'];
+  const countryKeys = direction === 'AP' ? ['supplier_country', 'vendor_country', 'buyer_country'] : ['buyer_country', 'customer_country', 'party_country'];
+  const cityKeys = direction === 'AP' ? ['supplier_city', 'vendor_city', 'buyer_city'] : ['buyer_city', 'customer_city', 'party_city'];
+  const subdivisionKeys = direction === 'AP' ? ['supplier_subdivision', 'vendor_subdivision', 'buyer_subdivision'] : ['buyer_subdivision', 'customer_subdivision', 'party_subdivision'];
+  const electronicAddressKeys =
+    direction === 'AP'
+      ? ['supplier_electronic_address', 'vendor_electronic_address', 'buyer_electronic_address']
+      : ['buyer_electronic_address', 'customer_electronic_address', 'party_electronic_address'];
+
+  return records.map((record, index) => ({
+    buyer_id: getValue(record, idKeys) || '',
+    buyer_name: getValue(record, nameKeys) || '',
+    buyer_trn: getValue(record, trnKeys),
+    buyer_address: getValue(record, addressKeys),
+    buyer_country: getValue(record, countryKeys),
+    buyer_city: getValue(record, cityKeys),
+    buyer_postcode: str(record, 'buyer_postcode', 'supplier_postcode', 'vendor_postcode'),
+    buyer_subdivision: getValue(record, subdivisionKeys),
+    buyer_electronic_address: getValue(record, electronicAddressKeys),
+    source_row_number: index + 2,
+    upload_session_id: options.uploadSessionId,
+    upload_manifest_id: options.uploadManifestId,
   }));
 }
 
-export async function parseHeadersFile(file: File): Promise<InvoiceHeader[]> {
+export async function parseHeadersFile(file: File, options: ParseOptions = {}): Promise<InvoiceHeader[]> {
   const text = await file.text();
   const records = parseCSV(text);
+  const direction = options.direction || 'AR';
+  const counterpartyIdKeys = direction === 'AP' ? ['supplier_id', 'vendor_id', 'buyer_id'] : ['buyer_id', 'customer_id', 'party_id'];
 
-  return records.map(record => ({
+  return records.map((record, index) => ({
     invoice_id: record.invoice_id || '',
     invoice_number: record.invoice_number || '',
     issue_date: record.issue_date || '',
     seller_trn: record.seller_trn || '',
-    buyer_id: record.buyer_id || '',
+    buyer_id: getValue(record, counterpartyIdKeys) || '',
+    buyer_trn: str(record, 'buyer_trn'),
     currency: record.currency || '',
+    direction,
     invoice_type: str(record, 'invoice_type_code', 'invoice_type'),
     total_excl_vat: num(record, 'total_excl_vat'),
     vat_total: num(record, 'vat_total'),
@@ -122,14 +161,17 @@ export async function parseHeadersFile(file: File): Promise<InvoiceHeader[]> {
     rounding_amount: num(record, 'rounding_amount'),
     spec_id: str(record, 'spec_id', 'specification_id'),
     business_process: str(record, 'business_process', 'business_process_type'),
+    source_row_number: index + 2,
+    upload_session_id: options.uploadSessionId,
+    upload_manifest_id: options.uploadManifestId,
   }));
 }
 
-export async function parseLinesFile(file: File): Promise<InvoiceLine[]> {
+export async function parseLinesFile(file: File, options: ParseOptions = {}): Promise<InvoiceLine[]> {
   const text = await file.text();
   const records = parseCSV(text);
 
-  return records.map(record => ({
+  return records.map((record, index) => ({
     line_id: record.line_id || '',
     invoice_id: record.invoice_id || '',
     line_number: parseInt(record.line_number) || 0,
@@ -145,5 +187,8 @@ export async function parseLinesFile(file: File): Promise<InvoiceLine[]> {
     tax_category_code: str(record, 'tax_category_code'),
     line_allowance_amount: num(record, 'line_allowance_amount'),
     line_charge_amount: num(record, 'line_charge_amount'),
+    source_row_number: index + 2,
+    upload_session_id: options.uploadSessionId,
+    upload_manifest_id: options.uploadManifestId,
   }));
 }

@@ -5,13 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useCompliance } from '@/context/ComplianceContext';
-import { parseBuyersFile, parseHeadersFile, parseLinesFile, parseCSV } from '@/lib/csvParser';
+import { parsePartiesFile, parseHeadersFile, parseLinesFile, parseCSV } from '@/lib/csvParser';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { FileDropZone, FileSummaryCard, analyzeFile, FileStats } from '@/components/upload/FileAnalysis';
 import { SampleScenario } from '@/lib/sampleData';
-import { addUploadAuditLog } from '@/lib/uploadAudit';
-import { DatasetType } from '@/types/datasets';
+import { detectDirectionFromColumns } from '@/lib/direction/directionUtils';
+import { Direction } from '@/types/direction';
 
 type StepKey = 'upload' | 'validation' | 'mapping';
 
@@ -31,7 +31,7 @@ interface RelationalCheck {
 export default function UploadPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { setData, clearData } = useCompliance();
+  const { direction, setDirection, setData, clearData, addUploadLogEntry } = useCompliance();
 
   const [files, setFiles] = useState<{ buyers: File | null; headers: File | null; lines: File | null }>({
     buyers: null, headers: null, lines: null,
@@ -47,10 +47,10 @@ export default function UploadPage() {
     lines: Record<string, string>[] | null;
   }>({ buyers: null, headers: null, lines: null });
   const [sampleScenario, setSampleScenario] = useState<SampleScenario>('positive');
-  const [datasetType, setDatasetType] = useState<DatasetType>('AR');
+  const [detectedDirection, setDetectedDirection] = useState<Direction | null>(null);
 
-  const allFilesSelected = files.buyers && files.headers && files.lines;
-  const allStats = stats.buyers && stats.headers && stats.lines;
+  const allFilesSelected = files.headers && files.lines;
+  const allStats = stats.headers && stats.lines;
 
   // Determine current step
   let currentStep: StepKey = 'upload';
@@ -58,14 +58,15 @@ export default function UploadPage() {
 
   // Compute blocking reasons
   const blockingReasons: string[] = [];
-  if (!files.buyers) blockingReasons.push('Buyers file not uploaded');
   if (!files.headers) blockingReasons.push('Invoice Headers file not uploaded');
   if (!files.lines) blockingReasons.push('Invoice Lines file not uploaded');
-  if (stats.buyers?.requiredMissing.length) blockingReasons.push(`Buyers: missing columns (${stats.buyers.requiredMissing.join(', ')})`);
+  if (stats.buyers?.requiredMissing.length) {
+    blockingReasons.push(`${direction === 'AP' ? 'Suppliers' : 'Buyers'}: missing columns (${stats.buyers.requiredMissing.join(', ')})`);
+  }
   if (stats.headers?.requiredMissing.length) blockingReasons.push(`Headers: missing columns (${stats.headers.requiredMissing.join(', ')})`);
   if (stats.lines?.requiredMissing.length) blockingReasons.push(`Lines: missing columns (${stats.lines.requiredMissing.join(', ')})`);
 
-  const hasStructuralErrors = [stats.buyers, stats.headers, stats.lines].some(
+  const hasStructuralErrors = [stats.headers, stats.lines].some(
     (s) => s && s.requiredMissing.length > 0
   );
   const canProceed = allFilesSelected && !hasStructuralErrors;
@@ -81,24 +82,30 @@ export default function UploadPage() {
     try {
       const text = await file.text();
       const rows = parseCSV(text);
-      const analysis = analyzeFile(rows, file, type);
+      const analysis = analyzeFile(rows, file, type, direction, text);
       setStats((prev) => ({ ...prev, [type]: analysis }));
       setParsedRows((prev) => ({ ...prev, [type]: rows }));
+
+      if (type !== 'lines' && rows.length > 0) {
+        const sniffed = detectDirectionFromColumns(Object.keys(rows[0]));
+        if (sniffed) setDetectedDirection(sniffed);
+      }
     } catch {
       toast({ title: 'Error reading file', description: 'Could not parse the CSV file.', variant: 'destructive' });
     }
-  }, [toast]);
+  }, [direction, toast]);
 
   // Relational integrity checks
   useEffect(() => {
     const checks: RelationalCheck[] = [];
     if (parsedRows.headers && parsedRows.buyers) {
-      const buyerIds = new Set(parsedRows.buyers.map((r) => r.buyer_id));
-      const headerBuyerIds = parsedRows.headers.map((r) => r.buyer_id).filter(Boolean);
+      const partyKey = direction === 'AP' ? 'supplier_id' : 'buyer_id';
+      const buyerIds = new Set(parsedRows.buyers.map((r) => r[partyKey] || r.buyer_id));
+      const headerBuyerIds = parsedRows.headers.map((r) => r[partyKey] || r.buyer_id).filter(Boolean);
       const matched = headerBuyerIds.filter((id) => buyerIds.has(id));
       const unmatched = headerBuyerIds.length - matched.length;
       checks.push({
-        label: 'headers.buyer_id -> buyers.buyer_id',
+        label: direction === 'AP' ? 'headers.supplier_id -> suppliers.supplier_id' : 'headers.buyer_id -> buyers.buyer_id',
         matchPct: headerBuyerIds.length > 0 ? (matched.length / headerBuyerIds.length) * 100 : 100,
         unmatchedCount: unmatched,
         total: headerBuyerIds.length,
@@ -117,66 +124,66 @@ export default function UploadPage() {
       });
     }
     setRelationalChecks(checks);
-  }, [parsedRows]);
+  }, [direction, parsedRows]);
 
   const handleLoadData = async () => {
     if (!canProceed) return;
     setIsLoading(true);
     try {
+      const sessionId = `upl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const manifestId = `man_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const [buyers, headers, lines] = await Promise.all([
-        parseBuyersFile(files.buyers!),
-        parseHeadersFile(files.headers!),
-        parseLinesFile(files.lines!),
+        files.buyers
+          ? parsePartiesFile(files.buyers, { direction, uploadSessionId: sessionId, uploadManifestId: manifestId })
+          : Promise.resolve([]),
+        parseHeadersFile(files.headers!, { direction, uploadSessionId: sessionId, uploadManifestId: manifestId }),
+        parseLinesFile(files.lines!, { uploadSessionId: sessionId, uploadManifestId: manifestId }),
       ]);
-      setData({ buyers, headers, lines }, datasetType);
+      setData(
+        { buyers, headers, lines, direction, uploadSessionId: sessionId, uploadManifestId: manifestId },
+        { direction, uploadSessionId: sessionId, uploadManifestId: manifestId },
+      );
 
-      if (stats.buyers && stats.headers && stats.lines) {
-        addUploadAuditLog({
-          datasetType,
+      addUploadLogEntry({
+        fileCount: files.buyers ? 3 : 2,
+        uploadSessionId: sessionId,
+        uploadManifestId: manifestId,
+        files: [
+          ...(files.buyers ? [{
+            dataset: 'buyers' as const,
+            fileName: files.buyers.name,
+            fileSize: files.buyers.size,
+            rowCount: stats.buyers?.rowCount ?? buyers.length,
+            columnCount: stats.buyers?.columnCount ?? 0,
+          }] : []),
+          {
+            dataset: 'headers',
+            fileName: files.headers!.name,
+            fileSize: files.headers!.size,
+            rowCount: stats.headers?.rowCount ?? headers.length,
+            columnCount: stats.headers?.columnCount ?? 0,
+          },
+          {
+            dataset: 'lines',
+            fileName: files.lines!.name,
+            fileSize: files.lines!.size,
+            rowCount: stats.lines?.rowCount ?? lines.length,
+            columnCount: stats.lines?.columnCount ?? 0,
+          },
+        ],
+        summary: {
           buyersCount: buyers.length,
           headersCount: headers.length,
           linesCount: lines.length,
-          datasets: [
-            {
-              dataset: 'buyers',
-              fileName: stats.buyers.fileName,
-              fileSize: stats.buyers.fileSize,
-              rowCount: stats.buyers.rowCount,
-              columnCount: stats.buyers.columnCount,
-              requiredMissing: stats.buyers.requiredMissing,
-              nullWarnings: stats.buyers.nullWarnings,
-            },
-            {
-              dataset: 'headers',
-              fileName: stats.headers.fileName,
-              fileSize: stats.headers.fileSize,
-              rowCount: stats.headers.rowCount,
-              columnCount: stats.headers.columnCount,
-              requiredMissing: stats.headers.requiredMissing,
-              nullWarnings: stats.headers.nullWarnings,
-            },
-            {
-              dataset: 'lines',
-              fileName: stats.lines.fileName,
-              fileSize: stats.lines.fileSize,
-              rowCount: stats.lines.rowCount,
-              columnCount: stats.lines.columnCount,
-              requiredMissing: stats.lines.requiredMissing,
-              nullWarnings: stats.lines.nullWarnings,
-            },
-          ],
-          relationalChecks: relationalChecks.map((check) => ({
-            label: check.label,
-            matchPct: check.matchPct,
-            unmatchedCount: check.unmatchedCount,
-            total: check.total,
-          })),
-        });
-      }
+          totalRows: buyers.length + headers.length + lines.length,
+          scenario: sampleScenario,
+          direction,
+        },
+      });
 
       toast({
         title: 'Data loaded successfully',
-        description: `${datasetType === 'AR' ? 'AR' : 'AP'}: ${buyers.length} buyers, ${headers.length} invoices, ${lines.length} line items`,
+        description: `${buyers.length} ${direction === 'AP' ? 'suppliers' : 'buyers'}, ${headers.length} invoices, ${lines.length} line items`,
       });
       navigate('/run');
     } catch {
@@ -190,6 +197,7 @@ export default function UploadPage() {
     setFiles({ buyers: null, headers: null, lines: null });
     setStats({ buyers: null, headers: null, lines: null });
     setParsedRows({ buyers: null, headers: null, lines: null });
+    setDetectedDirection(null);
     clearData();
   };
 
@@ -225,36 +233,30 @@ export default function UploadPage() {
           <p className="text-muted-foreground text-sm max-w-xl mx-auto">
             Upload your invoice datasets to begin readiness and structural validation.
           </p>
+          <div className="mt-4 inline-flex items-center gap-2 rounded-full border bg-card px-2 py-1">
+            <Button size="sm" variant={direction === 'AR' ? 'default' : 'ghost'} onClick={() => setDirection('AR')}>
+              Outbound (AR)
+            </Button>
+            <Button size="sm" variant={direction === 'AP' ? 'default' : 'ghost'} onClick={() => setDirection('AP')}>
+              Inbound (AP)
+            </Button>
+          </div>
         </div>
 
         <div className="space-y-6 animate-slide-up">
-          <div className="surface-glass rounded-2xl border border-white/70 shadow-sm p-4">
-            <div className="mb-4">
-              <p className="text-sm font-semibold text-foreground">Dataset Type</p>
-              <p className="text-xs text-muted-foreground mb-2">
-                Select whether these uploads are outbound AR invoices or inbound AP invoices.
-              </p>
-              <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Dataset type">
-                <Button
-                  size="sm"
-                  variant={datasetType === 'AR' ? 'default' : 'outline'}
-                  onClick={() => setDatasetType('AR')}
-                  role="radio"
-                  aria-checked={datasetType === 'AR'}
-                >
-                  Customer Invoices (AR / Outbound)
-                </Button>
-                <Button
-                  size="sm"
-                  variant={datasetType === 'AP' ? 'default' : 'outline'}
-                  onClick={() => setDatasetType('AP')}
-                  role="radio"
-                  aria-checked={datasetType === 'AP'}
-                >
-                  Vendor Invoices (AP / Inbound)
+          {detectedDirection && detectedDirection !== direction && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+              <p className="font-medium">Detected columns look like {detectedDirection} data.</p>
+              <p className="mt-1">Current direction is {direction}. Switch to match templates and required columns.</p>
+              <div className="mt-3">
+                <Button size="sm" variant="outline" onClick={() => setDirection(detectedDirection)}>
+                  Switch to {detectedDirection}
                 </Button>
               </div>
             </div>
+          )}
+
+          <div className="surface-glass rounded-2xl border border-white/70 shadow-sm p-4">
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div>
                 <p className="text-sm font-semibold text-foreground">Sample Testing Mode</p>
@@ -286,27 +288,41 @@ export default function UploadPage() {
             <div className="grid gap-6">
               {/* Buyers */}
               {stats.buyers ? (
-                <FileSummaryCard stats={stats.buyers} type="buyers" onRemove={() => handleFileSelect('buyers', null)} />
+                <FileSummaryCard stats={stats.buyers} type="buyers" direction={direction} onRemove={() => handleFileSelect('buyers', null)} />
               ) : (
-                <FileDropZone label="Buyers File" description="buyer_id, buyer_name, buyer_trn, buyer_address, buyer_country" sampleType="buyers" sampleScenario={sampleScenario} onFileSelect={(f) => handleFileSelect('buyers', f)} />
+                <FileDropZone
+                  label={direction === 'AP' ? 'Suppliers/Vendors File (Optional)' : 'Buyers/Customers File (Optional)'}
+                  description={direction === 'AP' ? 'supplier_id, supplier_name, supplier_trn, supplier_address, supplier_country' : 'buyer_id, buyer_name, buyer_trn, buyer_address, buyer_country'}
+                  sampleType="buyers"
+                  sampleScenario={sampleScenario}
+                  direction={direction}
+                  onFileSelect={(f) => handleFileSelect('buyers', f)}
+                />
               )}
 
               <div className="border-t" />
 
               {/* Headers */}
               {stats.headers ? (
-                <FileSummaryCard stats={stats.headers} type="headers" onRemove={() => handleFileSelect('headers', null)} />
+                <FileSummaryCard stats={stats.headers} type="headers" direction={direction} onRemove={() => handleFileSelect('headers', null)} />
               ) : (
-                <FileDropZone label="Invoice Headers File" description="invoice_id, invoice_number, issue_date, seller_trn, buyer_id, currency, ..." sampleType="headers" sampleScenario={sampleScenario} onFileSelect={(f) => handleFileSelect('headers', f)} />
+                <FileDropZone
+                  label="Invoice Headers File"
+                  description={direction === 'AP' ? 'invoice_id, invoice_number, issue_date, seller_trn, supplier_id, buyer_trn, currency, ...' : 'invoice_id, invoice_number, issue_date, seller_trn, buyer_id, currency, ...'}
+                  sampleType="headers"
+                  sampleScenario={sampleScenario}
+                  direction={direction}
+                  onFileSelect={(f) => handleFileSelect('headers', f)}
+                />
               )}
 
               <div className="border-t" />
 
               {/* Lines */}
               {stats.lines ? (
-                <FileSummaryCard stats={stats.lines} type="lines" onRemove={() => handleFileSelect('lines', null)} />
+                <FileSummaryCard stats={stats.lines} type="lines" direction={direction} onRemove={() => handleFileSelect('lines', null)} />
               ) : (
-                <FileDropZone label="Invoice Lines File" description="line_id, invoice_id, line_number, quantity, unit_price, vat_rate, ..." sampleType="lines" sampleScenario={sampleScenario} onFileSelect={(f) => handleFileSelect('lines', f)} />
+                <FileDropZone label="Invoice Lines File" description="line_id, invoice_id, line_number, quantity, unit_price, vat_rate, ..." sampleType="lines" sampleScenario={sampleScenario} direction={direction} onFileSelect={(f) => handleFileSelect('lines', f)} />
               )}
             </div>
           </div>
@@ -365,10 +381,7 @@ export default function UploadPage() {
           {canProceed && blockingReasons.length === 0 && (
             <div className="flex items-center gap-2 text-sm bg-[hsl(var(--success))]/5 rounded-lg p-4 border border-[hsl(var(--success))]/20">
               <CheckCircle2 className="w-4 h-4 text-[hsl(var(--success))]" />
-              <span className="text-[hsl(var(--success))] font-medium">
-                All files uploaded and validated for {datasetType === 'AR' ? 'AR (Outbound)' : 'AP (Inbound)'}.
-                Ready to proceed.
-              </span>
+              <span className="text-[hsl(var(--success))] font-medium">All files uploaded and validated. Ready to proceed.</span>
             </div>
           )}
 

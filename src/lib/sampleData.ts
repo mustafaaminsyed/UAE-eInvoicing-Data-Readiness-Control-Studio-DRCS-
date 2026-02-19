@@ -1,5 +1,6 @@
 export type SampleScenario = 'positive' | 'negative';
 export type SampleDataset = 'buyers' | 'headers' | 'lines';
+export type SampleDirection = 'AR' | 'AP';
 
 export const buyersSample = `buyer_id,buyer_name,buyer_trn,buyer_address,buyer_country,buyer_city,buyer_subdivision,buyer_electronic_address
 B001,Acme Corporation LLC,100000000000003,Office 42 Business Bay Tower,AE,Dubai,AE-DU,acme@peppol.ae
@@ -31,21 +32,73 @@ L001,INV001,1,Consulting Services - Tax Advisory,10,EA,100.00,0.00,1000.00,5.00,
 L002,INV002,1,E-Invoicing Integration Package,1,EA,2000.00,0.00,2000.00,5.00,140.00,S
 L003,INV003,1,Compliance Readiness Assessment,5,EA,100.00,0.00,500.00,5.00,25.00,S`;
 
-const SAMPLE_BY_SCENARIO: Record<SampleScenario, Record<SampleDataset, { content: string; filename: string }>> = {
+const apPartiesSample = buyersSample
+  .replace(/buyer_id/g, 'supplier_id')
+  .replace(/buyer_name/g, 'supplier_name')
+  .replace(/buyer_trn/g, 'supplier_trn')
+  .replace(/buyer_address/g, 'supplier_address')
+  .replace(/buyer_country/g, 'supplier_country')
+  .replace(/buyer_city/g, 'supplier_city')
+  .replace(/buyer_subdivision/g, 'supplier_subdivision')
+  .replace(/buyer_electronic_address/g, 'supplier_electronic_address')
+  .replace(/B001/g, 'S001')
+  .replace(/B002/g, 'S002')
+  .replace(/B003/g, 'S003');
+
+const apPartiesNegativeSample = buyersNegativeSample
+  .replace(/buyer_id/g, 'supplier_id')
+  .replace(/buyer_name/g, 'supplier_name')
+  .replace(/buyer_trn/g, 'supplier_trn')
+  .replace(/buyer_address/g, 'supplier_address')
+  .replace(/buyer_country/g, 'supplier_country')
+  .replace(/buyer_city/g, 'supplier_city')
+  .replace(/buyer_subdivision/g, 'supplier_subdivision')
+  .replace(/buyer_electronic_address/g, 'supplier_electronic_address')
+  .replace(/B001/g, 'S001')
+  .replace(/B002/g, 'S002')
+  .replace(/B003/g, 'S003');
+
+const apHeadersSample = headersSample
+  .replace(/buyer_id/g, 'supplier_id')
+  .replace(/,B001,/g, ',S001,')
+  .replace(/,B002,/g, ',S002,')
+  .replace(/,B003,/g, ',S003,');
+
+const apHeadersNegativeSample = headersNegativeSample
+  .replace(/buyer_id/g, 'supplier_id')
+  .replace(/,B001,/g, ',S001,')
+  .replace(/,B002,/g, ',S002,')
+  .replace(/,B003,/g, ',S003,');
+
+const SAMPLE_BY_SCENARIO: Record<SampleScenario, Record<SampleDirection, Record<SampleDataset, { content: string; filename: string }>>> = {
   positive: {
-    buyers: { content: buyersSample, filename: 'buyers_template.csv' },
-    headers: { content: headersSample, filename: 'invoice_headers_template.csv' },
-    lines: { content: linesSample, filename: 'invoice_lines_template.csv' },
+    AR: {
+      buyers: { content: buyersSample, filename: 'buyers_template.csv' },
+      headers: { content: headersSample, filename: 'invoice_headers_template.csv' },
+      lines: { content: linesSample, filename: 'invoice_lines_template.csv' },
+    },
+    AP: {
+      buyers: { content: apPartiesSample, filename: 'suppliers_template.csv' },
+      headers: { content: apHeadersSample, filename: 'invoice_headers_ap_template.csv' },
+      lines: { content: linesSample, filename: 'invoice_lines_template.csv' },
+    },
   },
   negative: {
-    buyers: { content: buyersNegativeSample, filename: 'buyers_template_negative.csv' },
-    headers: { content: headersNegativeSample, filename: 'invoice_headers_template_negative.csv' },
-    lines: { content: linesNegativeSample, filename: 'invoice_lines_template_negative.csv' },
+    AR: {
+      buyers: { content: buyersNegativeSample, filename: 'buyers_template_negative.csv' },
+      headers: { content: headersNegativeSample, filename: 'invoice_headers_template_negative.csv' },
+      lines: { content: linesNegativeSample, filename: 'invoice_lines_template_negative.csv' },
+    },
+    AP: {
+      buyers: { content: apPartiesNegativeSample, filename: 'suppliers_template_negative.csv' },
+      headers: { content: apHeadersNegativeSample, filename: 'invoice_headers_ap_template_negative.csv' },
+      lines: { content: linesNegativeSample, filename: 'invoice_lines_template_negative.csv' },
+    },
   },
 };
 
-export function getSampleData(dataset: SampleDataset, scenario: SampleScenario = 'positive') {
-  return SAMPLE_BY_SCENARIO[scenario][dataset];
+export function getSampleData(dataset: SampleDataset, scenario: SampleScenario = 'positive', direction: SampleDirection = 'AR') {
+  return SAMPLE_BY_SCENARIO[scenario][direction][dataset];
 }
 
 export function downloadSampleCSV(filename: string, content: string) {
@@ -58,10 +111,10 @@ export function downloadSampleCSV(filename: string, content: string) {
   document.body.removeChild(link);
 }
 
-export function downloadAllTemplatesAsZip(scenario: SampleScenario = 'positive') {
-  const sampleBuyers = getSampleData('buyers', scenario);
-  const sampleHeaders = getSampleData('headers', scenario);
-  const sampleLines = getSampleData('lines', scenario);
+export function downloadAllTemplatesAsZip(scenario: SampleScenario = 'positive', direction: SampleDirection = 'AR') {
+  const sampleBuyers = getSampleData('buyers', scenario, direction);
+  const sampleHeaders = getSampleData('headers', scenario, direction);
+  const sampleLines = getSampleData('lines', scenario, direction);
   downloadSampleCSV(sampleBuyers.filename, sampleBuyers.content);
   setTimeout(() => downloadSampleCSV(sampleHeaders.filename, sampleHeaders.content), 200);
   setTimeout(() => downloadSampleCSV(sampleLines.filename, sampleLines.content), 400);

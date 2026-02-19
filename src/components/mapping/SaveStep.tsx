@@ -25,10 +25,12 @@ import { analyzeCoverage } from '@/lib/mapping/coverageAnalyzer';
 import { useToast } from '@/hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Direction } from '@/types/direction';
 
 interface SaveStepProps {
   mappings: FieldMapping[];
   previewData: ERPPreviewData | null;
+  direction: Direction;
   onMappingsChange: (mappings: FieldMapping[]) => void;
   onTemplateSaved: (templateId: string, name?: string, isActive?: boolean) => void;
 }
@@ -43,7 +45,7 @@ const TRANSFORMATION_TYPES: { value: TransformationType; label: string; descript
   { value: 'lookup', label: 'Lookup Table', description: 'Map values using a lookup' },
 ];
 
-export function SaveStep({ mappings, previewData, onMappingsChange, onTemplateSaved }: SaveStepProps) {
+export function SaveStep({ mappings, previewData, direction, onMappingsChange, onTemplateSaved }: SaveStepProps) {
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
@@ -212,9 +214,10 @@ export function SaveStep({ mappings, previewData, onMappingsChange, onTemplateSa
       mappings: confirmedMappings,
       effectiveDate: formData.effectiveDate || undefined,
       notes: formData.notes || undefined,
+      direction,
     };
 
-    const templateId = await saveMappingTemplate(template);
+    const templateId = await saveMappingTemplate(template, direction);
 
     setIsSaving(false);
 
@@ -400,6 +403,9 @@ export function SaveStep({ mappings, previewData, onMappingsChange, onTemplateSa
           <CardDescription>
             Save this mapping configuration as a reusable template for future data imports.
           </CardDescription>
+          <div className="pt-1">
+            <Badge variant="outline">Direction: {direction}</Badge>
+          </div>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-2 gap-6">

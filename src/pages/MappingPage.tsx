@@ -26,6 +26,7 @@ import { analyzeCoverage } from '@/lib/mapping/coverageAnalyzer';
 import { fetchMappingTemplates, deleteMappingTemplate } from '@/lib/api/mappingApi';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { useCompliance } from '@/context/ComplianceContext';
 
 const STEPS: { id: MappingWizardStep; label: string }[] = [
   { id: 'upload', label: 'Upload Sample' },
@@ -38,6 +39,7 @@ export default function MappingPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
+  const { direction, setDirection, setActiveMappingProfileForDirection } = useCompliance();
   
   // Tab state
   const activeTab = searchParams.get('tab') || 'templates';
@@ -65,10 +67,10 @@ export default function MappingPage() {
   // Load templates
   const loadTemplates = useCallback(async () => {
     setIsLoadingTemplates(true);
-    const data = await fetchMappingTemplates();
+    const data = await fetchMappingTemplates(direction);
     setTemplates(data);
     setIsLoadingTemplates(false);
-  }, []);
+  }, [direction]);
 
   useEffect(() => {
     loadTemplates();
@@ -104,6 +106,12 @@ export default function MappingPage() {
   const handleViewTemplate = (template: MappingTemplate) => {
     setEditingTemplateId(template.id || null);
     setMappings(template.mappings);
+    if (template.id) {
+      setActiveMappingProfileForDirection(direction, {
+        id: template.id,
+        version: template.version,
+      });
+    }
     setSearchParams({ tab: 'create' });
     setCurrentStep('mapping');
   };
@@ -151,6 +159,7 @@ export default function MappingPage() {
 
   const handleTemplateSaved = (templateId: string, name?: string, isActive?: boolean) => {
     loadTemplates();
+    setActiveMappingProfileForDirection(direction, { id: templateId, version: 1 });
     setLastSavedAt(new Date().toISOString());
     setTemplateStatus(isActive ? 'active' : 'draft');
     if (name) setTemplateName(name);
@@ -174,6 +183,22 @@ export default function MappingPage() {
             <div>
               <h1 className="font-display text-2xl font-semibold">Field Mapping Assistant</h1>
               <p className="text-sm text-muted-foreground">ERP {'->'} PINT-AE Field Transformation Wizard</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant={direction === 'AR' ? 'default' : 'outline'}
+                onClick={() => setDirection('AR')}
+              >
+                Outbound (AR)
+              </Button>
+              <Button
+                size="sm"
+                variant={direction === 'AP' ? 'default' : 'outline'}
+                onClick={() => setDirection('AP')}
+              >
+                Inbound (AP)
+              </Button>
             </div>
             {activeTab === 'create' && (
               <div className="flex items-center gap-2 ml-4">
@@ -431,12 +456,13 @@ export default function MappingPage() {
               />
             )}
             {currentStep === 'save' && (
-              <SaveStep 
-                mappings={mappings} 
-                previewData={previewData}
-                onMappingsChange={setMappings}
-                onTemplateSaved={handleTemplateSaved} 
-              />
+                  <SaveStep 
+                    mappings={mappings} 
+                    previewData={previewData}
+                    direction={direction}
+                    onMappingsChange={setMappings}
+                    onTemplateSaved={handleTemplateSaved} 
+                  />
             )}
 
             {/* Post-Save CTA */}

@@ -1,6 +1,6 @@
 ﻿import { useNavigate } from 'react-router-dom';
 import { useState, useEffect, useCallback } from 'react';
-import { Play, CheckCircle, FileText, Users, List, ArrowRight, RotateCcw, Database, RefreshCw, ChevronDown, AlertCircle, Settings, Map, AlertTriangle, Shield, Wand2, Search } from 'lucide-react';
+import { Play, CheckCircle, FileText, Users, List, ArrowRight, RotateCcw, Database, RefreshCw, ChevronDown, AlertCircle, Settings, Map, AlertTriangle, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -19,39 +19,38 @@ import { getPintAeSpecMetadata } from '@/lib/pintAE/specCatalog';
 import { checkRunReadiness } from '@/lib/coverage/conformanceEngine';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
-import { fetchCustomChecks } from '@/lib/api/checksApi';
-import { CustomCheckConfig } from '@/types/customChecks';
-import { DatasetRunScope } from '@/types/datasets';
+import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
 
 export default function RunChecksPage() {
   const navigate = useNavigate();
   const { 
+    direction,
+    buyers, 
+    headers, 
+    lines, 
+    isDataLoaded, 
     isChecksRun, 
     isRunning, 
     runChecks,
-    runCustomChecks,
-    runSearchChecks,
-    activeDatasetType,
-    getDataForDataset,
-    hasDatasetLoaded,
-    exceptions 
+    exceptions,
+    activeMappingProfileByDirection,
+    setActiveMappingProfileForDirection,
   } = useCompliance();
 
   const [pintAEChecks, setPintAEChecks] = useState<PintAECheck[]>([]);
-  const [customChecks, setCustomChecks] = useState<CustomCheckConfig[]>([]);
   const [diagnostics, setDiagnostics] = useState<ChecksDiagnostics | null>(null);
   const [isLoadingChecks, setIsLoadingChecks] = useState(true);
-  const [isLoadingCustomChecks, setIsLoadingCustomChecks] = useState(true);
+  const [isSyncingChecks, setIsSyncingChecks] = useState(true);
   const [isSeeding, setIsSeeding] = useState(false);
   const [lastSeedResult, setLastSeedResult] = useState<string | null>(null);
   const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState(false);
-  const [runScope, setRunScope] = useState<DatasetRunScope>(activeDatasetType);
   const specMeta = getPintAeSpecMetadata();
 
   // Mapping template state
   const [mappingTemplates, setMappingTemplates] = useState<MappingTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('none');
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
+  const expectedUC1Count = UAE_UC1_CHECK_PACK.length;
 
   const loadChecks = useCallback(async () => {
     setIsLoadingChecks(true);
@@ -71,19 +70,55 @@ export default function RunChecksPage() {
     setIsLoadingChecks(false);
   }, []);
 
+  const ensureChecksReady = useCallback(async () => {
+    setIsSyncingChecks(true);
+    setIsLoadingChecks(true);
+    console.log('[Run Checks] Ensuring UC1 check pack is synced...');
+
+    const [checks, diag] = await Promise.all([
+      fetchEnabledPintAEChecks(),
+      getChecksDiagnostics(),
+    ]);
+
+    const requiresSync = (diag.uc1CheckCount ?? 0) < expectedUC1Count || checks.length < expectedUC1Count;
+
+    if (requiresSync) {
+      console.log('[Run Checks] UC1 check count mismatch detected. Forcing upsert...');
+      const result = await seedUC1CheckPack(true);
+      setLastSeedResult(result.message);
+      if (result.success) {
+        toast.success(`Checks synced (${expectedUC1Count})`);
+      } else {
+        toast.error(result.message);
+      }
+
+      const [syncedChecks, syncedDiag] = await Promise.all([
+        fetchEnabledPintAEChecks(),
+        getChecksDiagnostics(),
+      ]);
+      setPintAEChecks(syncedChecks);
+      setDiagnostics(syncedDiag);
+    } else {
+      setPintAEChecks(checks);
+      setDiagnostics(diag);
+    }
+
+    setIsLoadingChecks(false);
+    setIsSyncingChecks(false);
+  }, [expectedUC1Count]);
+
   const loadMappingTemplates = useCallback(async () => {
     setIsLoadingTemplates(true);
-    const templates = await fetchActiveTemplates();
+    const templates = await fetchActiveTemplates(direction);
     setMappingTemplates(templates);
+    const activeProfile = activeMappingProfileByDirection[direction];
+    if (activeProfile?.id && templates.some((template) => template.id === activeProfile.id)) {
+      setSelectedTemplateId(activeProfile.id);
+    } else {
+      setSelectedTemplateId('none');
+    }
     setIsLoadingTemplates(false);
-  }, []);
-
-  const loadCustomChecks = useCallback(async () => {
-    setIsLoadingCustomChecks(true);
-    const checks = await fetchCustomChecks();
-    setCustomChecks(checks);
-    setIsLoadingCustomChecks(false);
-  }, []);
+  }, [activeMappingProfileByDirection, direction]);
 
   const handleSeedUC1 = async (force = false) => {
     setIsSeeding(true);
@@ -103,40 +138,13 @@ export default function RunChecksPage() {
   };
 
   useEffect(() => {
-    loadChecks();
+    ensureChecksReady();
     loadMappingTemplates();
-    loadCustomChecks();
-  }, [loadChecks, loadMappingTemplates, loadCustomChecks]);
-
-  useEffect(() => {
-    setRunScope(activeDatasetType);
-  }, [activeDatasetType]);
+  }, [ensureChecksReady, loadMappingTemplates]);
 
   const noMappingProfile = !isLoadingTemplates && mappingTemplates.length === 0;
-  const validationCustomChecks = customChecks.filter(
-    (check) => (check.check_type || 'VALIDATION') !== 'SEARCH_CHECK'
-  );
-  const searchCustomChecks = customChecks.filter(
-    (check) => (check.check_type || 'VALIDATION') === 'SEARCH_CHECK'
-  );
 
-  const scopeData = (() => {
-    if (runScope === 'ALL') {
-      const ar = getDataForDataset('AR');
-      const ap = getDataForDataset('AP');
-      return {
-        buyers: [...ar.buyers, ...ap.buyers],
-        headers: [...ar.headers, ...ap.headers],
-        lines: [...ar.lines, ...ap.lines],
-      };
-    }
-    return getDataForDataset(runScope);
-  })();
-
-  const scopeHasData =
-    runScope === 'ALL' ? hasDatasetLoaded('AR') || hasDatasetLoaded('AP') : hasDatasetLoaded(runScope);
-
-  if (!hasDatasetLoaded('AR') && !hasDatasetLoaded('AP')) {
+  if (!isDataLoaded) {
     navigate('/');
     return null;
   }
@@ -168,26 +176,17 @@ export default function RunChecksPage() {
       );
       if (!proceed) return;
     }
-    await runChecks({ scope: runScope });
-    navigate('/dashboard');
-  };
-
-  const handleRunCustomChecksOnly = async () => {
-    if (validationCustomChecks.length === 0) {
-      toast.info('No active custom checks found.');
-      return;
+    if (selectedTemplate && selectedTemplate.id) {
+      setActiveMappingProfileForDirection(direction, {
+        id: selectedTemplate.id,
+        version: selectedTemplate.version,
+      });
     }
-    await runCustomChecks({ scope: runScope });
+    await runChecks({
+      mappingProfileId: selectedTemplate?.id,
+      mappingVersion: selectedTemplate?.version,
+    });
     navigate('/dashboard');
-  };
-
-  const handleRunSearchChecks = async () => {
-    if (searchCustomChecks.length === 0) {
-      toast.info('No active AP search checks found.');
-      return;
-    }
-    await runSearchChecks({ scope: runScope === 'AR' ? 'AP' : runScope });
-    navigate('/ap-explorer');
   };
 
   const handleRefreshChecks = () => {
@@ -207,38 +206,12 @@ export default function RunChecksPage() {
           </h1>
           <p className="text-muted-foreground max-w-xl mx-auto">
             Execute the PINT-AE compliance check library against your uploaded data. 
-            This will validate {scopeData.headers.length} invoices across {isLoadingChecks ? '...' : pintAEChecks.length} standard checks
-            {' '}and {isLoadingCustomChecks ? '...' : validationCustomChecks.length} active custom validation checks.
+            This will validate {headers.length} invoices across {isLoadingChecks ? '...' : pintAEChecks.length} checks.
           </p>
+          <div className="mt-3 flex justify-center">
+            <Badge variant="outline">Direction: {direction}</Badge>
+          </div>
         </div>
-
-        <Card className="mb-8 animate-slide-up surface-glass rounded-2xl border border-white/70">
-          <CardHeader>
-            <CardTitle className="text-lg">Run For Dataset</CardTitle>
-            <CardDescription>Select AR, AP, or both datasets for this run.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Select value={runScope} onValueChange={(value) => setRunScope(value as DatasetRunScope)}>
-              <SelectTrigger className="w-full md:w-72">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="AR">AR only (Outbound)</SelectItem>
-                <SelectItem value="AP">AP only (Inbound)</SelectItem>
-                <SelectItem value="ALL">All datasets</SelectItem>
-              </SelectContent>
-            </Select>
-            {!scopeHasData && (
-              <Alert className="bg-amber-500/10 border-amber-500/30">
-                <AlertCircle className="h-4 w-4 text-amber-600" />
-                <AlertTitle className="text-amber-700">No data for selected scope</AlertTitle>
-                <AlertDescription className="text-amber-600">
-                  Upload {runScope === 'ALL' ? 'AR or AP data' : `${runScope} data`} before running checks.
-                </AlertDescription>
-              </Alert>
-            )}
-          </CardContent>
-        </Card>
 
         {/* Mapping Template Selector */}
         <Card className="mb-8 animate-slide-up surface-glass rounded-2xl border border-white/70">
@@ -280,7 +253,7 @@ export default function RunChecksPage() {
 
                 {mappingTemplates.length === 0 && !isLoadingTemplates && (
                   <p className="text-sm text-muted-foreground mt-2">
-                    No mapping templates found.{' '}
+                    No active {direction} mapping templates found.{' '}
                     <Button variant="link" className="p-0 h-auto" onClick={() => navigate('/mapping?tab=create')}>
                       Create one
                     </Button>
@@ -329,19 +302,19 @@ export default function RunChecksPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 animate-slide-up">
           <StatsCard
             title="Buyers"
-            value={scopeData.buyers.length}
+            value={buyers.length}
             icon={<Users className="w-5 h-5" />}
             variant="default"
           />
           <StatsCard
             title="Invoice Headers"
-            value={scopeData.headers.length}
+            value={headers.length}
             icon={<FileText className="w-5 h-5" />}
             variant="default"
           />
           <StatsCard
             title="Invoice Lines"
-            value={scopeData.lines.length}
+            value={lines.length}
             icon={<List className="w-5 h-5" />}
             variant="default"
           />
@@ -433,62 +406,6 @@ export default function RunChecksPage() {
           </div>
         </div>
 
-        {/* Custom Checks Library */}
-        <div className="surface-glass rounded-2xl border border-white/70 shadow-sm mb-8 animate-slide-up">
-          <div className="p-6 border-b flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-semibold text-foreground">
-                  Custom Checks ({isLoadingCustomChecks ? '...' : customChecks.length})
-                </h2>
-                <Badge variant="outline" className="text-xs gap-1">
-                  <Wand2 className="w-3 h-3" />
-                  Check Builder
-                </Badge>
-              </div>
-              <p className="text-sm text-muted-foreground mt-1">
-                User-defined checks for targeted validation runs.
-              </p>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={loadCustomChecks}
-              disabled={isLoadingCustomChecks}
-              className="gap-1"
-            >
-              <RefreshCw className={`w-4 h-4 ${isLoadingCustomChecks ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
-          </div>
-          <div className="divide-y max-h-[260px] overflow-y-auto">
-            {isLoadingCustomChecks ? (
-              <div className="p-8 text-center text-muted-foreground">
-                Loading custom checks...
-              </div>
-            ) : customChecks.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground">
-                No active custom checks configured.
-              </div>
-            ) : (
-              customChecks.map((check) => (
-                <div key={check.id} className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-medium text-foreground">{check.name}</p>
-                      <Badge variant="outline" className="text-xs">{check.check_type || 'VALIDATION'}</Badge>
-                      <Badge variant="outline" className="text-xs">{check.dataset_scope}</Badge>
-                      <Badge variant="outline" className="text-xs">{check.rule_type}</Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground truncate">{check.description || 'Custom validation rule'}</p>
-                  </div>
-                  <SeverityBadge severity={check.severity} />
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
         {/* Mapping Prerequisite Warning */}
         {noMappingProfile && (
           <Alert className="mb-8 bg-amber-500/10 border-amber-500/30">
@@ -536,30 +453,12 @@ export default function RunChecksPage() {
             <>
               <Button
                 variant="outline"
-                onClick={handleRunChecks}
-                disabled={isRunning || pintAEChecks.length === 0 || isBlocked || !scopeHasData}
-                className="gap-2"
-              >
+              onClick={handleRunChecks}
+              disabled={isRunning || isSyncingChecks || pintAEChecks.length === 0 || isBlocked}
+              className="gap-2"
+            >
                 <RotateCcw className="w-4 h-4" />
                 Re-run Checks
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleRunCustomChecksOnly}
-                disabled={isRunning || validationCustomChecks.length === 0 || !scopeHasData}
-                className="gap-2"
-              >
-                <Wand2 className="w-4 h-4" />
-                Run Custom Checks Only
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleRunSearchChecks}
-                disabled={isRunning || runScope === 'AR' || !scopeHasData || searchCustomChecks.length === 0}
-                className="gap-2"
-              >
-                <Search className="w-4 h-4" />
-                Run AP Search Checks
               </Button>
               <Button
                 onClick={() => navigate('/dashboard')}
@@ -571,46 +470,24 @@ export default function RunChecksPage() {
               </Button>
             </>
           ) : (
-            <>
-              <Button
-                onClick={handleRunChecks}
-                disabled={isRunning || pintAEChecks.length === 0 || isBlocked || !scopeHasData}
-                size="lg"
-                className="gap-2 px-8"
-              >
-                {isRunning ? (
-                  <>
-                    <RefreshCw className="w-5 h-5 animate-spin" />
-                    Running Checks...
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-5 h-5" />
-                    Run All Checks ({pintAEChecks.length})
-                  </>
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleRunCustomChecksOnly}
-                disabled={isRunning || validationCustomChecks.length === 0 || !scopeHasData}
-                size="lg"
-                className="gap-2"
-              >
-                <Wand2 className="w-5 h-5" />
-                Run Custom Checks Only ({validationCustomChecks.length})
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleRunSearchChecks}
-                disabled={isRunning || runScope === 'AR' || !scopeHasData || searchCustomChecks.length === 0}
-                size="lg"
-                className="gap-2"
-              >
-                <Search className="w-5 h-5" />
-                Run AP Search Checks
-              </Button>
-            </>
+            <Button
+              onClick={handleRunChecks}
+              disabled={isRunning || isSyncingChecks || pintAEChecks.length === 0 || isBlocked}
+              size="lg"
+              className="gap-2 px-8"
+            >
+              {isRunning ? (
+                <>
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                  Running Checks...
+                </>
+              ) : (
+                <>
+                  <Play className="w-5 h-5" />
+                  Run All Checks ({pintAEChecks.length})
+                </>
+              )}
+            </Button>
           )}
         </div>
 

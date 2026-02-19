@@ -7,17 +7,29 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { cn } from '@/lib/utils';
 import { downloadSampleCSV, getSampleData, SampleScenario } from '@/lib/sampleData';
 import { getMandatoryColumnsForDataset } from '@/lib/registry/drRegistry';
+import { Direction } from '@/types/direction';
 
 // Expected customer-provided columns, derived from the downloadable sample templates.
-function getManifestColumns(type: 'buyers' | 'headers' | 'lines'): string[] {
-  const sample = getSampleData(type, 'positive')?.content ?? '';
+function getManifestColumns(type: 'buyers' | 'headers' | 'lines', direction: Direction): string[] {
+  const sample = getSampleData(type, 'positive', direction)?.content ?? '';
   const header = sample.split(/\r?\n/)[0] ?? '';
   return header.split(',').map((c) => c.trim()).filter(Boolean);
 }
 
 // Spec-driven: mandatory UC1 columns per dataset, from DR registry (used for gating)
-const getRequiredColumns = (type: 'buyers' | 'headers' | 'lines'): string[] =>
-  getMandatoryColumnsForDataset(type);
+const getRequiredColumns = (type: 'buyers' | 'headers' | 'lines', direction: Direction): string[] => {
+  if (type === 'buyers') {
+    return direction === 'AP' ? ['supplier_id', 'supplier_name', 'supplier_trn'] : ['buyer_id', 'buyer_name', 'buyer_trn'];
+  }
+  if (type === 'headers') {
+    const base = getMandatoryColumnsForDataset(type);
+    if (direction === 'AP') {
+      return Array.from(new Set(base.filter((column) => column !== 'buyer_id').concat(['supplier_id', 'buyer_trn'])));
+    }
+    return base;
+  }
+  return getMandatoryColumnsForDataset(type);
+};
 
 const PK_CANDIDATES: Record<string, string> = {
   buyers: 'buyer_id',
@@ -44,10 +56,11 @@ export function analyzeFile(
   rows: Record<string, string>[],
   file: File,
   type: 'buyers' | 'headers' | 'lines',
+  direction: Direction = 'AR',
   rawText?: string
 ): FileStats {
   const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
-  const required = getRequiredColumns(type);
+  const required = getRequiredColumns(type, direction);
   const requiredPresent = required.filter((c) => columns.includes(c));
   const requiredMissing = required.filter((c) => !columns.includes(c));
 
@@ -99,10 +112,11 @@ export function analyzeFile(
 interface FileSummaryCardProps {
   stats: FileStats;
   type: 'buyers' | 'headers' | 'lines';
+  direction?: Direction;
   onRemove: () => void;
 }
 
-export function FileSummaryCard({ stats, type, onRemove }: FileSummaryCardProps) {
+export function FileSummaryCard({ stats, type, direction = 'AR', onRemove }: FileSummaryCardProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const hasIssues = stats.requiredMissing.length > 0 || stats.nullWarnings.length > 0;
 
@@ -177,10 +191,10 @@ export function FileSummaryCard({ stats, type, onRemove }: FileSummaryCardProps)
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Structural Validation</p>
         <div className="flex flex-wrap gap-1.5">
           {(() => {
-            const manifestCols = getManifestColumns(type);
+            const manifestColsByDirection = getManifestColumns(type, direction);
             const uploadedCols = new Set(stats.columns);
-            const present = manifestCols.filter((c) => uploadedCols.has(c));
-            const missing = manifestCols.filter((c) => !uploadedCols.has(c));
+            const present = manifestColsByDirection.filter((c) => uploadedCols.has(c));
+            const missing = manifestColsByDirection.filter((c) => !uploadedCols.has(c));
             return (
               <>
                 {present.map((col) => (
@@ -251,16 +265,17 @@ interface FileDropZoneProps {
   description: string;
   sampleType: 'buyers' | 'headers' | 'lines';
   sampleScenario?: SampleScenario;
+  direction?: Direction;
   onFileSelect: (file: File) => void;
 }
 
-export function FileDropZone({ label, description, sampleType, sampleScenario = 'positive', onFileSelect }: FileDropZoneProps) {
+export function FileDropZone({ label, description, sampleType, sampleScenario = 'positive', direction = 'AR', onFileSelect }: FileDropZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
 
   const handleDownloadSample = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    const sample = getSampleData(sampleType, sampleScenario);
+    const sample = getSampleData(sampleType, sampleScenario, direction);
     downloadSampleCSV(sample.filename, sample.content);
   };
 
