@@ -142,12 +142,15 @@ export default function RunChecksPage() {
     loadMappingTemplates();
   }, [ensureChecksReady, loadMappingTemplates]);
 
+  useEffect(() => {
+    if (!isDataLoaded) {
+      navigate('/');
+    }
+  }, [isDataLoaded, navigate]);
+
   const noMappingProfile = !isLoadingTemplates && mappingTemplates.length === 0;
 
-  if (!isDataLoaded) {
-    navigate('/');
-    return null;
-  }
+  if (!isDataLoaded) return null;
 
   // Calculate coverage for selected template
   const selectedTemplate = mappingTemplates.find(t => t.id === selectedTemplateId);

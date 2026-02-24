@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   BarChart3,
   TrendingUp,
@@ -74,11 +74,7 @@ export default function ControlsDashboardPage() {
     return { total, covered, percent };
   }, []);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async (manualRefresh = false) => {
+  const loadData = useCallback(async (manualRefresh = false) => {
     if (manualRefresh) setIsRefreshing(true);
     else setIsLoading(true);
 
@@ -105,7 +101,11 @@ export default function ControlsDashboardPage() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const filteredRuns = checkRuns
     .filter((run) => {

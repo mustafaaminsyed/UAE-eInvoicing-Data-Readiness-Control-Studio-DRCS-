@@ -398,7 +398,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
               fieldName: 'total_incl_vat',
               observedValue: String(header.total_incl_vat),
               expectedValue: String(expected),
-              message: `Invoice ${header.invoice_number}: Total with VAT (${header.total_incl_vat}) ≠ Excl VAT (${header.total_excl_vat}) + VAT (${header.vat_total})`,
+              message: `Invoice ${header.invoice_number}: Total with VAT (${header.total_incl_vat}) != Excl VAT (${header.total_excl_vat}) + VAT (${header.vat_total})`,
             }));
           }
         }
@@ -451,7 +451,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
       });
       break;
 
-    // Invoice Must Have ≥1 Line
+    // Invoice Must Have >=1 Line
     case 'UAE-UC1-CHK-030':
       data.headers.forEach(header => {
         const invoiceLines = data.linesByInvoice.get(header.invoice_id) || [];
@@ -463,7 +463,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
             buyerId: header.buyer_id,
             fieldName: 'lines',
             observedValue: '0 lines',
-            expectedValue: '≥1 line',
+            expectedValue: '>=1 line',
             message: `Invoice ${header.invoice_number}: No line items found. At least one line is required.`,
           }));
         }

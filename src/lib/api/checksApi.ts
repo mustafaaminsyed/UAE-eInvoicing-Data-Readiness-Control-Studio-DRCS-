@@ -116,7 +116,7 @@ export async function seedStarterSearchChecks(): Promise<void> {
     {
       name: 'Possible Duplicate (Vendor + Amount + Date)',
       description:
-        'Flags likely duplicate AP invoices when vendor similarity is high, amount is equal, and dates are within ±3 days.',
+        'Flags likely duplicate AP invoices when vendor similarity is high, amount is equal, and dates are within +/-3 days.',
       severity: 'Low',
       check_type: 'SEARCH_CHECK',
       dataset_scope: 'header',

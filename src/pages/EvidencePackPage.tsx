@@ -129,6 +129,98 @@ export default function EvidencePackPage() {
     setExporting(false);
   }, [evidence, runId, toast, exportFormat]);
 
+  const q = search.trim().toLowerCase();
+  const drCoverageRows = useMemo(() => {
+    if (!evidence) return [];
+    const filtered = evidence.drCoverage.filter((r) =>
+      r.dr_id.toLowerCase().includes(q) ||
+      r.business_term.toLowerCase().includes(q) ||
+      r.column_names.toLowerCase().includes(q)
+    );
+    switch (drQuickFilter) {
+      case 'mandatory':
+        return filtered.filter((r) => r.mandatory);
+      case 'gaps':
+        return filtered.filter((r) => r.coverage_status === 'NO_RULE' || r.coverage_status === 'NO_CONTROL');
+      case 'asp':
+        return filtered.filter((r) => r.asp_derived);
+      default:
+        return filtered;
+    }
+  }, [q, evidence, drQuickFilter]);
+  const ruleRows = useMemo(() => {
+    if (!evidence) return [];
+    const filtered = evidence.ruleExecution.filter((r) =>
+      r.rule_id.toLowerCase().includes(q) ||
+      r.rule_name.toLowerCase().includes(q) ||
+      r.linked_dr_ids.toLowerCase().includes(q)
+    );
+    switch (ruleQuickFilter) {
+      case 'failing':
+        return filtered.filter((r) => r.failure_count > 0);
+      case 'critical':
+        return filtered.filter((r) => r.severity.toLowerCase() === 'critical');
+      case 'high_impact':
+        return filtered.filter((r) => r.failure_count >= 10);
+      default:
+        return filtered;
+    }
+  }, [q, evidence, ruleQuickFilter]);
+  const exceptionRows = useMemo(() => {
+    if (!evidence) return [];
+    const filtered = evidence.exceptions.filter((e) =>
+      e.exception_id.toLowerCase().includes(q) ||
+      e.dr_id.toLowerCase().includes(q) ||
+      e.rule_id.toLowerCase().includes(q) ||
+      e.message.toLowerCase().includes(q)
+    );
+    switch (exceptionQuickFilter) {
+      case 'open':
+        return filtered.filter((e) => e.exception_status.toLowerCase() === 'open');
+      case 'critical':
+        return filtered.filter((e) => e.severity.toLowerCase() === 'critical');
+      case 'with_case':
+        return filtered.filter((e) => Boolean(e.case_id));
+      default:
+        return filtered;
+    }
+  }, [q, evidence, exceptionQuickFilter]);
+  const controlRows = useMemo(() => {
+    if (!evidence) return [];
+    const filtered = evidence.controlsCoverage.filter((c) =>
+      c.control_id.toLowerCase().includes(q) ||
+      c.control_name.toLowerCase().includes(q) ||
+      c.covered_dr_ids.toLowerCase().includes(q)
+    );
+    switch (controlQuickFilter) {
+      case 'with_exceptions':
+        return filtered.filter((c) => c.linked_exception_count > 0);
+      case 'automated':
+        return filtered.filter((c) => c.control_type.toLowerCase() === 'automated');
+      case 'manual':
+        return filtered.filter((c) => c.control_type.toLowerCase() === 'manual');
+      default:
+        return filtered;
+    }
+  }, [q, evidence, controlQuickFilter]);
+  const populationRows = useMemo(() => {
+    if (!evidence) return [];
+    const filtered = evidence.populationQuality.filter((p) =>
+      p.dr_id.toLowerCase().includes(q) ||
+      p.business_term.toLowerCase().includes(q)
+    );
+    switch (populationQuickFilter) {
+      case 'fail':
+        return filtered.filter((p) => p.pass_fail === 'Fail');
+      case 'na':
+        return filtered.filter((p) => p.pass_fail === 'N/A');
+      case 'mandatory_fail':
+        return filtered.filter((p) => p.mandatory && p.pass_fail === 'Fail');
+      default:
+        return filtered;
+    }
+  }, [q, evidence, populationQuickFilter]);
+
   if (!isChecksRun || !evidence) {
     return (
       <div className="min-h-[calc(100vh-4rem)] bg-background">
@@ -149,92 +241,6 @@ export default function EvidencePackPage() {
   }
 
   const ov = evidence.overview;
-  const q = search.trim().toLowerCase();
-  const drCoverageRows = useMemo(() => {
-    const filtered = evidence.drCoverage.filter((r) =>
-      r.dr_id.toLowerCase().includes(q) ||
-      r.business_term.toLowerCase().includes(q) ||
-      r.column_names.toLowerCase().includes(q)
-    );
-    switch (drQuickFilter) {
-      case 'mandatory':
-        return filtered.filter((r) => r.mandatory);
-      case 'gaps':
-        return filtered.filter((r) => r.coverage_status === 'NO_RULE' || r.coverage_status === 'NO_CONTROL');
-      case 'asp':
-        return filtered.filter((r) => r.asp_derived);
-      default:
-        return filtered;
-    }
-  }, [q, evidence.drCoverage, drQuickFilter]);
-  const ruleRows = useMemo(() => {
-    const filtered = evidence.ruleExecution.filter((r) =>
-      r.rule_id.toLowerCase().includes(q) ||
-      r.rule_name.toLowerCase().includes(q) ||
-      r.linked_dr_ids.toLowerCase().includes(q)
-    );
-    switch (ruleQuickFilter) {
-      case 'failing':
-        return filtered.filter((r) => r.failure_count > 0);
-      case 'critical':
-        return filtered.filter((r) => r.severity.toLowerCase() === 'critical');
-      case 'high_impact':
-        return filtered.filter((r) => r.failure_count >= 10);
-      default:
-        return filtered;
-    }
-  }, [q, evidence.ruleExecution, ruleQuickFilter]);
-  const exceptionRows = useMemo(() => {
-    const filtered = evidence.exceptions.filter((e) =>
-      e.exception_id.toLowerCase().includes(q) ||
-      e.dr_id.toLowerCase().includes(q) ||
-      e.rule_id.toLowerCase().includes(q) ||
-      e.message.toLowerCase().includes(q)
-    );
-    switch (exceptionQuickFilter) {
-      case 'open':
-        return filtered.filter((e) => e.exception_status.toLowerCase() === 'open');
-      case 'critical':
-        return filtered.filter((e) => e.severity.toLowerCase() === 'critical');
-      case 'with_case':
-        return filtered.filter((e) => Boolean(e.case_id));
-      default:
-        return filtered;
-    }
-  }, [q, evidence.exceptions, exceptionQuickFilter]);
-  const controlRows = useMemo(() => {
-    const filtered = evidence.controlsCoverage.filter((c) =>
-      c.control_id.toLowerCase().includes(q) ||
-      c.control_name.toLowerCase().includes(q) ||
-      c.covered_dr_ids.toLowerCase().includes(q)
-    );
-    switch (controlQuickFilter) {
-      case 'with_exceptions':
-        return filtered.filter((c) => c.linked_exception_count > 0);
-      case 'automated':
-        return filtered.filter((c) => c.control_type.toLowerCase() === 'automated');
-      case 'manual':
-        return filtered.filter((c) => c.control_type.toLowerCase() === 'manual');
-      default:
-        return filtered;
-    }
-  }, [q, evidence.controlsCoverage, controlQuickFilter]);
-  const populationRows = useMemo(() => {
-    const filtered = evidence.populationQuality.filter((p) =>
-      p.dr_id.toLowerCase().includes(q) ||
-      p.business_term.toLowerCase().includes(q)
-    );
-    switch (populationQuickFilter) {
-      case 'fail':
-        return filtered.filter((p) => p.pass_fail === 'Fail');
-      case 'na':
-        return filtered.filter((p) => p.pass_fail === 'N/A');
-      case 'mandatory_fail':
-        return filtered.filter((p) => p.mandatory && p.pass_fail === 'Fail');
-      default:
-        return filtered;
-    }
-  }, [q, evidence.populationQuality, populationQuickFilter]);
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-background">

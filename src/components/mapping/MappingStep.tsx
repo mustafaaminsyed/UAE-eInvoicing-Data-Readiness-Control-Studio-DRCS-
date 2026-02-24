@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { ArrowRight, Check, X, Search, Wand2, ChevronDown, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,13 +35,7 @@ export function MappingStep({ previewData, mappings, onMappingsChange }: Mapping
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
 
   // Generate suggestions when data changes
-  useEffect(() => {
-    if (previewData && mappings.length === 0) {
-      handleGenerateSuggestions();
-    }
-  }, [previewData]);
-
-  const handleGenerateSuggestions = () => {
+  const handleGenerateSuggestions = useCallback(() => {
     setIsGenerating(true);
     setTimeout(() => {
       const newSuggestions = generateMappingSuggestions(previewData.columns, previewData.rows);
@@ -49,7 +43,13 @@ export function MappingStep({ previewData, mappings, onMappingsChange }: Mapping
       onMappingsChange(newMappings);
       setIsGenerating(false);
     }, 500);
-  };
+  }, [previewData.columns, previewData.rows, onMappingsChange]);
+
+  useEffect(() => {
+    if (mappings.length === 0) {
+      handleGenerateSuggestions();
+    }
+  }, [mappings.length, handleGenerateSuggestions]);
 
   const handleConfirmMapping = (mappingId: string) => {
     const updated = mappings.map(m => 
@@ -234,7 +234,7 @@ export function MappingStep({ previewData, mappings, onMappingsChange }: Mapping
               <TableHeader className="sticky top-0 bg-background z-10">
                 <TableRow>
                   <TableHead className="w-[200px]">ERP Column</TableHead>
-                  <TableHead className="w-12 text-center">→</TableHead>
+                  <TableHead className="w-12 text-center">-&gt;</TableHead>
                   <TableHead className="w-[280px]">PINT-AE Field</TableHead>
                   <TableHead className="w-[100px]">Confidence</TableHead>
                   <TableHead className="w-[200px]">Sample Values</TableHead>

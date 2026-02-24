@@ -5,8 +5,8 @@
 
 export const CONFORMANCE_CONFIG = {
   /** Active spec version label shown in UI */
-  specVersionLabel: 'PINT-AE 2025-Q2 · UAE DR v1.0.1',
-  
+  specVersionLabel: 'PINT-AE 2025-Q2 - UAE DR v1.0.1',
+
   /** Default use case for mandatory field resolution */
   defaultUseCase: 'UAE B2B Standard Invoice',
 
@@ -16,13 +16,13 @@ export const CONFORMANCE_CONFIG = {
   /** Minimum mandatory DR population coverage (%) to allow check runs */
   mandatoryPopulationThreshold: 99,
 
-  /** Population warning threshold — DRs below this are flagged */
+  /** Population warning threshold - DRs below this are flagged */
   populationWarningThreshold: 99,
 
   /** Maximum gaps shown in Evidence Pack */
   evidencePackTopGaps: 10,
 
-  // ── Validation Tolerances ──────────────────────────────────────────
+  // Validation Tolerances
   /** Default tolerance for monetary calculations (header totals, line net, etc.) */
   monetaryTolerance: 0.01,
 

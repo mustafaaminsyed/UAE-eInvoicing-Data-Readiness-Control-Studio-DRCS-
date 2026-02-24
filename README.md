@@ -1,39 +1,79 @@
-# Welcome to your Lovable project
+# UAE eInvoicing Data Readiness and Control Studio (DRCS)
 
-## Project info
+A React + Supabase application for assessing UAE PINT-AE eInvoicing readiness, executing compliance checks, triaging exceptions, and producing regulator-ready evidence packs.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## What this solution does
 
-## How can I edit this code?
+DRCS is an operational control studio for invoice data quality and compliance.
 
-There are several ways of editing your application.
+It supports:
+- AR and AP dataset ingestion and separation
+- Mapping ERP columns to PINT-AE UC1 fields
+- Standard PINT-AE/UAE check execution
+- Custom validation checks and AP search checks
+- Traceability coverage and conformance gating
+- Exception, case, rejection, and lifecycle views
+- Evidence Pack export for audit/regulatory use
 
-**Use Lovable**
+## End-to-end workflow
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+1. Upload AR and/or AP files.
+2. Build or select a mapping template.
+3. Run checks for AR, AP, or ALL scope.
+4. Review exceptions, cases, and controls insights.
+5. Export an Evidence Pack.
 
-Changes made via Lovable will be committed automatically to this repo.
+## Key application modules
 
-**Use your preferred IDE**
+- Upload and Upload Audit
+- Mapping and Traceability
+- Run Checks and Check Registry
+- Exceptions and Invoice Detail
+- Cases, Rejections, and Controls Dashboard
+- AP Explorer for search-check outputs
+- Evidence Pack
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## Architecture summary
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+Frontend:
+- React 18 + TypeScript + Vite
+- Tailwind + shadcn-ui components
+- React Router for module navigation
+- TanStack Query for query client wiring
 
-Follow these steps:
+Core orchestration:
+- `src/context/ComplianceContext.tsx` manages dataset state, run scope, execution, and result aggregation.
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+Validation and domain logic:
+- `src/lib/checks/*` for built-in and custom check runners
+- `src/lib/coverage/*` for readiness/traceability coverage
+- `src/lib/evidence/*` for Evidence Pack generation
+- `src/lib/mapping/*` for mapping suggestion and coverage
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+Persistence (Supabase):
+- Checks and runs: `pint_ae_checks`, `custom_checks`, `check_runs`, `check_exceptions`, `run_summaries`
+- Risk and analytics: `entity_scores`, `client_risk_scores`, `investigation_flags`, `client_health`
+- Operations: `cases`, `case_notes`, `rejections`, `invoice_lifecycle`
+- Mapping: `mapping_templates`
 
-# Step 3: Install the necessary dependencies.
-npm i
+## Local setup
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+Prerequisites:
+- Node.js 18+
+- npm
+
+Install and run:
+
+```bash
+npm install
 npm run dev
+```
+
+Build and preview:
+
+```bash
+npm run build
+npm run preview
 ```
 
 ## Team setup baseline
@@ -48,7 +88,7 @@ npm run dev
 
 Start of session:
 
-```sh
+```bash
 git fetch --all --prune
 git checkout <your-branch>
 git pull --rebase origin <your-branch>
@@ -58,7 +98,7 @@ npm ci
 
 End of session:
 
-```sh
+```bash
 git add -A
 git commit -m "wip: <short summary>"
 git push origin <your-branch>
@@ -66,7 +106,7 @@ git push origin <your-branch>
 
 Before merging:
 
-```sh
+```bash
 git fetch origin
 git rebase origin/main
 npm run lint
@@ -74,50 +114,50 @@ npm run test
 npm run build
 ```
 
-**Edit a file directly in GitHub**
+## Environment variables
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Create `.env` with:
 
-**Use GitHub Codespaces**
+```bash
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_or_publishable_key
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Optional feature flags:
 
-## What technologies are used for this project?
+```bash
+VITE_ENABLE_CASES=false
+VITE_ENABLE_SCENARIO_LENS=true
+VITE_ENABLE_SCENARIO_LENS_MOCK_DATA=false
+VITE_ENABLE_SCENARIO_APPLICABILITY_COLUMN=false
+```
 
-This project is built with:
+## Quality and smoke tests
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+Run the basic quality gate locally:
 
-## AP/AR dataset notes
+```bash
+npm run lint
+npm run test
+npm run build
+```
 
-- Uploads now require a dataset type selection:
-  - `AR` = Customer Invoices (Outbound)
-  - `AP` = Vendor Invoices (Inbound)
-- Validation runs can be scoped to `AR`, `AP`, or `ALL` from the Run Checks screen.
-- Exceptions are tagged with dataset type and can be filtered with AR/AP lenses on the Exceptions page.
-- AP investigation search checks are configured in Check Builder using `Check Type = SEARCH_CHECK`.
-  - Starter checks are auto-seeded and can be edited/deactivated like other custom checks.
-  - Add more starter checks in `src/lib/api/checksApi.ts` inside `seedStarterSearchChecks()`.
-- AP Explorer uses client-side fuzzy matching. For very large AP datasets, search remains functional but may be slower.
+## Spec utilities
 
-## How can I deploy this project?
+To regenerate/import PINT-AE resources used by the solution:
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+```bash
+npm run generate:pint-spec
+```
 
-## Can I connect a custom domain to my Lovable project?
+## Repository structure
 
-Yes, you can!
+- `src/` application code
+- `supabase/` Supabase SQL/migrations/config
+- `scripts/` utility scripts
+- `docs/` additional technical documentation
+- `specs/` specification-related assets
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Deployment
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+This is a static Vite app. Deploy the `dist/` output to any static host after `npm run build`, with required `VITE_*` variables configured in the host environment.

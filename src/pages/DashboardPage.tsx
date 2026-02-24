@@ -153,6 +153,12 @@ export default function DashboardPage() {
     setDirectionFilter((current) => (current === 'all' ? current : direction));
   }, [direction]);
 
+  useEffect(() => {
+    if (!isChecksRun) {
+      navigate('/');
+    }
+  }, [isChecksRun, navigate]);
+
   const loadMetrics = async () => {
     const [lifecycle, sla] = await Promise.all([
       getLifecycleMetrics(),
@@ -161,6 +167,8 @@ export default function DashboardPage() {
     setLifecycleMetrics(lifecycle);
     setSlaMetrics(sla);
   };
+
+  if (!isChecksRun) return null;
 
   const stats = getDashboardStats(directionFilter);
   
@@ -250,11 +258,6 @@ export default function DashboardPage() {
     setResultsSavedViews((prev) => prev.filter((view) => view.id !== selectedResultsViewId));
     setSelectedResultsViewId('none');
   };
-
-  if (!isChecksRun) {
-    navigate('/');
-    return null;
-  }
 
   return (
     <div className="min-h-[calc(100vh-4rem)]">

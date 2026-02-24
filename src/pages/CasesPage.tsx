@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Briefcase, 
@@ -78,11 +78,7 @@ export default function CasesPage() {
     resolvedCases: 0 
   });
 
-  useEffect(() => {
-    loadData();
-  }, [statusFilter, ownerFilter, slaFilter]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setIsLoading(true);
     await updateSLABreaches();
     
@@ -100,7 +96,11 @@ export default function CasesPage() {
     setCases(casesData);
     setSlaMetrics(metrics);
     setIsLoading(false);
-  };
+  }, [statusFilter, ownerFilter, slaFilter]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleOpenDetail = async (caseItem: Case) => {
     setSelectedCase(caseItem);

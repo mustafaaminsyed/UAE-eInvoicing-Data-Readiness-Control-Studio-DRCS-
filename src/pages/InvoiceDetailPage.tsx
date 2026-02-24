@@ -1,5 +1,5 @@
 ﻿import { useParams, useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, FileText, User, AlertTriangle, CheckCircle, Clock, Briefcase, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCompliance } from '@/context/ComplianceContext';
@@ -29,12 +29,12 @@ export default function InvoiceDetailPage() {
   const [linkedCase, setLinkedCase] = useState<Case | null>(null);
 
   useEffect(() => {
-    if (invoiceId) {
-      loadAdditionalData();
+    if (!isChecksRun || !invoiceId) {
+      navigate('/');
     }
-  }, [invoiceId]);
+  }, [isChecksRun, invoiceId, navigate]);
 
-  const loadAdditionalData = async () => {
+  const loadAdditionalData = useCallback(async () => {
     if (!invoiceId) return;
     const [events, caseData] = await Promise.all([
       fetchLifecycleEvents(invoiceId),
@@ -42,12 +42,15 @@ export default function InvoiceDetailPage() {
     ]);
     setLifecycleEvents(events);
     setLinkedCase(caseData);
-  };
+  }, [invoiceId]);
 
-  if (!isChecksRun || !invoiceId) {
-    navigate('/');
-    return null;
-  }
+  useEffect(() => {
+    if (invoiceId) {
+      loadAdditionalData();
+    }
+  }, [invoiceId, loadAdditionalData]);
+
+  if (!isChecksRun || !invoiceId) return null;
 
   const { header, lines, buyer, exceptions } = getInvoiceDetails(invoiceId);
 

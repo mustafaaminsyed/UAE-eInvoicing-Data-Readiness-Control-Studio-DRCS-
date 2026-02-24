@@ -128,8 +128,6 @@ function evaluateExpression(expression: string, record: any): number | undefined
         expr = expr.replace(match, String(value));
       }
     }
-    // Safely evaluate the expression
-    // eslint-disable-next-line no-new-func
     const result = new Function(`return ${expr}`)();
     return typeof result === 'number' ? result : undefined;
   } catch {
@@ -168,7 +166,6 @@ function evaluateCondition(condition: string | undefined, record: any): boolean 
         }
       }
     }
-    // eslint-disable-next-line no-new-func
     return Boolean(new Function(`return ${expr}`)());
   } catch {
     return true;
@@ -336,7 +333,6 @@ export function runCustomCheck(check: CustomCheckConfig, data: DataContext): Exc
               }
             }
           }
-          // eslint-disable-next-line no-new-func
           const result = new Function(`return ${expr}`)();
           if (!result) {
             const invoiceId = (record as any).invoice_id;
