@@ -1,156 +1,26 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Focus Tasks</title>
-  <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-  <main class="app-shell" aria-labelledby="app-title">
-    <header class="panel app-header">
-      <div>
-        <p class="eyebrow">Daily Planner</p>
-        <h1 id="app-title">Focus Tasks</h1>
-        <p id="task-summary" class="summary-text">0 total - 0 active - 0 completed</p>
-      </div>
-      <div class="header-control">
-        <label for="theme-select">Theme</label>
-        <select id="theme-select" aria-label="Theme preference">
-          <option value="system">System</option>
-          <option value="light">Light</option>
-          <option value="dark">Dark</option>
-        </select>
-      </div>
-    </header>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- TODO: Set the document title to the name of your application -->
+    <title>Lovable App</title>
+    <meta name="description" content="Lovable Generated Project" />
+    <meta name="author" content="Lovable" />
 
-    <section class="panel quick-add-panel" aria-labelledby="quick-add-title">
-      <h2 id="quick-add-title">Quick Add</h2>
-      <form id="task-form" class="task-form" novalidate>
-        <div class="form-field">
-          <label for="task-title-input">Task title</label>
-          <input id="task-title-input" name="title" type="text" autocomplete="off" maxlength="120" required>
-        </div>
-        <div class="form-field">
-          <label for="task-description-input">Description <span class="muted">(optional)</span></label>
-          <textarea id="task-description-input" name="description" rows="2" maxlength="240"></textarea>
-        </div>
-        <div class="form-row">
-          <div class="form-field">
-            <label for="task-due-input">Due date</label>
-            <input id="task-due-input" name="dueDate" type="date">
-          </div>
-          <div class="form-field">
-            <label for="task-priority-input">Priority</label>
-            <select id="task-priority-input" name="priority">
-              <option value="low">Low</option>
-              <option value="medium" selected>Medium</option>
-              <option value="high">High</option>
-            </select>
-          </div>
-          <button class="primary-btn" type="submit">Add Task</button>
-        </div>
-        <p id="form-error" class="form-error" role="alert" aria-live="assertive" hidden></p>
-      </form>
-    </section>
+    <!-- TODO: Update og:title to match your application name -->
+    <meta property="og:title" content="Lovable App" />
+    <meta property="og:description" content="Lovable Generated Project" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
 
-    <section class="panel control-panel" aria-label="Task controls">
-      <div class="search-wrap">
-        <label for="search-input">Search</label>
-        <input id="search-input" type="search" placeholder="Search title or description">
-      </div>
-      <div class="control-row">
-        <div id="filter-group" class="filter-group" role="group" aria-label="Filter tasks">
-          <button class="filter-btn active" type="button" data-filter="all" aria-pressed="true">All</button>
-          <button class="filter-btn" type="button" data-filter="active" aria-pressed="false">Active</button>
-          <button class="filter-btn" type="button" data-filter="completed" aria-pressed="false">Completed</button>
-        </div>
-        <div class="sort-wrap">
-          <label for="sort-select">Sort</label>
-          <select id="sort-select">
-            <option value="created-desc">Newest</option>
-            <option value="created-asc">Oldest</option>
-            <option value="due-asc">Due Date (Earliest)</option>
-            <option value="due-desc">Due Date (Latest)</option>
-            <option value="priority-desc">Priority (High to Low)</option>
-            <option value="priority-asc">Priority (Low to High)</option>
-          </select>
-        </div>
-      </div>
-      <div class="bulk-actions" role="group" aria-label="Bulk actions">
-        <button id="mark-all-complete-btn" type="button">Mark All Complete</button>
-        <button id="mark-all-active-btn" type="button">Mark All Active</button>
-        <button id="clear-completed-btn" type="button">Clear Completed</button>
-      </div>
-    </section>
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@Lovable" />
+    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+  </head>
 
-    <section class="panel list-panel" aria-label="Task list">
-      <p id="loading-state" class="status-text">Loading tasks...</p>
-      <p id="empty-state" class="status-text" hidden></p>
-      <ul id="task-list" class="task-list" aria-live="polite"></ul>
-    </section>
-  </main>
-
-  <template id="task-template">
-    <li class="task-item">
-      <div class="task-main">
-        <div class="task-top">
-          <label class="task-check-wrap">
-            <input class="task-toggle" type="checkbox">
-            <span class="sr-only">Toggle completion</span>
-          </label>
-          <div class="task-content">
-            <p class="task-title"></p>
-            <p class="task-description"></p>
-          </div>
-          <details class="task-menu">
-            <summary class="task-menu-trigger" aria-label="Task actions">⋮</summary>
-            <div class="task-menu-list" role="menu">
-              <button class="menu-edit-btn" type="button" role="menuitem">Edit</button>
-              <button class="menu-delete-btn danger" type="button" role="menuitem">Delete</button>
-            </div>
-          </details>
-        </div>
-        <div class="task-meta">
-          <span class="tag priority-tag"></span>
-          <span class="tag due-tag"></span>
-          <span class="tag created-tag"></span>
-        </div>
-        <form class="edit-form" hidden>
-          <div class="form-field">
-            <label class="sr-only">Edit title</label>
-            <input class="edit-title-input" type="text" maxlength="120" aria-label="Edit task title" required>
-          </div>
-          <div class="form-field">
-            <label class="sr-only">Edit description</label>
-            <textarea class="edit-description-input" rows="2" maxlength="240" aria-label="Edit task description"></textarea>
-          </div>
-          <div class="form-row edit-row">
-            <div class="form-field">
-              <label class="sr-only">Edit due date</label>
-              <input class="edit-due-input" type="date" aria-label="Edit due date">
-            </div>
-            <div class="form-field">
-              <label class="sr-only">Edit priority</label>
-              <select class="edit-priority-input" aria-label="Edit priority">
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-              </select>
-            </div>
-            <div class="edit-actions">
-              <button class="save-edit-btn primary-btn" type="submit">Save</button>
-              <button class="cancel-edit-btn" type="button">Cancel</button>
-            </div>
-          </div>
-          <p class="edit-error" role="alert" aria-live="assertive" hidden></p>
-        </form>
-      </div>
-    </li>
-  </template>
-
-  <script src="store.js"></script>
-  <script src="ui.js"></script>
-  <script src="app.js"></script>
-</body>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>

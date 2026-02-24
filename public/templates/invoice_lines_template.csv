@@ -1,0 +1,4 @@
+line_id,invoice_id,line_number,description,quantity,unit_of_measure,unit_price,line_discount,line_total_excl_vat,vat_rate,vat_amount,tax_category_code
+L001,INV001,1,Consulting Services - Tax Advisory,10,EA,100.00,0.00,1000.00,5.00,50.00,S
+L002,INV002,1,E-Invoicing Integration Package,1,EA,2000.00,0.00,2000.00,5.00,100.00,S
+L003,INV003,1,Compliance Readiness Assessment,5,EA,100.00,0.00,500.00,5.00,25.00,S

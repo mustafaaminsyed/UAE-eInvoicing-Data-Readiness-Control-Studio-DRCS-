@@ -1,0 +1,178 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 212 36% 97%;
+    --foreground: 221 42% 13%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 221 42% 13%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 221 42% 13%;
+
+    --primary: 199 89% 38%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 30% 94%;
+    --secondary-foreground: 221 42% 13%;
+
+    --muted: 210 28% 94%;
+    --muted-foreground: 215 17% 42%;
+
+    --accent: 165 64% 37%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 215 31% 88%;
+    --input: 215 31% 88%;
+    --ring: 199 89% 38%;
+
+    --radius: 0.5rem;
+
+    /* Severity Colors */
+    --severity-critical: 0 84% 60%;
+    --severity-critical-bg: 0 84% 97%;
+    --severity-high: 25 95% 53%;
+    --severity-high-bg: 25 95% 97%;
+    --severity-medium: 45 93% 47%;
+    --severity-medium-bg: 45 93% 97%;
+    --severity-low: 199 89% 42%;
+    --severity-low-bg: 199 89% 96%;
+
+    /* Success */
+    --success: 142 71% 45%;
+    --success-bg: 142 71% 97%;
+
+    /* Chart Colors */
+    --chart-1: 199 89% 38%;
+    --chart-2: 165 64% 37%;
+    --chart-3: 142 71% 45%;
+    --chart-4: 25 95% 53%;
+    --chart-5: 0 84% 60%;
+
+    --sidebar-background: 218 34% 12%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 199 89% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 32% 18%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 220 32% 18%;
+    --sidebar-ring: 199 89% 45%;
+  }
+
+  .dark {
+    --background: 220 36% 7%;
+    --foreground: 210 40% 98%;
+
+    --card: 219 33% 10%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 219 33% 10%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 199 89% 45%;
+    --primary-foreground: 222 47% 11%;
+
+    --secondary: 218 28% 17%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 218 28% 17%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 165 64% 44%;
+    --accent-foreground: 222 47% 11%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 218 28% 19%;
+    --input: 218 28% 19%;
+    --ring: 199 89% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: "Manrope", sans-serif;
+    background-image:
+      radial-gradient(circle at 12% 0%, rgba(0, 157, 217, 0.12), transparent 36%),
+      radial-gradient(circle at 100% 18%, rgba(17, 168, 119, 0.1), transparent 36%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(247, 250, 255, 0.88));
+    background-attachment: fixed;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: "Space Grotesk", sans-serif;
+  }
+
+  .surface-glass {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.7));
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    box-shadow: 0 20px 45px -26px rgba(12, 39, 73, 0.36);
+    backdrop-filter: blur(10px);
+  }
+
+  .grid-veil {
+    background-image:
+      linear-gradient(to right, rgba(84, 110, 145, 0.08) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(84, 110, 145, 0.08) 1px, transparent 1px);
+    background-size: 34px 34px;
+  }
+
+  .severity-critical {
+    @apply bg-[hsl(var(--severity-critical-bg))] text-[hsl(var(--severity-critical))] border-[hsl(var(--severity-critical))];
+  }
+  
+  .severity-high {
+    @apply bg-[hsl(var(--severity-high-bg))] text-[hsl(var(--severity-high))] border-[hsl(var(--severity-high))];
+  }
+  
+  .severity-medium {
+    @apply bg-[hsl(var(--severity-medium-bg))] text-[hsl(var(--severity-medium))] border-[hsl(var(--severity-medium))];
+  }
+  
+  .severity-low {
+    @apply bg-[hsl(var(--severity-low-bg))] text-[hsl(var(--severity-low))] border-[hsl(var(--severity-low))];
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.4s ease-out;
+  }
+
+  .animate-pulse-subtle {
+    animation: pulseSubtle 2s infinite;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseSubtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
