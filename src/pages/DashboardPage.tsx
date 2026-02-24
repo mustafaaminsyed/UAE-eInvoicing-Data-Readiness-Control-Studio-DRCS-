@@ -168,8 +168,6 @@ export default function DashboardPage() {
     setSlaMetrics(sla);
   };
 
-  if (!isChecksRun) return null;
-
   const stats = getDashboardStats(directionFilter);
   
   const severityData = Object.entries(stats.exceptionsBySeverity)
@@ -258,6 +256,8 @@ export default function DashboardPage() {
     setResultsSavedViews((prev) => prev.filter((view) => view.id !== selectedResultsViewId));
     setSelectedResultsViewId('none');
   };
+
+  if (!isChecksRun) return null;
 
   return (
     <div className="min-h-[calc(100vh-4rem)]">
