@@ -1,2 +1,2 @@
 # UAE-eInvoicing-Data-Readiness-Control-Studio-DRCS-
-UAE eInvoicing data readiness control studio solutionf or data cleansing activities for tax data
+UAE eInvoicing data readiness control studio solution for data cleansing activities for tax dat relevant for electronic invoicing in the UAE.
