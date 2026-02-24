@@ -757,6 +757,99 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      },
+      validation_explanations: {
+        Row: {
+          check_exception_id: string | null
+          check_id: string | null
+          check_name: string | null
+          confidence: number
+          created_at: string
+          dataset_type: string | null
+          direction: string | null
+          error_message: string | null
+          exception_key: string
+          explanation: string
+          generated_at: string
+          id: string
+          invoice_id: string | null
+          model: string | null
+          prompt_version: string
+          recommended_fix: string
+          risk: string
+          rule_code: string | null
+          source_context: Json | null
+          status: string
+          tenant_id: string
+          updated_at: string
+          validation_run_id: string | null
+        }
+        Insert: {
+          check_exception_id?: string | null
+          check_id?: string | null
+          check_name?: string | null
+          confidence: number
+          created_at?: string
+          dataset_type?: string | null
+          direction?: string | null
+          error_message?: string | null
+          exception_key: string
+          explanation: string
+          generated_at?: string
+          id?: string
+          invoice_id?: string | null
+          model?: string | null
+          prompt_version?: string
+          recommended_fix: string
+          risk: string
+          rule_code?: string | null
+          source_context?: Json | null
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+          validation_run_id?: string | null
+        }
+        Update: {
+          check_exception_id?: string | null
+          check_id?: string | null
+          check_name?: string | null
+          confidence?: number
+          created_at?: string
+          dataset_type?: string | null
+          direction?: string | null
+          error_message?: string | null
+          exception_key?: string
+          explanation?: string
+          generated_at?: string
+          id?: string
+          invoice_id?: string | null
+          model?: string | null
+          prompt_version?: string
+          recommended_fix?: string
+          risk?: string
+          rule_code?: string | null
+          source_context?: Json | null
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+          validation_run_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "validation_explanations_check_exception_id_fkey"
+            columns: ["check_exception_id"]
+            isOneToOne: false
+            referencedRelation: "check_exceptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "validation_explanations_validation_run_id_fkey"
+            columns: ["validation_run_id"]
+            isOneToOne: false
+            referencedRelation: "check_runs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

@@ -9,76 +9,105 @@ import {
 } from '@/types/pintAE';
 import { Severity } from '@/types/compliance';
 import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
+import { getSupabaseEnvStatus, shouldUseLocalDevFallback } from '@/lib/api/supabaseEnv';
 
 // ============ PINT-AE Checks CRUD ============
 
 export async function fetchPintAEChecks(): Promise<PintAECheck[]> {
-  const { data, error } = await supabase
-    .from('pint_ae_checks')
-    .select('*')
-    .order('check_id', { ascending: true });
+  const envStatus = getSupabaseEnvStatus();
+  if (!envStatus.configured) {
+    if (shouldUseLocalDevFallback()) {
+      return UAE_UC1_CHECK_PACK;
+    }
+    console.warn('[PINT-AE] Skipping check fetch: Supabase env is not configured', envStatus.issues);
+    return [];
+  }
 
-  if (error) {
+  try {
+    const { data, error } = await supabase
+      .from('pint_ae_checks')
+      .select('*')
+      .order('check_id', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching PINT-AE checks:', error);
+      return [];
+    }
+
+    return (data || []).map(row => ({
+      id: row.id,
+      check_id: row.check_id,
+      check_name: row.check_name,
+      description: row.description || undefined,
+      scope: row.scope as PintAECheck['scope'],
+      rule_type: row.rule_type as PintAECheck['rule_type'],
+      severity: row.severity as Severity,
+      use_case: row.use_case || undefined,
+      pint_reference_terms: row.pint_reference_terms || [],
+      mof_rule_reference: row.mof_rule_reference || undefined,
+      pass_condition: row.pass_condition || undefined,
+      fail_condition: row.fail_condition || undefined,
+      owner_team_default: row.owner_team_default as PintAECheck['owner_team_default'],
+      suggested_fix: row.suggested_fix || undefined,
+      evidence_required: row.evidence_required || undefined,
+      is_enabled: row.is_enabled,
+      parameters: (row.parameters as Record<string, any>) || {},
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    }));
+  } catch (error) {
     console.error('Error fetching PINT-AE checks:', error);
     return [];
   }
-
-  return (data || []).map(row => ({
-    id: row.id,
-    check_id: row.check_id,
-    check_name: row.check_name,
-    description: row.description || undefined,
-    scope: row.scope as PintAECheck['scope'],
-    rule_type: row.rule_type as PintAECheck['rule_type'],
-    severity: row.severity as Severity,
-    use_case: row.use_case || undefined,
-    pint_reference_terms: row.pint_reference_terms || [],
-    mof_rule_reference: row.mof_rule_reference || undefined,
-    pass_condition: row.pass_condition || undefined,
-    fail_condition: row.fail_condition || undefined,
-    owner_team_default: row.owner_team_default as PintAECheck['owner_team_default'],
-    suggested_fix: row.suggested_fix || undefined,
-    evidence_required: row.evidence_required || undefined,
-    is_enabled: row.is_enabled,
-    parameters: (row.parameters as Record<string, any>) || {},
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-  }));
 }
 
 export async function fetchEnabledPintAEChecks(): Promise<PintAECheck[]> {
-  const { data, error } = await supabase
-    .from('pint_ae_checks')
-    .select('*')
-    .eq('is_enabled', true)
-    .order('check_id', { ascending: true });
-
-  if (error) {
-    console.error('Error fetching enabled PINT-AE checks:', error);
+  const envStatus = getSupabaseEnvStatus();
+  if (!envStatus.configured) {
+    if (shouldUseLocalDevFallback()) {
+      return UAE_UC1_CHECK_PACK.filter((check) => check.is_enabled);
+    }
+    console.warn('[PINT-AE] Skipping enabled checks fetch: Supabase env is not configured', envStatus.issues);
     return [];
   }
 
-  return (data || []).map(row => ({
-    id: row.id,
-    check_id: row.check_id,
-    check_name: row.check_name,
-    description: row.description || undefined,
-    scope: row.scope as PintAECheck['scope'],
-    rule_type: row.rule_type as PintAECheck['rule_type'],
-    severity: row.severity as Severity,
-    use_case: row.use_case || undefined,
-    pint_reference_terms: row.pint_reference_terms || [],
-    mof_rule_reference: row.mof_rule_reference || undefined,
-    pass_condition: row.pass_condition || undefined,
-    fail_condition: row.fail_condition || undefined,
-    owner_team_default: row.owner_team_default as PintAECheck['owner_team_default'],
-    suggested_fix: row.suggested_fix || undefined,
-    evidence_required: row.evidence_required || undefined,
-    is_enabled: row.is_enabled,
-    parameters: (row.parameters as Record<string, any>) || {},
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-  }));
+  try {
+    const { data, error } = await supabase
+      .from('pint_ae_checks')
+      .select('*')
+      .eq('is_enabled', true)
+      .order('check_id', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching enabled PINT-AE checks:', error);
+      return [];
+    }
+
+    return (data || []).map(row => ({
+      id: row.id,
+      check_id: row.check_id,
+      check_name: row.check_name,
+      description: row.description || undefined,
+      scope: row.scope as PintAECheck['scope'],
+      rule_type: row.rule_type as PintAECheck['rule_type'],
+      severity: row.severity as Severity,
+      use_case: row.use_case || undefined,
+      pint_reference_terms: row.pint_reference_terms || [],
+      mof_rule_reference: row.mof_rule_reference || undefined,
+      pass_condition: row.pass_condition || undefined,
+      fail_condition: row.fail_condition || undefined,
+      owner_team_default: row.owner_team_default as PintAECheck['owner_team_default'],
+      suggested_fix: row.suggested_fix || undefined,
+      evidence_required: row.evidence_required || undefined,
+      is_enabled: row.is_enabled,
+      parameters: (row.parameters as Record<string, any>) || {},
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    }));
+  } catch (error) {
+    console.error('Error fetching enabled PINT-AE checks:', error);
+    return [];
+  }
 }
 
 export async function upsertPintAECheck(check: PintAECheck): Promise<boolean> {
@@ -131,73 +160,153 @@ export interface ChecksDiagnostics {
   dataSource: 'supabase' | 'hardcoded' | 'none';
   lastSeedAttempt?: string;
   lastSeedResult?: 'success' | 'skipped' | 'error';
+  configured: boolean;
+  configurationIssues: string[];
+  fetchError?: string;
 }
 
 export async function getChecksDiagnostics(): Promise<ChecksDiagnostics> {
-  const { data: allChecks } = await supabase
-    .from('pint_ae_checks')
-    .select('check_id, is_enabled');
+  const envStatus = getSupabaseEnvStatus();
+  if (!envStatus.configured) {
+    if (shouldUseLocalDevFallback()) {
+      const enabled = UAE_UC1_CHECK_PACK.filter((check) => check.is_enabled).length;
+      return {
+        totalChecks: UAE_UC1_CHECK_PACK.length,
+        enabledChecks: enabled,
+        uc1ChecksPresent: UAE_UC1_CHECK_PACK.length > 0,
+        uc1CheckCount: UAE_UC1_CHECK_PACK.length,
+        dataSource: 'hardcoded',
+        configured: false,
+        configurationIssues: envStatus.issues,
+        fetchError: undefined,
+      };
+    }
+    return {
+      totalChecks: 0,
+      enabledChecks: 0,
+      uc1ChecksPresent: false,
+      uc1CheckCount: 0,
+      dataSource: 'none',
+      configured: false,
+      configurationIssues: envStatus.issues,
+      fetchError: 'Supabase environment is not configured.',
+    };
+  }
 
-  const checks = allChecks || [];
-  const enabledChecks = checks.filter(c => c.is_enabled);
-  const uc1Checks = checks.filter(c => c.check_id.startsWith('UAE-UC1-CHK-'));
+  try {
+    const { data: allChecks, error } = await supabase
+      .from('pint_ae_checks')
+      .select('check_id, is_enabled');
 
-  return {
-    totalChecks: checks.length,
-    enabledChecks: enabledChecks.length,
-    uc1ChecksPresent: uc1Checks.length > 0,
-    uc1CheckCount: uc1Checks.length,
-    dataSource: checks.length > 0 ? 'supabase' : 'none',
-  };
+    if (error) {
+      return {
+        totalChecks: 0,
+        enabledChecks: 0,
+        uc1ChecksPresent: false,
+        uc1CheckCount: 0,
+        dataSource: 'none',
+        configured: true,
+        configurationIssues: [],
+        fetchError: error.message,
+      };
+    }
+
+    const checks = allChecks || [];
+    const enabledChecks = checks.filter(c => c.is_enabled);
+    const uc1Checks = checks.filter(c => c.check_id.startsWith('UAE-UC1-CHK-'));
+
+    return {
+      totalChecks: checks.length,
+      enabledChecks: enabledChecks.length,
+      uc1ChecksPresent: uc1Checks.length > 0,
+      uc1CheckCount: uc1Checks.length,
+      dataSource: checks.length > 0 ? 'supabase' : 'none',
+      configured: true,
+      configurationIssues: [],
+    };
+  } catch (error) {
+    return {
+      totalChecks: 0,
+      enabledChecks: 0,
+      uc1ChecksPresent: false,
+      uc1CheckCount: 0,
+      dataSource: 'none',
+      configured: true,
+      configurationIssues: [],
+      fetchError: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 export async function seedUC1CheckPack(forceUpsert = false): Promise<{ success: boolean; message: string }> {
   console.log('[PINT-AE] Starting UC1 check pack seed...');
+  const envStatus = getSupabaseEnvStatus();
+  if (!envStatus.configured) {
+    if (shouldUseLocalDevFallback()) {
+      return {
+        success: true,
+        message: 'Local fallback mode active - using built-in UC1 check pack',
+      };
+    }
+    return {
+      success: false,
+      message: `Cannot seed checks: ${envStatus.issues.join(', ')}`,
+    };
+  }
   
-  // Check specifically if UC1 checks already exist
-  const { data: existingUC1 } = await supabase
-    .from('pint_ae_checks')
-    .select('check_id')
-    .ilike('check_id', 'UAE-UC1-CHK-%')
-    .limit(1);
+  try {
+    // Check specifically if UC1 checks already exist
+    const { data: existingUC1, error: existingError } = await supabase
+      .from('pint_ae_checks')
+      .select('check_id')
+      .ilike('check_id', 'UAE-UC1-CHK-%')
+      .limit(1);
 
-  if (existingUC1 && existingUC1.length > 0 && !forceUpsert) {
-    console.log('[PINT-AE] UC1 checks already exist, skipping seed (use forceUpsert=true to update)');
-    return { success: true, message: 'Seed skipped - UC1 checks already exist' };
-  }
+    if (existingError) {
+      return { success: false, message: `Seed failed: ${existingError.message}` };
+    }
 
-  // Prepare checks for upsert
-  const checksToUpsert = UAE_UC1_CHECK_PACK.map(check => ({
-    check_id: check.check_id,
-    check_name: check.check_name,
-    description: check.description,
-    scope: check.scope,
-    rule_type: check.rule_type,
-    severity: check.severity,
-    use_case: check.use_case,
-    pint_reference_terms: check.pint_reference_terms,
-    mof_rule_reference: check.mof_rule_reference,
-    pass_condition: check.pass_condition,
-    fail_condition: check.fail_condition,
-    owner_team_default: check.owner_team_default,
-    suggested_fix: check.suggested_fix,
-    evidence_required: check.evidence_required,
-    is_enabled: check.is_enabled,
-    parameters: check.parameters,
-  }));
+    if (existingUC1 && existingUC1.length > 0 && !forceUpsert) {
+      console.log('[PINT-AE] UC1 checks already exist, skipping seed (use forceUpsert=true to update)');
+      return { success: true, message: 'Seed skipped - UC1 checks already exist' };
+    }
 
-  // Use upsert to handle both insert and update scenarios
-  const { error } = await supabase
-    .from('pint_ae_checks')
-    .upsert(checksToUpsert, { onConflict: 'check_id' });
+    // Prepare checks for upsert
+    const checksToUpsert = UAE_UC1_CHECK_PACK.map(check => ({
+      check_id: check.check_id,
+      check_name: check.check_name,
+      description: check.description,
+      scope: check.scope,
+      rule_type: check.rule_type,
+      severity: check.severity,
+      use_case: check.use_case,
+      pint_reference_terms: check.pint_reference_terms,
+      mof_rule_reference: check.mof_rule_reference,
+      pass_condition: check.pass_condition,
+      fail_condition: check.fail_condition,
+      owner_team_default: check.owner_team_default,
+      suggested_fix: check.suggested_fix,
+      evidence_required: check.evidence_required,
+      is_enabled: check.is_enabled,
+      parameters: check.parameters,
+    }));
 
-  if (error) {
+    // Use upsert to handle both insert and update scenarios
+    const { error } = await supabase
+      .from('pint_ae_checks')
+      .upsert(checksToUpsert, { onConflict: 'check_id' });
+
+    if (error) {
+      console.error('[PINT-AE] Error seeding UC1 check pack:', error);
+      return { success: false, message: `Seed failed: ${error.message}` };
+    }
+
+    console.log('[PINT-AE] Successfully seeded/updated UC1 check pack with', checksToUpsert.length, 'checks');
+    return { success: true, message: `Seeded ${checksToUpsert.length} UC1 checks` };
+  } catch (error) {
     console.error('[PINT-AE] Error seeding UC1 check pack:', error);
-    return { success: false, message: `Seed failed: ${error.message}` };
+    return { success: false, message: `Seed failed: ${error instanceof Error ? error.message : String(error)}` };
   }
-
-  console.log('[PINT-AE] Successfully seeded/updated UC1 check pack with', checksToUpsert.length, 'checks');
-  return { success: true, message: `Seeded ${checksToUpsert.length} UC1 checks` };
 }
 
 // ============ Exceptions CRUD ============

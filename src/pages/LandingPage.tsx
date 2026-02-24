@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   Orbit,
   Play,
+  Search,
   ShieldCheck,
   Upload,
   Wand2,
@@ -32,6 +33,7 @@ import type { Case } from "@/types/cases";
 
 const quickActions = [
   { label: "Upload Audit", icon: FileClock, path: "/upload-audit" },
+  { label: "AP Explorer", icon: Search, path: "/ap-explorer" },
   { label: "Exceptions", icon: AlertTriangle, path: "/exceptions" },
   { label: "Check Registry", icon: FileText, path: "/check-registry" },
   { label: "Cases", icon: Briefcase, path: "/cases" },

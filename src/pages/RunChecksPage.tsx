@@ -1,5 +1,5 @@
 ﻿import { useNavigate } from 'react-router-dom';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Play, CheckCircle, FileText, Users, List, ArrowRight, RotateCcw, Database, RefreshCw, ChevronDown, AlertCircle, Settings, Map, AlertTriangle, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +20,17 @@ import { checkRunReadiness } from '@/lib/coverage/conformanceEngine';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
+import { getSupabaseEnvStatus, shouldUseLocalDevFallback } from '@/lib/api/supabaseEnv';
+import { supabase } from '@/integrations/supabase/client';
+
+type ConnectionTestStatus = 'idle' | 'running' | 'passed' | 'failed';
+
+type ConnectionTestResult = {
+  status: ConnectionTestStatus;
+  message: string;
+  details: string[];
+  checkedAt: string | null;
+};
 
 export default function RunChecksPage() {
   const navigate = useNavigate();
@@ -44,7 +55,16 @@ export default function RunChecksPage() {
   const [isSeeding, setIsSeeding] = useState(false);
   const [lastSeedResult, setLastSeedResult] = useState<string | null>(null);
   const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState(false);
+  const [connectionTest, setConnectionTest] = useState<ConnectionTestResult>({
+    status: 'idle',
+    message: '',
+    details: [],
+    checkedAt: null,
+  });
   const specMeta = getPintAeSpecMetadata();
+  const supabaseEnvStatus = useMemo(() => getSupabaseEnvStatus(), []);
+  const isSupabaseConfigured = supabaseEnvStatus.configured;
+  const isLocalFallbackMode = useMemo(() => shouldUseLocalDevFallback(), []);
 
   // Mapping template state
   const [mappingTemplates, setMappingTemplates] = useState<MappingTemplate[]>([]);
@@ -55,6 +75,22 @@ export default function RunChecksPage() {
   const loadChecks = useCallback(async () => {
     setIsLoadingChecks(true);
     console.log('[Run Checks] Fetching enabled checks from Supabase...');
+
+    if (!isSupabaseConfigured && !isLocalFallbackMode) {
+      setPintAEChecks([]);
+      setDiagnostics({
+        totalChecks: 0,
+        enabledChecks: 0,
+        uc1ChecksPresent: false,
+        uc1CheckCount: 0,
+        dataSource: 'none',
+        configured: false,
+        configurationIssues: supabaseEnvStatus.issues,
+        fetchError: 'Supabase environment is not configured.',
+      });
+      setIsLoadingChecks(false);
+      return;
+    }
     
     const [checks, diag] = await Promise.all([
       fetchEnabledPintAEChecks(),
@@ -68,12 +104,29 @@ export default function RunChecksPage() {
     console.log('[Run Checks] Diagnostics:', diag);
     
     setIsLoadingChecks(false);
-  }, []);
+  }, [isSupabaseConfigured, isLocalFallbackMode, supabaseEnvStatus.issues]);
 
   const ensureChecksReady = useCallback(async () => {
     setIsSyncingChecks(true);
     setIsLoadingChecks(true);
     console.log('[Run Checks] Ensuring UC1 check pack is synced...');
+
+    if (!isSupabaseConfigured && !isLocalFallbackMode) {
+      setPintAEChecks([]);
+      setDiagnostics({
+        totalChecks: 0,
+        enabledChecks: 0,
+        uc1ChecksPresent: false,
+        uc1CheckCount: 0,
+        dataSource: 'none',
+        configured: false,
+        configurationIssues: supabaseEnvStatus.issues,
+        fetchError: 'Supabase environment is not configured.',
+      });
+      setIsLoadingChecks(false);
+      setIsSyncingChecks(false);
+      return;
+    }
 
     const [checks, diag] = await Promise.all([
       fetchEnabledPintAEChecks(),
@@ -105,10 +158,16 @@ export default function RunChecksPage() {
 
     setIsLoadingChecks(false);
     setIsSyncingChecks(false);
-  }, [expectedUC1Count]);
+  }, [expectedUC1Count, isSupabaseConfigured, isLocalFallbackMode, supabaseEnvStatus.issues]);
 
   const loadMappingTemplates = useCallback(async () => {
     setIsLoadingTemplates(true);
+    if (!isSupabaseConfigured) {
+      setMappingTemplates([]);
+      setSelectedTemplateId('none');
+      setIsLoadingTemplates(false);
+      return;
+    }
     const templates = await fetchActiveTemplates(direction);
     setMappingTemplates(templates);
     const activeProfile = activeMappingProfileByDirection[direction];
@@ -118,9 +177,13 @@ export default function RunChecksPage() {
       setSelectedTemplateId('none');
     }
     setIsLoadingTemplates(false);
-  }, [activeMappingProfileByDirection, direction]);
+  }, [activeMappingProfileByDirection, direction, isSupabaseConfigured]);
 
   const handleSeedUC1 = async (force = false) => {
+    if (!isSupabaseConfigured && !isLocalFallbackMode) {
+      toast.error(`Supabase not configured: ${supabaseEnvStatus.issues.join(', ')}`);
+      return;
+    }
     setIsSeeding(true);
     console.log('[Run Checks] Seeding UC1 pack...', force ? '(force upsert)' : '');
     
@@ -148,7 +211,7 @@ export default function RunChecksPage() {
     }
   }, [isDataLoaded, navigate]);
 
-  const noMappingProfile = !isLoadingTemplates && mappingTemplates.length === 0;
+  const noMappingProfile = isSupabaseConfigured && !isLoadingTemplates && mappingTemplates.length === 0;
 
   if (!isDataLoaded) return null;
 
@@ -170,7 +233,18 @@ export default function RunChecksPage() {
     : [];
   const hasCoverageWarning = selectedTemplate && mandatoryCoverage < 100;
   const readiness = checkRunReadiness(!noMappingProfile, mandatoryCoverage, null);
-  const isBlocked = !readiness.canRun;
+  const gateReasons = isLocalFallbackMode
+    ? readiness.reasons
+    : isSupabaseConfigured
+    ? readiness.reasons
+    : [
+      {
+        message: `Supabase environment is not configured (${supabaseEnvStatus.issues.join(', ')})`,
+        link: '/upload',
+        linkLabel: 'Open Setup Guide',
+      },
+    ];
+  const isBlocked = isLocalFallbackMode ? !readiness.canRun : (!isSupabaseConfigured || !readiness.canRun);
 
   const handleRunChecks = async () => {
     if (hasCoverageWarning) {
@@ -197,6 +271,87 @@ export default function RunChecksPage() {
     loadChecks();
   };
 
+  const handleTestConnection = async () => {
+    const checkedAt = new Date().toLocaleString();
+
+    if (!isSupabaseConfigured) {
+      if (isLocalFallbackMode) {
+        setConnectionTest({
+          status: 'passed',
+          message: 'Local fallback mode is active.',
+          details: [
+            'Supabase is not configured, but built-in UC1 checks are available for local testing.',
+            `Configuration issues: ${supabaseEnvStatus.issues.join(', ')}`,
+          ],
+          checkedAt,
+        });
+        toast.success('Local fallback mode is active');
+        return;
+      }
+      const message = 'Supabase environment is not configured.';
+      setConnectionTest({
+        status: 'failed',
+        message,
+        details: supabaseEnvStatus.issues,
+        checkedAt,
+      });
+      toast.error(message);
+      return;
+    }
+
+    setConnectionTest({
+      status: 'running',
+      message: 'Testing Supabase connection...',
+      details: [],
+      checkedAt: null,
+    });
+
+    try {
+      const [checksProbe, templatesProbe, diag] = await Promise.all([
+        supabase.from('pint_ae_checks').select('check_id', { count: 'exact', head: true }),
+        supabase.from('mapping_templates').select('id', { count: 'exact', head: true }),
+        getChecksDiagnostics(),
+      ]);
+
+      const details: string[] = [];
+      if (checksProbe.error) details.push(`pint_ae_checks probe failed: ${checksProbe.error.message}`);
+      if (templatesProbe.error) details.push(`mapping_templates probe failed: ${templatesProbe.error.message}`);
+      if (diag.fetchError) details.push(`diagnostics fetch failed: ${diag.fetchError}`);
+
+      if (details.length > 0) {
+        setConnectionTest({
+          status: 'failed',
+          message: 'Supabase connection test failed.',
+          details,
+          checkedAt,
+        });
+        toast.error('Supabase connection test failed');
+        return;
+      }
+
+      const checksCount = checksProbe.count ?? 0;
+      const templatesCount = templatesProbe.count ?? 0;
+      setConnectionTest({
+        status: 'passed',
+        message: 'Supabase connection test passed.',
+        details: [
+          `pint_ae_checks reachable (rows: ${checksCount})`,
+          `mapping_templates reachable (rows: ${templatesCount})`,
+        ],
+        checkedAt,
+      });
+      toast.success('Supabase connection test passed');
+    } catch (error) {
+      setConnectionTest({
+        status: 'failed',
+        message: 'Supabase connection test failed.',
+        details: [error instanceof Error ? error.message : String(error)],
+        checkedAt,
+      });
+      toast.error('Supabase connection test failed');
+    }
+  };
+
   return (
     <div className="min-h-[calc(100vh-4rem)]">
       <div className="container max-w-5xl py-8 md:py-10">
@@ -215,6 +370,26 @@ export default function RunChecksPage() {
             <Badge variant="outline">Direction: {direction}</Badge>
           </div>
         </div>
+
+        {!isSupabaseConfigured && !isLocalFallbackMode && (
+          <Alert variant="destructive" className="mb-8">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Supabase is not configured for this environment</AlertTitle>
+            <AlertDescription>
+              Update <code>.env</code> with real values for <code>VITE_SUPABASE_URL</code> and
+              <code> VITE_SUPABASE_PUBLISHABLE_KEY</code>, then restart the app.
+            </AlertDescription>
+          </Alert>
+        )}
+        {!isSupabaseConfigured && isLocalFallbackMode && (
+          <Alert className="mb-8 border-amber-500/30 bg-amber-500/10">
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <AlertTitle className="text-amber-700">Local fallback mode is active</AlertTitle>
+            <AlertDescription className="text-amber-600">
+              Supabase is not configured, so DRCS is using built-in UC1 checks for local testing only.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Mapping Template Selector */}
         <Card className="mb-8 animate-slide-up surface-glass rounded-2xl border border-white/70">
@@ -256,10 +431,16 @@ export default function RunChecksPage() {
 
                 {mappingTemplates.length === 0 && !isLoadingTemplates && (
                   <p className="text-sm text-muted-foreground mt-2">
-                    No active {direction} mapping templates found.{' '}
-                    <Button variant="link" className="p-0 h-auto" onClick={() => navigate('/mapping?tab=create')}>
-                      Create one
-                    </Button>
+                    {isLocalFallbackMode ? (
+                      'Local fallback mode: mapping templates from Supabase are unavailable. Checks can still run with raw uploaded data.'
+                    ) : (
+                      <>
+                        No active {direction} mapping templates found.{' '}
+                        <Button variant="link" className="p-0 h-auto" onClick={() => navigate('/mapping?tab=create')}>
+                          Create one
+                        </Button>
+                      </>
+                    )}
                   </p>
                 )}
               </div>
@@ -337,22 +518,64 @@ export default function RunChecksPage() {
                     Supabase
                   </Badge>
                 )}
+                {diagnostics?.dataSource === 'hardcoded' && (
+                  <Badge variant="secondary" className="text-xs gap-1">
+                    <Database className="w-3 h-3" />
+                    Local Fallback
+                  </Badge>
+                )}
               </div>
               <p className="text-sm text-muted-foreground mt-1">
                 PINT-AE / UAE MoF aligned compliance checks from database
               </p>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleRefreshChecks}
-              disabled={isLoadingChecks}
-              className="gap-1"
-            >
-              <RefreshCw className={`w-4 h-4 ${isLoadingChecks ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleTestConnection}
+                disabled={connectionTest.status === 'running'}
+                className="gap-1"
+              >
+                <Database className={`w-4 h-4 ${connectionTest.status === 'running' ? 'animate-pulse' : ''}`} />
+                Test Connection
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleRefreshChecks}
+                disabled={isLoadingChecks}
+                className="gap-1"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoadingChecks ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
           </div>
+
+          {connectionTest.status !== 'idle' && (
+            <div
+              className={`border-b px-6 py-3 text-sm ${
+                connectionTest.status === 'passed'
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : connectionTest.status === 'failed'
+                    ? 'border-destructive/20 bg-destructive/5 text-destructive'
+                    : 'border-border bg-muted/40 text-muted-foreground'
+              }`}
+            >
+              <p className="font-medium">{connectionTest.message}</p>
+              {connectionTest.details.length > 0 && (
+                <div className="mt-1 space-y-1 text-xs">
+                  {connectionTest.details.map((detail, index) => (
+                    <p key={`${detail}-${index}`}>{detail}</p>
+                  ))}
+                </div>
+              )}
+              {connectionTest.checkedAt && (
+                <p className="mt-1 text-xs opacity-80">Last checked: {connectionTest.checkedAt}</p>
+              )}
+            </div>
+          )}
           
           <div className="divide-y max-h-[400px] overflow-y-auto">
             {isLoadingChecks ? (
@@ -362,8 +585,21 @@ export default function RunChecksPage() {
             ) : pintAEChecks.length === 0 ? (
               <div className="p-8 text-center">
                 <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground mb-4">No enabled checks found in database</p>
-                <Button onClick={() => handleSeedUC1(true)} disabled={isSeeding}>
+                <p className="text-muted-foreground mb-2">
+                  {!isSupabaseConfigured && !isLocalFallbackMode
+                    ? 'Supabase configuration is missing.'
+                    : diagnostics?.fetchError
+                      ? 'Unable to load checks from Supabase.'
+                      : isLocalFallbackMode
+                        ? 'No local fallback checks available.'
+                        : 'No enabled checks found in database'}
+                </p>
+                {(diagnostics?.fetchError || (!isSupabaseConfigured && !isLocalFallbackMode)) && (
+                  <p className="text-xs text-muted-foreground mb-4">
+                    {diagnostics?.fetchError || supabaseEnvStatus.issues.join(', ')}
+                  </p>
+                )}
+                <Button onClick={() => handleSeedUC1(true)} disabled={isSeeding || (!isSupabaseConfigured && !isLocalFallbackMode)}>
                   <Settings className="w-4 h-4 mr-2" />
                   Seed UC1 Check Pack
                 </Button>
@@ -432,7 +668,7 @@ export default function RunChecksPage() {
             <AlertTitle className="text-destructive">Cannot run checks - conformance gate failed</AlertTitle>
             <AlertDescription className="text-destructive/80">
               <ul className="list-disc list-inside mt-2 space-y-1">
-                {readiness.reasons.map((reason, i) => (
+                {gateReasons.map((reason, i) => (
                   <li key={i} className="flex items-start gap-2">
                     <span>{reason.message}</span>
                     <Link to={reason.link} className="text-primary underline text-sm whitespace-nowrap">
@@ -539,6 +775,11 @@ export default function RunChecksPage() {
                             <Database className="w-3 h-3 mr-1" />
                             Supabase
                           </Badge>
+                        ) : diagnostics.dataSource === 'hardcoded' ? (
+                          <Badge className="bg-amber-500/10 text-amber-700 border-amber-500/20">
+                            <Database className="w-3 h-3 mr-1" />
+                            Local Fallback
+                          </Badge>
                         ) : (
                           <Badge variant="destructive">
                             No Data
@@ -556,6 +797,15 @@ export default function RunChecksPage() {
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={handleTestConnection}
+                    disabled={connectionTest.status === 'running'}
+                  >
+                    <Database className={`w-4 h-4 mr-2 ${connectionTest.status === 'running' ? 'animate-pulse' : ''}`} />
+                    Test Connection
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={handleRefreshChecks}
                     disabled={isLoadingChecks}
                   >
@@ -566,7 +816,7 @@ export default function RunChecksPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => handleSeedUC1(false)}
-                    disabled={isSeeding}
+                    disabled={isSeeding || (!isSupabaseConfigured && !isLocalFallbackMode)}
                   >
                     <Database className="w-4 h-4 mr-2" />
                     Seed UC1 Pack
@@ -575,7 +825,7 @@ export default function RunChecksPage() {
                     variant="secondary"
                     size="sm"
                     onClick={() => handleSeedUC1(true)}
-                    disabled={isSeeding}
+                    disabled={isSeeding || (!isSupabaseConfigured && !isLocalFallbackMode)}
                   >
                     <Settings className="w-4 h-4 mr-2" />
                     Force Upsert UC1
@@ -589,8 +839,23 @@ export default function RunChecksPage() {
                 )}
 
                 <div className="text-xs text-muted-foreground pt-2 border-t">
-                  <p><strong>Fallback to demo checks:</strong> false (using DB-driven checks only)</p>
-                  <p><strong>Check execution source:</strong> PINT-AE check runner with Supabase checks</p>
+                  <p>
+                    <strong>Fallback to demo checks:</strong>{' '}
+                    {isLocalFallbackMode ? 'true (using built-in UC1 check pack)' : 'false (using DB-driven checks only)'}
+                  </p>
+                  <p>
+                    <strong>Check execution source:</strong>{' '}
+                    {isLocalFallbackMode
+                      ? 'PINT-AE check runner with local built-in UC1 checks'
+                      : 'PINT-AE check runner with Supabase checks'}
+                  </p>
+                  <p><strong>Supabase configured:</strong> {diagnostics?.configured ? 'true' : 'false'}</p>
+                  {diagnostics?.configurationIssues?.length ? (
+                    <p><strong>Config issues:</strong> {diagnostics.configurationIssues.join(', ')}</p>
+                  ) : null}
+                  {diagnostics?.fetchError ? (
+                    <p><strong>Last fetch error:</strong> {diagnostics.fetchError}</p>
+                  ) : null}
                   <p><strong>Linked PINT-AE schematron rules:</strong> {specMeta.schematronRules}</p>
                   <p><strong>Linked PINT-AE codelists:</strong> {specMeta.codelists}</p>
                 </div>

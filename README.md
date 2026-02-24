@@ -11,6 +11,7 @@ It supports:
 - Mapping ERP columns to PINT-AE UC1 fields
 - Standard PINT-AE/UAE check execution
 - Custom validation checks and AP search checks
+- AI-generated validation explanations per exception (with cached responses)
 - Traceability coverage and conformance gating
 - Exception, case, rejection, and lifecycle views
 - Evidence Pack export for audit/regulatory use
@@ -29,6 +30,7 @@ It supports:
 - Mapping and Traceability
 - Run Checks and Check Registry
 - Exceptions and Invoice Detail
+- AI explanation panel in Exception Drill-down
 - Cases, Rejections, and Controls Dashboard
 - AP Explorer for search-check outputs
 - Evidence Pack
@@ -55,6 +57,10 @@ Persistence (Supabase):
 - Risk and analytics: `entity_scores`, `client_risk_scores`, `investigation_flags`, `client_health`
 - Operations: `cases`, `case_notes`, `rejections`, `invoice_lifecycle`
 - Mapping: `mapping_templates`
+- AI explanations cache: `validation_explanations`
+
+Edge functions:
+- `validation-explain` generates structured explanations (`explanation`, `risk`, `recommended_fix`, `confidence`) and stores them for reuse.
 
 ## Local setup
 
@@ -123,6 +129,10 @@ VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_or_publishable_key
 ```
 
+Important:
+- Do not keep placeholder values like `YOUR_PROJECT_REF` or `YOUR_SUPABASE_ANON_KEY`.
+- If placeholders are detected, Run Checks is now intentionally blocked and shows a setup error banner.
+
 Optional feature flags:
 
 ```bash
@@ -130,7 +140,42 @@ VITE_ENABLE_CASES=false
 VITE_ENABLE_SCENARIO_LENS=true
 VITE_ENABLE_SCENARIO_LENS_MOCK_DATA=false
 VITE_ENABLE_SCENARIO_APPLICABILITY_COLUMN=false
+VITE_ENABLE_LOCAL_DEV_FALLBACK=false
 ```
+
+`VITE_ENABLE_LOCAL_DEV_FALLBACK=true` allows Run Checks to use the built-in UC1 check pack when Supabase is not configured (local testing only).
+
+Server-side environment variables for `validation-explain`:
+
+```bash
+LLM_EXPLAINER_API_KEY=your_llm_api_key
+LLM_EXPLAINER_API_URL=https://api.openai.com/v1
+LLM_EXPLAINER_MODEL=gpt-4o-mini
+```
+
+## AI validation explanation setup
+
+1. Apply Supabase migrations (includes `validation_explanations` table):
+
+```bash
+supabase db push
+```
+
+2. Deploy the edge function:
+
+```bash
+supabase functions deploy validation-explain
+```
+
+3. Set edge function secrets in Supabase:
+
+```bash
+supabase secrets set LLM_EXPLAINER_API_KEY=...
+supabase secrets set LLM_EXPLAINER_API_URL=https://api.openai.com/v1
+supabase secrets set LLM_EXPLAINER_MODEL=gpt-4o-mini
+```
+
+4. In the app, open `Exceptions` and use `Explain` on any exception row.
 
 ## Quality and smoke tests
 

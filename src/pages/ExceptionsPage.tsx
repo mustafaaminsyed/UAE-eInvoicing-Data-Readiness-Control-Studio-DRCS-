@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Download, Eye, Filter, Save, Search, SlidersHorizontal, Trash2, CheckCheck } from 'lucide-react';
+import { Download, Eye, Filter, Save, Search, SlidersHorizontal, Trash2, CheckCheck, Sparkles, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -33,6 +33,11 @@ import { Exception, Severity } from '@/types/compliance';
 import { Direction, ResolutionReasonCode } from '@/types/direction';
 import { checksRegistry } from '@/lib/checks/checksRegistry';
 import { cn } from '@/lib/utils';
+import {
+  fetchValidationExplanation,
+  generateValidationExplanation,
+} from '@/lib/api/validationExplainApi';
+import { ValidationExplanation } from '@/types/validationExplain';
 
 type ExceptionSortKey = 'severity' | 'checkName' | 'invoiceNumber' | 'sellerTrn' | 'buyerId' | 'message';
 type SortDirection = 'asc' | 'desc';
@@ -113,6 +118,44 @@ function exportExceptionsToCsv(rows: Exception[], filenamePrefix = 'exceptions')
   document.body.removeChild(link);
 }
 
+function formatEvidenceValue(value: unknown): string {
+  if (value === null || value === undefined) return '-';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function getExplanationEvidence(
+  sourceContext: Record<string, unknown> | null | undefined,
+): { ruleHint: string | null; entries: Array<[string, unknown]> } {
+  if (!sourceContext) return { ruleHint: null, entries: [] };
+  const ruleHint = typeof sourceContext.rule_hint === 'string' ? sourceContext.rule_hint : null;
+  const hasEvidenceObject =
+    typeof sourceContext.evidence === 'object' &&
+    sourceContext.evidence !== null &&
+    !Array.isArray(sourceContext.evidence);
+  const evidenceRoot = hasEvidenceObject
+    ? (sourceContext.evidence as Record<string, unknown>)
+    : sourceContext;
+  const entries = Object.entries(evidenceRoot).filter(([, value]) => {
+    if (value === null || value === undefined) return false;
+    if (typeof value === 'string' && value.trim() === '') return false;
+    return true;
+  });
+  return { ruleHint, entries };
+}
+
+function getExplanationSourceLabel(source: ValidationExplanation['source'] | undefined): string {
+  if (source === 'cache') return 'Source: Cache';
+  if (source === 'edge') return 'Source: LLM';
+  if (source === 'fallback') return 'Source: Heuristic';
+  return 'Source: Unknown';
+}
+
 export default function ExceptionsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -130,6 +173,9 @@ export default function ExceptionsPage() {
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [selectedViewId, setSelectedViewId] = useState<string>('none');
   const [activeException, setActiveException] = useState<Exception | null>(null);
+  const [activeExplanation, setActiveExplanation] = useState<ValidationExplanation | null>(null);
+  const [isExplanationLoading, setIsExplanationLoading] = useState(false);
+  const [explanationError, setExplanationError] = useState<string | null>(null);
   const [workflowState, setWorkflowState] = useState<Record<string, { status: WorkflowStatus; reasonCode?: ResolutionReasonCode }>>({});
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -206,6 +252,53 @@ export default function ExceptionsPage() {
   useEffect(() => {
     setDirectionFilter((current) => (current === 'all' ? current : direction));
   }, [direction]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!activeException) {
+      setActiveExplanation(null);
+      setExplanationError(null);
+      setIsExplanationLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setIsExplanationLoading(true);
+    setActiveExplanation(null);
+    setExplanationError(null);
+    fetchValidationExplanation(activeException)
+      .then((existing) => {
+        if (cancelled) return;
+        setActiveExplanation(existing);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.warn('[Validation Explain] Could not load existing explanation:', error);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setIsExplanationLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeException]);
+
+  const handleGenerateExplanation = async (regenerate = false) => {
+    if (!activeException) return;
+    setIsExplanationLoading(true);
+    setExplanationError(null);
+    try {
+      const explanation = await generateValidationExplanation(activeException, { regenerate });
+      setActiveExplanation(explanation);
+    } catch (error) {
+      setExplanationError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsExplanationLoading(false);
+    }
+  };
 
   const getExceptionStatus = useCallback(
     (exception: Exception): WorkflowStatus => workflowState[exception.id]?.status || exception.status || 'Open',
@@ -750,7 +843,29 @@ export default function ExceptionsPage() {
                         )}
                         <td className="p-4 text-right">
                           <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="sm" className="gap-1" onClick={() => setActiveException(exception)}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="gap-1"
+                              onClick={() => {
+                                setActiveException(exception);
+                                setActiveExplanation(null);
+                                setExplanationError(null);
+                              }}
+                            >
+                              <Sparkles className="h-4 w-4" />
+                              Explain
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="gap-1"
+                              onClick={() => {
+                                setActiveException(exception);
+                                setActiveExplanation(null);
+                                setExplanationError(null);
+                              }}
+                            >
                               <Eye className="h-4 w-4" />
                               Details
                             </Button>
@@ -771,7 +886,16 @@ export default function ExceptionsPage() {
         </div>
       </div>
 
-      <Dialog open={Boolean(activeException)} onOpenChange={(open) => !open && setActiveException(null)}>
+      <Dialog
+        open={Boolean(activeException)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setActiveException(null);
+            setActiveExplanation(null);
+            setExplanationError(null);
+          }
+        }}
+      >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Exception Drill-down</DialogTitle>
@@ -819,6 +943,98 @@ export default function ExceptionsPage() {
                   <p><span className="text-muted-foreground">Expected:</span> <span className="font-mono">{String(activeException.expectedValue ?? '-')}</span></p>
                   <p><span className="text-muted-foreground">Actual:</span> <span className="font-mono">{String(activeException.actualValue ?? '-')}</span></p>
                 </div>
+              </div>
+              <div className="rounded-lg border bg-primary/5 p-4">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    <p className="text-xs font-medium text-muted-foreground">AI Validation Explanation</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleGenerateExplanation(false)}
+                      disabled={isExplanationLoading}
+                      className="gap-1"
+                    >
+                      {isExplanationLoading ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                      {activeExplanation ? 'Refresh' : 'Generate'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleGenerateExplanation(true)}
+                      disabled={isExplanationLoading}
+                    >
+                      Regenerate
+                    </Button>
+                  </div>
+                </div>
+                {explanationError && (
+                  <p className="mb-2 text-xs text-destructive">{explanationError}</p>
+                )}
+                {isExplanationLoading && !activeExplanation && (
+                  <p className="text-sm text-muted-foreground">Loading explanation...</p>
+                )}
+                {!activeExplanation && !isExplanationLoading && !explanationError && (
+                  <p className="text-sm text-muted-foreground">
+                    No explanation generated yet. Click Generate to create one.
+                  </p>
+                )}
+                {activeExplanation && (
+                  <div className="space-y-2 text-sm">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline">{activeExplanation.risk} Risk</Badge>
+                      <Badge variant="secondary">
+                        Confidence {(activeExplanation.confidence * 100).toFixed(0)}%
+                      </Badge>
+                      {activeExplanation.cached && <Badge variant="outline">Cached</Badge>}
+                    </div>
+                    <p><span className="text-muted-foreground">Explanation:</span> {activeExplanation.explanation}</p>
+                    <p><span className="text-muted-foreground">Recommended fix:</span> {activeExplanation.recommendedFix}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Model: {activeExplanation.model || '-'} | Prompt: {activeExplanation.promptVersion}
+                    </p>
+                    {activeExplanation.sourceContext && (
+                      <details className="rounded-md border bg-background/60 p-2">
+                        <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+                          Why this explanation?
+                        </summary>
+                        <div className="mt-2 space-y-1 text-xs">
+                          {(() => {
+                            const evidence = getExplanationEvidence(activeExplanation.sourceContext || null);
+                            return (
+                              <>
+                                <div className="mb-1">
+                                  <Badge variant="outline" className="text-[10px]">
+                                    {getExplanationSourceLabel(activeExplanation.source)}
+                                  </Badge>
+                                </div>
+                                {evidence.ruleHint && (
+                                  <p>
+                                    <span className="text-muted-foreground">Rule hint:</span>{' '}
+                                    <span className="font-mono">{evidence.ruleHint}</span>
+                                  </p>
+                                )}
+                                {evidence.entries.length > 0 ? (
+                                  evidence.entries.map(([key, value]) => (
+                                    <p key={key}>
+                                      <span className="text-muted-foreground">{key}:</span>{' '}
+                                      <span className="font-mono">{formatEvidenceValue(value)}</span>
+                                    </p>
+                                  ))
+                                ) : (
+                                  <p className="text-muted-foreground">No evidence details available.</p>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </details>
+                    )}
+                  </div>
+                )}
               </div>
               {activeException.invoiceId && (
                 <div className="flex justify-end">

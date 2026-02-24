@@ -3,6 +3,7 @@ import { MappingTemplate, FieldMapping } from '@/types/fieldMapping';
 import { Json } from '@/integrations/supabase/types';
 import { Direction } from '@/types/direction';
 import { parseDirectionFromDescription, withDirectionTag } from '@/lib/direction/directionUtils';
+import { getSupabaseEnvStatus } from '@/lib/api/supabaseEnv';
 
 // Helper to safely parse mappings from JSONB
 function parseMappings(mappings: Json | null): FieldMapping[] {
@@ -35,37 +36,59 @@ function mapTemplateRow(row: Record<string, unknown>): MappingTemplate {
 
 // Fetch all mapping templates
 export async function fetchMappingTemplates(direction?: Direction): Promise<MappingTemplate[]> {
-  const { data, error } = await supabase
-    .from('mapping_templates')
-    .select('*')
-    .order('updated_at', { ascending: false });
-
-  if (error) {
-    console.error('[MappingAPI] Error fetching templates:', error);
+  const envStatus = getSupabaseEnvStatus();
+  if (!envStatus.configured) {
+    console.warn('[MappingAPI] Skipping template fetch: Supabase env is not configured', envStatus.issues);
     return [];
   }
 
-  const mapped = (data || []).map((row) => mapTemplateRow(row as unknown as Record<string, unknown>));
-  if (!direction) return mapped;
-  return mapped.filter((template) => (template.direction || 'AR') === direction);
+  try {
+    const { data, error } = await supabase
+      .from('mapping_templates')
+      .select('*')
+      .order('updated_at', { ascending: false });
+
+    if (error) {
+      console.error('[MappingAPI] Error fetching templates:', error);
+      return [];
+    }
+
+    const mapped = (data || []).map((row) => mapTemplateRow(row as unknown as Record<string, unknown>));
+    if (!direction) return mapped;
+    return mapped.filter((template) => (template.direction || 'AR') === direction);
+  } catch (error) {
+    console.error('[MappingAPI] Error fetching templates:', error);
+    return [];
+  }
 }
 
 // Fetch active templates only
 export async function fetchActiveTemplates(direction?: Direction): Promise<MappingTemplate[]> {
-  const { data, error } = await supabase
-    .from('mapping_templates')
-    .select('*')
-    .eq('is_active', true)
-    .order('template_name');
-
-  if (error) {
-    console.error('[MappingAPI] Error fetching active templates:', error);
+  const envStatus = getSupabaseEnvStatus();
+  if (!envStatus.configured) {
+    console.warn('[MappingAPI] Skipping active template fetch: Supabase env is not configured', envStatus.issues);
     return [];
   }
 
-  const mapped = (data || []).map((row) => mapTemplateRow(row as unknown as Record<string, unknown>));
-  if (!direction) return mapped;
-  return mapped.filter((template) => (template.direction || 'AR') === direction);
+  try {
+    const { data, error } = await supabase
+      .from('mapping_templates')
+      .select('*')
+      .eq('is_active', true)
+      .order('template_name');
+
+    if (error) {
+      console.error('[MappingAPI] Error fetching active templates:', error);
+      return [];
+    }
+
+    const mapped = (data || []).map((row) => mapTemplateRow(row as unknown as Record<string, unknown>));
+    if (!direction) return mapped;
+    return mapped.filter((template) => (template.direction || 'AR') === direction);
+  } catch (error) {
+    console.error('[MappingAPI] Error fetching active templates:', error);
+    return [];
+  }
 }
 
 // Save a new mapping template
