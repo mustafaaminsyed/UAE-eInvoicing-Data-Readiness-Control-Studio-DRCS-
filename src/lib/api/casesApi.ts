@@ -15,6 +15,8 @@ import {
   SLA_HOURS_BY_SEVERITY
 } from '@/types/cases';
 import { Severity } from '@/types/compliance';
+import { shouldUseLocalDevFallback } from '@/lib/api/supabaseEnv';
+import { fetchLatestEntityScores } from '@/lib/api/checksApi';
 
 // Generate case number
 function generateCaseNumber(): string {
@@ -148,6 +150,17 @@ export async function fetchCaseNotes(caseId: string): Promise<CaseNote[]> {
 }
 
 export async function getSLAMetrics(): Promise<SLAMetrics> {
+  if (shouldUseLocalDevFallback()) {
+    return {
+      averageResolutionHours: {},
+      breachPercentage: 0,
+      totalCases: 0,
+      breachedCases: 0,
+      openCases: 0,
+      resolvedCases: 0,
+    };
+  }
+
   const { data: cases, error } = await supabase.from('cases').select('*');
   
   if (error || !cases) {
@@ -311,6 +324,10 @@ export async function getRejectionAnalytics(): Promise<{
   repeatRate: number;
   totalRejections: number;
 }> {
+  if (shouldUseLocalDevFallback()) {
+    return { byCategory: {}, byClient: [], repeatRate: 0, totalRejections: 0 };
+  }
+
   const { data: rejections, error } = await supabase.from('rejections').select('*');
   
   if (error || !rejections) {
@@ -385,6 +402,22 @@ export async function calculateClientHealth(sellerTrn: string, clientName?: stri
 }
 
 export async function fetchClientHealthScores(): Promise<ClientHealth[]> {
+  if (shouldUseLocalDevFallback()) {
+    const localSellerScores = await fetchLatestEntityScores('seller', 50);
+    return localSellerScores.map((score) => ({
+      id: `local-health-${score.entity_id}`,
+      seller_trn: score.entity_id,
+      client_name: score.entity_name,
+      score: score.score,
+      rejection_rate: 0,
+      critical_issues: score.critical_count,
+      sla_breaches: 0,
+      total_invoices: 0,
+      total_rejections: score.total_exceptions,
+      calculated_at: score.created_at || new Date().toISOString(),
+    }));
+  }
+
   const { data, error } = await supabase
     .from('client_health')
     .select('*')

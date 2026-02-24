@@ -1,6 +1,72 @@
 import { supabase } from '@/integrations/supabase/client';
 import { CheckRun, CustomCheckConfig, EntityScore, InvestigationFlag } from '@/types/customChecks';
 import { DatasetType } from '@/types/datasets';
+import { shouldUseLocalDevFallback } from '@/lib/api/supabaseEnv';
+
+const LOCAL_CHECK_RUNS_KEY = 'drcs_local_check_runs_v1';
+const LOCAL_ENTITY_SCORES_KEY = 'drcs_local_entity_scores_v1';
+
+function readLocalJson<T>(key: string, fallback: T): T {
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeLocalJson<T>(key: string, value: T): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Ignore local persistence failures in browser private modes/storage constraints.
+  }
+}
+
+function nextLocalId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function saveLocalCheckRun(run: Omit<CheckRun, 'id'>): string {
+  const existing = readLocalJson<CheckRun[]>(LOCAL_CHECK_RUNS_KEY, []);
+  const entry: CheckRun = {
+    id: nextLocalId('local-run'),
+    ...run,
+    dataset_type: run.dataset_type || 'AR',
+  };
+  const next = [entry, ...existing].slice(0, 500);
+  writeLocalJson(LOCAL_CHECK_RUNS_KEY, next);
+  return entry.id;
+}
+
+function saveLocalEntityScores(scores: Omit<EntityScore, 'id' | 'created_at'>[]): void {
+  const existing = readLocalJson<EntityScore[]>(LOCAL_ENTITY_SCORES_KEY, []);
+  const createdAt = new Date().toISOString();
+  const entries: EntityScore[] = scores.map((score) => ({
+    id: nextLocalId('local-score'),
+    created_at: createdAt,
+    ...score,
+  }));
+  const next = [...entries, ...existing].slice(0, 2000);
+  writeLocalJson(LOCAL_ENTITY_SCORES_KEY, next);
+}
+
+function fetchLocalCheckRuns(limit = 20): CheckRun[] {
+  const runs = readLocalJson<CheckRun[]>(LOCAL_CHECK_RUNS_KEY, []);
+  return [...runs]
+    .sort((a, b) => new Date(b.run_date).getTime() - new Date(a.run_date).getTime())
+    .slice(0, limit);
+}
+
+function fetchLocalEntityScores(runId: string, entityType?: string): EntityScore[] {
+  const scores = readLocalJson<EntityScore[]>(LOCAL_ENTITY_SCORES_KEY, []);
+  return scores
+    .filter((score) => score.run_id === runId && (!entityType || score.entity_type === entityType))
+    .sort((a, b) => a.score - b.score);
+}
 
 function mapCustomCheckRow(row: any): CustomCheckConfig {
   return {
@@ -186,6 +252,10 @@ export async function seedStarterSearchChecks(): Promise<void> {
 }
 
 export async function saveCheckRun(run: Omit<CheckRun, 'id'>): Promise<string | null> {
+  if (shouldUseLocalDevFallback()) {
+    return saveLocalCheckRun(run);
+  }
+
   const { data, error } = await supabase
     .from('check_runs')
     .insert({
@@ -215,6 +285,10 @@ export async function saveEntityScores(
   scores: Omit<EntityScore, 'id' | 'created_at'>[]
 ): Promise<boolean> {
   if (scores.length === 0) return true;
+  if (shouldUseLocalDevFallback()) {
+    saveLocalEntityScores(scores);
+    return true;
+  }
 
   const { error } = await supabase.from('entity_scores').insert(
     scores.map((score) => ({
@@ -240,6 +314,10 @@ export async function saveEntityScores(
 }
 
 export async function fetchCheckRuns(limit: number = 20): Promise<CheckRun[]> {
+  if (shouldUseLocalDevFallback()) {
+    return fetchLocalCheckRuns(limit);
+  }
+
   const { data, error } = await supabase
     .from('check_runs')
     .select('*')
@@ -332,6 +410,10 @@ export async function fetchEntityScores(
   runId: string,
   entityType?: string
 ): Promise<EntityScore[]> {
+  if (shouldUseLocalDevFallback()) {
+    return fetchLocalEntityScores(runId, entityType);
+  }
+
   let query = supabase
     .from('entity_scores')
     .select('*')
@@ -369,6 +451,12 @@ export async function fetchLatestEntityScores(
   entityType?: string,
   limit: number = 10
 ): Promise<EntityScore[]> {
+  if (shouldUseLocalDevFallback()) {
+    const latestRun = fetchLocalCheckRuns(1)[0];
+    if (!latestRun) return [];
+    return fetchLocalEntityScores(latestRun.id, entityType).slice(0, limit);
+  }
+
   const { data: latestRun } = await supabase
     .from('check_runs')
     .select('id')
