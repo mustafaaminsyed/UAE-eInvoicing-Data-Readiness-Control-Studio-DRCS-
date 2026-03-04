@@ -56,10 +56,6 @@ export default function UploadPage() {
     (s) => s && s.requiredMissing.length === 0
   ).length;
 
-  // Determine current step
-  let currentStep: StepKey = 'upload';
-  if (allFilesSelected && allStats) currentStep = 'validation';
-
   // Compute blocking reasons
   const blockingReasons: string[] = [];
   if (!files.buyers) blockingReasons.push('Buyers file not uploaded');
@@ -73,6 +69,12 @@ export default function UploadPage() {
     (s) => s && s.requiredMissing.length > 0
   );
   const canProceed = allFilesSelected && !hasStructuralErrors;
+
+  // Determine current step
+  let currentStep: StepKey = 'upload';
+  if (allFilesSelected && allStats) {
+    currentStep = canProceed ? 'mapping' : 'validation';
+  }
 
   // Analyze file on upload
   const handleFileSelect = useCallback(async (type: 'buyers' | 'headers' | 'lines', file: File | null) => {

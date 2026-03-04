@@ -167,7 +167,7 @@ export function FileSummaryCard({ stats, type, onRemove }: FileSummaryCardProps)
             </>
           ) : (
             <>
-              <p className="text-sm text-muted-foreground">—</p>
+              <p className="text-sm text-muted-foreground">-</p>
               <p className="text-xs text-muted-foreground">No PK</p>
             </>
           )}
@@ -178,7 +178,7 @@ export function FileSummaryCard({ stats, type, onRemove }: FileSummaryCardProps)
         </div>
       </div>
 
-      {/* Structural Validation — driven by template manifest */}
+      {/* Structural Validation - driven by template manifest */}
       <div className="space-y-2">
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Structural Validation</p>
         {hasDelimiterMismatch && (

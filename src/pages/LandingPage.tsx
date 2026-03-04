@@ -10,12 +10,15 @@ import {
   FileClock,
   FileText,
   LayoutDashboard,
+  Moon,
   Orbit,
   Play,
   ShieldCheck,
+  Sun,
   Upload,
   Wand2,
 } from "lucide-react";
+import { useTheme } from "next-themes";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -48,6 +51,7 @@ const workflow = [
 ];
 
 export default function LandingPage() {
+  const { resolvedTheme, setTheme } = useTheme();
   const { isDataLoaded, isChecksRun, getDashboardStats, headers } = useCompliance();
   const [activeTemplates, setActiveTemplates] = useState<MappingTemplate[]>([]);
   const [cases, setCases] = useState<Case[]>([]);
@@ -66,6 +70,7 @@ export default function LandingPage() {
   const blockingGaps = coverage?.unmappedMandatory.length ?? 0;
   const openCases = cases.filter((c) => c.status === "Open" || c.status === "In Progress");
   const criticalCases = openCases.filter((c) => c.severity === "Critical");
+  const isDark = resolvedTheme === "dark";
 
   const activeStep = !isDataLoaded ? 0 : !hasActiveMapping ? 1 : !isChecksRun ? 2 : 3;
 
@@ -84,9 +89,20 @@ export default function LandingPage() {
           <div className="absolute -left-20 bottom-0 h-60 w-60 rounded-full bg-accent/15 blur-3xl" />
           <div className="relative z-10 grid gap-8 lg:grid-cols-[1.6fr_1fr]">
             <div>
-              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                <Orbit className="h-3.5 w-3.5" />
-                UAE PINT-AE Compliance Engine
+              <div className="mb-5 flex items-center justify-between gap-3">
+                <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                  <Orbit className="h-3.5 w-3.5" />
+                  UAE PINT-AE Compliance Engine
+                </div>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setTheme(isDark ? "light" : "dark")}
+                  aria-label="Toggle dark mode"
+                >
+                  {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                </Button>
               </div>
               <div className="mb-4 flex items-center gap-3">
                 <img src={daribaLogo} alt="Dariba Tech" className="h-20 md:h-24 w-auto shrink-0" />
@@ -304,20 +320,30 @@ function CommandTile({
   path: string;
   tone: "success" | "medium" | "low" | "neutral";
 }) {
-  const toneClasses =
+  const iconToneClass =
     tone === "success"
-      ? "border-[hsl(var(--success))]/30 bg-[hsl(var(--success-bg))]/60"
+      ? "text-[hsl(var(--success))]"
       : tone === "medium"
-      ? "border-[hsl(var(--severity-medium))]/35 bg-[hsl(var(--severity-medium-bg))]/60"
+      ? "text-[hsl(var(--severity-medium))]"
       : tone === "low"
-      ? "border-[hsl(var(--severity-low))]/30 bg-[hsl(var(--severity-low-bg))]/60"
-      : "border-border bg-card/80";
+      ? "text-[hsl(var(--severity-low))]"
+      : "text-primary";
+
+  const railToneClass =
+    tone === "success"
+      ? "bg-[hsl(var(--success))]/70"
+      : tone === "medium"
+      ? "bg-[hsl(var(--severity-medium))]/70"
+      : tone === "low"
+      ? "bg-[hsl(var(--severity-low))]/70"
+      : "bg-primary/70";
 
   return (
     <Link to={path} className="group block">
-      <div className={cn("h-full rounded-2xl border p-5 transition-all hover:-translate-y-0.5 hover:shadow-md", toneClasses)}>
-        <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-white/80">
-          <Icon className="h-5 w-5 text-primary" />
+      <div className="relative h-full rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+        <div className={cn("absolute left-0 top-0 h-1 w-full rounded-t-2xl", railToneClass)} />
+        <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-muted/50">
+          <Icon className={cn("h-5 w-5", iconToneClass)} />
         </div>
         <p className="font-display text-lg font-semibold text-foreground">{title}</p>
         <p className="mt-1 text-sm text-muted-foreground">{description}</p>

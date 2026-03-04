@@ -38,11 +38,10 @@ export function PipelineProgress({ steps }: PipelineProgressProps) {
               {step.state === 'blocked' && <Lock className="h-3.5 w-3.5" />}
               <span>{step.label}</span>
             </div>
-            {index < steps.length - 1 && <span className="text-muted-foreground/50">→</span>}
+            {index < steps.length - 1 && <span className="text-muted-foreground/50">-&gt;</span>}
           </div>
         ))}
       </div>
     </div>
   );
 }
-

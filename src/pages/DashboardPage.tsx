@@ -6,8 +6,6 @@ import {
   CheckCircle,
   Clock,
   FileText,
-  Moon,
-  Sun,
   TrendingUp,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -74,13 +72,8 @@ export default function DashboardPage() {
   const [lifecycleMetrics, setLifecycleMetrics] = useState<LifecycleMetrics | null>(null);
   const [slaMetrics, setSlaMetrics] = useState<SLAMetrics | null>(null);
   const [recentRuns, setRecentRuns] = useState<CheckRun[]>([]);
-  const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem('drcs.theme');
-    const initialDark = stored === 'dark' || document.documentElement.classList.contains('dark');
-    document.documentElement.classList.toggle('dark', initialDark);
-    setIsDarkMode(initialDark);
     loadMetrics();
   }, []);
 
@@ -91,14 +84,21 @@ export default function DashboardPage() {
   }, [isChecksRun, navigate]);
 
   const loadMetrics = async () => {
-    const [lifecycle, sla, runs] = await Promise.all([
+    const [lifecycle, sla, runs] = await Promise.allSettled([
       getLifecycleMetrics(),
       getSLAMetrics(),
       fetchCheckRuns(10),
     ]);
-    setLifecycleMetrics(lifecycle);
-    setSlaMetrics(sla);
-    setRecentRuns(runs);
+
+    if (lifecycle.status === 'fulfilled') {
+      setLifecycleMetrics(lifecycle.value);
+    }
+    if (sla.status === 'fulfilled') {
+      setSlaMetrics(sla.value);
+    }
+    if (runs.status === 'fulfilled') {
+      setRecentRuns(runs.value);
+    }
   };
 
   const stats = getDashboardStats();
@@ -249,15 +249,6 @@ export default function DashboardPage() {
       }
     : { label: 'Awaiting Data', className: 'bg-muted text-muted-foreground border-border' };
 
-  const toggleDarkMode = () => {
-    setIsDarkMode((previous) => {
-      const next = !previous;
-      document.documentElement.classList.toggle('dark', next);
-      localStorage.setItem('drcs.theme', next ? 'dark' : 'light');
-      return next;
-    });
-  };
-
   if (!isChecksRun) {
     return null;
   }
@@ -294,15 +285,6 @@ export default function DashboardPage() {
                 <Badge variant="outline" className={systemStatus.className}>
                   {systemStatus.label}
                 </Badge>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={toggleDarkMode}
-                  aria-label="Toggle dark mode"
-                >
-                  {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                </Button>
               </div>
             </div>
 

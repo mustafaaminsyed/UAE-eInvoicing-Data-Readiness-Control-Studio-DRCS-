@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowUpRight, Download, Eye, Search } from 'lucide-react';
+import { ArrowUpRight, Download, Eye, Search, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -10,10 +10,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useCompliance } from '@/context/ComplianceContext';
 import { SeverityBadge } from '@/components/SeverityBadge';
 import { Severity } from '@/types/compliance';
 import { DatasetType } from '@/types/datasets';
+import {
+  generateValidationExplanation,
+} from '@/lib/api/validationExplainApi';
+import { ValidationExplainMode, ValidationExplanation } from '@/types/validationExplain';
+import { ExplanationPackPanel } from '@/components/explanations/ExplanationPackPanel';
 
 export default function ExceptionsPage() {
   const navigate = useNavigate();
@@ -23,10 +34,15 @@ export default function ExceptionsPage() {
   const [search, setSearch] = useState('');
   const [severityFilter, setSeverityFilter] = useState<Severity | 'all'>('all');
   const [checkFilter, setCheckFilter] = useState<string>('all');
+  const [explainMode, setExplainMode] = useState<ValidationExplainMode>('heuristic_only');
   const [datasetFilter, setDatasetFilter] = useState<DatasetType>(() => {
     const value = searchParams.get('dataset');
     return value === 'AP' ? 'AP' : 'AR';
   });
+  const [selectedExceptionId, setSelectedExceptionId] = useState<string | null>(null);
+  const [selectedExplanation, setSelectedExplanation] = useState<ValidationExplanation | null>(null);
+  const [explanationLoading, setExplanationLoading] = useState(false);
+  const [explanationError, setExplanationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isChecksRun) navigate('/');
@@ -99,6 +115,62 @@ export default function ExceptionsPage() {
 
   const handleViewInvoice = (invoiceId: string) => {
     navigate(`/invoice/${invoiceId}`);
+  };
+
+  const selectedException = useMemo(
+    () => filteredExceptions.find((item) => item.id === selectedExceptionId) || null,
+    [filteredExceptions, selectedExceptionId]
+  );
+
+  const closeExplanationDialog = () => {
+    setSelectedExceptionId(null);
+    setSelectedExplanation(null);
+    setExplanationError(null);
+    setExplanationLoading(false);
+  };
+
+  const openExplanationDialog = async (exceptionId: string) => {
+    const exception = filteredExceptions.find((item) => item.id === exceptionId);
+    if (!exception) return;
+
+    setSelectedExceptionId(exception.id);
+    setExplanationLoading(true);
+    setExplanationError(null);
+    setSelectedExplanation(null);
+
+    try {
+      const explanation = await generateValidationExplanation({
+        exception,
+        datasetType: exception.datasetType,
+        mode: explainMode,
+        promptVersion: 'validation_explain_v1',
+      });
+      setSelectedExplanation(explanation);
+    } catch {
+      setExplanationError('Unable to generate explanation. Please retry.');
+    } finally {
+      setExplanationLoading(false);
+    }
+  };
+
+  const regenerateExplanation = async () => {
+    if (!selectedException) return;
+    setExplanationLoading(true);
+    setExplanationError(null);
+    try {
+      const explanation = await generateValidationExplanation({
+        exception: selectedException,
+        datasetType: selectedException.datasetType,
+        mode: explainMode,
+        regenerate: true,
+        promptVersion: 'validation_explain_v1',
+      });
+      setSelectedExplanation(explanation);
+    } catch {
+      setExplanationError('Unable to regenerate explanation.');
+    } finally {
+      setExplanationLoading(false);
+    }
   };
 
   const handleOpenAPExplorer = (invoiceId?: string) => {
@@ -192,6 +264,16 @@ export default function ExceptionsPage() {
                 ))}
               </SelectContent>
             </Select>
+
+            <Select value={explainMode} onValueChange={(value) => setExplainMode(value as ValidationExplainMode)}>
+              <SelectTrigger className="w-full sm:w-44">
+                <SelectValue placeholder="Explain mode" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="heuristic_only">Heuristic Only</SelectItem>
+                <SelectItem value="assist">Assist</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -261,6 +343,15 @@ export default function ExceptionsPage() {
                               AP Explorer
                             </Button>
                           )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openExplanationDialog(exception.id)}
+                            className="gap-1"
+                          >
+                            <Sparkles className="w-4 h-4" />
+                            Explain
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -271,6 +362,32 @@ export default function ExceptionsPage() {
           </div>
         </div>
       </div>
+
+      <Dialog open={!!selectedExceptionId} onOpenChange={(open) => !open && closeExplanationDialog()}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Validation Explanation</DialogTitle>
+          </DialogHeader>
+
+          <div className="flex items-center justify-end gap-2 mb-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={regenerateExplanation}
+              disabled={explanationLoading || !selectedException}
+            >
+              Regenerate
+            </Button>
+          </div>
+
+          <ExplanationPackPanel
+            explanation={selectedExplanation}
+            exception={selectedException}
+            isLoading={explanationLoading}
+            errorMessage={explanationError}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
