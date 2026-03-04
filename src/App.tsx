@@ -23,6 +23,7 @@ import EvidencePage from "./pages/EvidencePage";
 import EvidencePackPage from "./pages/EvidencePackPage";
 import TraceabilityPage from "./pages/TraceabilityPage";
 import NotFound from "./pages/NotFound";
+import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 
 const queryClient = new QueryClient();
 
@@ -39,22 +40,25 @@ const App = () => (
             <main className="relative z-10">
               <Routes>
                 <Route path="/" element={<LandingPage />} />
-                <Route path="/upload" element={<UploadPage />} />
-                <Route path="/run" element={<RunChecksPage />} />
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/exceptions" element={<ExceptionsPage />} />
-                <Route path="/invoice/:invoiceId" element={<InvoiceDetailPage />} />
-                <Route path="/check-builder" element={<CheckBuilderPage />} />
-                <Route path="/check-registry" element={<CheckRegistryPage />} />
-                <Route path="/upload-audit" element={<UploadAuditPage />} />
-                <Route path="/ap-explorer" element={<APInvoiceExplorerPage />} />
-                <Route path="/controls" element={<ControlsDashboardPage />} />
-                <Route path="/cases" element={<CasesPage />} />
-                <Route path="/rejections" element={<RejectionsPage />} />
-                <Route path="/mapping" element={<MappingPage />} />
-                <Route path="/evidence" element={<EvidencePage />} />
-                <Route path="/evidence-pack" element={<EvidencePackPage />} />
-                <Route path="/traceability" element={<TraceabilityPage />} />
+                <Route element={<WorkspaceShell />}>
+                  <Route path="/upload" element={<UploadPage />} />
+                  <Route path="/run" element={<RunChecksPage />} />
+                  <Route path="/dashboard" element={<DashboardPage />} />
+                  <Route path="/exceptions" element={<ExceptionsPage />} />
+                  <Route path="/invoice/:invoiceId" element={<InvoiceDetailPage />} />
+                  <Route path="/check-builder" element={<CheckBuilderPage />} />
+                  <Route path="/check-registry" element={<CheckRegistryPage />} />
+                  <Route path="/upload-audit" element={<UploadAuditPage />} />
+                  <Route path="/ap-explorer" element={<APInvoiceExplorerPage />} />
+                  <Route path="/controls" element={<ControlsDashboardPage />} />
+                  <Route path="/settings" element={<ControlsDashboardPage />} />
+                  <Route path="/cases" element={<CasesPage />} />
+                  <Route path="/rejections" element={<RejectionsPage />} />
+                  <Route path="/mapping" element={<MappingPage />} />
+                  <Route path="/evidence" element={<EvidencePage />} />
+                  <Route path="/evidence-pack" element={<EvidencePackPage />} />
+                  <Route path="/traceability" element={<TraceabilityPage />} />
+                </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </main>

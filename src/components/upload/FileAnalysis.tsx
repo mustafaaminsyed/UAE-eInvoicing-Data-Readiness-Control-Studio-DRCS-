@@ -105,6 +105,7 @@ interface FileSummaryCardProps {
 export function FileSummaryCard({ stats, type, onRemove }: FileSummaryCardProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const hasIssues = stats.requiredMissing.length > 0 || stats.nullWarnings.length > 0;
+  const hasDelimiterMismatch = stats.detectedDelimiter !== 'comma';
 
   return (
     <div className={cn(
@@ -127,7 +128,12 @@ export function FileSummaryCard({ stats, type, onRemove }: FileSummaryCardProps)
             <p className="text-xs text-muted-foreground">{(stats.fileSize / 1024).toFixed(1)} KB</p>
           </div>
         </div>
-        <button onClick={onRemove} className="p-1 hover:bg-muted rounded">
+        <button
+          onClick={onRemove}
+          className="p-1 hover:bg-muted rounded"
+          aria-label={`Remove ${stats.fileName}`}
+          title="Remove file"
+        >
           <X className="w-4 h-4 text-muted-foreground" />
         </button>
       </div>
@@ -175,6 +181,12 @@ export function FileSummaryCard({ stats, type, onRemove }: FileSummaryCardProps)
       {/* Structural Validation — driven by template manifest */}
       <div className="space-y-2">
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Structural Validation</p>
+        {hasDelimiterMismatch && (
+          <p className="text-xs text-destructive flex items-center gap-1">
+            <AlertTriangle className="w-3 h-3" />
+            Delimiter looks like {stats.detectedDelimiter}. Ingestion parser expects comma-delimited CSV.
+          </p>
+        )}
         <div className="flex flex-wrap gap-1.5">
           {(() => {
             const manifestCols = getManifestColumns(type);
@@ -296,10 +308,12 @@ export function FileDropZone({ label, description, sampleType, sampleScenario = 
           accept=".csv"
           onChange={(e) => { const f = e.target.files?.[0]; if (f) onFileSelect(f); }}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          aria-label={`${label} CSV upload`}
         />
         <div className="flex flex-col items-center text-center">
           <FileText className="w-8 h-8 text-muted-foreground mb-2" />
           <p className="text-sm font-medium text-foreground">Drop CSV here or click to browse</p>
+          <p className="text-xs text-muted-foreground mt-1">CSV only. Use comma-delimited files for ingestion.</p>
         </div>
       </div>
     </div>

@@ -51,6 +51,10 @@ export default function UploadPage() {
 
   const allFilesSelected = files.buyers && files.headers && files.lines;
   const allStats = stats.buyers && stats.headers && stats.lines;
+  const selectedFileCount = [files.buyers, files.headers, files.lines].filter(Boolean).length;
+  const validFileCount = [stats.buyers, stats.headers, stats.lines].filter(
+    (s) => s && s.requiredMissing.length === 0
+  ).length;
 
   // Determine current step
   let currentStep: StepKey = 'upload';
@@ -81,7 +85,7 @@ export default function UploadPage() {
     try {
       const text = await file.text();
       const rows = parseCSV(text);
-      const analysis = analyzeFile(rows, file, type);
+      const analysis = analyzeFile(rows, file, type, text);
       setStats((prev) => ({ ...prev, [type]: analysis }));
       setParsedRows((prev) => ({ ...prev, [type]: rows }));
     } catch {
@@ -283,6 +287,11 @@ export default function UploadPage() {
 
           {/* File Cards */}
           <div className="surface-glass rounded-2xl border border-white/70 shadow-sm p-6">
+            <div className="mb-4 rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              Upload progress: <span className="font-semibold text-foreground">{validFileCount}/3</span> files structurally valid
+              <span className="mx-1">|</span>
+              <span className="font-medium">{selectedFileCount}/3</span> files selected
+            </div>
             <div className="grid gap-6">
               {/* Buyers */}
               {stats.buyers ? (

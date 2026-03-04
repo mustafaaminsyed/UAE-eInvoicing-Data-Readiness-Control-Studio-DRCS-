@@ -1,85 +1,88 @@
-# Welcome to your Lovable project
+# UAE eInvoicing Data Readiness Control Studio (DRCS)
 
-## Project info
+Enterprise frontend for UAE e-invoicing data readiness, validation, exception triage, and evidence reporting.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Tech Stack
 
-## How can I edit this code?
+- Vite
+- React 18
+- TypeScript
+- Tailwind CSS
+- shadcn/ui
+- Supabase
 
-There are several ways of editing your application.
+## Local Setup
 
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
+git clone https://github.com/mustafaaminsyed/UAE-eInvoicing-Data-Readiness-Control-Studio-DRCS-.git
+cd UAE-eInvoicing-Data-Readiness-Control-Studio-DRCS-
+npm install
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Default local URL: `http://127.0.0.1:5173`
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Scripts
 
-**Use GitHub Codespaces**
+- `npm run dev` - start local dev server
+- `npm test` - run test suite (Vitest)
+- `npx tsc --noEmit` - typecheck
+- `npm run lint` - ESLint
+- `npm run build` - production build
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Workspace Navigation
 
-## What technologies are used for this project?
+The app now uses a shared workspace shell with left sidebar navigation (desktop) across all primary routes.
 
-This project is built with:
+Sidebar labels and routes:
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- `Dashboard` -> `/dashboard`
+- `Ingestion` -> `/upload`
+- `Schema Mapping` -> `/mapping`
+- `Validation` -> `/run`
+- `Exceptions` -> `/exceptions`
+- `Cases` -> `/cases`
+- `Evidence` -> `/evidence-pack`
+- `Check Registry` -> `/check-registry`
+- `Settings` -> `/settings` (alias to controls page)
 
-## AP/AR dataset notes
+Compatibility note:
 
-- Uploads now require a dataset type selection:
-  - `AR` = Customer Invoices (Outbound)
-  - `AP` = Vendor Invoices (Inbound)
-- Validation runs can be scoped to `AR`, `AP`, or `ALL` from the Run Checks screen.
-- Exceptions are tagged with dataset type and can be filtered with AR/AP lenses on the Exceptions page.
-- AP investigation search checks are configured in Check Builder using `Check Type = SEARCH_CHECK`.
-  - Starter checks are auto-seeded and can be edited/deactivated like other custom checks.
-  - Add more starter checks in `src/lib/api/checksApi.ts` inside `seedStarterSearchChecks()`.
-- AP Explorer uses client-side fuzzy matching. For very large AP datasets, search remains functional but may be slower.
+- Existing top navigation remains available.
+- Existing route paths and page behavior are preserved.
 
-## How can I deploy this project?
+## Dashboard UX Enhancements
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+`/dashboard` now includes:
 
-## Can I connect a custom domain to my Lovable project?
+- Compact control bar with dataset selector (`AR`/`AP`), PINT-AE badge, and system status
+- Dark mode toggle (persisted using `localStorage` key `drcs.theme`)
+- Pipeline progress: `Ingest -> Map -> Validate -> Control`
+- Validation results preview panel (top failed checks)
+- Mapping confidence by category: `Header`, `Supplier`, `Buyer`, `Tax`, `Lines`
+- Grouped quick actions: `Data`, `Compliance`, `Governance`
+- Activity log (last 10 actions) from upload audit + recent check runs
+- Standardized card styling with `rounded-xl`, `shadow-lg`, neutral borders, and consistent spacing
 
-Yes, you can!
+## Upload UX and Ingestion Notes
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+Upload screen improvements:
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- File upload progress indicator (`valid/selected`)
+- Better CSV guidance and accessibility labels
+- Delimiter mismatch warning (ingestion parser expects comma-delimited CSV)
+- Improved top nav overflow behavior
+
+AR/AP notes:
+
+- `AR` = Customer Invoices (Outbound)
+- `AP` = Vendor Invoices (Inbound)
+- Exceptions are dataset-aware and can be filtered by dataset type
+- Validation can run per scope (`AR`, `AP`, `ALL`)
+
+## Repo Hygiene
+
+The following local/generated paths are ignored in Git:
+
+- `.vite/`
+- `review_free_llm_api_resources_20260224/`

@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+.vite/
+review_free_llm_api_resources_20260224/
 *.local
 
 # Editor directories and files
