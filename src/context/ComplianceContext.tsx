@@ -11,7 +11,6 @@ import {
   Severity,
 } from '@/types/compliance';
 import { PintAEException, RunSummary } from '@/types/pintAE';
-import { runAllChecks } from '@/lib/checks/checksRegistry';
 import {
   fetchCustomChecks,
   saveCheckRun,
@@ -19,17 +18,9 @@ import {
   saveInvestigationFlags,
 } from '@/lib/api/checksApi';
 import { calculateScore, CustomCheckConfig, InvestigationFlag } from '@/types/customChecks';
-import {
-  fetchEnabledPintAEChecks,
-  seedUC1CheckPack,
-  saveExceptions,
-  saveRunSummary,
-  saveClientRiskScores,
-  calculateClientScores,
-  generateRunSummary,
-} from '@/lib/api/pintAEApi';
-import { runAllPintAEChecks } from '@/lib/checks/pintAECheckRunner';
+import { seedUC1CheckPack } from '@/lib/api/pintAEApi';
 import { runCustomCheck, runSearchCheck } from '@/lib/checks/customCheckRunner';
+import { planRunChecks, runChecksPipeline } from '@/services/runChecksService';
 import {
   DatasetBundle,
   DatasetRunScope,
@@ -190,107 +181,30 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
   const hasDatasetLoaded = (datasetType: DatasetType): boolean => loadedDatasets[datasetType];
 
   const runChecks = async (options?: { scope?: DatasetRunScope }) => {
-    const scope = options?.scope || activeDatasetType;
-    const datasetsToRun = getDatasetScopeOrder(scope).filter((datasetType) =>
-      hasDatasetLoaded(datasetType)
-    );
-
-    if (datasetsToRun.length === 0) return;
+    const plan = planRunChecks({
+      options,
+      activeDatasetType,
+      hasDatasetLoaded,
+    });
+    if (plan.datasetTypesRan.length === 0) return;
 
     setIsRunning(true);
     try {
-      const pintAEChecks = await fetchEnabledPintAEChecks();
-
-      const allBuiltInResults: CheckResult[] = [];
-      const allPintExceptions: PintAEException[] = [];
-      const allLegacyExceptions: Exception[] = [];
-      const allHeadersForScope: InvoiceHeader[] = [];
-
-      datasetsToRun.forEach((datasetType) => {
-        const dataset = getDataForDataset(datasetType);
-        const dataContext = buildDataContext(dataset.buyers, dataset.headers, dataset.lines);
-        allHeadersForScope.push(...dataset.headers);
-
-        const builtInResults = runAllChecks(dataContext).map((result) => ({
-          ...result,
-          exceptions: annotateDatasetType(result.exceptions, datasetType),
-        }));
-        allBuiltInResults.push(...builtInResults);
-
-        const pintExceptionsForDataset = runAllPintAEChecks(pintAEChecks, dataContext).map((exception) => ({
-          ...exception,
-          dataset_type: datasetType,
-        }));
-        allPintExceptions.push(...pintExceptionsForDataset);
-
-        const legacyExceptionsForDataset: Exception[] = pintExceptionsForDataset.map((exception) => ({
-          id: exception.id,
-          checkId: exception.check_id,
-          checkName: exception.check_name,
-          severity: exception.severity,
-          message: exception.message,
-          datasetType,
-          invoiceId: exception.invoice_id,
-          invoiceNumber: exception.invoice_number,
-          sellerTrn: exception.seller_trn,
-          buyerId: exception.buyer_id,
-          lineId: exception.line_id,
-          field: exception.field_name,
-          expectedValue: exception.expected_value_or_rule,
-          actualValue: exception.observed_value,
-        }));
-        allLegacyExceptions.push(...legacyExceptionsForDataset);
+      const artifacts = await runChecksPipeline({
+        plan,
+        getDataForDataset,
       });
 
-      const mergedBuiltInResults = mergeCheckResults(allBuiltInResults);
-      const allExceptions = [
-        ...mergedBuiltInResults.flatMap((result) => result.exceptions),
-        ...allLegacyExceptions,
-      ];
-
-      setCheckResults(mergedBuiltInResults);
-      setExceptions(allExceptions);
-      setPintAEExceptions(allPintExceptions);
+      setCheckResults(artifacts.mergedCheckResults);
+      setExceptions(artifacts.allExceptions);
+      setPintAEExceptions(artifacts.allPintAEExceptions);
       setIsChecksRun(true);
 
-      const stats = calculateStats(allExceptions, allHeadersForScope.length);
-      const runId = await saveCheckRun({
-        run_date: new Date().toISOString(),
-        dataset_type: scope,
-        total_invoices: allHeadersForScope.length,
-        total_exceptions: allExceptions.length,
-        critical_count: stats.exceptionsBySeverity.Critical,
-        high_count: stats.exceptionsBySeverity.High,
-        medium_count: stats.exceptionsBySeverity.Medium,
-        low_count: stats.exceptionsBySeverity.Low,
-        pass_rate: stats.passRate,
-        results_summary: {
-          checkCount: mergedBuiltInResults.length + pintAEChecks.length,
-          scope,
-        },
-      });
-
-      if (runId) {
-        await saveExceptions(runId, allPintExceptions);
-
-        const clientScores = calculateClientScores(allPintExceptions, allHeadersForScope);
-        await saveClientRiskScores(runId, clientScores);
-
-        const summary = generateRunSummary(
-          runId,
-          allHeadersForScope.length,
-          allPintExceptions,
-          clientScores
-        );
-        await saveRunSummary(summary);
-        setRunSummary(summary);
-
-        const sellerScores = calculateEntityScores(allExceptions, allHeadersForScope, 'seller');
-        const invoiceScores = calculateEntityScores(allExceptions, allHeadersForScope, 'invoice');
-        await saveEntityScores([
-          ...sellerScores.map((score) => ({ ...score, run_id: runId })),
-          ...invoiceScores.map((score) => ({ ...score, run_id: runId })),
-        ]);
+      if (artifacts.runSummary) {
+        setRunSummary(artifacts.runSummary);
+      }
+      if (artifacts.kind === 'persist_failed') {
+        throw artifacts.persistenceError;
       }
     } finally {
       setIsRunning(false);

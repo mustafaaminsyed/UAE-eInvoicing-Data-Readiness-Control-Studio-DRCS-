@@ -72,7 +72,7 @@ export function computeTraceabilityMatrix(
 
   let mandatoryNotInTemplate = 0;
   let mandatoryNotIngestible = 0;
-  let mandatoryUnmapped = 0;
+  const mandatoryUnmapped = 0;
   let mandatoryLowPopulation = 0;
   let drsWithNoRules = 0;
   let drsWithNoControls = 0;
