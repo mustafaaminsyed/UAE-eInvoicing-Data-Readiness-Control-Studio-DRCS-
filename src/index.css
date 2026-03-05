@@ -15,7 +15,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 221 42% 13%;
 
-    --primary: 199 89% 38%;
+    --primary: 142 50% 35%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 210 30% 94%;
@@ -24,7 +24,7 @@
     --muted: 210 28% 94%;
     --muted-foreground: 215 17% 42%;
 
-    --accent: 165 64% 37%;
+    --accent: 197 83% 40%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -32,7 +32,7 @@
 
     --border: 215 31% 88%;
     --input: 215 31% 88%;
-    --ring: 199 89% 38%;
+    --ring: 142 50% 35%;
 
     --radius: 0.5rem;
 
@@ -43,28 +43,28 @@
     --severity-high-bg: 25 95% 97%;
     --severity-medium: 45 93% 47%;
     --severity-medium-bg: 45 93% 97%;
-    --severity-low: 199 89% 42%;
-    --severity-low-bg: 199 89% 96%;
+    --severity-low: 197 83% 40%;
+    --severity-low-bg: 197 83% 96%;
 
     /* Success */
     --success: 142 71% 45%;
     --success-bg: 142 71% 97%;
 
     /* Chart Colors */
-    --chart-1: 199 89% 38%;
-    --chart-2: 165 64% 37%;
+    --chart-1: 142 50% 35%;
+    --chart-2: 197 83% 40%;
     --chart-3: 142 71% 45%;
     --chart-4: 25 95% 53%;
     --chart-5: 0 84% 60%;
 
-    --sidebar-background: 218 34% 12%;
+    --sidebar-background: 148 29% 13%;
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 199 89% 45%;
+    --sidebar-primary: 142 50% 42%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 32% 18%;
+    --sidebar-accent: 150 18% 19%;
     --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 220 32% 18%;
-    --sidebar-ring: 199 89% 45%;
+    --sidebar-border: 150 18% 19%;
+    --sidebar-ring: 142 50% 42%;
   }
 
   .dark {
@@ -77,7 +77,7 @@
     --popover: 219 33% 10%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 199 89% 45%;
+    --primary: 142 50% 48%;
     --primary-foreground: 222 47% 11%;
 
     --secondary: 218 28% 17%;
@@ -86,7 +86,7 @@
     --muted: 218 28% 17%;
     --muted-foreground: 215 20% 65%;
 
-    --accent: 165 64% 44%;
+    --accent: 197 83% 53%;
     --accent-foreground: 222 47% 11%;
 
     --destructive: 0 62% 50%;
@@ -94,7 +94,7 @@
 
     --border: 218 28% 19%;
     --input: 218 28% 19%;
-    --ring: 199 89% 45%;
+    --ring: 142 50% 48%;
   }
 }
 
@@ -107,10 +107,17 @@
     @apply bg-background text-foreground font-sans antialiased;
     font-family: "Manrope", sans-serif;
     background-image:
-      radial-gradient(circle at 12% 0%, rgba(0, 157, 217, 0.12), transparent 36%),
-      radial-gradient(circle at 100% 18%, rgba(17, 168, 119, 0.1), transparent 36%),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(247, 250, 255, 0.88));
+      radial-gradient(circle at 12% 0%, rgba(37, 121, 73, 0.08), transparent 36%),
+      radial-gradient(circle at 100% 18%, rgba(11, 124, 173, 0.06), transparent 34%),
+      linear-gradient(180deg, rgba(250, 252, 251, 0.98), rgba(245, 248, 250, 0.98));
     background-attachment: fixed;
+  }
+
+  .dark body {
+    background-image:
+      radial-gradient(circle at 12% 0%, rgba(55, 170, 109, 0.14), transparent 36%),
+      radial-gradient(circle at 100% 18%, rgba(37, 141, 185, 0.12), transparent 34%),
+      linear-gradient(180deg, rgba(16, 24, 30, 0.97), rgba(13, 20, 26, 0.98));
   }
 }
 
@@ -120,16 +127,16 @@
   }
 
   .surface-glass {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.7));
-    border: 1px solid rgba(255, 255, 255, 0.7);
-    box-shadow: 0 20px 45px -26px rgba(12, 39, 73, 0.36);
-    backdrop-filter: blur(10px);
+    background: hsl(var(--card) / 0.96);
+    border: 1px solid hsl(var(--border) / 0.95) !important;
+    box-shadow: 0 16px 34px -24px rgba(16, 39, 28, 0.34);
+    backdrop-filter: blur(2px);
   }
 
   .grid-veil {
     background-image:
-      linear-gradient(to right, rgba(84, 110, 145, 0.08) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(84, 110, 145, 0.08) 1px, transparent 1px);
+      linear-gradient(to right, rgba(84, 110, 145, 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(84, 110, 145, 0.04) 1px, transparent 1px);
     background-size: 34px 34px;
   }
 

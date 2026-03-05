@@ -1,57 +1,37 @@
 import { useNavigate } from 'react-router-dom';
-import { useState, useEffect, useMemo } from 'react';
-import { 
-  FileText, 
-  AlertTriangle, 
-  CheckCircle, 
-  TrendingUp,
+import { useEffect, useMemo, useState } from 'react';
+import {
   ArrowRight,
-  Clock,
   Briefcase,
-  XCircle,
-  Search,
-  Download,
-  Save,
-  Trash2,
-  SlidersHorizontal
+  CheckCircle,
+  Clock,
+  FileText,
+  TrendingUp,
 } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
 import { useCompliance } from '@/context/ComplianceContext';
 import { StatsCard } from '@/components/StatsCard';
 import { SeverityBadge } from '@/components/SeverityBadge';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell
+  Cell,
 } from 'recharts';
 import { getLifecycleMetrics, getSLAMetrics } from '@/lib/api/casesApi';
+import { fetchCheckRuns } from '@/lib/api/checksApi';
+import { getUploadAuditLogs } from '@/lib/uploadAudit';
 import { LifecycleMetrics, SLAMetrics, InvoiceStatus } from '@/types/cases';
-import { Severity } from '@/types/compliance';
-import { Direction } from '@/types/direction';
-
+import { CheckRun } from '@/types/customChecks';
+import { PipelineProgress, PipelineStep, PipelineState } from '@/components/dashboard/PipelineProgress';
 
 const SEVERITY_COLORS = {
   Critical: 'hsl(0, 84%, 60%)',
@@ -61,97 +41,41 @@ const SEVERITY_COLORS = {
 };
 
 const STATUS_COLORS: Record<InvoiceStatus, string> = {
-  'Received': '#6b7280',
+  Received: '#6b7280',
   'Pre-Validated': '#3b82f6',
-  'Held': '#f59e0b',
-  'Submitted': '#06b6d4',
-  'Acknowledged': '#8b5cf6',
-  'Accepted': '#22c55e',
-  'Rejected': '#ef4444',
-  'Resolved': '#10b981',
-  'Resubmitted': '#f97316',
-  'Closed': '#4b5563',
+  Held: '#f59e0b',
+  Submitted: '#06b6d4',
+  Acknowledged: '#8b5cf6',
+  Accepted: '#22c55e',
+  Rejected: '#ef4444',
+  Resolved: '#10b981',
+  Resubmitted: '#f97316',
+  Closed: '#4b5563',
 };
-
-type ResultsColumnKey = 'checkName' | 'severity' | 'passed' | 'failed' | 'passRate' | 'drilldown';
-
-type ResultsViewConfig = {
-  search: string;
-  severityFilter: Severity | 'all';
-  sort: 'failed_desc' | 'failed_asc' | 'pass_desc' | 'pass_asc';
-  visibleColumns: Record<ResultsColumnKey, boolean>;
-};
-
-type ResultsSavedView = {
-  id: string;
-  name: string;
-  config: ResultsViewConfig;
-};
-
-const RESULTS_SAVED_VIEWS_KEY = 'results_saved_views_v1';
-const defaultResultsColumns: Record<ResultsColumnKey, boolean> = {
-  checkName: true,
-  severity: true,
-  passed: true,
-  failed: true,
-  passRate: true,
-  drilldown: true,
-};
-
-function exportResultsCsv(rows: Array<{ checkId: string; checkName: string; severity: Severity; passed: number; failed: number }>) {
-  const csv = [
-    ['Check ID', 'Check Name', 'Severity', 'Passed', 'Failed', 'Pass Rate'].join(','),
-    ...rows.map((row) => {
-      const total = row.passed + row.failed;
-      const passRate = total > 0 ? ((row.passed / total) * 100).toFixed(1) : '100.0';
-      return [`"${row.checkId}"`, `"${row.checkName.replace(/"/g, '""')}"`, row.severity, row.passed, row.failed, `${passRate}%`].join(',');
-    }),
-  ].join('\n');
-
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = `check_results_${new Date().toISOString().split('T')[0]}.csv`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { isChecksRun, getDashboardStats, checkResults, direction } = useCompliance();
+  const {
+    isChecksRun,
+    isDataLoaded,
+    isRunning,
+    activeDatasetType,
+    setActiveDatasetType,
+    getDashboardStats,
+    checkResults,
+    runSummary,
+    buyers,
+    headers,
+    lines,
+  } = useCompliance();
+
   const [lifecycleMetrics, setLifecycleMetrics] = useState<LifecycleMetrics | null>(null);
   const [slaMetrics, setSlaMetrics] = useState<SLAMetrics | null>(null);
-  const [resultsSearch, setResultsSearch] = useState('');
-  const [resultsSeverityFilter, setResultsSeverityFilter] = useState<Severity | 'all'>('all');
-  const [resultsSort, setResultsSort] = useState<'failed_desc' | 'failed_asc' | 'pass_desc' | 'pass_asc'>('failed_desc');
-  const [visibleResultsColumns, setVisibleResultsColumns] = useState<Record<ResultsColumnKey, boolean>>(defaultResultsColumns);
-  const [resultsSavedViews, setResultsSavedViews] = useState<ResultsSavedView[]>([]);
-  const [selectedResultsViewId, setSelectedResultsViewId] = useState<string>('none');
-  const [directionFilter, setDirectionFilter] = useState<Direction | 'all'>(direction);
+  const [recentRuns, setRecentRuns] = useState<CheckRun[]>([]);
 
   useEffect(() => {
     loadMetrics();
   }, []);
-
-  useEffect(() => {
-    const raw = localStorage.getItem(RESULTS_SAVED_VIEWS_KEY);
-    if (!raw) return;
-    try {
-      const parsed = JSON.parse(raw) as ResultsSavedView[];
-      if (Array.isArray(parsed)) setResultsSavedViews(parsed);
-    } catch {
-      // Ignore malformed saved views
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem(RESULTS_SAVED_VIEWS_KEY, JSON.stringify(resultsSavedViews));
-  }, [resultsSavedViews]);
-
-  useEffect(() => {
-    setDirectionFilter((current) => (current === 'all' ? current : direction));
-  }, [direction]);
 
   useEffect(() => {
     if (!isChecksRun) {
@@ -160,16 +84,25 @@ export default function DashboardPage() {
   }, [isChecksRun, navigate]);
 
   const loadMetrics = async () => {
-    const [lifecycle, sla] = await Promise.all([
+    const [lifecycle, sla, runs] = await Promise.allSettled([
       getLifecycleMetrics(),
       getSLAMetrics(),
+      fetchCheckRuns(10),
     ]);
-    setLifecycleMetrics(lifecycle);
-    setSlaMetrics(sla);
+
+    if (lifecycle.status === 'fulfilled') {
+      setLifecycleMetrics(lifecycle.value);
+    }
+    if (sla.status === 'fulfilled') {
+      setSlaMetrics(sla.value);
+    }
+    if (runs.status === 'fulfilled') {
+      setRecentRuns(runs.value);
+    }
   };
 
-  const stats = getDashboardStats(directionFilter);
-  
+  const stats = getDashboardStats();
+
   const severityData = Object.entries(stats.exceptionsBySeverity)
     .filter(([_, count]) => count > 0)
     .map(([severity, count]) => ({
@@ -178,45 +111,18 @@ export default function DashboardPage() {
       color: SEVERITY_COLORS[severity as keyof typeof SEVERITY_COLORS],
     }));
 
-  const directionScopedChecks = checkResults.filter(
-    (result) => directionFilter === 'all' || (result.direction || direction) === directionFilter,
-  );
-
-  const checkData = directionScopedChecks
-    .filter(r => r.failed > 0)
+  const checkData = checkResults
+    .filter((r) => r.failed > 0)
     .sort((a, b) => b.failed - a.failed)
     .slice(0, 6)
-    .map(r => ({
+    .map((r) => ({
       name: r.checkName.substring(0, 20),
       fullName: r.checkName,
-      checkId: r.checkId,
       exceptions: r.failed,
       severity: r.severity,
     }));
 
-  const filteredAndSortedResults = useMemo(() => {
-    const filtered = directionScopedChecks.filter((result) => {
-      const matchesSearch =
-        !resultsSearch ||
-        result.checkName.toLowerCase().includes(resultsSearch.toLowerCase()) ||
-        result.checkId.toLowerCase().includes(resultsSearch.toLowerCase());
-      const matchesSeverity = resultsSeverityFilter === 'all' || result.severity === resultsSeverityFilter;
-      return matchesSearch && matchesSeverity;
-    });
-
-    return filtered.sort((a, b) => {
-      const totalA = a.passed + a.failed;
-      const totalB = b.passed + b.failed;
-      const passA = totalA > 0 ? (a.passed / totalA) * 100 : 100;
-      const passB = totalB > 0 ? (b.passed / totalB) * 100 : 100;
-      if (resultsSort === 'failed_desc') return b.failed - a.failed;
-      if (resultsSort === 'failed_asc') return a.failed - b.failed;
-      if (resultsSort === 'pass_desc') return passB - passA;
-      return passA - passB;
-    });
-  }, [directionScopedChecks, resultsSearch, resultsSeverityFilter, resultsSort]);
-
-  const lifecycleData = lifecycleMetrics 
+  const lifecycleData = lifecycleMetrics
     ? Object.entries(lifecycleMetrics.statusCounts)
         .filter(([_, count]) => count > 0)
         .map(([status, count]) => ({
@@ -226,421 +132,441 @@ export default function DashboardPage() {
         }))
     : [];
 
-  const applyResultsView = (config: ResultsViewConfig) => {
-    setResultsSearch(config.search);
-    setResultsSeverityFilter(config.severityFilter);
-    setResultsSort(config.sort);
-    setVisibleResultsColumns(config.visibleColumns);
-  };
+  const pipelineSteps: PipelineStep[] = useMemo(() => {
+    const ingest: PipelineState = isDataLoaded ? 'complete' : 'active';
+    const map: PipelineState = !isDataLoaded ? 'blocked' : isChecksRun ? 'complete' : 'active';
+    const validate: PipelineState = !isDataLoaded ? 'blocked' : isChecksRun ? 'complete' : 'pending';
+    const control: PipelineState = isChecksRun ? 'active' : !isDataLoaded ? 'blocked' : 'pending';
 
-  const handleSaveResultsView = () => {
-    const name = window.prompt('Results view name');
-    if (!name) return;
-    const config: ResultsViewConfig = {
-      search: resultsSearch,
-      severityFilter: resultsSeverityFilter,
-      sort: resultsSort,
-      visibleColumns: visibleResultsColumns,
+    return [
+      { id: 'ingest', label: 'Ingest', state: ingest },
+      { id: 'map', label: 'Map', state: map },
+      { id: 'validate', label: 'Validate', state: validate },
+      { id: 'control', label: 'Control', state: control },
+    ];
+  }, [isDataLoaded, isChecksRun]);
+
+  const categoryCoverage = useMemo(() => {
+    const coverage = (records: Record<string, unknown>[], fields: string[]) => {
+      if (records.length === 0 || fields.length === 0) return 0;
+      let present = 0;
+      records.forEach((record) => {
+        fields.forEach((field) => {
+          const value = record[field];
+          if (value !== undefined && value !== null && String(value).trim() !== '') {
+            present++;
+          }
+        });
+      });
+      return (present / (records.length * fields.length)) * 100;
     };
-    const view: ResultsSavedView = {
-      id: `results_view_${Date.now()}`,
-      name,
-      config,
-    };
-    setResultsSavedViews((prev) => [view, ...prev]);
-    setSelectedResultsViewId(view.id);
-  };
 
-  const handleDeleteResultsView = () => {
-    if (selectedResultsViewId === 'none') return;
-    setResultsSavedViews((prev) => prev.filter((view) => view.id !== selectedResultsViewId));
-    setSelectedResultsViewId('none');
-  };
+    const headerCoverage = coverage(headers as unknown as Record<string, unknown>[], [
+      'invoice_id',
+      'invoice_number',
+      'issue_date',
+      'currency',
+      'invoice_type',
+    ]);
 
-  if (!isChecksRun) return null;
+    const supplierCoverage = coverage(headers as unknown as Record<string, unknown>[], [
+      'seller_trn',
+      'seller_name',
+      'seller_country',
+      'seller_address',
+    ]);
+
+    const buyerCoverage = coverage(buyers as unknown as Record<string, unknown>[], [
+      'buyer_id',
+      'buyer_name',
+      'buyer_country',
+      'buyer_trn',
+    ]);
+
+    const taxHeader = coverage(headers as unknown as Record<string, unknown>[], [
+      'total_excl_vat',
+      'vat_total',
+      'total_incl_vat',
+      'tax_currency',
+    ]);
+    const taxLine = coverage(lines as unknown as Record<string, unknown>[], [
+      'vat_rate',
+      'vat_amount',
+      'tax_category_code',
+    ]);
+    const taxCoverage = (taxHeader + taxLine) / 2;
+
+    const linesCoverage = coverage(lines as unknown as Record<string, unknown>[], [
+      'line_id',
+      'line_number',
+      'quantity',
+      'unit_price',
+      'line_total_excl_vat',
+    ]);
+
+    return [
+      { category: 'Header', value: headerCoverage },
+      { category: 'Supplier', value: supplierCoverage },
+      { category: 'Buyer', value: buyerCoverage },
+      { category: 'Tax', value: taxCoverage },
+      { category: 'Lines', value: linesCoverage },
+    ];
+  }, [buyers, headers, lines]);
+
+  const activityFeed = useMemo(() => {
+    const uploads = getUploadAuditLogs().slice(0, 10).map((entry) => ({
+      id: `upload-${entry.id}`,
+      createdAt: entry.createdAt,
+      category: 'Data',
+      label: `${entry.datasetType || 'AR'} upload (${entry.headersCount} invoices, ${entry.linesCount} lines)`,
+      path: '/upload-audit',
+    }));
+
+    const runs = recentRuns.map((run) => ({
+      id: `run-${run.id}`,
+      createdAt: run.run_date,
+      category: 'Compliance',
+      label: `Validation run (${run.dataset_type || 'AR'}): ${run.total_exceptions} exceptions`,
+      path: '/run',
+    }));
+
+    return [...uploads, ...runs]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 10);
+  }, [recentRuns]);
+
+  const systemStatus = isRunning
+    ? { label: 'Checks Running', className: 'bg-primary/15 text-primary border-primary/25' }
+    : isChecksRun
+    ? {
+        label: 'Validated',
+        className: 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/25',
+      }
+    : isDataLoaded
+    ? {
+        label: 'Dataset Loaded',
+        className: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/25',
+      }
+    : { label: 'Awaiting Data', className: 'bg-muted text-muted-foreground border-border' };
+
+  if (!isChecksRun) {
+    return null;
+  }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)]">
-      <div className="container max-w-7xl py-8 md:py-10">
-        <div className="flex items-center justify-between mb-8 animate-fade-in">
-          <div>
-            <h1 className="font-display text-3xl font-semibold text-foreground">
-              Operations Dashboard
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Compliance checks, lifecycle status & SLA summary
-            </p>
-            <div className="mt-3">
-              <Select value={directionFilter} onValueChange={(value) => setDirectionFilter(value as Direction | 'all')}>
-                <SelectTrigger className="w-44">
-                  <SelectValue placeholder="Direction" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Directions</SelectItem>
-                  <SelectItem value="AR">Outbound (AR)</SelectItem>
-                  <SelectItem value="AP">Inbound (AP)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <Button onClick={() => navigate('/exceptions')} className="gap-2">
-            View All Exceptions
-            <ArrowRight className="w-4 h-4" />
-          </Button>
-        </div>
-
-        {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 animate-slide-up">
-          <StatsCard
-            title="Total Invoices"
-            value={stats.totalInvoices}
-            icon={<FileText className="w-5 h-5" />}
-            variant="default"
-          />
-          <StatsCard
-            title="Total Exceptions"
-            value={stats.totalExceptions}
-            icon={<AlertTriangle className="w-5 h-5" />}
-            variant={stats.totalExceptions > 0 ? 'danger' : 'success'}
-            onClick={() => navigate('/exceptions')}
-          />
-          <StatsCard
-            title="Pass Rate"
-            value={`${stats.passRate.toFixed(1)}%`}
-            icon={<TrendingUp className="w-5 h-5" />}
-            variant={stats.passRate >= 90 ? 'success' : stats.passRate >= 70 ? 'warning' : 'danger'}
-          />
-          <StatsCard
-            title="Critical Issues"
-            value={stats.exceptionsBySeverity.Critical}
-            icon={<AlertTriangle className="w-5 h-5" />}
-            variant={stats.exceptionsBySeverity.Critical > 0 ? 'danger' : 'success'}
-            onClick={() => navigate('/exceptions?severity=Critical')}
-          />
-        </div>
-
-        {/* SLA & Case Summary */}
-        {slaMetrics && slaMetrics.totalCases > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 animate-slide-up">
-            <StatsCard
-              title="Open Cases"
-              value={slaMetrics.openCases}
-              icon={<Briefcase className="w-5 h-5" />}
-              variant={slaMetrics.openCases > 0 ? 'warning' : 'success'}
-            />
-            <StatsCard
-              title="SLA Breached"
-              value={slaMetrics.breachedCases}
-              subtitle={`${slaMetrics.breachPercentage.toFixed(1)}% of total`}
-              icon={<Clock className="w-5 h-5" />}
-              variant={slaMetrics.breachedCases > 0 ? 'danger' : 'success'}
-            />
-            <StatsCard
-              title="Resolved Cases"
-              value={slaMetrics.resolvedCases}
-              icon={<CheckCircle className="w-5 h-5" />}
-              variant="success"
-            />
-            <StatsCard
-              title="Total Cases"
-              value={slaMetrics.totalCases}
-              icon={<Briefcase className="w-5 h-5" />}
-              variant="default"
-            />
-          </div>
-        )}
-
-        {/* Charts Row 1 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 animate-slide-up">
-          {/* Severity Distribution */}
-          <div className="surface-glass rounded-2xl border border-white/70 shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-foreground mb-4">
-              Exceptions by Severity
-            </h2>
-            <p className="mb-3 text-xs text-muted-foreground">Click a segment to drill down into filtered exceptions.</p>
-            {severityData.length > 0 ? (
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={severityData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={2}
-                      dataKey="value"
-                      label={({ name, value }) => `${name}: ${value}`}
-                      onClick={(entry) => navigate(`/exceptions?severity=${encodeURIComponent(entry.name)}`)}
-                    >
-                      {severityData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="h-64 flex items-center justify-center">
-                <div className="text-center">
-                  <CheckCircle className="w-12 h-12 text-success mx-auto mb-2" />
-                  <p className="text-muted-foreground">No exceptions found!</p>
+    <div className="space-y-6">
+            <div className="rounded-xl border border-border/70 bg-card shadow-lg p-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-muted-foreground">Dataset</span>
+                <div className="inline-flex rounded-lg border border-border bg-background p-1">
+                  <Button
+                    size="sm"
+                    variant={activeDatasetType === 'AR' ? 'default' : 'ghost'}
+                    onClick={() => setActiveDatasetType('AR')}
+                    className="h-8 text-xs"
+                  >
+                    AR / Outbound
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={activeDatasetType === 'AP' ? 'default' : 'ghost'}
+                    onClick={() => setActiveDatasetType('AP')}
+                    className="h-8 text-xs"
+                  >
+                    AP / Inbound
+                  </Button>
                 </div>
               </div>
-            )}
-          </div>
 
-          {/* Lifecycle Status */}
-          <div className="surface-glass rounded-2xl border border-white/70 shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-foreground mb-4">
-              Invoice Lifecycle Status
-            </h2>
-            {lifecycleData.length > 0 ? (
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={lifecycleData} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" horizontal vertical={false} />
-                    <XAxis type="number" />
-                    <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11 }} />
-                    <Tooltip />
-                    <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                      {lifecycleData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="h-64 flex items-center justify-center text-muted-foreground">
-                No lifecycle data yet
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Top Failing Checks */}
-        <div className="surface-glass rounded-2xl border border-white/70 shadow-sm p-6 mb-8 animate-slide-up">
-          <h2 className="text-lg font-semibold text-foreground mb-4">
-            Top Failing Checks
-          </h2>
-          <p className="mb-3 text-xs text-muted-foreground">Click a bar to open exceptions for that check.</p>
-          {checkData.length > 0 ? (
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={checkData} layout="vertical" margin={{ left: 0, right: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                  <XAxis type="number" />
-                  <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(value, name, props) => [value, props.payload.fullName]} />
-                  <Bar
-                    dataKey="exceptions"
-                    fill="hsl(217, 91%, 40%)"
-                    radius={[0, 4, 4, 0]}
-                    onClick={(entry) => navigate(`/exceptions?checkId=${encodeURIComponent(entry.checkId)}`)}
-                    className="cursor-pointer"
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="h-64 flex items-center justify-center">
-              <div className="text-center">
-                <CheckCircle className="w-12 h-12 text-success mx-auto mb-2" />
-                <p className="text-muted-foreground">All checks passed!</p>
+              <div className="flex items-center gap-2 text-xs">
+                <Badge variant="outline" className="rounded-md border-border">
+                  PINT-AE UAE UC1 v1.0
+                </Badge>
+                <Badge variant="outline" className={systemStatus.className}>
+                  {systemStatus.label}
+                </Badge>
               </div>
             </div>
-          )}
-        </div>
 
-        {/* Check Results Table */}
-        <div className="surface-glass rounded-2xl border border-white/70 shadow-sm animate-slide-up">
-          <div className="p-6 border-b">
-            <h2 className="text-lg font-semibold text-foreground">
-              All Check Results
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {filteredAndSortedResults.length} of {directionScopedChecks.length} checks shown
-            </p>
-            <div className="mt-4 flex flex-col gap-3 md:flex-row">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={resultsSearch}
-                  onChange={(event) => setResultsSearch(event.target.value)}
-                  placeholder="Search by check name or ID..."
-                  className="pl-10"
+            <PipelineProgress steps={pipelineSteps} />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+              <StatsCard
+                title="Total Invoices"
+                value={stats.totalInvoices}
+                icon={<FileText className="w-5 h-5" />}
+                variant="default"
+              />
+              <StatsCard
+                title="Total Exceptions"
+                value={stats.totalExceptions}
+                icon={<Briefcase className="w-5 h-5" />}
+                variant={stats.totalExceptions > 0 ? 'danger' : 'success'}
+              />
+              <StatsCard
+                title="Pass Rate"
+                value={`${stats.passRate.toFixed(1)}%`}
+                icon={<TrendingUp className="w-5 h-5" />}
+                variant={stats.passRate >= 90 ? 'success' : stats.passRate >= 70 ? 'warning' : 'danger'}
+              />
+              <StatsCard
+                title="Critical Issues"
+                value={stats.exceptionsBySeverity.Critical}
+                icon={<Clock className="w-5 h-5" />}
+                variant={stats.exceptionsBySeverity.Critical > 0 ? 'danger' : 'success'}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="rounded-xl border border-border/70 bg-card shadow-lg p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-sm font-semibold text-foreground">Validation Results Preview</h2>
+                  <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => navigate('/exceptions')}>
+                    Open Exceptions <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                {checkData.length > 0 ? (
+                  <div className="space-y-2">
+                    {checkData.slice(0, 5).map((item) => (
+                      <div key={item.fullName} className="flex items-center justify-between rounded-lg border border-border/70 p-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{item.fullName}</p>
+                          <div className="mt-1">
+                            <SeverityBadge severity={item.severity} />
+                          </div>
+                        </div>
+                        <span className="text-sm font-semibold text-destructive">{item.exceptions}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-[hsl(var(--success))]/30 bg-[hsl(var(--success))]/10 p-4 text-sm text-[hsl(var(--success))]">
+                    No failed checks in current run.
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-border/70 bg-card shadow-lg p-5">
+                <h2 className="text-sm font-semibold text-foreground mb-3">Mapping Confidence</h2>
+                <div className="space-y-3">
+                  {categoryCoverage.map((entry) => (
+                    <div key={entry.category}>
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="font-medium text-foreground">{entry.category}</span>
+                        <span className="text-muted-foreground">{entry.value.toFixed(0)}%</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className={
+                            entry.value >= 90
+                              ? 'h-full bg-[hsl(var(--success))]'
+                              : entry.value >= 70
+                              ? 'h-full bg-amber-500'
+                              : 'h-full bg-destructive'
+                          }
+                          style={{ width: `${Math.max(0, Math.min(100, entry.value))}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="rounded-xl border border-border/70 bg-card shadow-lg p-5">
+                <h2 className="text-sm font-semibold mb-3">Data</h2>
+                <div className="space-y-2">
+                  <Button variant="outline" className="w-full justify-between" onClick={() => navigate('/upload')}>
+                    Ingestion Workspace <ArrowRight className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" className="w-full justify-between" onClick={() => navigate('/upload-audit')}>
+                    Upload Audit <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border/70 bg-card shadow-lg p-5">
+                <h2 className="text-sm font-semibold mb-3">Compliance</h2>
+                <div className="space-y-2">
+                  <Button variant="outline" className="w-full justify-between" onClick={() => navigate('/run')}>
+                    Run Validation <ArrowRight className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" className="w-full justify-between" onClick={() => navigate('/exceptions')}>
+                    Exceptions Queue <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border/70 bg-card shadow-lg p-5">
+                <h2 className="text-sm font-semibold mb-3">Governance</h2>
+                <div className="space-y-2">
+                  <Button variant="outline" className="w-full justify-between" onClick={() => navigate('/cases')}>
+                    Cases <ArrowRight className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" className="w-full justify-between" onClick={() => navigate('/evidence-pack')}>
+                    Evidence Pack <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {slaMetrics && slaMetrics.totalCases > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <StatsCard
+                  title="Open Cases"
+                  value={slaMetrics.openCases}
+                  icon={<Briefcase className="w-5 h-5" />}
+                  variant={slaMetrics.openCases > 0 ? 'warning' : 'success'}
+                />
+                <StatsCard
+                  title="SLA Breached"
+                  value={slaMetrics.breachedCases}
+                  subtitle={`${slaMetrics.breachPercentage.toFixed(1)}% of total`}
+                  icon={<Clock className="w-5 h-5" />}
+                  variant={slaMetrics.breachedCases > 0 ? 'danger' : 'success'}
+                />
+                <StatsCard
+                  title="Resolved Cases"
+                  value={slaMetrics.resolvedCases}
+                  icon={<CheckCircle className="w-5 h-5" />}
+                  variant="success"
+                />
+                <StatsCard
+                  title="Total Cases"
+                  value={slaMetrics.totalCases}
+                  icon={<Briefcase className="w-5 h-5" />}
+                  variant="default"
                 />
               </div>
-              <Select value={resultsSeverityFilter} onValueChange={(value) => setResultsSeverityFilter(value as Severity | 'all')}>
-                <SelectTrigger className="w-full md:w-44">
-                  <SelectValue placeholder="Severity" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Severities</SelectItem>
-                  <SelectItem value="Critical">Critical</SelectItem>
-                  <SelectItem value="High">High</SelectItem>
-                  <SelectItem value="Medium">Medium</SelectItem>
-                  <SelectItem value="Low">Low</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={resultsSort} onValueChange={(value) => setResultsSort(value as typeof resultsSort)}>
-                <SelectTrigger className="w-full md:w-52">
-                  <SelectValue placeholder="Sort" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="failed_desc">Most Failed First</SelectItem>
-                  <SelectItem value="failed_asc">Least Failed First</SelectItem>
-                  <SelectItem value="pass_desc">Highest Pass Rate</SelectItem>
-                  <SelectItem value="pass_asc">Lowest Pass Rate</SelectItem>
-                </SelectContent>
-              </Select>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="gap-2">
-                    <SlidersHorizontal className="h-4 w-4" />
-                    Columns
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-52">
-                  <DropdownMenuLabel>Visible Columns</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuCheckboxItem checked={visibleResultsColumns.checkName} onCheckedChange={(checked) => setVisibleResultsColumns((prev) => ({ ...prev, checkName: Boolean(checked) }))}>
-                    Check Name
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuCheckboxItem checked={visibleResultsColumns.severity} onCheckedChange={(checked) => setVisibleResultsColumns((prev) => ({ ...prev, severity: Boolean(checked) }))}>
-                    Severity
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuCheckboxItem checked={visibleResultsColumns.passed} onCheckedChange={(checked) => setVisibleResultsColumns((prev) => ({ ...prev, passed: Boolean(checked) }))}>
-                    Passed
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuCheckboxItem checked={visibleResultsColumns.failed} onCheckedChange={(checked) => setVisibleResultsColumns((prev) => ({ ...prev, failed: Boolean(checked) }))}>
-                    Failed
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuCheckboxItem checked={visibleResultsColumns.passRate} onCheckedChange={(checked) => setVisibleResultsColumns((prev) => ({ ...prev, passRate: Boolean(checked) }))}>
-                    Pass Rate
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuCheckboxItem checked={visibleResultsColumns.drilldown} onCheckedChange={(checked) => setVisibleResultsColumns((prev) => ({ ...prev, drilldown: Boolean(checked) }))}>
-                    Drill-down
-                  </DropdownMenuCheckboxItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center">
-              <Select
-                value={selectedResultsViewId}
-                onValueChange={(value) => {
-                  setSelectedResultsViewId(value);
-                  if (value === 'none') return;
-                  const view = resultsSavedViews.find((item) => item.id === value);
-                  if (view) applyResultsView(view.config);
-                }}
-              >
-                <SelectTrigger className="w-full md:w-64">
-                  <SelectValue placeholder="Saved views" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No saved view</SelectItem>
-                  {resultsSavedViews.map((view) => (
-                    <SelectItem key={view.id} value={view.id}>
-                      {view.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button variant="outline" className="gap-2" onClick={handleSaveResultsView}>
-                <Save className="h-4 w-4" />
-                Save View
-              </Button>
-              <Button
-                variant="outline"
-                className="gap-2"
-                onClick={handleDeleteResultsView}
-                disabled={selectedResultsViewId === 'none'}
-              >
-                <Trash2 className="h-4 w-4" />
-                Delete View
-              </Button>
-              <Button
-                variant="outline"
-                className="gap-2 md:ml-auto"
-                onClick={() =>
-                  exportResultsCsv(
-                    filteredAndSortedResults.map((result) => ({
-                      checkId: result.checkId,
-                      checkName: result.checkName,
-                      severity: result.severity,
-                      passed: result.passed,
-                      failed: result.failed,
-                    })),
-                  )
-                }
-              >
-                <Download className="h-4 w-4" />
-                Export Filtered
-              </Button>
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b bg-muted/30">
-                  {visibleResultsColumns.checkName && <th className="text-left p-4 text-sm font-medium text-muted-foreground">Check Name</th>}
-                  {visibleResultsColumns.severity && <th className="text-left p-4 text-sm font-medium text-muted-foreground">Severity</th>}
-                  {visibleResultsColumns.passed && <th className="text-right p-4 text-sm font-medium text-muted-foreground">Passed</th>}
-                  {visibleResultsColumns.failed && <th className="text-right p-4 text-sm font-medium text-muted-foreground">Failed</th>}
-                  {visibleResultsColumns.passRate && <th className="text-right p-4 text-sm font-medium text-muted-foreground">Pass Rate</th>}
-                  {visibleResultsColumns.drilldown && <th className="text-right p-4 text-sm font-medium text-muted-foreground">Drill-down</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredAndSortedResults.map((result) => {
-                  const total = result.passed + result.failed;
-                  const passRate = total > 0 ? (result.passed / total) * 100 : 100;
-                  
-                  return (
-                    <tr key={result.checkId} className="border-b hover:bg-muted/20 transition-colors">
-                      {visibleResultsColumns.checkName && <td className="p-4 font-medium text-foreground">{result.checkName}</td>}
-                      {visibleResultsColumns.severity && <td className="p-4"><SeverityBadge severity={result.severity} /></td>}
-                      {visibleResultsColumns.passed && <td className="p-4 text-right text-success font-medium">{result.passed}</td>}
-                      {visibleResultsColumns.failed && <td className="p-4 text-right text-severity-critical font-medium">{result.failed}</td>}
-                      {visibleResultsColumns.passRate && (
-                        <td className="p-4 text-right">
-                          <span className={passRate >= 90 ? 'text-success' : passRate >= 70 ? 'text-severity-medium' : 'text-severity-critical'}>
-                            {passRate.toFixed(1)}%
-                          </span>
-                        </td>
-                      )}
-                      {visibleResultsColumns.drilldown && (
-                        <td className="p-4 text-right">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => navigate(`/exceptions?checkId=${encodeURIComponent(result.checkId)}`)}
-                          >
-                            View Exceptions
-                          </Button>
-                        </td>
-                      )}
-                    </tr>
-                  );
-                })}
-                {filteredAndSortedResults.length === 0 && (
-                  <tr>
-                    <td colSpan={Math.max(1, Object.values(visibleResultsColumns).filter(Boolean).length)} className="p-8 text-center text-muted-foreground">
-                      No check results match your filters
-                    </td>
-                  </tr>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="rounded-xl border border-border/70 bg-card shadow-lg p-5 lg:col-span-2">
+                <h2 className="text-sm font-semibold text-foreground mb-4">Exceptions by Severity</h2>
+                {severityData.length > 0 ? (
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={severityData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={100}
+                          paddingAngle={2}
+                          dataKey="value"
+                          label={({ name, value }) => `${name}: ${value}`}
+                        >
+                          {severityData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="h-64 flex items-center justify-center text-sm text-muted-foreground">
+                    No exceptions found in current run.
+                  </div>
                 )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+              </div>
+
+              <div className="rounded-xl border border-border/70 bg-card shadow-lg p-5">
+                <h2 className="text-sm font-semibold text-foreground mb-4">Activity Log (Last 10)</h2>
+                <div className="space-y-2 max-h-64 overflow-auto pr-1">
+                  {activityFeed.length > 0 ? (
+                    activityFeed.map((entry) => (
+                      <button
+                        key={entry.id}
+                        className="w-full rounded-lg border border-border/70 p-2 text-left hover:bg-muted/40 transition-colors"
+                        onClick={() => navigate(entry.path)}
+                      >
+                        <p className="text-xs font-semibold text-muted-foreground">{entry.category}</p>
+                        <p className="text-sm">{entry.label}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {formatDistanceToNow(new Date(entry.createdAt), { addSuffix: true })}
+                        </p>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No recent actions recorded.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-border/70 bg-card shadow-lg p-5">
+              <h2 className="text-sm font-semibold text-foreground mb-4">Invoice Lifecycle Status</h2>
+              {lifecycleData.length > 0 ? (
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={lifecycleData} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" horizontal vertical={false} />
+                      <XAxis type="number" />
+                      <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11 }} />
+                      <Tooltip />
+                      <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                        {lifecycleData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="h-64 flex items-center justify-center text-muted-foreground">No lifecycle data yet.</div>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-border/70 bg-card shadow-lg">
+              <div className="p-5 border-b border-border/70 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-foreground">All Check Results</h2>
+                <div className="flex items-center gap-2">
+                  {runSummary && <Badge variant="outline">Run ID: {runSummary.run_id.slice(0, 8)}...</Badge>}
+                  <Button onClick={() => navigate('/exceptions')} size="sm" className="gap-1.5">
+                    View All Exceptions
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b bg-muted/30">
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Check Name</th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Severity</th>
+                      <th className="text-right p-4 text-sm font-medium text-muted-foreground">Passed</th>
+                      <th className="text-right p-4 text-sm font-medium text-muted-foreground">Failed</th>
+                      <th className="text-right p-4 text-sm font-medium text-muted-foreground">Pass Rate</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {checkResults.map((result) => {
+                      const total = result.passed + result.failed;
+                      const passRate = total > 0 ? (result.passed / total) * 100 : 100;
+
+                      return (
+                        <tr key={result.checkId} className="border-b hover:bg-muted/20 transition-colors">
+                          <td className="p-4 font-medium text-foreground">{result.checkName}</td>
+                          <td className="p-4">
+                            <SeverityBadge severity={result.severity} />
+                          </td>
+                          <td className="p-4 text-right text-success font-medium">{result.passed}</td>
+                          <td className="p-4 text-right text-severity-critical font-medium">{result.failed}</td>
+                          <td className="p-4 text-right">
+                            <span className={passRate >= 90 ? 'text-success' : passRate >= 70 ? 'text-severity-medium' : 'text-severity-critical'}>
+                              {passRate.toFixed(1)}%
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
     </div>
   );
 }
-
-
-

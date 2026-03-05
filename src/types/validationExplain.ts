@@ -1,83 +1,92 @@
-import { Exception } from './compliance';
+import { Severity, Exception } from '@/types/compliance';
+import { DatasetType } from '@/types/datasets';
 
-export type ValidationRisk = 'Low' | 'Medium' | 'High' | 'Critical';
-export type ValidationExplanationStatus = 'completed' | 'failed';
+export interface ExplanationEngineMeta {
+  source: 'cache' | 'heuristic' | 'assist';
+  version: 'heuristic_v1' | 'assist_v1';
+  promptVersion?: string;
+  heuristicRuleHint?: string;
+}
+
+export interface ExplanationRootCause {
+  cause: string;
+  probability: number; // 0..1, normalized across all causes
+  evidence: string[];
+}
+
+export interface ExplanationFixStep {
+  step: string;
+  ownerHint: string;
+  linkToUI?: string;
+}
+
+export interface ExplanationRuleReference {
+  ruleCode: string;
+  ruleName?: string;
+  severity: Severity;
+  specRef?: string;
+}
+
+export interface ExplanationEvidenceSnapshot {
+  invoice?: string;
+  field?: string;
+  expected?: string | number;
+  actual?: string | number;
+  delta?: number | string;
+  mapping?: Record<string, unknown>;
+  rawMessage?: string;
+  [key: string]: unknown;
+}
+
+export interface ExplanationPack {
+  summary: string;
+  whyItFailed: string[];
+  likelyRootCauses: ExplanationRootCause[];
+  impact: string;
+  fixChecklist: ExplanationFixStep[];
+  ruleReferences: ExplanationRuleReference[];
+  confidence: number; // 0..1
+  engine: ExplanationEngineMeta;
+  evidenceSnapshot: ExplanationEvidenceSnapshot;
+}
 
 export interface ValidationExplanation {
   id?: string;
-  tenantId: string;
-  exceptionKey: string;
-  checkExceptionId?: string | null;
-  validationRunId?: string | null;
-  invoiceId?: string | null;
-  ruleCode?: string | null;
-  checkId?: string | null;
-  checkName?: string | null;
-  datasetType?: string | null;
-  direction?: string | null;
-  explanation: string;
-  risk: ValidationRisk;
-  recommendedFix: string;
-  confidence: number;
-  model?: string | null;
-  promptVersion: string;
-  sourceContext?: Record<string, unknown> | null;
-  status: ValidationExplanationStatus;
-  errorMessage?: string | null;
-  generatedAt?: string;
+  exceptionId?: string;
+  checkId?: string;
+  datasetType?: DatasetType;
+  fieldName?: string;
+  explanation: string; // backward-compatible flat summary
+  recommendedFix: string; // backward-compatible top recommendation
+  promptVersion?: string;
+  sourceContext?: Record<string, unknown>;
   createdAt?: string;
   updatedAt?: string;
-  cached?: boolean;
-  source?: 'cache' | 'edge' | 'fallback';
+  explanationPack?: ExplanationPack;
 }
 
-export interface GenerateValidationExplanationOptions {
+export type ValidationExplainMode = 'heuristic_only' | 'assist';
+
+export interface GenerateValidationExplanationInput {
+  exception: Exception;
+  datasetType?: DatasetType;
+  mode?: ValidationExplainMode;
   regenerate?: boolean;
-  tenantId?: string;
   promptVersion?: string;
 }
 
-export interface ValidationExplainFunctionInput {
-  exception_key: string;
-  tenant_id: string;
-  regenerate: boolean;
-  prompt_version: string;
-  exception: {
-    id: string;
-    check_id: string;
-    check_name: string;
-    severity: string;
-    message: string;
-    invoice_id?: string | null;
-    invoice_number?: string | null;
-    seller_trn?: string | null;
-    buyer_id?: string | null;
-    line_id?: string | null;
-    field_name?: string | null;
-    expected_value?: string | number | null;
-    actual_value?: string | number | null;
-    dataset_type?: string | null;
-    direction?: string | null;
-    validation_run_id?: string | null;
-  };
+export interface MappingContext {
+  mapping_path: string;
+  sample_source_value?: string;
+  dataset_type?: DatasetType;
+  field_name?: string;
 }
 
-export type ExceptionLike = Pick<
-  Exception,
-  | 'id'
-  | 'checkId'
-  | 'checkName'
-  | 'severity'
-  | 'message'
-  | 'invoiceId'
-  | 'invoiceNumber'
-  | 'sellerTrn'
-  | 'buyerId'
-  | 'lineId'
-  | 'field'
-  | 'expectedValue'
-  | 'actualValue'
-  | 'datasetType'
-  | 'direction'
-  | 'validationRunId'
->;
+export interface MappingContextProvider {
+  getMappingContext(params: {
+    datasetType?: DatasetType;
+    fieldName?: string;
+    exception: Exception;
+  }): Promise<MappingContext | null>;
+}
+
