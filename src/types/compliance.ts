@@ -12,6 +12,8 @@ export interface Buyer {
   buyer_postcode?: string;
   buyer_subdivision?: string;
   buyer_electronic_address?: string;
+  buyer_legal_reg_id?: string;
+  buyer_legal_reg_id_type?: string;
   source_row_number?: number;
   upload_session_id?: string;
   upload_manifest_id?: string;
@@ -66,10 +68,13 @@ export interface InvoiceLine {
   description?: string;
   quantity: number;
   unit_price: number;
+  item_gross_price?: number;
   line_discount?: number;
   line_total_excl_vat: number;
+  line_amount_aed?: number;
   vat_rate: number;
   vat_amount: number;
+  line_vat_amount_aed?: number;
   // UC1 expansions
   unit_of_measure?: string;
   tax_category_code?: string;

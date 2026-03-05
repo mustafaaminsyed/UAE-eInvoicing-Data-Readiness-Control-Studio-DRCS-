@@ -64,7 +64,7 @@ const DR_TO_COLUMN_MAP: Record<string, { dataset: 'buyers' | 'headers' | 'lines'
   'IBT-130': { dataset: 'lines', columns: ['unit_of_measure'] },
   'IBT-131': { dataset: 'lines', columns: ['line_total_excl_vat'] },
   'IBT-146': { dataset: 'lines', columns: ['unit_price'] },
-  'IBT-148': { dataset: 'lines', columns: ['unit_price'] }, // gross price maps to same input
+  'IBT-148': { dataset: 'lines', columns: ['item_gross_price'] },
   'IBT-151': { dataset: 'lines', columns: ['tax_category_code'] },
   'IBT-152': { dataset: 'lines', columns: ['vat_rate'] },
   'IBT-153': { dataset: 'lines', columns: ['description'] },
@@ -131,6 +131,7 @@ export const PARSER_KNOWN_COLUMNS: Record<'buyers' | 'headers' | 'lines', Set<st
   buyers: new Set([
     'buyer_id', 'buyer_name', 'buyer_trn', 'buyer_address', 'buyer_country',
     'buyer_city', 'buyer_postcode', 'buyer_subdivision', 'buyer_electronic_address',
+    'buyer_legal_reg_id', 'buyer_legal_reg_id_type',
   ]),
   headers: new Set([
     'invoice_id', 'invoice_number', 'issue_date', 'seller_trn', 'buyer_id',
@@ -145,7 +146,8 @@ export const PARSER_KNOWN_COLUMNS: Record<'buyers' | 'headers' | 'lines', Set<st
   ]),
   lines: new Set([
     'line_id', 'invoice_id', 'line_number', 'description', 'quantity',
-    'unit_price', 'line_discount', 'line_total_excl_vat', 'vat_rate', 'vat_amount',
+    'unit_price', 'item_gross_price', 'line_discount', 'line_total_excl_vat',
+    'vat_rate', 'vat_amount', 'line_vat_amount_aed', 'line_amount_aed',
     'unit_of_measure', 'tax_category_code', 'item_name',
     'line_allowance_amount', 'line_charge_amount',
   ]),
@@ -171,6 +173,20 @@ export function getMandatoryColumnsForDataset(dataset: 'buyers' | 'headers' | 'l
   if (dataset === 'headers') { cols.add('invoice_id'); cols.add('buyer_id'); }
   if (dataset === 'lines') { cols.add('line_id'); cols.add('invoice_id'); }
   return Array.from(cols);
+}
+
+// MoF-priority ingestible columns that are mandatory in the UAE rulebook
+// but still optional in the current UC1 baseline templates.
+const MOF_PRIORITY_OVERLAY_COLUMNS: Record<'buyers' | 'headers' | 'lines', string[]> = {
+  buyers: ['buyer_legal_reg_id', 'buyer_legal_reg_id_type', 'buyer_subdivision'],
+  headers: ['payment_due_date', 'payment_means_code', 'seller_subdivision', 'amount_due'],
+  lines: ['item_gross_price', 'line_vat_amount_aed', 'line_amount_aed'],
+};
+
+export function getMofPriorityOverlayColumnsForDataset(
+  dataset: 'buyers' | 'headers' | 'lines'
+): string[] {
+  return [...MOF_PRIORITY_OVERLAY_COLUMNS[dataset]];
 }
 
 /**

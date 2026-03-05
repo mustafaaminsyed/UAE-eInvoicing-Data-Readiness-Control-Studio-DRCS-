@@ -18,6 +18,14 @@ import {
 } from '@/types/fieldMapping';
 import { analyzeCoverage, validateMappedData, getCoverageStats } from '@/lib/mapping/coverageAnalyzer';
 
+const MOF_OVERLAY_FIELD_IDS = [
+  'buyer_legal_reg_id',
+  'buyer_legal_reg_id_type',
+  'item_gross_price',
+  'line_vat_amount_aed',
+  'line_amount_aed',
+] as const;
+
 interface AnalysisStepProps {
   previewData: ERPPreviewData;
   mappings: FieldMapping[];
@@ -42,6 +50,25 @@ export function AnalysisStep({
     validateMappedData(mappings, previewData.rows), 
     [mappings, previewData]
   );
+
+  const mofOverlayCoverage = useMemo(() => {
+    const targetFields = PINT_AE_UC1_FIELDS.filter((field) =>
+      MOF_OVERLAY_FIELD_IDS.includes(field.id as typeof MOF_OVERLAY_FIELD_IDS[number])
+    );
+    const mappingByTarget = new Map(mappings.map((mapping) => [mapping.targetField.id, mapping]));
+    const rows = targetFields.map((field) => ({
+      field,
+      mapping: mappingByTarget.get(field.id),
+    }));
+    const mapped = rows.filter((row) => !!row.mapping).length;
+    return {
+      rows,
+      total: rows.length,
+      mapped,
+      unmapped: rows.length - mapped,
+      pct: rows.length > 0 ? Math.round((mapped / rows.length) * 100) : 100,
+    };
+  }, [mappings]);
 
   // Filter unmapped mandatory based on conditional answers
   const applicableUnmappedMandatory = useMemo(() => {
@@ -143,6 +170,52 @@ export function AnalysisStep({
           </CardContent>
         </Card>
       </div>
+
+      {/* MoF Overlay Coverage */}
+      <Card>
+        <CardHeader>
+          <CardTitle>MoF Overlay Mapping Coverage</CardTitle>
+          <CardDescription>
+            Status of newly added MoF-priority mapping fields (24, 25, 44, 48, 49).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-medium">
+              {mofOverlayCoverage.mapped} of {mofOverlayCoverage.total} mapped
+            </span>
+            <Badge variant={mofOverlayCoverage.unmapped === 0 ? 'default' : 'outline'}>
+              {mofOverlayCoverage.pct}%
+            </Badge>
+          </div>
+          <Progress value={mofOverlayCoverage.pct} className="h-2 mb-4" />
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {mofOverlayCoverage.rows.map(({ field, mapping }) => (
+              <div key={field.id} className="rounded-lg border p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-medium">{field.name}</p>
+                  {mapping ? (
+                    <Badge className="bg-green-500/10 text-green-600 border-green-500/20">Mapped</Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-amber-700 border-amber-500/30">Unmapped</Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">{field.ibtReference}</p>
+                <p className="text-xs mt-2">
+                  {mapping ? (
+                    <>
+                      ERP column: <code>{mapping.erpColumn}</code>
+                    </>
+                  ) : (
+                    'No ERP column linked yet'
+                  )}
+                </p>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Conditional Fields Questionnaire */}
       <Card>

@@ -23,6 +23,7 @@ import MappingPage from "./pages/MappingPage";
 import EvidencePage from "./pages/EvidencePage";
 import EvidencePackPage from "./pages/EvidencePackPage";
 import TraceabilityPage from "./pages/TraceabilityPage";
+import RulebookShadowPage from "./pages/RulebookShadowPage";
 import NotFound from "./pages/NotFound";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 
@@ -60,6 +61,7 @@ const App = () => (
                     <Route path="/evidence" element={<EvidencePage />} />
                     <Route path="/evidence-pack" element={<EvidencePackPage />} />
                     <Route path="/traceability" element={<TraceabilityPage />} />
+                    <Route path="/rulebook-shadow" element={<RulebookShadowPage />} />
                   </Route>
                   <Route path="*" element={<NotFound />} />
                 </Routes>
