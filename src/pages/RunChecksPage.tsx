@@ -22,6 +22,17 @@ import { Link } from 'react-router-dom';
 import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
 import { getSupabaseEnvStatus, shouldUseLocalDevFallback } from '@/lib/api/supabaseEnv';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  getMofMandatoryGateFieldNumbers,
+  isMofMandatoryGateEnabled,
+  isMofRulebookEnabled,
+  isMofRulebookShadowModeEnabled,
+  loadMofRulebookBundle,
+} from '@/lib/rulebook/loader';
+import { runRulebookShadowChecks } from '@/lib/rulebook/shadowRunner';
+import { runAllPintAEChecks } from '@/lib/checks/pintAECheckRunner';
+import { buildMofRuleTraceability } from '@/lib/rulebook/traceability';
+import { getControlsForDR } from '@/lib/registry/controlsRegistry';
 
 type ConnectionTestStatus = 'idle' | 'running' | 'passed' | 'failed';
 
@@ -71,6 +82,18 @@ export default function RunChecksPage() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('none');
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
   const expectedUC1Count = UAE_UC1_CHECK_PACK.length;
+  const mofRulebookEnabled = useMemo(() => isMofRulebookEnabled(), []);
+  const mofShadowModeEnabled = useMemo(() => isMofRulebookShadowModeEnabled(), []);
+  const mofMandatoryGateEnabled = useMemo(() => isMofMandatoryGateEnabled(), []);
+  const mofMandatoryGateFields = useMemo(() => getMofMandatoryGateFieldNumbers(), []);
+  const rulebookBundle = useMemo(() => {
+    if (!mofRulebookEnabled && !mofShadowModeEnabled) return null;
+    try {
+      return loadMofRulebookBundle();
+    } catch {
+      return null;
+    }
+  }, [mofRulebookEnabled, mofShadowModeEnabled]);
 
   const loadChecks = useCallback(async () => {
     setIsLoadingChecks(true);
@@ -213,8 +236,6 @@ export default function RunChecksPage() {
 
   const noMappingProfile = isSupabaseConfigured && !isLoadingTemplates && mappingTemplates.length === 0;
 
-  if (!isDataLoaded) return null;
-
   // Calculate coverage for selected template
   const selectedTemplate = mappingTemplates.find(t => t.id === selectedTemplateId);
   const mandatoryFields = PINT_AE_UC1_FIELDS.filter(f => f.isMandatory);
@@ -245,6 +266,65 @@ export default function RunChecksPage() {
       },
     ];
   const isBlocked = isLocalFallbackMode ? !readiness.canRun : (!isSupabaseConfigured || !readiness.canRun);
+
+  const shadowStatus = useMemo(() => {
+    if (!rulebookBundle) return null;
+
+    const buyerMap = new Map(buyers.map((b) => [b.buyer_id, b]));
+    const headerMap = new Map(headers.map((h) => [h.invoice_id, h]));
+    const linesByInvoice = new Map<string, typeof lines>();
+    lines.forEach((line) => {
+      if (!linesByInvoice.has(line.invoice_id)) linesByInvoice.set(line.invoice_id, []);
+      linesByInvoice.get(line.invoice_id)!.push(line);
+    });
+
+    const dataContext = { buyers, headers, lines, buyerMap, headerMap, linesByInvoice };
+    const shadow = runRulebookShadowChecks(
+      dataContext,
+      rulebookBundle.rulebook,
+      rulebookBundle.adapted.checks
+    );
+
+    // Rough overlap indicator against current PINT exceptions for visibility in UI.
+    const pint = runAllPintAEChecks(pintAEChecks, dataContext);
+    const legacyKeys = new Set(
+      pint.map((e) => `${e.invoice_id || '-'}|${e.line_id || '-'}|${e.field_name || '-'}|${e.check_id}`)
+    );
+    const shadowKeys = new Set(
+      shadow.exceptions.map((e) => `${e.invoiceId || '-'}|${e.lineId || '-'}|${e.field || '-'}|${e.ruleId}`)
+    );
+    let overlap = 0;
+    shadowKeys.forEach((key) => {
+      if (legacyKeys.has(key)) overlap++;
+    });
+    const exceptionCodeCounts = new Map<string, number>();
+    shadow.exceptions.forEach((e) => {
+      const code = e.exceptionCode || 'UNKNOWN';
+      exceptionCodeCounts.set(code, (exceptionCodeCounts.get(code) ?? 0) + 1);
+    });
+    const ruleTrace = buildMofRuleTraceability(rulebookBundle.rulebook);
+    const drIdsByRuleId = new Map(ruleTrace.map((entry) => [entry.rule_id, entry.affected_dr_ids]));
+    const impactedControlIds = new Set<string>();
+    shadow.exceptions.forEach((e) => {
+      const drIds = drIdsByRuleId.get(e.ruleId) || [];
+      drIds.forEach((drId) => {
+        getControlsForDR(drId).forEach((control) => impactedControlIds.add(control.control_id));
+      });
+    });
+
+    return {
+      validationErrors: rulebookBundle.validation.errors.length,
+      validationWarnings: rulebookBundle.validation.warnings.length,
+      adaptedRules: rulebookBundle.adapted.checks.length,
+      executableRules: shadow.executedRules,
+      skippedRules: shadow.skippedRules,
+      shadowExceptions: shadow.exceptions.length,
+      pintExceptions: pint.length,
+      overlap,
+      shadowDistinctExceptionCodes: exceptionCodeCounts.size,
+      shadowImpactedControls: impactedControlIds.size,
+    };
+  }, [rulebookBundle, buyers, headers, lines, pintAEChecks]);
 
   const handleRunChecks = async () => {
     if (hasCoverageWarning) {
@@ -351,6 +431,8 @@ export default function RunChecksPage() {
       toast.error('Supabase connection test failed');
     }
   };
+
+  if (!isDataLoaded) return null;
 
   return (
     <div className="min-h-[calc(100vh-4rem)]">
@@ -682,6 +764,69 @@ export default function RunChecksPage() {
                   View full traceability matrix {'->'}
                 </Link>
               </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {(mofRulebookEnabled || mofShadowModeEnabled) && shadowStatus && (
+          <Card className="mb-8 surface-glass border-white/70">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Shield className="h-5 w-5" />
+                Rulebook Shadow Status
+              </CardTitle>
+              <CardDescription>
+                Side-by-side MoF rulebook diagnostics (safe mode, no enforcement switch yet).
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-3 md:grid-cols-4">
+                <MetricBox label="Mode" value={mofRulebookEnabled ? 'Enforce+Shadow' : 'Shadow'} />
+                <MetricBox label="Rules" value={`${shadowStatus.executableRules}/${shadowStatus.adaptedRules}`} />
+                <MetricBox label="Shadow Issues" value={String(shadowStatus.shadowExceptions)} />
+                <MetricBox label="PINT Issues" value={String(shadowStatus.pintExceptions)} />
+              </div>
+              <div className="mt-3 grid gap-2 md:grid-cols-3 text-xs text-muted-foreground">
+                <p>Validation errors: <span className="font-semibold text-foreground">{shadowStatus.validationErrors}</span></p>
+                <p>Validation warnings: <span className="font-semibold text-foreground">{shadowStatus.validationWarnings}</span></p>
+                <p>Skipped rules: <span className="font-semibold text-foreground">{shadowStatus.skippedRules}</span></p>
+              </div>
+              <div className="mt-2 grid gap-2 md:grid-cols-2 text-xs text-muted-foreground">
+                <p>MoF exception codes: <span className="font-semibold text-foreground">{shadowStatus.shadowDistinctExceptionCodes}</span></p>
+                <p>Impacted controls: <span className="font-semibold text-foreground">{shadowStatus.shadowImpactedControls}</span></p>
+              </div>
+              <div className="mt-2 text-xs text-muted-foreground">
+                <p>
+                  Mandatory gate:{' '}
+                  <span className="font-semibold text-foreground">
+                    {mofRulebookEnabled && mofMandatoryGateEnabled ? 'Enabled' : 'Disabled'}
+                  </span>
+                </p>
+                <p>
+                  Gate fields:{' '}
+                  <span className="font-semibold text-foreground">
+                    {mofMandatoryGateFields.length > 0 ? mofMandatoryGateFields.join(', ') : 'None configured'}
+                  </span>
+                </p>
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Overlap indicator (shadow vs PINT): <span className="font-semibold text-foreground">{shadowStatus.overlap}</span>
+              </p>
+              <div className="mt-3">
+                <Button asChild size="sm" variant="outline" className="text-xs">
+                  <Link to="/rulebook-shadow">Open Full Shadow Diagnostics</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {mofRulebookEnabled && mofMandatoryGateEnabled && mofMandatoryGateFields.length === 0 && (
+          <Alert className="mb-8 border-amber-500/30 bg-amber-500/10">
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <AlertTitle className="text-amber-700">Mandatory gate is enabled but no fields are configured</AlertTitle>
+            <AlertDescription className="text-amber-600">
+              Set <code>VITE_MOF_MANDATORY_GATE_FIELDS</code> (for example <code>1,2,3,4,5</code>) to enforce a controlled subset.
             </AlertDescription>
           </Alert>
         )}

@@ -299,7 +299,7 @@ export default function UploadPage() {
               {stats.buyers ? (
                 <FileSummaryCard stats={stats.buyers} type="buyers" onRemove={() => handleFileSelect('buyers', null)} />
               ) : (
-                <FileDropZone label="Buyers File" description="buyer_id, buyer_name, buyer_trn, buyer_address, buyer_country" sampleType="buyers" sampleScenario={sampleScenario} onFileSelect={(f) => handleFileSelect('buyers', f)} />
+                <FileDropZone label="Buyers File" description="buyer_id, buyer_name, buyer_trn, buyer_address, buyer_country, buyer_legal_reg_id (optional), buyer_legal_reg_id_type (optional)" sampleType="buyers" sampleScenario={sampleScenario} onFileSelect={(f) => handleFileSelect('buyers', f)} />
               )}
 
               <div className="border-t" />
@@ -317,7 +317,7 @@ export default function UploadPage() {
               {stats.lines ? (
                 <FileSummaryCard stats={stats.lines} type="lines" onRemove={() => handleFileSelect('lines', null)} />
               ) : (
-                <FileDropZone label="Invoice Lines File" description="line_id, invoice_id, line_number, quantity, unit_price, vat_rate, ..." sampleType="lines" sampleScenario={sampleScenario} onFileSelect={(f) => handleFileSelect('lines', f)} />
+                <FileDropZone label="Invoice Lines File" description="line_id, invoice_id, line_number, quantity, unit_price, item_gross_price (optional), line_vat_amount_aed (optional), line_amount_aed (optional), ..." sampleType="lines" sampleScenario={sampleScenario} onFileSelect={(f) => handleFileSelect('lines', f)} />
               )}
             </div>
           </div>

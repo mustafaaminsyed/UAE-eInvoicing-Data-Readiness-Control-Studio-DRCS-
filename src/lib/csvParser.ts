@@ -102,6 +102,14 @@ export async function parsePartiesFile(file: File, options: ParseOptions = {}): 
     direction === 'AP'
       ? ['supplier_electronic_address', 'vendor_electronic_address', 'buyer_electronic_address']
       : ['buyer_electronic_address', 'customer_electronic_address', 'party_electronic_address'];
+  const legalRegIdKeys =
+    direction === 'AP'
+      ? ['supplier_legal_reg_id', 'vendor_legal_reg_id', 'buyer_legal_reg_id']
+      : ['buyer_legal_reg_id', 'customer_legal_reg_id', 'party_legal_reg_id'];
+  const legalRegIdTypeKeys =
+    direction === 'AP'
+      ? ['supplier_legal_reg_id_type', 'vendor_legal_reg_id_type', 'buyer_legal_reg_id_type']
+      : ['buyer_legal_reg_id_type', 'customer_legal_reg_id_type', 'party_legal_reg_id_type'];
 
   return records.map((record, index) => ({
     buyer_id: getValue(record, idKeys) || '',
@@ -113,6 +121,8 @@ export async function parsePartiesFile(file: File, options: ParseOptions = {}): 
     buyer_postcode: str(record, 'buyer_postcode', 'supplier_postcode', 'vendor_postcode'),
     buyer_subdivision: getValue(record, subdivisionKeys),
     buyer_electronic_address: getValue(record, electronicAddressKeys),
+    buyer_legal_reg_id: getValue(record, legalRegIdKeys),
+    buyer_legal_reg_id_type: getValue(record, legalRegIdTypeKeys),
     source_row_number: index + 2,
     upload_session_id: options.uploadSessionId,
     upload_manifest_id: options.uploadManifestId,
@@ -179,10 +189,13 @@ export async function parseLinesFile(file: File, options: ParseOptions = {}): Pr
     item_name: str(record, 'item_name', 'description'),
     quantity: parseFloat(record.quantity) || 0,
     unit_price: parseFloat(record.unit_price) || 0,
+    item_gross_price: num(record, 'item_gross_price', 'gross_price', 'line_gross_price'),
     line_discount: record.line_discount ? parseFloat(record.line_discount) : undefined,
     line_total_excl_vat: num(record, 'line_total_excl_vat', 'line_net_amount') || 0,
+    line_amount_aed: num(record, 'line_amount_aed'),
     vat_rate: parseFloat(record.vat_rate) || 0,
     vat_amount: parseFloat(record.vat_amount) || 0,
+    line_vat_amount_aed: num(record, 'line_vat_amount_aed', 'vat_amount_aed'),
     unit_of_measure: str(record, 'unit_of_measure', 'unit_code'),
     tax_category_code: str(record, 'tax_category_code'),
     line_allowance_amount: num(record, 'line_allowance_amount'),

@@ -6,7 +6,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import { downloadSampleCSV, getSampleData, SampleScenario } from '@/lib/sampleData';
-import { getMandatoryColumnsForDataset } from '@/lib/registry/drRegistry';
+import {
+  getMandatoryColumnsForDataset,
+  getMofPriorityOverlayColumnsForDataset,
+} from '@/lib/registry/drRegistry';
 import { Direction } from '@/types/direction';
 
 // Expected customer-provided columns, derived from the downloadable sample templates.
@@ -49,6 +52,8 @@ export interface FileStats {
   previewRows: Record<string, string>[];
   requiredPresent: string[];
   requiredMissing: string[];
+  mofOverlayPresent: string[];
+  mofOverlayMissing: string[];
   nullWarnings: { column: string; nullRate: number }[];
 }
 
@@ -61,8 +66,11 @@ export function analyzeFile(
 ): FileStats {
   const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
   const required = getRequiredColumns(type, direction);
+  const mofOverlayColumns = getMofPriorityOverlayColumnsForDataset(type);
   const requiredPresent = required.filter((c) => columns.includes(c));
   const requiredMissing = required.filter((c) => !columns.includes(c));
+  const mofOverlayPresent = mofOverlayColumns.filter((c) => columns.includes(c));
+  const mofOverlayMissing = mofOverlayColumns.filter((c) => !columns.includes(c));
 
   // Detect delimiter from raw text
   let detectedDelimiter = 'comma';
@@ -105,6 +113,8 @@ export function analyzeFile(
     previewRows: rows.slice(0, 5),
     requiredPresent,
     requiredMissing,
+    mofOverlayPresent,
+    mofOverlayMissing,
     nullWarnings,
   };
 }
@@ -231,6 +241,25 @@ export function FileSummaryCard({ stats, type, direction = 'AR', onRemove }: Fil
                 {w.column}: {(w.nullRate * 100).toFixed(0)}% null rate
               </p>
             ))}
+          </div>
+        )}
+        {stats.mofOverlayMissing.length > 0 && (
+          <div className="space-y-1 mt-2">
+            <p className="text-xs text-muted-foreground">
+              MoF overlay (shadow): optional today, mandatory under UAE rulebook
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {stats.mofOverlayPresent.map((col) => (
+                <Badge key={`mof-present-${col}`} variant="outline" className="text-xs gap-1 border-[hsl(var(--success))]/30 text-[hsl(var(--success))]">
+                  <Check className="w-3 h-3" /> {col}
+                </Badge>
+              ))}
+              {stats.mofOverlayMissing.map((col) => (
+                <Badge key={`mof-missing-${col}`} variant="outline" className="text-xs gap-1 border-amber-500/40 text-amber-700">
+                  <AlertTriangle className="w-3 h-3" /> {col}
+                </Badge>
+              ))}
+            </div>
           </div>
         )}
       </div>

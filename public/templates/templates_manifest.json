@@ -9,7 +9,7 @@
       "file": "buyers_template.csv",
       "dataset": "Buyers",
       "description": "Buyer master data",
-      "column_count": 8,
+      "column_count": 10,
       "join_keys": ["buyer_id"],
       "columns": [
         { "name": "buyer_id", "dr_ids": [], "mandatory": true, "asp_derived": false, "type": "String", "format": "Free text identifier", "description": "Internal join key (system primary key)", "responsibility": "ERP (Corner 1)" },
@@ -19,7 +19,9 @@
         { "name": "buyer_country", "dr_ids": ["IBT-055"], "mandatory": true, "asp_derived": false, "type": "Code", "format": "ISO 3166-1 alpha-2", "description": "Buyer country code", "responsibility": "ERP (Corner 1)" },
         { "name": "buyer_city", "dr_ids": ["IBT-052"], "mandatory": true, "asp_derived": false, "type": "String", "format": "Free text", "description": "Buyer city name", "responsibility": "ERP (Corner 1)" },
         { "name": "buyer_subdivision", "dr_ids": ["IBT-054"], "mandatory": false, "asp_derived": false, "type": "Code", "format": "AE-AZ, AE-DU, AE-SH, etc.", "description": "UAE emirate code", "responsibility": "ERP (Corner 1)" },
-        { "name": "buyer_electronic_address", "dr_ids": ["IBT-049"], "mandatory": true, "asp_derived": false, "type": "String", "format": "Electronic address identifier", "description": "Buyer PEPPOL or email endpoint", "responsibility": "ERP (Corner 1)" }
+        { "name": "buyer_electronic_address", "dr_ids": ["IBT-049"], "mandatory": true, "asp_derived": false, "type": "String", "format": "Electronic address identifier", "description": "Buyer PEPPOL or email endpoint", "responsibility": "ERP (Corner 1)" },
+        { "name": "buyer_legal_reg_id", "dr_ids": [], "mandatory": false, "asp_derived": false, "type": "String", "format": "Trade license or legal registration ID", "description": "Buyer legal registration identifier (MoF field 24 gap coverage)", "responsibility": "ERP (Corner 1)" },
+        { "name": "buyer_legal_reg_id_type", "dr_ids": [], "mandatory": false, "asp_derived": false, "type": "Code", "format": "TL, EID, PAS, CD", "description": "Buyer legal registration identifier type (MoF field 25 gap coverage)", "responsibility": "ERP (Corner 1)" }
       ]
     },
     {
@@ -60,7 +62,7 @@
       "file": "invoice_lines_template.csv",
       "dataset": "Invoice Lines",
       "description": "Invoice line item facts",
-      "column_count": 12,
+      "column_count": 15,
       "join_keys": ["line_id", "invoice_id"],
       "columns": [
         { "name": "line_id", "dr_ids": ["IBT-126"], "mandatory": true, "asp_derived": false, "type": "String", "format": "Unique sequential identifier", "description": "Line identifier", "responsibility": "ERP (Corner 1)" },
@@ -70,10 +72,13 @@
         { "name": "quantity", "dr_ids": ["IBT-129"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Decimal", "description": "Invoiced quantity", "responsibility": "ERP (Corner 1)" },
         { "name": "unit_of_measure", "dr_ids": ["IBT-130"], "mandatory": true, "asp_derived": false, "type": "Code", "format": "UN/ECE Rec 20 (EA, KGM, MTR…)", "description": "Unit of measure code", "responsibility": "ERP (Corner 1)" },
         { "name": "unit_price", "dr_ids": ["IBT-146"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Decimal", "description": "Item net price", "responsibility": "ERP (Corner 1)" },
+        { "name": "item_gross_price", "dr_ids": ["IBT-148"], "mandatory": false, "asp_derived": false, "type": "Number", "format": "Decimal", "description": "Item gross price (MoF field 44 gap coverage)", "responsibility": "ERP (Corner 1)" },
         { "name": "line_discount", "dr_ids": [], "mandatory": false, "asp_derived": false, "type": "Number", "format": "Decimal (2dp)", "description": "Line-level allowance/discount amount", "responsibility": "ERP (Corner 1)" },
         { "name": "line_total_excl_vat", "dr_ids": ["IBT-131"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Decimal (2dp)", "description": "Line net amount", "responsibility": "ERP (Corner 1)" },
+        { "name": "line_amount_aed", "dr_ids": [], "mandatory": false, "asp_derived": false, "type": "Number", "format": "Decimal (2dp)", "description": "Invoice line amount in AED (MoF field 49 gap coverage)", "responsibility": "ERP (Corner 1)" },
         { "name": "vat_rate", "dr_ids": ["IBT-152"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Percentage (e.g. 5.00)", "description": "VAT rate", "responsibility": "ERP (Corner 1)" },
         { "name": "vat_amount", "dr_ids": ["BTUAE-08"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Decimal (2dp)", "description": "VAT line amount", "responsibility": "ERP (Corner 1)" },
+        { "name": "line_vat_amount_aed", "dr_ids": [], "mandatory": false, "asp_derived": false, "type": "Number", "format": "Decimal (2dp)", "description": "VAT line amount in AED (MoF field 48 gap coverage)", "responsibility": "ERP (Corner 1)" },
         { "name": "tax_category_code", "dr_ids": ["IBT-151"], "mandatory": true, "asp_derived": false, "type": "Code", "format": "S, Z, E, RC", "description": "Item tax category code", "responsibility": "ERP (Corner 1)" }
       ]
     }

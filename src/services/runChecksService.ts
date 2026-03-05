@@ -23,6 +23,19 @@ import {
 } from '@/lib/api/pintAEApi';
 import { saveCheckRun, saveEntityScores } from '@/lib/api/checksApi';
 import { calculateScore } from '@/types/customChecks';
+import {
+  isMofRulebookEnabled,
+  isMofRulebookShadowModeEnabled,
+  isMofMandatoryGateEnabled,
+  getMofMandatoryGateFieldNumbers,
+  LoadedRulebookBundle,
+  RulebookGovernanceMetadata,
+  loadMofRulebookBundle,
+} from '@/lib/rulebook/loader';
+import { runRulebookShadowChecks } from '@/lib/rulebook/shadowRunner';
+import { buildMofRuleTraceability } from '@/lib/rulebook/traceability';
+import { getControlsForDR } from '@/lib/registry/controlsRegistry';
+import { getInternalFieldByMofFieldNumber } from '@/lib/rulebook/adapter';
 
 export type PersistencePhase =
   | 'saveCheckRun'
@@ -75,9 +88,100 @@ export interface RunArtifactsPersistFailed extends RunArtifactsBase {
 
 export type RunArtifacts = RunArtifactsOk | RunArtifactsPersistFailed;
 
+interface RulebookShadowDiffCounts {
+  shadowExceptions: number;
+  legacyPintMappedExceptions: number;
+  shadowOnly: number;
+  legacyOnly: number;
+  overlap: number;
+  shadowDistinctExceptionCodes: number;
+  shadowImpactedControls: number;
+}
+
+interface RulebookShadowTaxonomySummary {
+  distinctExceptionCodes: number;
+  topExceptionCodes: Array<{ code: string; count: number }>;
+  impactedControlIds: string[];
+}
+
+interface MofMandatoryGateResult {
+  enforcedFields: string[];
+  gateExceptions: Exception[];
+}
+
+function buildRulebookGovernance(
+  loadedRulebook: LoadedRulebookBundle | null,
+  useMofRulebook: boolean,
+  useMofShadowMode: boolean
+): RulebookGovernanceMetadata {
+  if (loadedRulebook) return loadedRulebook.governance;
+
+  return {
+    ruleSource: 'PINT_UC1',
+    rulebookTitle: 'PINT-AE UC1 Check Pack',
+    rulebookVersion: 'runtime',
+    rulebookDate: 'runtime',
+    crosswalkVersion: 'n/a',
+    precedencePolicy: 'PINT_UC1_ONLY',
+    mode: useMofRulebook ? 'enforced' : useMofShadowMode ? 'shadow' : 'legacy_only',
+  };
+}
+
 function getDatasetScopeOrder(scope: DatasetRunScope): DatasetType[] {
   if (scope === 'ALL') return ['AR', 'AP'];
   return [scope];
+}
+
+function buildMofMandatoryGateExceptions(
+  allRulebookShadowExceptions: Array<{
+    ruleId: string;
+    exceptionCode: string;
+    datasetType: DatasetType;
+    invoiceId?: string;
+    lineId?: string;
+    field?: string;
+  }>,
+  enforcedFieldNumbers: number[]
+): MofMandatoryGateResult {
+  const enforcedFields = Array.from(
+    new Set(
+      enforcedFieldNumbers
+        .map((fieldNumber) => getInternalFieldByMofFieldNumber(fieldNumber))
+        .filter((field): field is string => Boolean(field))
+    )
+  );
+
+  if (enforcedFields.length === 0) {
+    return { enforcedFields: [], gateExceptions: [] };
+  }
+
+  const gateExceptions: Exception[] = [];
+  const seen = new Set<string>();
+  allRulebookShadowExceptions.forEach((ex) => {
+    if (ex.exceptionCode !== 'EINV_MISSING_MANDATORY_FIELD') return;
+    if (!ex.field || !enforcedFields.includes(ex.field)) return;
+
+    const key = `${ex.datasetType}|${ex.ruleId}|${ex.invoiceId || '-'}|${ex.lineId || '-'}|${ex.field}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+
+    gateExceptions.push({
+      id: `mof-gate-${gateExceptions.length + 1}-${Date.now()}`,
+      checkId: 'MOF-GATE-MANDATORY',
+      ruleId: ex.ruleId,
+      checkName: 'MoF Mandatory Field Enforcement Gate',
+      severity: 'Critical',
+      datasetType: ex.datasetType,
+      invoiceId: ex.invoiceId,
+      lineId: ex.lineId,
+      field: ex.field,
+      message: `MoF gate failed: mandatory field ${ex.field} is missing`,
+      expectedValue: 'Required value (MoF mandatory field)',
+      actualValue: '(empty)',
+    });
+  });
+
+  return { enforcedFields, gateExceptions };
 }
 
 function mergeCheckResults(results: CheckResult[]): CheckResult[] {
@@ -231,6 +335,27 @@ export async function runChecksPipeline({
   getDataForDataset,
 }: RunChecksPipelineParams): Promise<RunArtifacts> {
   const runLog: RunLogStep[] = [];
+  let loadedRulebook: LoadedRulebookBundle | null = null;
+  let shadowDiffCounts: RulebookShadowDiffCounts | null = null;
+
+  const useMofRulebook = isMofRulebookEnabled();
+  const useMofShadowMode = isMofRulebookShadowModeEnabled();
+  const useMofMandatoryGate = isMofMandatoryGateEnabled();
+  const mofMandatoryGateFieldNumbers = getMofMandatoryGateFieldNumbers();
+  if (useMofRulebook || useMofShadowMode) {
+    const rulebookStep = startStep('rulebook_shadow_validation');
+    const bundle = loadMofRulebookBundle();
+    loadedRulebook = bundle;
+    endStep(runLog, rulebookStep, {
+      rulebookEnabled: useMofRulebook ? 1 : 0,
+      shadowModeEnabled: useMofShadowMode ? 1 : 0,
+      rulebookValidationErrors: bundle.validation.errors.length,
+      rulebookValidationWarnings: bundle.validation.warnings.length,
+      adaptedRules: bundle.adapted.checks.length,
+      adaptedExecutableRules: bundle.adapted.executableCount,
+      adaptedNonExecutableRules: bundle.adapted.nonExecutableCount,
+    });
+  }
 
   const fetchChecksStep = startStep('fetch_enabled_pint_checks');
   const pintAEChecks = await fetchEnabledPintAEChecks();
@@ -240,6 +365,14 @@ export async function runChecksPipeline({
   const allPintExceptions: PintAEException[] = [];
   const allLegacyExceptions: Exception[] = [];
   const allHeadersForScope: InvoiceHeader[] = [];
+  const allRulebookShadowExceptions: Array<{
+    ruleId: string;
+    exceptionCode: string;
+    datasetType: DatasetType;
+    invoiceId?: string;
+    lineId?: string;
+    field?: string;
+  }> = [];
 
   const executeDatasetsStep = startStep('execute_datasets');
   plan.datasetTypesRan.forEach((datasetType) => {
@@ -278,6 +411,24 @@ export async function runChecksPipeline({
       actualValue: exception.observed_value,
     }));
     allLegacyExceptions.push(...legacyExceptionsForDataset);
+
+    if ((useMofRulebook || useMofShadowMode) && loadedRulebook) {
+      const shadow = runRulebookShadowChecks(
+        dataContext,
+        loadedRulebook.rulebook,
+        loadedRulebook.adapted.checks
+      );
+      allRulebookShadowExceptions.push(
+        ...shadow.exceptions.map((ex) => ({
+          ruleId: ex.ruleId,
+          exceptionCode: ex.exceptionCode,
+          datasetType,
+          invoiceId: ex.invoiceId,
+          lineId: ex.lineId,
+          field: ex.field,
+        }))
+      );
+    }
   });
   endStep(runLog, executeDatasetsStep, {
     datasetTypesRan: plan.datasetTypesRan.length,
@@ -292,11 +443,82 @@ export async function runChecksPipeline({
     ...mergedBuiltInResults.flatMap((result) => result.exceptions),
     ...allLegacyExceptions,
   ];
+
+  let mofMandatoryGateResult: MofMandatoryGateResult | null = null;
+  if (useMofRulebook && useMofMandatoryGate) {
+    const gateStep = startStep('rulebook_enforcement_gate');
+    mofMandatoryGateResult = buildMofMandatoryGateExceptions(
+      allRulebookShadowExceptions,
+      mofMandatoryGateFieldNumbers
+    );
+    allExceptions.push(...mofMandatoryGateResult.gateExceptions);
+    endStep(runLog, gateStep, {
+      configuredFieldNumbers: mofMandatoryGateFieldNumbers.length,
+      resolvedEnforcedFields: mofMandatoryGateResult.enforcedFields.length,
+      gateExceptions: mofMandatoryGateResult.gateExceptions.length,
+    });
+  }
+
   const stats = calculateStats(allExceptions, allHeadersForScope.length);
   endStep(runLog, mergeStep, {
     mergedCheckResults: mergedBuiltInResults.length,
     allExceptions: allExceptions.length,
   });
+
+  let shadowTaxonomy: RulebookShadowTaxonomySummary | null = null;
+  if ((useMofRulebook || useMofShadowMode) && loadedRulebook) {
+    const shadowDiffStep = startStep('rulebook_shadow_diff');
+    const legacyKeys = new Set(
+      allLegacyExceptions.map((ex) => `${ex.invoiceId || '-'}|${ex.lineId || '-'}|${ex.field || '-'}|${ex.checkId}`)
+    );
+    const shadowKeys = new Set(
+      allRulebookShadowExceptions.map((ex) => `${ex.invoiceId || '-'}|${ex.lineId || '-'}|${ex.field || '-'}|${ex.ruleId}`)
+    );
+
+    let overlap = 0;
+    shadowKeys.forEach((k) => {
+      if (legacyKeys.has(k)) overlap++;
+    });
+
+    const exceptionCodeCounts = new Map<string, number>();
+    allRulebookShadowExceptions.forEach((ex) => {
+      const code = ex.exceptionCode || 'UNKNOWN';
+      exceptionCodeCounts.set(code, (exceptionCodeCounts.get(code) ?? 0) + 1);
+    });
+
+    const ruleTrace = buildMofRuleTraceability(loadedRulebook.rulebook);
+    const drIdsByRuleId = new Map(ruleTrace.map((entry) => [entry.rule_id, entry.affected_dr_ids]));
+    const impactedControlIds = new Set<string>();
+    allRulebookShadowExceptions.forEach((ex) => {
+      const drIds = drIdsByRuleId.get(ex.ruleId) || [];
+      drIds.forEach((drId) => {
+        getControlsForDR(drId).forEach((control) => impactedControlIds.add(control.control_id));
+      });
+    });
+
+    const topExceptionCodes = Array.from(exceptionCodeCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([code, count]) => ({ code, count }));
+
+    shadowTaxonomy = {
+      distinctExceptionCodes: exceptionCodeCounts.size,
+      topExceptionCodes,
+      impactedControlIds: Array.from(impactedControlIds).sort(),
+    };
+
+    shadowDiffCounts = {
+      shadowExceptions: allRulebookShadowExceptions.length,
+      legacyPintMappedExceptions: allLegacyExceptions.length,
+      shadowOnly: Math.max(0, allRulebookShadowExceptions.length - overlap),
+      legacyOnly: Math.max(0, allLegacyExceptions.length - overlap),
+      overlap,
+      shadowDistinctExceptionCodes: shadowTaxonomy.distinctExceptionCodes,
+      shadowImpactedControls: shadowTaxonomy.impactedControlIds.length,
+    };
+
+    endStep(runLog, shadowDiffStep, shadowDiffCounts);
+  }
 
   let runSummary: RunSummary | undefined;
   let persistencePhase: PersistencePhase | undefined;
@@ -304,6 +526,7 @@ export async function runChecksPipeline({
   try {
     const saveCheckRunStep = startStep('persist_save_check_run');
     persistencePhase = 'saveCheckRun';
+    const governance = buildRulebookGovernance(loadedRulebook, useMofRulebook, useMofShadowMode);
     const runId = await saveCheckRun({
       run_date: new Date().toISOString(),
       dataset_type: plan.scope,
@@ -317,6 +540,24 @@ export async function runChecksPipeline({
       results_summary: {
         checkCount: mergedBuiltInResults.length + pintAEChecks.length,
         scope: plan.scope,
+        ruleGovernance: governance,
+        rulebookValidation: loadedRulebook
+          ? {
+              errors: loadedRulebook.validation.errors.length,
+              warnings: loadedRulebook.validation.warnings.length,
+              adaptedRules: loadedRulebook.adapted.checks.length,
+              executableRules: loadedRulebook.adapted.executableCount,
+              nonExecutableRules: loadedRulebook.adapted.nonExecutableCount,
+            }
+          : null,
+        shadowDiff: shadowDiffCounts,
+        rulebookShadowTaxonomy: shadowTaxonomy,
+        rulebookMandatoryGate: {
+          enabled: useMofRulebook && useMofMandatoryGate,
+          configuredFieldNumbers: mofMandatoryGateFieldNumbers,
+          enforcedFields: mofMandatoryGateResult?.enforcedFields || [],
+          gateExceptions: mofMandatoryGateResult?.gateExceptions.length || 0,
+        },
       },
     });
     endStep(runLog, saveCheckRunStep, {

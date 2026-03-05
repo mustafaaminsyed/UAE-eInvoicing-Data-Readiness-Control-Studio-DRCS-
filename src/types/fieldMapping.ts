@@ -190,15 +190,20 @@ export const PINT_AE_UC1_FIELDS: PintAEField[] = [
   { id: 'buyer_endpoint', name: 'Buyer Electronic Address', description: 'Buyer PEPPOL ID or email', ibtReference: 'IBT-049', category: 'buyer', isMandatory: true, dataType: 'string' },
   { id: 'buyer_address', name: 'Buyer Address', description: 'Buyer street address', ibtReference: 'IBT-050', category: 'buyer', isMandatory: true, dataType: 'string' },
   { id: 'buyer_country', name: 'Buyer Country', description: 'ISO country code', ibtReference: 'IBT-055', category: 'buyer', isMandatory: true, dataType: 'string', format: '^[A-Z]{2}$' },
+  { id: 'buyer_legal_reg_id', name: 'Buyer Legal Registration ID', description: 'Buyer legal registration identifier (MoF field 24)', ibtReference: 'MOF-24', category: 'buyer', isMandatory: false, dataType: 'string' },
+  { id: 'buyer_legal_reg_id_type', name: 'Buyer Legal Registration ID Type', description: 'Buyer legal registration identifier type (MoF field 25)', ibtReference: 'MOF-25', category: 'buyer', isMandatory: false, dataType: 'string', allowedValues: ['TL', 'EID', 'PAS', 'CD'] },
   
   // Line Item Fields
   { id: 'line_id', name: 'Line ID', description: 'Unique line identifier', ibtReference: 'IBT-126', category: 'line', isMandatory: true, dataType: 'string' },
   { id: 'line_quantity', name: 'Quantity', description: 'Invoiced quantity', ibtReference: 'IBT-129', category: 'line', isMandatory: true, dataType: 'number' },
   { id: 'line_unit_price', name: 'Unit Price', description: 'Item net price', ibtReference: 'IBT-146', category: 'line', isMandatory: true, dataType: 'number' },
+  { id: 'item_gross_price', name: 'Item Gross Price', description: 'Item gross price before discount (MoF field 44)', ibtReference: 'MOF-44', category: 'line', isMandatory: false, dataType: 'number' },
   { id: 'line_net_amount', name: 'Line Net Amount', description: 'Line total excl VAT', ibtReference: 'IBT-131', category: 'line', isMandatory: true, dataType: 'number' },
   { id: 'line_description', name: 'Item Description', description: 'Item name/description', ibtReference: 'IBT-153', category: 'line', isMandatory: true, dataType: 'string' },
   { id: 'line_vat_rate', name: 'VAT Rate', description: 'VAT/tax percentage', ibtReference: 'IBT-152', category: 'line', isMandatory: true, dataType: 'number' },
   { id: 'line_vat_amount', name: 'Line VAT Amount', description: 'Line VAT amount', ibtReference: 'IBT-117', category: 'line', isMandatory: true, dataType: 'number' },
+  { id: 'line_vat_amount_aed', name: 'Line VAT Amount in AED', description: 'Line VAT amount in AED (MoF field 48)', ibtReference: 'MOF-48', category: 'line', isMandatory: false, dataType: 'number' },
+  { id: 'line_amount_aed', name: 'Line Amount in AED', description: 'Invoice line amount in AED (MoF field 49)', ibtReference: 'MOF-49', category: 'line', isMandatory: false, dataType: 'number' },
   
   // Totals Fields
   { id: 'total_excl_vat', name: 'Total Excl VAT', description: 'Invoice total excluding VAT', ibtReference: 'IBT-109', category: 'totals', isMandatory: true, dataType: 'number' },

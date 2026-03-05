@@ -1,0 +1,631 @@
+{
+  "metadata": {
+    "generated_on": "2026-03-06",
+    "intent": "Authoritative crosswalk to align UAE MoF mandatory-field rulebook with current PINT-AE UC1 implementation model",
+    "precedence_policy": "UAE_MOF_OVERLAY_ON_PINT_UC1",
+    "status_scale": [
+      "aligned",
+      "partial",
+      "derived_only",
+      "semantic_conflict",
+      "gap"
+    ]
+  },
+  "field_crosswalk": [
+    {
+      "mof_field_number": 1,
+      "mof_name": "Invoice number",
+      "pint_dr_ids": [
+        "IBT-001"
+      ],
+      "dataset": "headers",
+      "internal_columns": [
+        "invoice_number"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 2,
+      "mof_name": "Invoice date",
+      "pint_dr_ids": [
+        "IBT-002"
+      ],
+      "dataset": "headers",
+      "internal_columns": [
+        "issue_date"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 3,
+      "mof_name": "Invoice type code",
+      "pint_dr_ids": [
+        "IBT-003"
+      ],
+      "dataset": "headers",
+      "internal_columns": [
+        "invoice_type"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 4,
+      "mof_name": "Invoice currency code",
+      "pint_dr_ids": [
+        "IBT-005"
+      ],
+      "dataset": "headers",
+      "internal_columns": [
+        "currency"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 5,
+      "mof_name": "Invoice transaction type code",
+      "pint_dr_ids": [
+        "BTUAE-02"
+      ],
+      "dataset": "headers",
+      "internal_columns": [
+        "transaction_type_code"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 6,
+      "mof_name": "Payment due date",
+      "pint_dr_ids": [
+        "IBT-009"
+      ],
+      "dataset": "headers",
+      "internal_columns": [
+        "payment_due_date"
+      ],
+      "status": "partial",
+      "notes": "Rulebook marks 1..1 mandatory; current model treats as conditional/optional."
+    },
+    {
+      "mof_field_number": 7,
+      "mof_name": "Business process type",
+      "pint_dr_ids": [
+        "IBT-023"
+      ],
+      "dataset": "headers",
+      "internal_columns": [
+        "business_process"
+      ],
+      "status": "derived_only",
+      "notes": "ASP/system-derived in current implementation."
+    },
+    {
+      "mof_field_number": 8,
+      "mof_name": "Specification identifier",
+      "pint_dr_ids": [
+        "IBT-024"
+      ],
+      "dataset": "headers",
+      "internal_columns": [
+        "spec_id"
+      ],
+      "status": "derived_only",
+      "notes": "ASP/system-derived in current implementation."
+    },
+    {
+      "mof_field_number": 9,
+      "mof_name": "Payment means type code",
+      "pint_dr_ids": [
+        "IBT-081"
+      ],
+      "dataset": "headers",
+      "internal_columns": [
+        "payment_means_code"
+      ],
+      "status": "partial",
+      "notes": "Rulebook marks 1..1 mandatory; current model treats as optional."
+    },
+    {
+      "mof_field_number": 10,
+      "mof_name": "Seller name",
+      "pint_dr_ids": [
+        "IBT-027"
+      ],
+      "dataset": "headers",
+      "internal_columns": [
+        "seller_name"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 11,
+      "mof_name": "Seller electronic address",
+      "pint_dr_ids": [
+        "IBT-034"
+      ],
+      "dataset": "headers",
+      "internal_columns": [
+        "seller_electronic_address"
+      ],
+      "status": "semantic_conflict",
+      "notes": "Rulebook semantics enforce TIN(10-digit) format; current model treats as generic endpoint."
+    },
+    {
+      "mof_field_number": 12,
+      "mof_name": "Seller electronic identifier",
+      "pint_dr_ids": [
+        "IBT-034-1"
+      ],
+      "dataset": "headers",
+      "internal_columns": [],
+      "status": "derived_only",
+      "notes": "Rulebook fixed value 0235; currently not first-class persisted input column."
+    },
+    {
+      "mof_field_number": 13,
+      "mof_name": "Seller legal registration identifier",
+      "pint_dr_ids": [
+        "IBT-030"
+      ],
+      "dataset": "headers",
+      "internal_columns": [
+        "seller_legal_reg_id"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 14,
+      "mof_name": "Seller legal registration identifier type",
+      "pint_dr_ids": [
+        "BTUAE-15"
+      ],
+      "dataset": "headers",
+      "internal_columns": [
+        "seller_legal_reg_id_type"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 15,
+      "mof_name": "Seller tax registration identifier",
+      "pint_dr_ids": [
+        "IBT-031"
+      ],
+      "dataset": "headers",
+      "internal_columns": [
+        "seller_trn"
+      ],
+      "status": "semantic_conflict",
+      "notes": "Rulebook requires TRN(15) if VAT-registered else TIN(10); current checks assume TRN pattern only."
+    },
+    {
+      "mof_field_number": 16,
+      "mof_name": "Seller tax scheme code",
+      "pint_dr_ids": [
+        "IBT-031-1"
+      ],
+      "dataset": "headers",
+      "internal_columns": [],
+      "status": "derived_only",
+      "notes": "Current behavior defaults VAT via derived metadata."
+    },
+    {
+      "mof_field_number": 17,
+      "mof_name": "Seller address line 1",
+      "pint_dr_ids": [
+        "IBT-035"
+      ],
+      "dataset": "headers",
+      "internal_columns": [
+        "seller_address"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 18,
+      "mof_name": "Seller city",
+      "pint_dr_ids": [
+        "IBT-037"
+      ],
+      "dataset": "headers",
+      "internal_columns": [
+        "seller_city"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 19,
+      "mof_name": "Seller country subdivision",
+      "pint_dr_ids": [
+        "IBT-039"
+      ],
+      "dataset": "headers",
+      "internal_columns": [
+        "seller_subdivision"
+      ],
+      "status": "partial",
+      "notes": "Rulebook marks 1..1 mandatory; templates/model currently optional."
+    },
+    {
+      "mof_field_number": 20,
+      "mof_name": "Seller country code",
+      "pint_dr_ids": [
+        "IBT-040"
+      ],
+      "dataset": "headers",
+      "internal_columns": [
+        "seller_country"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 21,
+      "mof_name": "Buyer name",
+      "pint_dr_ids": [
+        "IBT-044"
+      ],
+      "dataset": "buyers",
+      "internal_columns": [
+        "buyer_name"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 22,
+      "mof_name": "Buyer electronic address",
+      "pint_dr_ids": [
+        "IBT-049"
+      ],
+      "dataset": "buyers",
+      "internal_columns": [
+        "buyer_electronic_address"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 23,
+      "mof_name": "Buyer electronic identifier",
+      "pint_dr_ids": [
+        "IBT-049-1"
+      ],
+      "dataset": "buyers",
+      "internal_columns": [],
+      "status": "derived_only",
+      "notes": "Scheme/prefix not first-class in current ingest model."
+    },
+    {
+      "mof_field_number": 24,
+      "mof_name": "Buyer legal registration identifier",
+      "pint_dr_ids": [],
+      "dataset": "buyers",
+      "internal_columns": [],
+      "status": "gap"
+    },
+    {
+      "mof_field_number": 25,
+      "mof_name": "Buyer legal registration identifier type",
+      "pint_dr_ids": [],
+      "dataset": "buyers",
+      "internal_columns": [],
+      "status": "gap"
+    },
+    {
+      "mof_field_number": 26,
+      "mof_name": "Buyer address line 1",
+      "pint_dr_ids": [
+        "IBT-050"
+      ],
+      "dataset": "buyers",
+      "internal_columns": [
+        "buyer_address"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 27,
+      "mof_name": "Buyer city",
+      "pint_dr_ids": [
+        "IBT-052"
+      ],
+      "dataset": "buyers",
+      "internal_columns": [
+        "buyer_city"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 28,
+      "mof_name": "Buyer country subdivision",
+      "pint_dr_ids": [
+        "IBT-054"
+      ],
+      "dataset": "buyers",
+      "internal_columns": [
+        "buyer_subdivision"
+      ],
+      "status": "partial",
+      "notes": "Rulebook marks 1..1 mandatory; templates/model currently optional."
+    },
+    {
+      "mof_field_number": 29,
+      "mof_name": "Buyer country code",
+      "pint_dr_ids": [
+        "IBT-055"
+      ],
+      "dataset": "buyers",
+      "internal_columns": [
+        "buyer_country"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 30,
+      "mof_name": "Sum of invoice line net amount",
+      "pint_dr_ids": [
+        "IBT-106"
+      ],
+      "dataset": "headers",
+      "internal_columns": [
+        "total_excl_vat"
+      ],
+      "status": "partial",
+      "notes": "Current implementation verifies by calculation, not dedicated persisted field."
+    },
+    {
+      "mof_field_number": 31,
+      "mof_name": "Invoice total amount without tax",
+      "pint_dr_ids": [
+        "IBT-109"
+      ],
+      "dataset": "headers",
+      "internal_columns": [
+        "total_excl_vat"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 32,
+      "mof_name": "Invoice total tax amount",
+      "pint_dr_ids": [
+        "IBT-110"
+      ],
+      "dataset": "headers",
+      "internal_columns": [
+        "vat_total"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 33,
+      "mof_name": "Invoice total amount with tax",
+      "pint_dr_ids": [
+        "IBT-112"
+      ],
+      "dataset": "headers",
+      "internal_columns": [
+        "total_incl_vat"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 34,
+      "mof_name": "Amount due for payment",
+      "pint_dr_ids": [
+        "IBT-115"
+      ],
+      "dataset": "headers",
+      "internal_columns": [
+        "amount_due"
+      ],
+      "status": "partial",
+      "notes": "Rulebook marks 1..1 mandatory; templates/model currently optional."
+    },
+    {
+      "mof_field_number": 35,
+      "mof_name": "Tax category taxable amount",
+      "pint_dr_ids": [
+        "IBT-116"
+      ],
+      "dataset": "headers",
+      "internal_columns": [
+        "total_excl_vat"
+      ],
+      "status": "partial",
+      "notes": "Category-level granularity not explicit in current ingest model."
+    },
+    {
+      "mof_field_number": 36,
+      "mof_name": "Tax category tax amount",
+      "pint_dr_ids": [
+        "IBT-117"
+      ],
+      "dataset": "headers",
+      "internal_columns": [
+        "vat_total"
+      ],
+      "status": "partial",
+      "notes": "Category-level granularity not explicit in current ingest model."
+    },
+    {
+      "mof_field_number": 37,
+      "mof_name": "Tax category code",
+      "pint_dr_ids": [
+        "IBT-118",
+        "IBT-151"
+      ],
+      "dataset": "headers,lines",
+      "internal_columns": [
+        "tax_category_code"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 38,
+      "mof_name": "Tax category rate",
+      "pint_dr_ids": [
+        "IBT-119",
+        "IBT-152"
+      ],
+      "dataset": "headers,lines",
+      "internal_columns": [
+        "tax_category_rate",
+        "vat_rate"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 39,
+      "mof_name": "Invoice line identifier",
+      "pint_dr_ids": [
+        "IBT-126"
+      ],
+      "dataset": "lines",
+      "internal_columns": [
+        "line_id",
+        "line_number"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 40,
+      "mof_name": "Invoiced quantity",
+      "pint_dr_ids": [
+        "IBT-129"
+      ],
+      "dataset": "lines",
+      "internal_columns": [
+        "quantity"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 41,
+      "mof_name": "Unit of measure code",
+      "pint_dr_ids": [
+        "IBT-130"
+      ],
+      "dataset": "lines",
+      "internal_columns": [
+        "unit_of_measure"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 42,
+      "mof_name": "Invoice line net amount",
+      "pint_dr_ids": [
+        "IBT-131"
+      ],
+      "dataset": "lines",
+      "internal_columns": [
+        "line_total_excl_vat"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 43,
+      "mof_name": "Item net price",
+      "pint_dr_ids": [
+        "IBT-146"
+      ],
+      "dataset": "lines",
+      "internal_columns": [
+        "unit_price"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 44,
+      "mof_name": "Item gross price",
+      "pint_dr_ids": [
+        "IBT-148"
+      ],
+      "dataset": "lines",
+      "internal_columns": [
+        "unit_price"
+      ],
+      "status": "partial",
+      "notes": "Mapped to net price column today; gross price is not first-class."
+    },
+    {
+      "mof_field_number": 45,
+      "mof_name": "Item price base quantity",
+      "pint_dr_ids": [
+        "IBT-149"
+      ],
+      "dataset": "lines",
+      "internal_columns": [],
+      "status": "derived_only",
+      "notes": "Current assumption is ASP-derived default 1."
+    },
+    {
+      "mof_field_number": 46,
+      "mof_name": "Invoiced item tax category code",
+      "pint_dr_ids": [
+        "IBT-151"
+      ],
+      "dataset": "lines",
+      "internal_columns": [
+        "tax_category_code"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 47,
+      "mof_name": "Invoiced item tax rate",
+      "pint_dr_ids": [
+        "IBT-152"
+      ],
+      "dataset": "lines",
+      "internal_columns": [
+        "vat_rate"
+      ],
+      "status": "aligned"
+    },
+    {
+      "mof_field_number": 48,
+      "mof_name": "VAT line amount in AED",
+      "pint_dr_ids": [
+        "BTUAE-08"
+      ],
+      "dataset": "lines",
+      "internal_columns": [
+        "vat_amount"
+      ],
+      "status": "partial",
+      "notes": "Amount is available, but explicit AED-converted field is not modeled separately."
+    },
+    {
+      "mof_field_number": 49,
+      "mof_name": "Invoice line amount in AED",
+      "pint_dr_ids": [],
+      "dataset": "lines",
+      "internal_columns": [],
+      "status": "gap"
+    },
+    {
+      "mof_field_number": 50,
+      "mof_name": "Item name",
+      "pint_dr_ids": [
+        "IBT-154"
+      ],
+      "dataset": "lines",
+      "internal_columns": [
+        "item_name"
+      ],
+      "status": "partial",
+      "notes": "Present but not mandatory in current templates (rulebook marks mandatory for commercial_xml)."
+    },
+    {
+      "mof_field_number": 51,
+      "mof_name": "Item description",
+      "pint_dr_ids": [
+        "IBT-153"
+      ],
+      "dataset": "lines",
+      "internal_columns": [
+        "description"
+      ],
+      "status": "aligned"
+    }
+  ]
+}

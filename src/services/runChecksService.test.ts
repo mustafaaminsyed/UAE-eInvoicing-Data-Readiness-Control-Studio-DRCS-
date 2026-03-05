@@ -153,6 +153,16 @@ describe('runChecksService', () => {
     expect(artifacts.allExceptions).toEqual([]);
     expect(artifacts.allPintAEExceptions).toEqual([]);
     expect(artifacts.runLog?.some((step) => step.name === 'persist_save_check_run')).toBe(true);
+    expect(mockedSaveCheckRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        results_summary: expect.objectContaining({
+          ruleGovernance: expect.objectContaining({
+            ruleSource: 'UAE_MOF_OVERLAY',
+            mode: 'shadow',
+          }),
+        }),
+      })
+    );
   });
 
   it('maps PintAE exceptions to legacy exception shape identically', async () => {

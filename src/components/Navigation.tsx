@@ -14,6 +14,7 @@ const navItems = [
   { path: '/ap-explorer', label: 'AP Explorer', icon: Search },
   { path: '/mapping', label: 'Mapping', icon: Wand2 },
   { path: '/traceability', label: 'Traceability', icon: Shield },
+  { path: '/rulebook-shadow', label: 'MoF Shadow', icon: Shield },
   { path: '/run', label: 'Run Checks', icon: Play },
   { path: '/check-registry', label: 'Check Registry', icon: BookCheck },
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
