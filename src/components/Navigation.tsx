@@ -1,7 +1,9 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Upload, Play, LayoutDashboard, AlertTriangle, Wand2, BarChart3, Briefcase, XCircle, Home, Shield, FileDown, BookCheck, FileClock, Search } from 'lucide-react';
+import { Upload, Play, LayoutDashboard, AlertTriangle, Wand2, BarChart3, Briefcase, XCircle, Home, Shield, FileDown, BookCheck, FileClock, Search, Moon, Sun } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import { useCompliance } from '@/context/ComplianceContext';
+import { Button } from '@/components/ui/button';
 import daribaLogo from '@/assets/dariba-logo.png';
 import { FEATURE_FLAGS } from '@/config/features';
 
@@ -29,6 +31,7 @@ const effectiveNavItems = FEATURE_FLAGS.casesMenu
 
 function NavigationContent() {
   const { isDataLoaded, isChecksRun } = useCompliance();
+  const { resolvedTheme, setTheme } = useTheme();
 
   const getItemState = (path: string) => {
     if (path === '/run' && !isDataLoaded) return 'disabled';
@@ -37,9 +40,10 @@ function NavigationContent() {
   };
 
   const location = useLocation();
+  const isDark = resolvedTheme === 'dark';
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-white/60 bg-background/75 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 w-full border-b border-border/80 bg-background/95 backdrop-blur-xl">
       <div className="container flex h-16 items-center gap-4">
         <Link to="/" className="flex items-center gap-3 mr-2">
           <div className="surface-glass rounded-xl p-1.5">
@@ -51,34 +55,50 @@ function NavigationContent() {
           </div>
         </Link>
 
-        <nav className="flex items-center gap-1 overflow-x-auto rounded-xl surface-glass px-2 py-1">
-          {effectiveNavItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname === item.path;
-            const state = getItemState(item.path);
+        <div className="relative flex-1 min-w-0">
+          <nav
+            className="flex items-center gap-1 overflow-x-auto rounded-xl surface-glass px-2 py-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            aria-label="Primary navigation"
+          >
+            {effectiveNavItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = location.pathname === item.path;
+              const state = getItemState(item.path);
 
-            return (
-              <Link
-                key={item.path}
-                to={state === 'disabled' ? '#' : item.path}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap',
-                  isActive
-                    ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/25'
-                    : state === 'disabled'
-                    ? 'text-muted-foreground/50 cursor-not-allowed'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-white/70'
-                )}
-                onClick={(e) => state === 'disabled' && e.preventDefault()}
-              >
-                <Icon className="w-4 h-4" />
-                <span className="hidden sm:inline">{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
+              return (
+                <Link
+                  key={item.path}
+                  to={state === 'disabled' ? '#' : item.path}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap',
+                    isActive
+                      ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/25'
+                      : state === 'disabled'
+                      ? 'text-muted-foreground/50 cursor-not-allowed'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/70'
+                  )}
+                  onClick={(e) => state === 'disabled' && e.preventDefault()}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span className="hidden sm:inline">{item.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-4 bg-gradient-to-r from-background/80 to-transparent rounded-l-xl" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-4 bg-gradient-to-l from-background/80 to-transparent rounded-r-xl" />
+        </div>
 
-        <div className="ml-auto hidden xl:flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setTheme(isDark ? 'light' : 'dark')}
+            aria-label="Toggle dark mode"
+          >
+            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
           <span className="rounded-full border border-primary/20 bg-primary/5 px-2.5 py-1 text-[11px] font-semibold text-primary">
             Compliance Command Center
           </span>
