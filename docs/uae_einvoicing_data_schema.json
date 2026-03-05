@@ -1,0 +1,231 @@
+{
+  "spec": {
+    "jurisdiction": "UAE",
+    "source_document": {
+      "title": "UAE Electronic Invoice - Mandatory Fields",
+      "version": "V1.0",
+      "date": "2026-02-23"
+    },
+    "basis": {
+      "tax_invoice_mandatory_fields": { "section_id": "4.1", "field_numbers": "1-41", "count": 41 },
+      "commercial_xml_additional_mandatory_fields": { "section_id": "4.2", "field_numbers": "42-51", "count": 10 },
+      "commercial_xml_total_mandatory_fields": { "composition": "Fields 1-41 plus 42-51", "count": 51 }
+    },
+    "modeling_notes": [
+      "This JSON encodes MoF mandatory field numbers/names as the source of truth and adds only minimal implementation semantics explicitly stated/required by the MoF guidelines (e.g., 0235 scheme and TIN logic).",
+      "Cardinality is represented as min..max occurrences; mandatory fields are 1..1."
+    ]
+  },
+
+  "field_dictionary": {
+    "global_defaults": {
+      "cardinality_for_mandatory_fields": "1..1"
+    },
+    "fields": [
+      { "field_number": 1, "name": "Invoice number", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 2, "name": "Invoice date", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 3, "name": "Invoice type code", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 4, "name": "Invoice currency code", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 5, "name": "Invoice transaction type code", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 6, "name": "Payment due date", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 7, "name": "Business process type", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 8, "name": "Specification identifier", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 9, "name": "Payment means type code", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+
+      { "field_number": 10, "name": "Seller name", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+
+      {
+        "field_number": 11,
+        "name": "Seller electronic address",
+        "section": "4.1",
+        "cardinality": "1..1",
+        "applies_to": ["tax_invoice", "commercial_xml"],
+        "semantics": {
+          "identifier_name": "TIN",
+          "definition": "10-digit TIN; if TRN exists then first 10 digits of TRN; otherwise obtained via FTA registration for entities in scope that are not registered for a tax type",
+          "format": "^[0-9]{10}$"
+        }
+      },
+
+      {
+        "field_number": 12,
+        "name": "Seller electronic identifier",
+        "section": "4.1",
+        "cardinality": "1..1",
+        "applies_to": ["tax_invoice", "commercial_xml"],
+        "semantics": {
+          "type": "scheme_prefix",
+          "fixed_value": "0235",
+          "meaning": "UAE scheme identifier used with participant identifiers (e.g., 0235:<TIN>)"
+        }
+      },
+
+      { "field_number": 13, "name": "Seller legal registration identifier", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 14, "name": "Seller legal registration identifier type", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+
+      {
+        "field_number": 15,
+        "name": "Seller tax registration identifier",
+        "section": "4.1",
+        "cardinality": "1..1",
+        "applies_to": ["tax_invoice", "commercial_xml"],
+        "semantics": {
+          "type": "conditional_identifier",
+          "cases": [
+            { "when": "seller_is_uae_vat_registered == true", "use": "TRN", "format": "^[0-9]{15}$" },
+            { "when": "seller_is_uae_vat_registered == false", "use": "TIN", "format": "^[0-9]{10}$" }
+          ]
+        }
+      },
+
+      {
+        "field_number": 16,
+        "name": "Seller tax scheme code",
+        "section": "4.1",
+        "cardinality": "1..1",
+        "applies_to": ["tax_invoice", "commercial_xml"],
+        "default": "VAT"
+      },
+
+      { "field_number": 17, "name": "Seller address line 1", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 18, "name": "Seller city", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 19, "name": "Seller country subdivision", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 20, "name": "Seller country code", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+
+      { "field_number": 21, "name": "Buyer name", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 22, "name": "Buyer electronic address", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 23, "name": "Buyer electronic identifier", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 24, "name": "Buyer legal registration identifier", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 25, "name": "Buyer legal registration identifier type", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 26, "name": "Buyer address line 1", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 27, "name": "Buyer city", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 28, "name": "Buyer country subdivision", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 29, "name": "Buyer country code", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+
+      { "field_number": 30, "name": "Sum of invoice line net amount", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 31, "name": "Invoice total amount without tax", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 32, "name": "Invoice total tax amount", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 33, "name": "Invoice total amount with tax", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 34, "name": "Amount due for payment", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+
+      { "field_number": 35, "name": "Tax category taxable amount", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 36, "name": "Tax category tax amount", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 37, "name": "Tax category code", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 38, "name": "Tax category rate", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+
+      { "field_number": 39, "name": "Invoice line identifier", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 40, "name": "Invoiced quantity", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+      { "field_number": 41, "name": "Unit of measure code", "section": "4.1", "cardinality": "1..1", "applies_to": ["tax_invoice", "commercial_xml"] },
+
+      { "field_number": 42, "name": "Invoice line net amount", "section": "4.2", "cardinality": "1..1", "applies_to": ["commercial_xml"] },
+      { "field_number": 43, "name": "Item net price", "section": "4.2", "cardinality": "1..1", "applies_to": ["commercial_xml"] },
+      { "field_number": 44, "name": "Item gross price", "section": "4.2", "cardinality": "1..1", "applies_to": ["commercial_xml"] },
+      { "field_number": 45, "name": "Item price base quantity", "section": "4.2", "cardinality": "1..1", "applies_to": ["commercial_xml"] },
+      { "field_number": 46, "name": "Invoiced item tax category code", "section": "4.2", "cardinality": "1..1", "applies_to": ["commercial_xml"] },
+      { "field_number": 47, "name": "Invoiced item tax rate", "section": "4.2", "cardinality": "1..1", "applies_to": ["commercial_xml"] },
+      { "field_number": 48, "name": "VAT line amount in AED", "section": "4.2", "cardinality": "1..1", "applies_to": ["commercial_xml"] },
+      { "field_number": 49, "name": "Invoice line amount in AED", "section": "4.2", "cardinality": "1..1", "applies_to": ["commercial_xml"] },
+      { "field_number": 50, "name": "Item name", "section": "4.2", "cardinality": "1..1", "applies_to": ["commercial_xml"] },
+      { "field_number": 51, "name": "Item description", "section": "4.2", "cardinality": "1..1", "applies_to": ["commercial_xml"] }
+    ]
+  },
+
+  "validation_rules": [
+    {
+      "rule_id": "UAE_MOF_4_1_REQUIRED_FIELDS_PRESENT",
+      "invoice_type": "tax_invoice",
+      "severity": "error",
+      "type": "presence",
+      "required_field_numbers": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41],
+      "field_count": 41,
+      "exception_code": "EINV_MISSING_MANDATORY_FIELD"
+    },
+    {
+      "rule_id": "UAE_MOF_4_2_REQUIRED_FIELDS_PRESENT",
+      "invoice_type": "commercial_xml",
+      "severity": "error",
+      "type": "presence",
+      "required_field_numbers": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51],
+      "field_count": 51,
+      "exception_code": "EINV_MISSING_MANDATORY_FIELD"
+    },
+
+    {
+      "rule_id": "UAE_FIELD_12_SCHEME_MUST_BE_0235",
+      "invoice_type": ["tax_invoice", "commercial_xml"],
+      "severity": "error",
+      "type": "equals",
+      "field_number": 12,
+      "expected_value": "0235",
+      "exception_code": "EINV_FIELD_VALUE_INVALID"
+    },
+    {
+      "rule_id": "UAE_FIELD_11_TIN_MUST_BE_10_DIGITS",
+      "invoice_type": ["tax_invoice", "commercial_xml"],
+      "severity": "error",
+      "type": "regex",
+      "field_number": 11,
+      "pattern": "^[0-9]{10}$",
+      "exception_code": "EINV_FIELD_FORMAT_INVALID"
+    },
+    {
+      "rule_id": "UAE_FIELD_15_TRN_IF_VAT_REGISTERED_ELSE_TIN",
+      "invoice_type": ["tax_invoice", "commercial_xml"],
+      "severity": "error",
+      "type": "conditional_format",
+      "field_number": 15,
+      "cases": [
+        { "when": "seller_is_uae_vat_registered == true", "pattern": "^[0-9]{15}$", "meaning": "TRN is 15 digits" },
+        { "when": "seller_is_uae_vat_registered == false", "pattern": "^[0-9]{10}$", "meaning": "TIN is 10 digits" }
+      ],
+      "exception_code": "EINV_FIELD_FORMAT_INVALID"
+    },
+    {
+      "rule_id": "UAE_FIELD_16_DEFAULT_VAT_IF_MISSING",
+      "invoice_type": ["tax_invoice", "commercial_xml"],
+      "severity": "warning",
+      "type": "default_if_missing",
+      "field_number": 16,
+      "default_value": "VAT",
+      "exception_code": "EINV_DEFAULT_APPLIED"
+    }
+  ],
+
+  "exception_explanations": [
+    {
+      "exception_code": "EINV_MISSING_MANDATORY_FIELD",
+      "severity": "error",
+      "message": "Missing mandatory field",
+      "explanation_template": "Field #{field_number} ({field_name}) is mandatory for {invoice_type} according to UAE MoF Mandatory Fields specification.",
+      "suggested_fix": "Populate the missing field in the ERP/invoicing payload before submitting the invoice."
+    },
+    {
+      "exception_code": "EINV_FIELD_EMPTY",
+      "severity": "error",
+      "message": "Mandatory field empty",
+      "explanation_template": "Field #{field_number} ({field_name}) must contain a value for {invoice_type}.",
+      "suggested_fix": "Provide a valid value for the field and re-run validation."
+    },
+    {
+      "exception_code": "EINV_FIELD_VALUE_INVALID",
+      "severity": "error",
+      "message": "Invalid fixed value",
+      "explanation_template": "Field #{field_number} ({field_name}) must equal {expected_value} for UAE participant identification. Observed: {observed_value}.",
+      "suggested_fix": "Set the scheme/prefix to the required fixed value."
+    },
+    {
+      "exception_code": "EINV_FIELD_FORMAT_INVALID",
+      "severity": "error",
+      "message": "Invalid identifier format",
+      "explanation_template": "Field #{field_number} ({field_name}) has an invalid format for {invoice_type}. Expected pattern: {pattern}. Observed: {observed_value}.",
+      "suggested_fix": "Correct the source identifier value (e.g., ensure TIN is 10 digits; TRN is 15 digits)."
+    },
+    {
+      "exception_code": "EINV_DEFAULT_APPLIED",
+      "severity": "warning",
+      "message": "Default applied",
+      "explanation_template": "Field #{field_number} ({field_name}) was missing, so the default value {default_value} was applied.",
+      "suggested_fix": "Confirm the default value is appropriate; if not, explicitly populate the field."
+    }
+  ]
+}
