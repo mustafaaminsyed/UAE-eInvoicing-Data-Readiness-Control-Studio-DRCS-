@@ -1,0 +1,1486 @@
+{
+  "meta": {
+    "schema_name": "UAE_eInvoice_MoF_Source_Schema_v1",
+    "schema_version": "1.0.0",
+    "status": "baseline_source_truth",
+    "purpose": "MoF-source-truth schema layer for UAE electronic Tax Invoice and Commercial Electronic Invoice (XML), based strictly on the uploaded MoF mandatory-fields PDF and the validated baseline workbook.",
+    "source_of_truth_policy": "Only requirements explicitly stated in the MoF mandatory-fields document are locked as source_literal. Safe interpretations are tagged as source_derived. Unknown technical literals are tagged as needs_technical_source_confirmation.",
+    "notes": [
+      "This schema is intentionally limited to the MoF mandatory-fields document baseline.",
+      "Exact literal values for Field 7 and Field 8 are not locked because they were not printed in the uploaded MoF document.",
+      "No composite endpoint syntax, regex patterns, or additional implementation validations are locked as source_literal in this file."
+    ]
+  },
+  "source_document": {
+    "title": "UAE Electronic Invoice - Mandatory Fields",
+    "version": "V1.0",
+    "date": "2026-02-23",
+    "sections": [
+      {
+        "section_id": "4.1",
+        "title": "Mandatory fields in an electronic Tax Invoice",
+        "page_range": "5-11",
+        "field_range": "1-51",
+        "field_count": 51
+      },
+      {
+        "section_id": "4.2",
+        "title": "Mandatory fields required in a commercial Electronic Invoice (XML)",
+        "page_range": "11-16",
+        "field_range": "1-49",
+        "field_count": 49
+      }
+    ]
+  },
+  "baseline_summary": {
+    "tax_invoice": {
+      "field_range": "1-51",
+      "field_count": 51,
+      "certainty": "source_literal"
+    },
+    "commercial_xml": {
+      "field_range": "1-49",
+      "field_count": 49,
+      "certainty": "source_literal"
+    },
+    "shared_core_fields": {
+      "field_range": "1-41",
+      "certainty": "source_literal"
+    },
+    "tax_invoice_extension": {
+      "field_range": "42-51",
+      "certainty": "source_literal"
+    },
+    "commercial_xml_extension": {
+      "field_range": "42-49",
+      "certainty": "source_literal"
+    }
+  },
+  "glossary": [
+    {
+      "term": "TIN",
+      "definition": "Tax Identification Number; 10-digit identifier based on the first 10 digits of the 15-digit TRN.",
+      "certainty": "source_literal"
+    },
+    {
+      "term": "TRN",
+      "definition": "Tax Registration Number; 15-digit identifier.",
+      "certainty": "source_literal"
+    }
+  ],
+  "shared_code_lists": {
+    "seller_legal_registration_identifier_type": {
+      "field_id": 14,
+      "applies_to": [
+        "tax_invoice",
+        "commercial_xml"
+      ],
+      "values": [
+        "TL",
+        "EID",
+        "PAS",
+        "CD"
+      ],
+      "certainty": "source_literal"
+    },
+    "buyer_legal_registration_identifier_type_commercial_xml": {
+      "field_id": 25,
+      "applies_to": [
+        "commercial_xml"
+      ],
+      "values": [
+        "TL",
+        "EID",
+        "PAS",
+        "CD"
+      ],
+      "certainty": "source_literal"
+    }
+  },
+  "document_models": {
+    "tax_invoice": {
+      "description": "MoF-source-truth field inventory for electronic Tax Invoice.",
+      "fields": {
+        "1": {
+          "field_id": 1,
+          "field_name": "Invoice number",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "2": {
+          "field_id": 2,
+          "field_name": "Invoice date",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "3": {
+          "field_id": 3,
+          "field_name": "Invoice type code",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "4": {
+          "field_id": 4,
+          "field_name": "Invoice currency code",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "5": {
+          "field_id": 5,
+          "field_name": "Invoice transaction type code",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [
+            {
+              "rule_statement": "Field represents an 8-flag transaction type sequence covering supply scenarios listed by the MoF document.",
+              "rule_class": "source_literal"
+            }
+          ],
+          "notes": []
+        },
+        "6": {
+          "field_id": 6,
+          "field_name": "Payment due date",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "7": {
+          "field_id": 7,
+          "field_name": "Business process type",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal_with_pending_literal_confirmation",
+          "rules": [
+            {
+              "rule_statement": "Field has a predefined value for electronic Tax Invoice context.",
+              "rule_class": "source_literal",
+              "applies_to": [
+                "tax_invoice"
+              ]
+            },
+            {
+              "rule_statement": "Exact literal value is not locked in this schema because it is not printed in the uploaded MoF document.",
+              "rule_class": "needs_technical_source_confirmation"
+            }
+          ],
+          "notes": [
+            "Exact literal value pending technical specification confirmation."
+          ]
+        },
+        "8": {
+          "field_id": 8,
+          "field_name": "Specification identifier",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal_with_pending_literal_confirmation",
+          "rules": [
+            {
+              "rule_statement": "Field has a predefined value for electronic Tax Invoice context.",
+              "rule_class": "source_literal",
+              "applies_to": [
+                "tax_invoice"
+              ]
+            },
+            {
+              "rule_statement": "Exact literal value is not locked in this schema because it is not printed in the uploaded MoF document.",
+              "rule_class": "needs_technical_source_confirmation"
+            }
+          ],
+          "notes": [
+            "Exact literal value pending technical specification confirmation."
+          ]
+        },
+        "9": {
+          "field_id": 9,
+          "field_name": "Payment means type code",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "10": {
+          "field_id": 10,
+          "field_name": "Seller name",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "11": {
+          "field_id": 11,
+          "field_name": "Seller electronic address",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [
+            {
+              "rule_statement": "Seller electronic address is based on TIN in the UAE e-invoicing context.",
+              "rule_class": "source_literal"
+            }
+          ],
+          "notes": [
+            "TIN definition relies on MoF glossary."
+          ]
+        },
+        "12": {
+          "field_id": 12,
+          "field_name": "Seller electronic identifier",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [
+            {
+              "rule_statement": "For UAE businesses, seller electronic identifier is fixed as 0235.",
+              "rule_class": "source_literal",
+              "expected_value": "0235"
+            }
+          ],
+          "notes": []
+        },
+        "13": {
+          "field_id": 13,
+          "field_name": "Seller legal registration identifier",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "14": {
+          "field_id": 14,
+          "field_name": "Seller legal registration identifier type",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [
+            {
+              "rule_statement": "Allowed values are TL, EID, PAS, or CD.",
+              "rule_class": "source_literal",
+              "allowed_values": [
+                "TL",
+                "EID",
+                "PAS",
+                "CD"
+              ]
+            }
+          ],
+          "notes": []
+        },
+        "15": {
+          "field_id": 15,
+          "field_name": "Seller tax identifier",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [
+            {
+              "rule_statement": "For UAE sellers registered under tax, provide the TRN.",
+              "rule_class": "source_literal",
+              "applies_to": [
+                "tax_invoice"
+              ]
+            },
+            {
+              "rule_statement": "For sellers who do not have a TRN, use the TIN.",
+              "rule_class": "source_literal",
+              "applies_to": [
+                "commercial_xml"
+              ]
+            }
+          ],
+          "notes": [
+            "Do not over-normalize field 15 into a single universal format across both document types."
+          ]
+        },
+        "16": {
+          "field_id": 16,
+          "field_name": "Seller tax scheme code",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [
+            {
+              "rule_statement": "Default value VAT to be used.",
+              "rule_class": "source_literal",
+              "expected_value": "VAT"
+            }
+          ],
+          "notes": []
+        },
+        "17": {
+          "field_id": 17,
+          "field_name": "Seller address line 1",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "18": {
+          "field_id": 18,
+          "field_name": "Seller city",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "19": {
+          "field_id": 19,
+          "field_name": "Seller country subdivision",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "20": {
+          "field_id": 20,
+          "field_name": "Seller country code",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [
+            {
+              "rule_statement": "For UAE it should be AE.",
+              "rule_class": "source_literal",
+              "applies_to": [
+                "tax_invoice"
+              ]
+            },
+            {
+              "rule_statement": "Country code field present; no universal AE lock applied here outside the specific wording above.",
+              "rule_class": "source_derived",
+              "applies_to": [
+                "commercial_xml"
+              ]
+            }
+          ],
+          "notes": []
+        },
+        "21": {
+          "field_id": 21,
+          "field_name": "Buyer name",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "22": {
+          "field_id": 22,
+          "field_name": "Buyer electronic address",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "23": {
+          "field_id": 23,
+          "field_name": "Buyer electronic identifier",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "24": {
+          "field_id": 24,
+          "field_name": "Buyer tax identifier",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [
+            {
+              "rule_statement": "Buyer tax identifier field applies in Tax e-invoice.",
+              "rule_class": "source_literal"
+            },
+            {
+              "rule_statement": "UAE buyers registered under tax should provide TRN.",
+              "rule_class": "source_literal"
+            }
+          ],
+          "notes": []
+        },
+        "25": {
+          "field_id": 25,
+          "field_name": "Buyer tax scheme code",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [
+            {
+              "rule_statement": "Buyer tax scheme code field applies in Tax e-invoice.",
+              "rule_class": "source_literal"
+            },
+            {
+              "rule_statement": "Default value VAT to be used.",
+              "rule_class": "source_literal",
+              "expected_value": "VAT"
+            }
+          ],
+          "notes": []
+        },
+        "26": {
+          "field_id": 26,
+          "field_name": "Buyer address line 1",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "27": {
+          "field_id": 27,
+          "field_name": "Buyer city",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "28": {
+          "field_id": 28,
+          "field_name": "Buyer country subdivision",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "29": {
+          "field_id": 29,
+          "field_name": "Buyer country code",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "30": {
+          "field_id": 30,
+          "field_name": "Sum of invoice line net amount",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "31": {
+          "field_id": 31,
+          "field_name": "Invoice total amount without tax",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "32": {
+          "field_id": 32,
+          "field_name": "Invoice total tax amount",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "33": {
+          "field_id": 33,
+          "field_name": "Invoice total amount with tax",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "34": {
+          "field_id": 34,
+          "field_name": "Amount due for payment",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "35": {
+          "field_id": 35,
+          "field_name": "Tax category taxable amount",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "tax_breakdown",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "36": {
+          "field_id": 36,
+          "field_name": "Tax category tax amount",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "tax_breakdown",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "37": {
+          "field_id": 37,
+          "field_name": "Tax category code",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "tax_breakdown",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "38": {
+          "field_id": 38,
+          "field_name": "Tax category rate",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "tax_breakdown",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "39": {
+          "field_id": 39,
+          "field_name": "Invoice line identifier",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "line",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "40": {
+          "field_id": 40,
+          "field_name": "Invoiced quantity",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "line",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "41": {
+          "field_id": 41,
+          "field_name": "Unit of measure code",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "line",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "42": {
+          "field_id": 42,
+          "field_name": "Invoice line net amount",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "line",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "43": {
+          "field_id": 43,
+          "field_name": "Item net price",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "line",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "44": {
+          "field_id": 44,
+          "field_name": "Item gross price",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "line",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "45": {
+          "field_id": 45,
+          "field_name": "Item price base quantity",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "line",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "46": {
+          "field_id": 46,
+          "field_name": "Invoiced item tax category code",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "line",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "47": {
+          "field_id": 47,
+          "field_name": "Invoiced item tax rate",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "line",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "48": {
+          "field_id": 48,
+          "field_name": "VAT line amount in AED",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "line",
+          "source_status": "source_literal",
+          "rules": [
+            {
+              "rule_statement": "VAT line amount in AED field applies in Tax e-invoice.",
+              "rule_class": "source_literal"
+            }
+          ],
+          "notes": []
+        },
+        "49": {
+          "field_id": 49,
+          "field_name": "Invoice line amount in AED",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "line",
+          "source_status": "source_literal",
+          "rules": [
+            {
+              "rule_statement": "Invoice line amount in AED field applies in Tax e-invoice.",
+              "rule_class": "source_literal"
+            }
+          ],
+          "notes": []
+        },
+        "50": {
+          "field_id": 50,
+          "field_name": "Item name",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "line",
+          "source_status": "source_literal",
+          "rules": [
+            {
+              "rule_statement": "Item name field applies in Tax e-invoice.",
+              "rule_class": "source_literal"
+            }
+          ],
+          "notes": []
+        },
+        "51": {
+          "field_id": 51,
+          "field_name": "Item description",
+          "document_type": "tax_invoice",
+          "section_id": "4.1",
+          "mandatory": true,
+          "scope": "line",
+          "source_status": "source_literal",
+          "rules": [
+            {
+              "rule_statement": "Item description field applies in Tax e-invoice.",
+              "rule_class": "source_literal"
+            }
+          ],
+          "notes": []
+        }
+      }
+    },
+    "commercial_xml": {
+      "description": "MoF-source-truth field inventory for commercial Electronic Invoice (XML).",
+      "fields": {
+        "1": {
+          "field_id": 1,
+          "field_name": "Invoice number",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "2": {
+          "field_id": 2,
+          "field_name": "Invoice date",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "3": {
+          "field_id": 3,
+          "field_name": "Invoice type code",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "4": {
+          "field_id": 4,
+          "field_name": "Invoice currency code",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "5": {
+          "field_id": 5,
+          "field_name": "Invoice transaction type code",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [
+            {
+              "rule_statement": "Field represents an 8-flag transaction type sequence covering supply scenarios listed by the MoF document.",
+              "rule_class": "source_literal"
+            }
+          ],
+          "notes": []
+        },
+        "6": {
+          "field_id": 6,
+          "field_name": "Payment due date",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "7": {
+          "field_id": 7,
+          "field_name": "Business process type",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal_with_pending_literal_confirmation",
+          "rules": [
+            {
+              "rule_statement": "Field is mandatory in the commercial Electronic Invoice (XML) table in Section 4.2.",
+              "rule_class": "source_literal"
+            },
+            {
+              "rule_statement": "The uploaded MoF document does not explicitly lock an exact predefined literal for this field in the commercial_xml context.",
+              "rule_class": "needs_technical_source_confirmation"
+            },
+            {
+              "rule_statement": "No predefined-value rule is locked here for commercial_xml in the source-truth schema.",
+              "rule_class": "needs_technical_source_confirmation"
+            }
+          ],
+          "notes": [
+            "Exact commercial_xml predefined literal remains pending technical specification confirmation."
+          ]
+        },
+        "8": {
+          "field_id": 8,
+          "field_name": "Specification identifier",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal_with_pending_literal_confirmation",
+          "rules": [
+            {
+              "rule_statement": "Field is mandatory in the commercial Electronic Invoice (XML) table in Section 4.2.",
+              "rule_class": "source_literal"
+            },
+            {
+              "rule_statement": "The uploaded MoF document does not explicitly lock an exact predefined literal for this field in the commercial_xml context.",
+              "rule_class": "needs_technical_source_confirmation"
+            },
+            {
+              "rule_statement": "No predefined-value rule is locked here for commercial_xml in the source-truth schema.",
+              "rule_class": "needs_technical_source_confirmation"
+            }
+          ],
+          "notes": [
+            "Exact commercial_xml predefined literal remains pending technical specification confirmation."
+          ]
+        },
+        "9": {
+          "field_id": 9,
+          "field_name": "Payment means type code",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "10": {
+          "field_id": 10,
+          "field_name": "Seller name",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "11": {
+          "field_id": 11,
+          "field_name": "Seller electronic address",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [
+            {
+              "rule_statement": "Seller electronic address is based on TIN in the UAE e-invoicing context.",
+              "rule_class": "source_literal"
+            }
+          ],
+          "notes": [
+            "TIN definition relies on MoF glossary."
+          ]
+        },
+        "12": {
+          "field_id": 12,
+          "field_name": "Seller electronic identifier",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [
+            {
+              "rule_statement": "For UAE businesses, seller electronic identifier is fixed as 0235.",
+              "rule_class": "source_literal",
+              "expected_value": "0235"
+            }
+          ],
+          "notes": []
+        },
+        "13": {
+          "field_id": 13,
+          "field_name": "Seller legal registration identifier",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "14": {
+          "field_id": 14,
+          "field_name": "Seller legal registration identifier type",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [
+            {
+              "rule_statement": "Allowed values are TL, EID, PAS, or CD.",
+              "rule_class": "source_literal",
+              "allowed_values": [
+                "TL",
+                "EID",
+                "PAS",
+                "CD"
+              ]
+            }
+          ],
+          "notes": []
+        },
+        "15": {
+          "field_id": 15,
+          "field_name": "Seller tax identifier",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [
+            {
+              "rule_statement": "For UAE sellers registered under tax, provide the TRN.",
+              "rule_class": "source_literal",
+              "applies_to": [
+                "tax_invoice"
+              ]
+            },
+            {
+              "rule_statement": "For sellers who do not have a TRN, use the TIN.",
+              "rule_class": "source_literal",
+              "applies_to": [
+                "commercial_xml"
+              ]
+            }
+          ],
+          "notes": [
+            "Do not over-normalize field 15 into a single universal format across both document types."
+          ]
+        },
+        "16": {
+          "field_id": 16,
+          "field_name": "Seller tax scheme code",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [
+            {
+              "rule_statement": "Default value VAT to be used.",
+              "rule_class": "source_literal",
+              "expected_value": "VAT"
+            }
+          ],
+          "notes": []
+        },
+        "17": {
+          "field_id": 17,
+          "field_name": "Seller address line 1",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "18": {
+          "field_id": 18,
+          "field_name": "Seller city",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "19": {
+          "field_id": 19,
+          "field_name": "Seller country subdivision",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "20": {
+          "field_id": 20,
+          "field_name": "Seller country code",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [
+            {
+              "rule_statement": "For UAE it should be AE.",
+              "rule_class": "source_literal",
+              "applies_to": [
+                "tax_invoice"
+              ]
+            },
+            {
+              "rule_statement": "Country code field present; no universal AE lock applied here outside the specific wording above.",
+              "rule_class": "source_derived",
+              "applies_to": [
+                "commercial_xml"
+              ]
+            }
+          ],
+          "notes": [
+            "AE should not be universally locked here without broader technical context."
+          ]
+        },
+        "21": {
+          "field_id": 21,
+          "field_name": "Buyer name",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "22": {
+          "field_id": 22,
+          "field_name": "Buyer electronic address",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "23": {
+          "field_id": 23,
+          "field_name": "Buyer electronic identifier",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "24": {
+          "field_id": 24,
+          "field_name": "Buyer legal registration identifier",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [
+            {
+              "rule_statement": "Buyer legal registration identifier field applies in Commercial Electronic Invoice (XML).",
+              "rule_class": "source_literal"
+            }
+          ],
+          "notes": []
+        },
+        "25": {
+          "field_id": 25,
+          "field_name": "Buyer legal registration identifier type",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [
+            {
+              "rule_statement": "Buyer legal registration identifier type field applies in Commercial Electronic Invoice (XML).",
+              "rule_class": "source_literal"
+            },
+            {
+              "rule_statement": "Allowed values are TL, EID, PAS, or CD.",
+              "rule_class": "source_literal",
+              "allowed_values": [
+                "TL",
+                "EID",
+                "PAS",
+                "CD"
+              ]
+            }
+          ],
+          "notes": []
+        },
+        "26": {
+          "field_id": 26,
+          "field_name": "Buyer address line 1",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "27": {
+          "field_id": 27,
+          "field_name": "Buyer city",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "28": {
+          "field_id": 28,
+          "field_name": "Buyer country subdivision",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "29": {
+          "field_id": 29,
+          "field_name": "Buyer country code",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "30": {
+          "field_id": 30,
+          "field_name": "Sum of invoice line net amount",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "31": {
+          "field_id": 31,
+          "field_name": "Invoice total amount without tax",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "32": {
+          "field_id": 32,
+          "field_name": "Invoice total tax amount",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "33": {
+          "field_id": 33,
+          "field_name": "Invoice total amount with tax",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "34": {
+          "field_id": 34,
+          "field_name": "Amount due for payment",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "header",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "35": {
+          "field_id": 35,
+          "field_name": "Tax category taxable amount",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "tax_breakdown",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "36": {
+          "field_id": 36,
+          "field_name": "Tax category tax amount",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "tax_breakdown",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "37": {
+          "field_id": 37,
+          "field_name": "Tax category code",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "tax_breakdown",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "38": {
+          "field_id": 38,
+          "field_name": "Tax category rate",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "tax_breakdown",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "39": {
+          "field_id": 39,
+          "field_name": "Invoice line identifier",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "line",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "40": {
+          "field_id": 40,
+          "field_name": "Invoiced quantity",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "line",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "41": {
+          "field_id": 41,
+          "field_name": "Unit of measure code",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "line",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "42": {
+          "field_id": 42,
+          "field_name": "Invoice line net amount",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "line",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "43": {
+          "field_id": 43,
+          "field_name": "Item net price",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "line",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "44": {
+          "field_id": 44,
+          "field_name": "Item gross price",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "line",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "45": {
+          "field_id": 45,
+          "field_name": "Item price base quantity",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "line",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "46": {
+          "field_id": 46,
+          "field_name": "Invoiced item tax category code",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "line",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "47": {
+          "field_id": 47,
+          "field_name": "Invoiced item tax rate",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "line",
+          "source_status": "source_literal",
+          "rules": [],
+          "notes": []
+        },
+        "48": {
+          "field_id": 48,
+          "field_name": "Item name",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "line",
+          "source_status": "source_literal",
+          "rules": [
+            {
+              "rule_statement": "Item name field applies in Commercial Electronic Invoice (XML).",
+              "rule_class": "source_literal"
+            }
+          ],
+          "notes": []
+        },
+        "49": {
+          "field_id": 49,
+          "field_name": "Item description",
+          "document_type": "commercial_xml",
+          "section_id": "4.2",
+          "mandatory": true,
+          "scope": "line",
+          "source_status": "source_literal",
+          "rules": [
+            {
+              "rule_statement": "Item description field applies in Commercial Electronic Invoice (XML).",
+              "rule_class": "source_literal"
+            }
+          ],
+          "notes": []
+        }
+      }
+    }
+  },
+  "rule_classification_guide": {
+    "source_literal": "Explicitly stated in the uploaded MoF mandatory-fields document.",
+    "source_derived": "Careful interpretation grounded in the uploaded MoF mandatory-fields document, but not stated as a formal validation rule.",
+    "needs_technical_source_confirmation": "Not locked from the uploaded MoF mandatory-fields document alone; requires additional technical-source confirmation.",
+    "source_literal_with_pending_literal_confirmation": "Field existence/predefined-value concept is explicit, but the exact literal is not printed in the uploaded MoF mandatory-fields document."
+  },
+  "exclusions": [
+    "No regex validations are locked in this file.",
+    "No composite participant endpoint syntax is locked in this file.",
+    "No implementation-only remediation logic is included in this file."
+  ]
+}
