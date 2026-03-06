@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { FileText, Check, X, AlertTriangle, ChevronDown, ChevronUp, Key, Download } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -283,6 +283,7 @@ interface FileDropZoneProps {
 
 export function FileDropZone({ label, description, sampleType, sampleScenario = 'positive', direction = 'AR', onFileSelect }: FileDropZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleDownloadSample = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -319,16 +320,26 @@ export function FileDropZone({ label, description, sampleType, sampleScenario = 
         )}
       >
         <input
+          ref={fileInputRef}
           type="file"
           accept=".csv"
           onChange={(e) => { const f = e.target.files?.[0]; if (f) onFileSelect(f); }}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          className="hidden"
           aria-label={`${label} CSV upload`}
         />
         <div className="flex flex-col items-center text-center">
           <FileText className="w-8 h-8 text-muted-foreground mb-2" />
-          <p className="text-sm font-medium text-foreground">Drop CSV here or click to browse</p>
+          <p className="text-sm font-medium text-foreground">Drop CSV here</p>
           <p className="text-xs text-muted-foreground mt-1">CSV only. Use comma-delimited files for ingestion.</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-3"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            Browse CSV
+          </Button>
         </div>
       </div>
     </div>
