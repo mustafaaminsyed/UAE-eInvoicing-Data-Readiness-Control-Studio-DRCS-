@@ -65,7 +65,7 @@ Edge functions:
 ## Local setup
 
 Prerequisites:
-- Node.js 18+
+- Node.js 22.x
 - npm
 
 Install and run:
@@ -208,3 +208,40 @@ npm run generate:pint-spec
 ## Deployment
 
 This is a static Vite app. Deploy the `dist/` output to any static host after `npm run build`, with required `VITE_*` variables configured in the host environment.
+
+## Release tracepoints
+
+Use annotated Git tags as rollback-safe checkpoints for production.
+
+Latest checkpoint:
+- Tag: `checkpoint-2026-03-07-prod-runchecks-hardening`
+- Commit: `813ccc5`
+- Scope:
+  - Run Checks conformance gate diagnostics
+  - Raw template mode support (no mapping profile required when canonical structure is present)
+  - Last run context banner (Run Checks + Exceptions)
+  - Safe UC1 sync behavior (no automatic overwrite of DB-managed check registry settings)
+
+Create a new checkpoint tag:
+
+```bash
+git fetch origin --prune
+git tag -a checkpoint-YYYY-MM-DD-<label> <commit_sha> -m "Production tracepoint"
+git push origin checkpoint-YYYY-MM-DD-<label>
+```
+
+Rollback to a checkpoint:
+
+```bash
+git fetch origin --tags
+git checkout checkpoint-YYYY-MM-DD-<label>
+```
+
+Or restore `main` to a checkpoint in a controlled way:
+
+```bash
+git checkout main
+git pull --rebase origin main
+git revert <bad_commit_sha>
+# or open a rollback PR based on the checkpoint tag
+```
