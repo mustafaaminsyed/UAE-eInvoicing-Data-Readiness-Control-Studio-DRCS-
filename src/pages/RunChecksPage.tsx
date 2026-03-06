@@ -22,6 +22,7 @@ import { Link } from 'react-router-dom';
 import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
 import { getSupabaseEnvStatus, shouldUseLocalDevFallback } from '@/lib/api/supabaseEnv';
 import { supabase } from '@/integrations/supabase/client';
+import { LastRunContextBanner } from '@/components/run/LastRunContextBanner';
 
 type ConnectionTestStatus = 'idle' | 'running' | 'passed' | 'failed';
 
@@ -44,6 +45,8 @@ export default function RunChecksPage() {
     isRunning, 
     runChecks,
     exceptions,
+    lastChecksRunAt,
+    lastChecksRunDatasetType,
     activeMappingProfileByDirection,
     setActiveMappingProfileForDirection,
   } = useCompliance();
@@ -431,6 +434,12 @@ export default function RunChecksPage() {
             <Badge variant="outline">Direction: {direction}</Badge>
           </div>
         </div>
+
+        <LastRunContextBanner
+          lastChecksRunAt={lastChecksRunAt}
+          datasetType={lastChecksRunDatasetType || direction}
+          exceptionsCount={exceptions.length}
+        />
 
         {!isSupabaseConfigured && !isLocalFallbackMode && (
           <Alert variant="destructive" className="mb-8">

@@ -25,11 +25,12 @@ import {
 } from '@/lib/api/validationExplainApi';
 import { ValidationExplainMode, ValidationExplanation } from '@/types/validationExplain';
 import { ExplanationPackPanel } from '@/components/explanations/ExplanationPackPanel';
+import { LastRunContextBanner } from '@/components/run/LastRunContextBanner';
 
 export default function ExceptionsPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { isChecksRun, exceptions } = useCompliance();
+  const { isChecksRun, exceptions, direction, lastChecksRunAt, lastChecksRunDatasetType } = useCompliance();
 
   const [search, setSearch] = useState('');
   const [severityFilter, setSeverityFilter] = useState<Severity | 'all'>('all');
@@ -205,6 +206,13 @@ export default function ExceptionsPage() {
             Export CSV
           </Button>
         </div>
+
+        <LastRunContextBanner
+          lastChecksRunAt={lastChecksRunAt}
+          datasetType={lastChecksRunDatasetType || direction}
+          exceptionsCount={exceptions.length}
+          showWhenEmpty
+        />
 
         <div className="surface-glass rounded-2xl border border-white/70 shadow-sm p-4 mb-6 animate-slide-up">
           <div className="flex items-center gap-2 mb-4">
