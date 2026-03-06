@@ -255,21 +255,17 @@ export async function seedUC1CheckPack(forceUpsert = false): Promise<{ success: 
   }
   
   try {
-    // Check specifically if UC1 checks already exist
+    // Fetch existing UC1 check IDs so non-force mode can repair only missing checks
+    // without overwriting DB-managed settings (enabled state, severity tuning, text updates).
     const { data: existingUC1, error: existingError } = await supabase
       .from('pint_ae_checks')
       .select('check_id')
-      .ilike('check_id', 'UAE-UC1-CHK-%')
-      .limit(1);
+      .ilike('check_id', 'UAE-UC1-CHK-%');
 
     if (existingError) {
       return { success: false, message: `Seed failed: ${existingError.message}` };
     }
-
-    if (existingUC1 && existingUC1.length > 0 && !forceUpsert) {
-      console.log('[PINT-AE] UC1 checks already exist, skipping seed (use forceUpsert=true to update)');
-      return { success: true, message: 'Seed skipped - UC1 checks already exist' };
-    }
+    const existingIds = new Set((existingUC1 || []).map((row) => row.check_id));
 
     // Prepare checks for upsert
     const checksToUpsert = UAE_UC1_CHECK_PACK.map(check => ({
@@ -291,18 +287,37 @@ export async function seedUC1CheckPack(forceUpsert = false): Promise<{ success: 
       parameters: check.parameters,
     }));
 
-    // Use upsert to handle both insert and update scenarios
-    const { error } = await supabase
-      .from('pint_ae_checks')
-      .upsert(checksToUpsert, { onConflict: 'check_id' });
+    let error: { message: string } | null = null;
+    let seededCount = 0;
+
+    if (forceUpsert) {
+      // Admin path: explicitly refresh canonical pack and overwrite existing entries.
+      const result = await supabase
+        .from('pint_ae_checks')
+        .upsert(checksToUpsert, { onConflict: 'check_id' });
+      error = result.error;
+      seededCount = checksToUpsert.length;
+    } else {
+      // Safe path: insert only missing checks, preserving existing DB settings.
+      const missingChecks = checksToUpsert.filter((check) => !existingIds.has(check.check_id));
+      if (missingChecks.length === 0) {
+        console.log('[PINT-AE] Seed skipped - UC1 checks already complete');
+        return { success: true, message: 'Seed skipped - UC1 checks already complete' };
+      }
+      const result = await supabase
+        .from('pint_ae_checks')
+        .insert(missingChecks);
+      error = result.error;
+      seededCount = missingChecks.length;
+    }
 
     if (error) {
       console.error('[PINT-AE] Error seeding UC1 check pack:', error);
       return { success: false, message: `Seed failed: ${error.message}` };
     }
 
-    console.log('[PINT-AE] Successfully seeded/updated UC1 check pack with', checksToUpsert.length, 'checks');
-    return { success: true, message: `Seeded ${checksToUpsert.length} UC1 checks` };
+    console.log('[PINT-AE] Successfully seeded/updated UC1 check pack with', seededCount, 'checks');
+    return { success: true, message: `${forceUpsert ? 'Upserted' : 'Seeded'} ${seededCount} UC1 checks` };
   } catch (error) {
     console.error('[PINT-AE] Error seeding UC1 check pack:', error);
     return { success: false, message: `Seed failed: ${error instanceof Error ? error.message : String(error)}` };

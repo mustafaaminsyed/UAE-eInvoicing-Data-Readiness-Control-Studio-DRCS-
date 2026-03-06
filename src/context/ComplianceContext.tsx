@@ -164,15 +164,8 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(ACTIVE_MAPPING_STORAGE_KEY, JSON.stringify(activeMappingProfileByDirection));
   }, [activeMappingProfileByDirection]);
 
-  // Seed UC1 check pack on mount (idempotent - only seeds if UC1 checks don't exist)
-  useEffect(() => {
-    const initChecks = async () => {
-      console.log('[Compliance] Initializing PINT-AE checks...');
-      const result = await seedUC1CheckPack(false);
-      console.log('[Compliance] Seed result:', result.message);
-    };
-    initChecks();
-  }, []);
+  // Intentionally do not auto-seed on mount.
+  // Check-pack synchronization is handled explicitly in Run Checks workflow.
 
   const getDataForDataset = (datasetType: DatasetType): ParsedData => {
     return dataByDirection[datasetType] || { buyers: [], headers: [], lines: [], direction: datasetType };
@@ -269,8 +262,8 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
     // Run built-in checks
     const builtInResults = runAllChecks(dataContext);
     
-    // Ensure the latest UC1 pack is present before running checks.
-    await seedUC1CheckPack(true);
+    // Ensure missing UC1 checks are inserted without overwriting DB-managed settings.
+    await seedUC1CheckPack(false);
 
     // Fetch and run PINT-AE checks
     const pintAEChecks = await fetchEnabledPintAEChecks();
