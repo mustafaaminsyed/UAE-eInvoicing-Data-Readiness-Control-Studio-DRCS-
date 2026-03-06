@@ -50,6 +50,8 @@ interface ComplianceContextType {
   investigationFlags: InvestigationFlag[];
   pintAEExceptions: PintAEException[];
   runSummary: RunSummary | null;
+  lastChecksRunAt: string | null;
+  lastChecksRunDatasetType: DatasetType | null;
   isDataLoaded: boolean;
   isChecksRun: boolean;
   isRunning: boolean;
@@ -118,6 +120,8 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
   const [investigationFlags] = useState<InvestigationFlag[]>([]);
   const [pintAEExceptions, setPintAEExceptions] = useState<PintAEException[]>([]);
   const [runSummary, setRunSummary] = useState<RunSummary | null>(null);
+  const [lastChecksRunAt, setLastChecksRunAt] = useState<string | null>(null);
+  const [lastChecksRunDatasetType, setLastChecksRunDatasetType] = useState<DatasetType | null>(null);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [isChecksRun, setIsChecksRun] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
@@ -240,6 +244,8 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
     setExceptions([]);
     setPintAEExceptions([]);
     setRunSummary(null);
+    setLastChecksRunAt(null);
+    setLastChecksRunDatasetType(null);
   };
 
   const runChecks = async (options?: { mappingProfileId?: string; mappingVersion?: number }) => {
@@ -312,6 +318,8 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
     setExceptions(allExceptions);
     setPintAEExceptions(pintExceptions);
     setIsChecksRun(true);
+    setLastChecksRunAt(new Date().toISOString());
+    setLastChecksRunDatasetType(direction);
 
     // Calculate and save scores
     const stats = calculateStats(allExceptions, headers.length);
@@ -412,6 +420,8 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
     setBuyers([]); setHeaders([]); setLines([]);
     setCheckResults([]); setExceptions([]); setPintAEExceptions([]);
     setRunSummary(null);
+    setLastChecksRunAt(null);
+    setLastChecksRunDatasetType(null);
     setIsDataLoaded(false); setIsChecksRun(false);
     setUploadSessionId(null);
     setUploadManifestId(null);
@@ -471,7 +481,7 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
       uploadManifestId,
       activeMappingProfileByDirection,
       setActiveMappingProfileForDirection,
-      buyers, headers, lines, checkResults, exceptions, investigationFlags, pintAEExceptions, runSummary,
+      buyers, headers, lines, checkResults, exceptions, investigationFlags, pintAEExceptions, runSummary, lastChecksRunAt, lastChecksRunDatasetType,
       isDataLoaded, isChecksRun, isRunning,
       uploadLogs,
       setData, runChecks, clearData,
