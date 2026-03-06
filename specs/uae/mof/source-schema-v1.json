@@ -882,19 +882,20 @@
           "source_status": "source_literal_with_pending_literal_confirmation",
           "rules": [
             {
-              "rule_statement": "Field has a predefined value for electronic Tax Invoice context.",
-              "rule_class": "source_literal",
-              "applies_to": [
-                "tax_invoice"
-              ]
+              "rule_statement": "Field is mandatory in the commercial Electronic Invoice (XML) table in Section 4.2.",
+              "rule_class": "source_literal"
             },
             {
-              "rule_statement": "Exact literal value is not locked in this schema because it is not printed in the uploaded MoF document.",
+              "rule_statement": "The uploaded MoF document does not explicitly lock an exact predefined literal for this field in the commercial_xml context.",
+              "rule_class": "needs_technical_source_confirmation"
+            },
+            {
+              "rule_statement": "No predefined-value rule is locked here for commercial_xml in the source-truth schema.",
               "rule_class": "needs_technical_source_confirmation"
             }
           ],
           "notes": [
-            "Exact literal value pending technical specification confirmation."
+            "Exact commercial_xml predefined literal remains pending technical specification confirmation."
           ]
         },
         "8": {
@@ -907,19 +908,20 @@
           "source_status": "source_literal_with_pending_literal_confirmation",
           "rules": [
             {
-              "rule_statement": "Field has a predefined value for electronic Tax Invoice context.",
-              "rule_class": "source_literal",
-              "applies_to": [
-                "tax_invoice"
-              ]
+              "rule_statement": "Field is mandatory in the commercial Electronic Invoice (XML) table in Section 4.2.",
+              "rule_class": "source_literal"
             },
             {
-              "rule_statement": "Exact literal value is not locked in this schema because it is not printed in the uploaded MoF document.",
+              "rule_statement": "The uploaded MoF document does not explicitly lock an exact predefined literal for this field in the commercial_xml context.",
+              "rule_class": "needs_technical_source_confirmation"
+            },
+            {
+              "rule_statement": "No predefined-value rule is locked here for commercial_xml in the source-truth schema.",
               "rule_class": "needs_technical_source_confirmation"
             }
           ],
           "notes": [
-            "Exact literal value pending technical specification confirmation."
+            "Exact commercial_xml predefined literal remains pending technical specification confirmation."
           ]
         },
         "9": {
