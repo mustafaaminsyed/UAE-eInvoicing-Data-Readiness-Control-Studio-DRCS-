@@ -132,6 +132,8 @@ VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_or_publishable_key
 Important:
 - Do not keep placeholder values like `YOUR_PROJECT_REF` or `YOUR_SUPABASE_ANON_KEY`.
 - If placeholders are detected, Run Checks is now intentionally blocked and shows a setup error banner.
+- For new Supabase projects, apply repo migrations before running checks. See:
+  - `docs/supabase-bootstrap-for-new-project.md`
 
 Optional feature flags:
 

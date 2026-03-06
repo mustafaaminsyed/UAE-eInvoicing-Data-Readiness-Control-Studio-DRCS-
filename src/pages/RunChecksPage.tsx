@@ -70,7 +70,15 @@ export default function RunChecksPage() {
   const [mappingTemplates, setMappingTemplates] = useState<MappingTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('none');
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
+  const [mappingTemplatesError, setMappingTemplatesError] = useState<string | null>(null);
   const expectedUC1Count = UAE_UC1_CHECK_PACK.length;
+
+  const formatSetupError = (errorMessage: string, tableName: string) => {
+    if (errorMessage.includes(`Could not find the table 'public.${tableName}'`)) {
+      return `Supabase table '${tableName}' is missing. Apply project migrations before running checks.`;
+    }
+    return errorMessage;
+  };
 
   const loadChecks = useCallback(async () => {
     setIsLoadingChecks(true);
@@ -162,7 +170,19 @@ export default function RunChecksPage() {
 
   const loadMappingTemplates = useCallback(async () => {
     setIsLoadingTemplates(true);
+    setMappingTemplatesError(null);
     if (!isSupabaseConfigured) {
+      setMappingTemplates([]);
+      setSelectedTemplateId('none');
+      setIsLoadingTemplates(false);
+      return;
+    }
+    const { error: mappingProbeError } = await supabase
+      .from('mapping_templates')
+      .select('id', { count: 'exact', head: true });
+    if (mappingProbeError) {
+      const message = formatSetupError(mappingProbeError.message, 'mapping_templates');
+      setMappingTemplatesError(message);
       setMappingTemplates([]);
       setSelectedTemplateId('none');
       setIsLoadingTemplates(false);
@@ -211,7 +231,11 @@ export default function RunChecksPage() {
     }
   }, [isDataLoaded, navigate]);
 
-  const noMappingProfile = isSupabaseConfigured && !isLoadingTemplates && mappingTemplates.length === 0;
+  const checksInfraError = diagnostics?.fetchError
+    ? formatSetupError(diagnostics.fetchError, 'pint_ae_checks')
+    : null;
+  const noMappingProfile =
+    isSupabaseConfigured && !isLoadingTemplates && !mappingTemplatesError && mappingTemplates.length === 0;
 
   if (!isDataLoaded) return null;
 
@@ -233,10 +257,26 @@ export default function RunChecksPage() {
     : [];
   const hasCoverageWarning = selectedTemplate && mandatoryCoverage < 100;
   const readiness = checkRunReadiness(!noMappingProfile, mandatoryCoverage, null);
+  const setupReasons = [
+    ...(checksInfraError
+      ? [{
+          message: checksInfraError,
+          link: '/run',
+          linkLabel: 'Retry after setup',
+        }]
+      : []),
+    ...(mappingTemplatesError
+      ? [{
+          message: mappingTemplatesError,
+          link: '/run',
+          linkLabel: 'Retry after setup',
+        }]
+      : []),
+  ];
   const gateReasons = isLocalFallbackMode
     ? readiness.reasons
     : isSupabaseConfigured
-    ? readiness.reasons
+    ? [...setupReasons, ...readiness.reasons]
     : [
       {
         message: `Supabase environment is not configured (${supabaseEnvStatus.issues.join(', ')})`,
@@ -244,7 +284,10 @@ export default function RunChecksPage() {
         linkLabel: 'Open Setup Guide',
       },
     ];
-  const isBlocked = isLocalFallbackMode ? !readiness.canRun : (!isSupabaseConfigured || !readiness.canRun);
+  const hasSetupBlockers = setupReasons.length > 0;
+  const isBlocked = isLocalFallbackMode
+    ? !readiness.canRun
+    : (!isSupabaseConfigured || hasSetupBlockers || !readiness.canRun);
 
   const handleRunChecks = async () => {
     if (hasCoverageWarning) {
@@ -433,6 +476,8 @@ export default function RunChecksPage() {
                   <p className="text-sm text-muted-foreground mt-2">
                     {isLocalFallbackMode ? (
                       'Local fallback mode: mapping templates from Supabase are unavailable. Checks can still run with raw uploaded data.'
+                    ) : mappingTemplatesError ? (
+                      `Mapping templates unavailable: ${mappingTemplatesError}`
                     ) : (
                       <>
                         No active {direction} mapping templates found.{' '}
