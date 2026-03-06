@@ -237,6 +237,23 @@ export default function RunChecksPage() {
   const noMappingProfile =
     isSupabaseConfigured && !isLoadingTemplates && !mappingTemplatesError && mappingTemplates.length === 0;
 
+  // Raw template mode: allow check execution without a saved mapping profile
+  // when uploaded data already has the minimum canonical shape required for UC1 checks.
+  const canRunWithoutMapping = useMemo(() => {
+    if (!isDataLoaded) return false;
+    if (headers.length === 0 || lines.length === 0 || buyers.length === 0) return false;
+
+    const headersCanonical = headers.every((h) =>
+      Boolean(h.invoice_id && h.invoice_number && h.issue_date && h.seller_trn && h.currency)
+    );
+    const linesCanonical = lines.every((l) =>
+      Boolean(l.line_id && l.invoice_id) && Number.isFinite(l.line_number) && l.line_number > 0
+    );
+    const buyersCanonical = buyers.every((b) => Boolean(b.buyer_id && b.buyer_name));
+
+    return headersCanonical && linesCanonical && buyersCanonical;
+  }, [buyers, headers, lines, isDataLoaded]);
+
   if (!isDataLoaded) return null;
 
   // Calculate coverage for selected template
@@ -256,7 +273,8 @@ export default function RunChecksPage() {
       )
     : [];
   const hasCoverageWarning = selectedTemplate && mandatoryCoverage < 100;
-  const readiness = checkRunReadiness(!noMappingProfile, mandatoryCoverage, null);
+  const mappingSatisfied = !noMappingProfile || canRunWithoutMapping;
+  const readiness = checkRunReadiness(mappingSatisfied, mandatoryCoverage, null);
   const setupReasons = [
     ...(checksInfraError
       ? [{
@@ -478,6 +496,8 @@ export default function RunChecksPage() {
                       'Local fallback mode: mapping templates from Supabase are unavailable. Checks can still run with raw uploaded data.'
                     ) : mappingTemplatesError ? (
                       `Mapping templates unavailable: ${mappingTemplatesError}`
+                    ) : canRunWithoutMapping ? (
+                      'No active mapping template found. Raw template mode is enabled because uploaded columns already match required canonical structure.'
                     ) : (
                       <>
                         No active {direction} mapping templates found.{' '}
@@ -691,7 +711,7 @@ export default function RunChecksPage() {
         </div>
 
         {/* Mapping Prerequisite Warning */}
-        {noMappingProfile && (
+        {noMappingProfile && !canRunWithoutMapping && (
           <Alert className="mb-8 bg-amber-500/10 border-amber-500/30">
             <AlertTriangle className="h-4 w-4 text-amber-600" />
             <AlertTitle className="text-amber-700">Mapping required before running checks</AlertTitle>
@@ -702,6 +722,16 @@ export default function RunChecksPage() {
                   Go to Mapping Studio
                 </Button>
               </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {noMappingProfile && canRunWithoutMapping && (
+          <Alert className="mb-8 border-emerald-500/20 bg-emerald-500/5">
+            <AlertCircle className="h-4 w-4 text-emerald-600" />
+            <AlertTitle className="text-emerald-700">Running in raw template mode</AlertTitle>
+            <AlertDescription className="text-emerald-700/90">
+              No active mapping profile is selected. Checks can run because uploaded data already matches required canonical template fields.
             </AlertDescription>
           </Alert>
         )}
