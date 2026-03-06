@@ -144,11 +144,13 @@ export default function RunChecksPage() {
       getChecksDiagnostics(),
     ]);
 
-    const requiresSync = (diag.uc1CheckCount ?? 0) < expectedUC1Count || checks.length < expectedUC1Count;
+    // Sync only when UC1 records are actually missing from DB. Do not use enabled-check count
+    // because teams may intentionally disable certain checks in registry.
+    const requiresSync = (diag.uc1CheckCount ?? 0) < expectedUC1Count;
 
     if (requiresSync) {
-      console.log('[Run Checks] UC1 check count mismatch detected. Forcing upsert...');
-      const result = await seedUC1CheckPack(true);
+      console.log('[Run Checks] UC1 check count mismatch detected. Seeding missing checks...');
+      const result = await seedUC1CheckPack(false);
       setLastSeedResult(result.message);
       if (result.success) {
         toast.success(`Checks synced (${expectedUC1Count})`);
