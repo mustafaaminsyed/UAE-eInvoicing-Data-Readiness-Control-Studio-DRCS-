@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Upload, FileText, Check, X, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ const sampleData = {
 
 export function FileUpload({ label, description, file, onFileSelect, sampleType }: FileUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleDrop = useCallback(
     (e: React.DragEvent<HTMLDivElement>) => {
@@ -88,10 +89,11 @@ export function FileUpload({ label, description, file, onFileSelect, sampleType 
         )}
       >
         <input
+          ref={fileInputRef}
           type="file"
           accept=".csv"
           onChange={handleFileInput}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          className="hidden"
         />
         
         <div className="flex flex-col items-center text-center">
@@ -123,7 +125,15 @@ export function FileUpload({ label, description, file, onFileSelect, sampleType 
                 <Upload className="w-6 h-6 text-muted-foreground" />
               </div>
               <p className="font-medium text-foreground">Drop your CSV file here</p>
-              <p className="text-sm text-muted-foreground mt-1">or click to browse</p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                Browse CSV
+              </Button>
             </>
           )}
         </div>
