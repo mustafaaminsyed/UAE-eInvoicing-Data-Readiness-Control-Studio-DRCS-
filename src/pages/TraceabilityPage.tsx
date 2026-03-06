@@ -33,8 +33,74 @@ import {
   getScenarioApplicabilityBadgeClass,
   getScenarioApplicabilityForDR,
 } from '@/modules/scenarioLens/drScenarioApplicability';
+import mofRulebookData from '../../docs/uae_einvoicing_data_schema.json';
 
 type FilterType = 'all' | 'mandatory' | 'pint-new' | 'pint-legacy' | 'unmapped' | 'not-ingestible' | 'low-population' | 'no-rules' | 'no-controls' | 'covered';
+type TraceabilityViewMode = 'pint' | 'mof';
+
+const MOF_FIELD_TO_INTERNAL_COLUMN: Record<number, string | undefined> = {
+  1: 'invoice_number',
+  2: 'issue_date',
+  3: 'invoice_type',
+  4: 'currency',
+  5: 'transaction_type_code',
+  6: 'payment_due_date',
+  7: 'business_process',
+  8: 'spec_id',
+  9: 'payment_means_code',
+  10: 'seller_name',
+  11: 'seller_electronic_address',
+  13: 'seller_legal_reg_id',
+  14: 'seller_legal_reg_id_type',
+  15: 'seller_trn',
+  17: 'seller_address',
+  18: 'seller_city',
+  19: 'seller_subdivision',
+  20: 'seller_country',
+  21: 'buyer_name',
+  22: 'buyer_electronic_address',
+  26: 'buyer_address',
+  27: 'buyer_city',
+  28: 'buyer_subdivision',
+  29: 'buyer_country',
+  31: 'total_excl_vat',
+  32: 'vat_total',
+  33: 'total_incl_vat',
+  34: 'amount_due',
+  37: 'tax_category_code',
+  39: 'line_id',
+  40: 'quantity',
+  41: 'unit_of_measure',
+  42: 'line_total_excl_vat',
+  43: 'unit_price',
+  46: 'tax_category_code',
+  47: 'vat_rate',
+  48: 'vat_amount',
+  50: 'description',
+  51: 'item_name',
+};
+
+type MofFieldEntry = {
+  field_number: number;
+  name: string;
+  section: string;
+  cardinality: string;
+  applies_to: string[];
+};
+
+type MofOverlayRow = {
+  fieldNumber: number;
+  fieldName: string;
+  section: string;
+  cardinality: string;
+  appliesTo: string[];
+  internalColumn: string | null;
+  linkedDrIds: string[];
+  inTemplate: boolean;
+  ingestible: boolean;
+  ruleCount: number;
+  controlCount: number;
+};
 
 const SCENARIO_PARAM_KEYS: Record<keyof ScenarioLensFilters, string> = {
   documentType: 'slDoc',
@@ -189,6 +255,7 @@ export default function TraceabilityPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
+  const [viewMode, setViewMode] = useState<TraceabilityViewMode>('pint');
   const [drillDownRow, setDrillDownRow] = useState<TraceabilityRow | null>(null);
   const [showConsistency, setShowConsistency] = useState(false);
 
@@ -259,6 +326,50 @@ export default function TraceabilityPage() {
     [populations, exceptionCountsByDR]
   );
 
+  const mofFields = useMemo<MofFieldEntry[]>(() => {
+    const raw = (mofRulebookData as { field_dictionary?: { fields?: MofFieldEntry[] } })?.field_dictionary?.fields;
+    if (!Array.isArray(raw)) return [];
+    return raw;
+  }, []);
+
+  const mofOverlayRows = useMemo<MofOverlayRow[]>(() => {
+    const byInternal = new Map<string, TraceabilityRow[]>();
+    rows.forEach((row) => {
+      row.internal_columns.forEach((col) => {
+        if (!byInternal.has(col)) byInternal.set(col, []);
+        byInternal.get(col)!.push(row);
+      });
+    });
+
+    return mofFields
+      .map((field) => {
+        const internalColumn = MOF_FIELD_TO_INTERNAL_COLUMN[field.field_number] || null;
+        const linked = internalColumn ? byInternal.get(internalColumn) || [] : [];
+        const linkedDrIds = Array.from(new Set(linked.map((r) => r.dr_id)));
+        const ruleIds = new Set<string>();
+        const controlIds = new Set<string>();
+        linked.forEach((r) => {
+          r.ruleIds.forEach((id) => ruleIds.add(id));
+          r.controlIds.forEach((id) => controlIds.add(id));
+        });
+
+        return {
+          fieldNumber: field.field_number,
+          fieldName: field.name,
+          section: field.section,
+          cardinality: field.cardinality,
+          appliesTo: field.applies_to || [],
+          internalColumn,
+          linkedDrIds,
+          inTemplate: linked.some((r) => r.inTemplate),
+          ingestible: linked.length > 0 && linked.every((r) => r.ingestible),
+          ruleCount: ruleIds.size,
+          controlCount: controlIds.size,
+        };
+      })
+      .sort((a, b) => a.fieldNumber - b.fieldNumber);
+  }, [mofFields, rows]);
+
   const rowNumberByDrId = useMemo(() => {
     const map = new Map<string, number>();
     rows.forEach((row, idx) => map.set(row.dr_id, idx + 1));
@@ -288,6 +399,29 @@ export default function TraceabilityPage() {
     }
     return result;
   }, [rows, filter, search]);
+
+  const filteredMofRows = useMemo(() => {
+    let result = mofOverlayRows;
+    if (search) {
+      const q = search.toLowerCase();
+      result = result.filter((row) =>
+        String(row.fieldNumber).includes(q) ||
+        row.fieldName.toLowerCase().includes(q) ||
+        row.section.toLowerCase().includes(q) ||
+        (row.internalColumn || '').toLowerCase().includes(q) ||
+        row.linkedDrIds.some((id) => id.toLowerCase().includes(q))
+      );
+    }
+    return result;
+  }, [mofOverlayRows, search]);
+
+  const mofOverlaySummary = useMemo(() => {
+    const total = mofOverlayRows.length;
+    const linked = mofOverlayRows.filter((row) => row.linkedDrIds.length > 0).length;
+    const inTemplate = mofOverlayRows.filter((row) => row.inTemplate).length;
+    const ingestible = mofOverlayRows.filter((row) => row.ingestible).length;
+    return { total, linked, inTemplate, ingestible };
+  }, [mofOverlayRows]);
 
   const filters: { key: FilterType; label: string; count: number }[] = [
     { key: 'all', label: 'All', count: rows.length },
@@ -394,8 +528,26 @@ export default function TraceabilityPage() {
 
         {/* Filters, Search & Export */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-4">
+          <div className="flex items-center gap-2">
+            <Button
+              variant={viewMode === 'pint' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('pint')}
+              className="text-xs"
+            >
+              PINT DR View
+            </Button>
+            <Button
+              variant={viewMode === 'mof' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('mof')}
+              className="text-xs"
+            >
+              MoF Overlay View
+            </Button>
+          </div>
           <div className="flex items-center gap-1 flex-wrap">
-            {filters.map(f => (
+            {viewMode === 'pint' && filters.map(f => (
               <Button
                 key={f.key}
                 variant={filter === f.key ? 'default' : 'outline'}
@@ -409,14 +561,20 @@ export default function TraceabilityPage() {
             ))}
           </div>
           <div className="flex items-center gap-2 ml-auto">
-            <Button variant="outline" size="sm" onClick={() => exportTraceabilityReport(rows)} className="text-xs gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportTraceabilityReport(rows)}
+              className="text-xs gap-1"
+              disabled={viewMode !== 'pint'}
+            >
               <Download className="w-3 h-3" />
               Export Report
             </Button>
             <div className="relative max-w-xs">
               <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Search DR ID, term, column..."
+                placeholder={viewMode === 'pint' ? 'Search DR ID, term, column...' : 'Search MoF #, field, mapped column...'}
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 className="pl-9 h-9 text-sm"
@@ -426,7 +584,7 @@ export default function TraceabilityPage() {
         </div>
 
         {/* Table */}
-        <div className="bg-card rounded-xl border shadow-sm overflow-hidden animate-slide-up">
+        <div className={cn("bg-card rounded-xl border shadow-sm overflow-hidden animate-slide-up", viewMode !== 'pint' && "hidden")}>
           <div className="overflow-x-auto border-b bg-card">
             <table className={cn('w-full text-sm', tableMinWidthClass)}>
               <thead>
@@ -636,12 +794,92 @@ export default function TraceabilityPage() {
           </div>
         </div>
 
+        {viewMode === 'mof' && (
+          <div className="bg-card rounded-xl border shadow-sm overflow-hidden animate-slide-up">
+            <div className="overflow-x-auto border-b bg-card">
+              <table className="w-full text-sm min-w-[1100px]">
+                <thead>
+                  <tr className="border-b bg-card">
+                    <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-16">#</th>
+                    <th className="h-12 px-4 text-left align-middle text-xs font-medium text-muted-foreground w-20">MoF #</th>
+                    <th className="h-12 px-4 text-left align-middle text-xs font-medium text-muted-foreground">Field Name</th>
+                    <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-20">Section</th>
+                    <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-20">Card.</th>
+                    <th className="h-12 px-4 text-left align-middle text-xs font-medium text-muted-foreground w-24">Mapped Col</th>
+                    <th className="h-12 px-4 text-left align-middle text-xs font-medium text-muted-foreground w-24">Linked DR(s)</th>
+                    <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-20">In Tmpl</th>
+                    <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-20">Ingestible</th>
+                    <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-16">Rules</th>
+                    <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-16">Controls</th>
+                  </tr>
+                </thead>
+              </table>
+            </div>
+
+            <div className="max-h-[68vh] overflow-auto">
+              <table className="w-full text-sm min-w-[1100px]">
+                <tbody className="[&_tr:last-child]:border-0">
+                  {filteredMofRows.map((row, idx) => (
+                    <tr key={row.fieldNumber} className="border-b transition-colors hover:bg-muted/30">
+                      <td className="p-4 text-center align-middle text-xs text-muted-foreground w-16">{idx + 1}</td>
+                      <td className="p-4 align-middle font-mono text-xs font-medium text-primary w-20">{row.fieldNumber}</td>
+                      <td className="p-4 align-middle text-sm">{row.fieldName}</td>
+                      <td className="p-4 align-middle text-center text-xs w-20">{row.section}</td>
+                      <td className="p-4 align-middle text-center text-xs w-20">{row.cardinality}</td>
+                      <td className="p-4 align-middle text-xs w-24">
+                        {row.internalColumn ? <code className="bg-muted px-1.5 py-0.5 rounded">{row.internalColumn}</code> : <span className="text-muted-foreground">-</span>}
+                      </td>
+                      <td className="p-4 align-middle text-xs w-24">
+                        {row.linkedDrIds.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {row.linkedDrIds.map((drId) => (
+                              <Badge key={drId} variant="outline" className="font-mono text-[10px]">{drId}</Badge>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">Unlinked</span>
+                        )}
+                      </td>
+                      <td className="p-4 align-middle text-center w-20">
+                        {row.inTemplate ? <CheckCircle2 className="w-4 h-4 text-[hsl(var(--success))] mx-auto" /> : <XCircle className="w-4 h-4 text-muted-foreground mx-auto" />}
+                      </td>
+                      <td className="p-4 align-middle text-center w-20">
+                        {row.ingestible ? <CheckCircle2 className="w-4 h-4 text-[hsl(var(--success))] mx-auto" /> : <span className="text-xs text-muted-foreground">-</span>}
+                      </td>
+                      <td className="p-4 align-middle text-center w-16"><Badge variant="secondary" className="text-xs">{row.ruleCount}</Badge></td>
+                      <td className="p-4 align-middle text-center w-16"><Badge variant="secondary" className="text-xs">{row.controlCount}</Badge></td>
+                    </tr>
+                  ))}
+                  {filteredMofRows.length === 0 && (
+                    <tr className="border-b">
+                      <td colSpan={11} className="p-4 align-middle text-center text-muted-foreground py-12">
+                        No matching MoF fields found
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         <div className="mt-4 text-xs text-muted-foreground text-center">
-          Showing {filteredRows.length} of {rows.length} data requirements | 
-          Population threshold: {CONFORMANCE_CONFIG.populationWarningThreshold}% | 
-          Consistency: {consistencyReport.passed} passed, {consistencyReport.failed} issues
-          {FEATURE_FLAGS.scenarioLens && (
-            <> | Scenario selection: {scenarioInvoicesInSelection.length} invoice(s)</>
+          {viewMode === 'pint' ? (
+            <>
+              Showing {filteredRows.length} of {rows.length} data requirements |
+              Population threshold: {CONFORMANCE_CONFIG.populationWarningThreshold}% |
+              Consistency: {consistencyReport.passed} passed, {consistencyReport.failed} issues
+              {FEATURE_FLAGS.scenarioLens && (
+                <> | Scenario selection: {scenarioInvoicesInSelection.length} invoice(s)</>
+              )}
+            </>
+          ) : (
+            <>
+              Showing {filteredMofRows.length} of {mofOverlaySummary.total} MoF fields |
+              Linked to DRs: {mofOverlaySummary.linked} |
+              In template: {mofOverlaySummary.inTemplate} |
+              Ingestible: {mofOverlaySummary.ingestible}
+            </>
           )}
         </div>
       </div>
