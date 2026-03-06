@@ -206,3 +206,21 @@ npm run generate:pint-spec
 ## Deployment
 
 This is a static Vite app. Deploy the `dist/` output to any static host after `npm run build`, with required `VITE_*` variables configured in the host environment.
+
+## Latest production checkpoint (2026-03-06)
+
+- Production merge commit: `74c7c9f` (PR #5)
+- Feature commit included: `7875b63` (Traceability `PINT DR View` / `MoF Overlay View`)
+- Fix commit included: `1814ae4` (prevent unintended file picker popups on Upload toggles)
+
+Behavior now expected in production:
+- On `/upload`, clicking `Customer Invoices (AR/Outbound)` or `Vendor Invoices (AP/Inbound)` does not open the file picker.
+- On `/upload`, clicking `Positive Samples` or `Negative Test Samples` does not open the file picker.
+- File picker opens only from explicit `Browse CSV` in each upload card.
+- Drag-and-drop CSV upload remains supported.
+
+Quick Vercel verification:
+1. Open Vercel `Deployments`.
+2. Confirm `Current` production source commit is `74c7c9f` (or a later commit that includes it).
+3. Open production URL and hard refresh (`Ctrl+F5`).
+4. Re-test `/upload` behaviors above.
