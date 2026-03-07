@@ -204,6 +204,7 @@ npm run generate:pint-spec
 - `scripts/` utility scripts
 - `docs/` additional technical documentation
 - `specs/` specification-related assets
+  - Canonical MoF source-truth schema: `specs/uae/mof/source-schema-v1.json`
 
 ## Deployment
 
