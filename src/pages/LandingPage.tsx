@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { StatsCard } from "@/components/StatsCard";
+import { LayeredFrameworkSection } from "@/components/home/LayeredFrameworkSection";
 import { useCompliance } from "@/context/ComplianceContext";
 import { fetchActiveTemplates } from "@/lib/api/mappingApi";
 import { fetchCases } from "@/lib/api/casesApi";
@@ -157,6 +158,8 @@ export default function LandingPage() {
             </Card>
           </div>
         </section>
+
+        <LayeredFrameworkSection />
 
         <section className="mt-7 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {workflow.map((step, index) => (
