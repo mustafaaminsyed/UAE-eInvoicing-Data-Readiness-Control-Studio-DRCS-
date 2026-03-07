@@ -62,7 +62,7 @@ function NavigationContent() {
   }, [isDark, mounted]);
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/80 bg-background/95 backdrop-blur-xl">
+    <header className="app-topbar sticky top-0 z-50 w-full border-b border-border/80 bg-background/95 backdrop-blur-xl">
       <div className="container flex h-16 items-center gap-4">
         <Link to="/" className="flex items-center gap-3 mr-2">
           <div className="surface-glass rounded-xl p-1.5">

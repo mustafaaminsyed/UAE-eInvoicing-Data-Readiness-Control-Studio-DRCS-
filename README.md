@@ -230,6 +230,18 @@ Latest production updates (after the checkpoint above):
 - Evidence/Traceability labels now distinguish:
   - `System Default` fields (no upload column required, controlled default path)
   - `ASP Derived` fields (technical/derived fields not expected from upload templates)
+- UI/UX consistency layer added across all app routes:
+  - shared background gradient + grid overlay system in app shell
+  - sidebar-area grid masking and shell isolation to prevent visual bleed lines
+  - top navigation chrome alignment for consistent dark-mode rendering
+- Landing page redesigned as a premium SaaS entry experience:
+  - two-column hero, capability cards, workflow narrative, module cards, trust/intelligence section, and CTA banner
+  - added direct hero CTA to `Check Registry` alongside `Explore Traceability`
+- Controls Dashboard upgraded with clearer executive logic:
+  - readiness score band with visible thresholds and legend
+  - removal of SLA breach KPI from the executive row
+  - explicit PINT-AE DR coverage + MoF mandatory coverage KPI tiles
+  - readiness score weighting disclosure (pass-rate, DR coverage, MoF coverage, critical pressure)
 
 Create a new checkpoint tag:
 

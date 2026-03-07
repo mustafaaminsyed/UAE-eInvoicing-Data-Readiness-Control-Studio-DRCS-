@@ -5,6 +5,7 @@ import {
   ArrowRight,
   CheckCircle2,
   Database,
+  BookCheck,
   FileCode2,
   LayoutDashboard,
   Moon,
@@ -193,6 +194,12 @@ export default function LandingPage() {
                 </Button>
                 <Button asChild variant="outline" size="lg" className="rounded-xl">
                   <Link to="/traceability">Explore Traceability</Link>
+                </Button>
+                <Button asChild variant="outline" size="lg" className="rounded-xl gap-2">
+                  <Link to="/check-registry">
+                    <BookCheck className="h-4 w-4" />
+                    Check Registry
+                  </Link>
                 </Button>
               </div>
             </div>

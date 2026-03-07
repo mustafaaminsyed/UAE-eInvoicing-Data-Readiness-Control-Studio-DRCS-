@@ -42,8 +42,9 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <div className="min-h-screen relative overflow-x-clip">
-              <div className="pointer-events-none absolute inset-0 grid-veil opacity-50" />
+            <div className="app-shell min-h-screen relative overflow-x-clip">
+              <div className="pointer-events-none absolute inset-0 app-gradient-wash" />
+              <div className="pointer-events-none absolute inset-0 app-grid-veil" />
               <Navigation />
               <main className="relative z-10">
                 <Routes>

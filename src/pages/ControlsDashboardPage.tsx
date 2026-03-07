@@ -9,6 +9,9 @@ import {
   XCircle,
   FilterX,
   Shield,
+  FileCheck,
+  Layers3,
+  Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Progress } from '@/components/ui/progress';
 import { StatsCard } from '@/components/StatsCard';
 import {
   LineChart,
@@ -31,14 +35,15 @@ import {
   Bar,
 } from 'recharts';
 import { fetchCheckRuns, fetchLatestEntityScores } from '@/lib/api/checksApi';
-import { fetchClientHealthScores, getSLAMetrics, getRejectionAnalytics } from '@/lib/api/casesApi';
+import { fetchClientHealthScores, getRejectionAnalytics } from '@/lib/api/casesApi';
 import { CheckRun, EntityScore } from '@/types/customChecks';
 import { ClientHealth } from '@/types/cases';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { computeTraceabilityMatrix } from '@/lib/coverage/conformanceEngine';
+import { computeMoFCoverage } from '@/lib/coverage/mofCoverageEngine';
 
-type InsightMode = 'none' | 'quality' | 'sla' | 'rejections' | 'repeat' | 'critical' | 'volume' | 'dr_coverage';
+type InsightMode = 'none' | 'quality' | 'rejections' | 'repeat' | 'critical' | 'volume' | 'dr_coverage' | 'mof_coverage';
 
 function getScoreColor(score: number): string {
   if (score >= 90) return 'text-success';
@@ -59,7 +64,6 @@ export default function ControlsDashboardPage() {
   const [checkRuns, setCheckRuns] = useState<CheckRun[]>([]);
   const [clientHealth, setClientHealth] = useState<ClientHealth[]>([]);
   const [topRiskSellers, setTopRiskSellers] = useState<EntityScore[]>([]);
-  const [slaMetrics, setSlaMetrics] = useState({ breachPercentage: 0, totalCases: 0, breachedCases: 0 });
   const [rejectionAnalytics, setRejectionAnalytics] = useState({ totalRejections: 0, repeatRate: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -74,22 +78,42 @@ export default function ControlsDashboardPage() {
     return { total, covered, percent };
   }, []);
 
+  const mofTaxCoverage = useMemo(() => {
+    try {
+      return computeMoFCoverage('tax_invoice');
+    } catch {
+      return null;
+    }
+  }, []);
+  const mofCommercialCoverage = useMemo(() => {
+    try {
+      return computeMoFCoverage('commercial_xml');
+    } catch {
+      return null;
+    }
+  }, []);
+  const mofMandatoryCoveragePct = useMemo(
+    () => {
+      if (!mofTaxCoverage || !mofCommercialCoverage) return null;
+      return (mofTaxCoverage.mandatoryCoveragePct + mofCommercialCoverage.mandatoryCoveragePct) / 2;
+    },
+    [mofTaxCoverage, mofCommercialCoverage]
+  );
+
   const loadData = useCallback(async (manualRefresh = false) => {
     if (manualRefresh) setIsRefreshing(true);
     else setIsLoading(true);
 
     try {
-      const [runs, health, sellers, sla, rejections] = await Promise.all([
+      const [runs, health, sellers, rejections] = await Promise.all([
         fetchCheckRuns(20),
         fetchClientHealthScores(),
         fetchLatestEntityScores('seller', 10),
-        getSLAMetrics(),
         getRejectionAnalytics(),
       ]);
       setCheckRuns(runs);
       setClientHealth(health);
       setTopRiskSellers(sellers);
-      setSlaMetrics(sla);
       setRejectionAnalytics(rejections);
     } catch {
       toast({
@@ -133,7 +157,6 @@ export default function ControlsDashboardPage() {
   const avgHealthScore =
     clientHealth.length > 0 ? clientHealth.reduce((sum, c) => sum + c.score, 0) / clientHealth.length : null;
   const latestPassRate = latestRun?.pass_rate ?? null;
-  const slaBreachRate = slaMetrics.totalCases > 0 ? slaMetrics.breachPercentage : null;
   const periodRunCount = filteredRuns.length;
   const avgPassRatePeriod = periodRunCount > 0
     ? filteredRuns.reduce((sum, r) => sum + r.pass_rate, 0) / periodRunCount
@@ -147,6 +170,26 @@ export default function ControlsDashboardPage() {
 
   const formatPct = (value: number | null, digits = 1) => (value === null ? 'N/A' : `${value.toFixed(digits)}%`);
   const formatNum = (value: number | null, digits = 1) => (value === null ? 'N/A' : value.toFixed(digits));
+
+  const readinessScore = useMemo(() => {
+    const normalizedPassRate = latestPassRate ?? 0;
+    const normalizedDrCoverage = drCoverageSummary.percent;
+    const normalizedMoFCoverage = mofMandatoryCoveragePct ?? 0;
+    const normalizedCriticalRisk = criticalDensity === null ? 100 : Math.max(0, 100 - Math.min(criticalDensity * 4, 100));
+    return (
+      normalizedPassRate * 0.4 +
+      normalizedDrCoverage * 0.25 +
+      normalizedMoFCoverage * 0.25 +
+      normalizedCriticalRisk * 0.1
+    );
+  }, [latestPassRate, drCoverageSummary.percent, mofMandatoryCoveragePct, criticalDensity]);
+
+  const readinessBand = useMemo(() => {
+    if (readinessScore >= 90) return { label: 'Controlled', color: 'text-success', hint: 'Strong readiness posture' };
+    if (readinessScore >= 75) return { label: 'Watch', color: 'text-severity-medium', hint: 'Monitor and remediate key gaps' };
+    if (readinessScore >= 60) return { label: 'Exposed', color: 'text-severity-high', hint: 'Material risk is building' };
+    return { label: 'Critical', color: 'text-severity-critical', hint: 'Immediate remediation required' };
+  }, [readinessScore]);
 
   const focusRuns = insightMode === 'quality'
     ? filteredRuns.filter((run) => run.pass_rate < 90)
@@ -186,12 +229,12 @@ export default function ControlsDashboardPage() {
   const insightLabel: Record<InsightMode, string> = {
     none: 'None',
     quality: 'Quality Risk',
-    sla: 'SLA Risk',
     rejections: 'Rejection Risk',
     repeat: 'Repeat Failure Risk',
     critical: 'Critical Exceptions',
     volume: 'Run Volume',
     dr_coverage: 'DR Coverage',
+    mof_coverage: 'MoF Mandatory Coverage',
   };
   const chartAnimationSeed = `${timeRange}-${insightMode}-${focusTrendData.length}`;
 
@@ -216,7 +259,7 @@ export default function ControlsDashboardPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-foreground">Controls Dashboard</h1>
-              <p className="text-muted-foreground">Client health, SLA compliance & risk trends</p>
+              <p className="text-muted-foreground">Readiness scoring, conformance coverage, and operational risk intelligence</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -238,19 +281,56 @@ export default function ControlsDashboardPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8 animate-slide-up">
+        <div className="mb-8 rounded-2xl border border-white/70 surface-glass p-5 animate-slide-up">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Compliance readiness band</p>
+              <div className="mt-1 flex items-end gap-2">
+                <p className="text-3xl font-bold text-foreground">{readinessScore.toFixed(1)}%</p>
+                <p className={cn('text-sm font-semibold pb-1', readinessBand.color)}>{readinessBand.label}</p>
+              </div>
+              <p className="text-sm text-muted-foreground">{readinessBand.hint}</p>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Info className="h-4 w-4" />
+              <span>Thresholds: Critical &lt;60 | Exposed 60-74 | Watch 75-89 | Controlled 90+</span>
+            </div>
+          </div>
+          <div className="mt-4">
+            <div className="relative h-3 overflow-hidden rounded-full bg-muted">
+              <div className="grid h-full grid-cols-4">
+                <div className="bg-severity-critical/70" />
+                <div className="bg-severity-high/70" />
+                <div className="bg-severity-medium/70" />
+                <div className="bg-success/70" />
+              </div>
+              <span
+                className="pointer-events-none absolute top-[-2px] h-7 w-[2px] rounded bg-white/90 shadow-[0_0_0_1px_rgba(0,0,0,0.18)]"
+                style={{ left: `calc(${Math.min(Math.max(readinessScore, 0), 100)}% - 1px)` }}
+                aria-hidden="true"
+              />
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] sm:grid-cols-4">
+              <div className="rounded-md border border-severity-critical/40 bg-severity-critical-bg/60 px-2 py-1 text-severity-critical">Critical (&lt;60)</div>
+              <div className="rounded-md border border-severity-high/40 bg-severity-high-bg/60 px-2 py-1 text-severity-high">Exposed (60-74)</div>
+              <div className="rounded-md border border-severity-medium/40 bg-severity-medium-bg/60 px-2 py-1 text-severity-medium">Watch (75-89)</div>
+              <div className="rounded-md border border-success/40 bg-success-bg/60 px-2 py-1 text-success">Controlled (90+)</div>
+            </div>
+            <div className="mt-2">
+              <Progress value={readinessScore} className="h-2" />
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Readiness score combines latest check pass rate, PINT-AE DR coverage, MoF mandatory coverage, and critical exception pressure.
+            </p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Weighting: pass rate 40% | PINT-AE DR coverage 25% | MoF mandatory coverage 25% | critical pressure 10%.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-8 animate-slide-up">
           <StatsCard
-            title="Avg Client Health"
-            value={avgHealthScore === null ? 'N/A' : avgHealthScore.toFixed(0)}
-            subtitle={avgHealthScore === null ? 'No client score data yet' : 'Composite score across monitored clients'}
-            helpText="Composite customer readiness score. Higher means fewer and less severe issues across recent assessments."
-            onClick={() => setInsightMode('quality')}
-            isActive={insightMode === 'quality'}
-            icon={<Award className="w-5 h-5" />}
-            variant={avgHealthScore === null ? 'default' : avgHealthScore >= 80 ? 'success' : avgHealthScore >= 60 ? 'warning' : 'danger'}
-          />
-          <StatsCard
-            title="Latest Pass Rate"
+            title="Latest Conformance Pass Rate"
             value={formatPct(latestPassRate)}
             subtitle={
               latestPassRate === null
@@ -262,91 +342,62 @@ export default function ControlsDashboardPage() {
             helpText="Percentage of validation checks that passed in the most recent run in the selected time range."
             onClick={() => setInsightMode('quality')}
             isActive={insightMode === 'quality'}
-            icon={<TrendingUp className="w-5 h-5" />}
+            icon={<FileCheck className="w-5 h-5" />}
             variant={latestPassRate === null ? 'default' : latestPassRate >= 90 ? 'success' : latestPassRate >= 70 ? 'warning' : 'danger'}
           />
           <StatsCard
-            title="SLA Breach Rate"
-            value={formatPct(slaBreachRate)}
-            subtitle={slaMetrics.totalCases > 0 ? `${slaMetrics.breachedCases} of ${slaMetrics.totalCases} cases` : 'No cases recorded yet'}
-            helpText="Share of exception cases that exceeded agreed resolution time. Lower is better."
-            onClick={() => setInsightMode('sla')}
-            isActive={insightMode === 'sla'}
-            icon={<AlertTriangle className="w-5 h-5" />}
-            variant={slaBreachRate === null ? 'default' : slaBreachRate > 20 ? 'danger' : slaBreachRate > 10 ? 'warning' : 'success'}
-          />
-          <StatsCard
-            title="Total Rejections"
-            value={rejectionAnalytics.totalRejections}
-            subtitle="Rejected submissions in selected analytics scope"
-            helpText="Total rejected invoices detected by the platform. Indicates direct operational impact."
-            onClick={() => setInsightMode('rejections')}
-            isActive={insightMode === 'rejections'}
-            icon={<XCircle className="w-5 h-5" />}
-            variant={rejectionAnalytics.totalRejections > 0 ? 'danger' : 'success'}
-          />
-          <StatsCard
-            title="Repeat Rate"
-            value={`${rejectionAnalytics.repeatRate.toFixed(1)}%`}
-            subtitle="Repeated rejection pattern share"
-            helpText="How often rejected issues reoccur. High values indicate unresolved root causes."
-            onClick={() => setInsightMode('repeat')}
-            isActive={insightMode === 'repeat'}
-            icon={<RefreshCw className="w-5 h-5" />}
-            variant={rejectionAnalytics.repeatRate > 20 ? 'danger' : rejectionAnalytics.repeatRate > 10 ? 'warning' : 'success'}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8 animate-slide-up">
-          <StatsCard
-            title={`DR Coverage (${drCoverageSummary.total})`}
+            title="PINT-AE DR Coverage"
             value={`${drCoverageSummary.percent.toFixed(1)}%`}
-            subtitle={`${drCoverageSummary.covered} of ${drCoverageSummary.total} DRs covered by rule + control`}
-            helpText="System-level traceability coverage across UAE PINT-AE data requirements. A DR is covered when at least one validation rule and one control are mapped to it."
+            subtitle={`${drCoverageSummary.covered} of ${drCoverageSummary.total} DRs have rule+control linkage`}
+            helpText="PINT-AE coverage across mapped data requirements. A DR is counted when linked to at least one validation rule and one control."
             onClick={() => setInsightMode('dr_coverage')}
             isActive={insightMode === 'dr_coverage'}
             icon={<Shield className="w-5 h-5" />}
             variant={drCoverageSummary.percent >= 90 ? 'success' : drCoverageSummary.percent >= 75 ? 'warning' : 'danger'}
           />
           <StatsCard
-            title="Runs In Period"
-            value={periodRunCount}
-            subtitle={timeRange === 'all' ? 'All-time run count' : `Runs in the last ${timeRange === '7d' ? 7 : 30} days`}
-            helpText="Number of completed validation runs in the selected period. More runs provide a more stable trend."
-            onClick={() => setInsightMode('volume')}
-            isActive={insightMode === 'volume'}
-            icon={<BarChart3 className="w-5 h-5" />}
-            variant={periodRunCount > 0 ? 'success' : 'default'}
+            title="MoF Mandatory Coverage"
+            value={mofMandatoryCoveragePct === null ? 'N/A' : `${mofMandatoryCoveragePct.toFixed(1)}%`}
+            subtitle={
+              mofTaxCoverage && mofCommercialCoverage
+                ? `Tax ${mofTaxCoverage.coveredMandatory}/${mofTaxCoverage.mandatoryFields} | Commercial ${mofCommercialCoverage.coveredMandatory}/${mofCommercialCoverage.mandatoryFields}`
+                : 'MoF source coverage unavailable in current runtime'
+            }
+            helpText="Mandatory-field coverage using the MoF source-truth layer across tax_invoice and commercial_xml document types."
+            onClick={() => setInsightMode('mof_coverage')}
+            isActive={insightMode === 'mof_coverage'}
+            icon={<Layers3 className="w-5 h-5" />}
+            variant={mofMandatoryCoveragePct === null ? 'default' : mofMandatoryCoveragePct >= 90 ? 'success' : mofMandatoryCoveragePct >= 75 ? 'warning' : 'danger'}
           />
           <StatsCard
-            title="Avg Pass Rate (Period)"
-            value={formatPct(avgPassRatePeriod)}
-            subtitle={avgPassRatePeriod === null ? 'No runs in selected period' : 'Mean pass rate over selected period'}
-            helpText="Average pass rate across all runs in the selected period, used to smooth single-run volatility."
-            onClick={() => setInsightMode('quality')}
-            isActive={insightMode === 'quality'}
-            icon={<TrendingUp className="w-5 h-5" />}
-            variant={avgPassRatePeriod === null ? 'default' : avgPassRatePeriod >= 90 ? 'success' : avgPassRatePeriod >= 70 ? 'warning' : 'danger'}
-          />
-          <StatsCard
-            title="Exceptions / Invoice"
-            value={formatNum(exceptionsPerInvoice)}
-            subtitle={exceptionsPerInvoice === null ? 'No latest run data' : 'Based on most recent run'}
-            helpText="Average number of detected exceptions per invoice in the latest run. Lower indicates cleaner source data."
-            onClick={() => setInsightMode('rejections')}
-            isActive={insightMode === 'rejections'}
-            icon={<AlertTriangle className="w-5 h-5" />}
-            variant={exceptionsPerInvoice === null ? 'default' : exceptionsPerInvoice > 0.5 ? 'danger' : exceptionsPerInvoice > 0.2 ? 'warning' : 'success'}
-          />
-          <StatsCard
-            title="Critical Density"
+            title="Critical Exception Pressure"
             value={formatPct(criticalDensity)}
             subtitle={criticalDensity === null ? 'No latest run data' : 'Critical exceptions per 100 invoices'}
-            helpText="Critical exception rate normalized by invoice volume, so risk can be compared fairly across periods."
+            helpText="Critical exception rate normalized by invoice volume, so risk can be compared across periods."
             onClick={() => setInsightMode('critical')}
             isActive={insightMode === 'critical'}
-            icon={<XCircle className="w-5 h-5" />}
+            icon={<AlertTriangle className="w-5 h-5" />}
             variant={criticalDensity === null ? 'default' : criticalDensity > 10 ? 'danger' : criticalDensity > 3 ? 'warning' : 'success'}
+          />
+          <StatsCard
+            title="Repeat Rejection Risk"
+            value={`${rejectionAnalytics.repeatRate.toFixed(1)}%`}
+            subtitle={`${rejectionAnalytics.totalRejections} rejected records in selected analytics scope`}
+            helpText="How often rejected issues reoccur. Higher values indicate unresolved root causes."
+            onClick={() => setInsightMode('repeat')}
+            isActive={insightMode === 'repeat'}
+            icon={<RefreshCw className="w-5 h-5" />}
+            variant={rejectionAnalytics.repeatRate > 20 ? 'danger' : rejectionAnalytics.repeatRate > 10 ? 'warning' : 'success'}
+          />
+          <StatsCard
+            title="Run Quality Signal"
+            value={avgHealthScore === null ? 'N/A' : avgHealthScore.toFixed(0)}
+            subtitle={avgHealthScore === null ? 'No client score data yet' : `${periodRunCount} runs | Avg pass ${formatPct(avgPassRatePeriod)}`}
+            helpText="Composite quality signal blending client health trend and recent run performance."
+            onClick={() => setInsightMode('quality')}
+            isActive={insightMode === 'quality'}
+            icon={<Award className="w-5 h-5" />}
+            variant={avgHealthScore === null ? 'default' : avgHealthScore >= 80 ? 'success' : avgHealthScore >= 60 ? 'warning' : 'danger'}
           />
         </div>
 
