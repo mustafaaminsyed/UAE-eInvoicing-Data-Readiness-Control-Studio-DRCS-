@@ -102,6 +102,88 @@ type MofOverlayRow = {
   controlCount: number;
 };
 
+type LegacyMofRulebook = {
+  field_dictionary?: {
+    fields?: Array<{
+      field_number?: number;
+      name?: string;
+      section?: string;
+      cardinality?: string;
+      applies_to?: string[];
+    }>;
+  };
+};
+
+type MofSourceRulebook = {
+  document_models?: Record<
+    string,
+    {
+      fields?: Record<
+        string,
+        {
+          field_id?: number;
+          field_name?: string;
+          section_id?: string;
+          mandatory?: boolean;
+          document_type?: string;
+        }
+      >;
+    }
+  >;
+};
+
+function normalizeMofFields(rulebook: unknown): MofFieldEntry[] {
+  const legacyFields = (rulebook as LegacyMofRulebook)?.field_dictionary?.fields;
+  if (Array.isArray(legacyFields) && legacyFields.length > 0) {
+    return legacyFields
+      .map((field) => ({
+        field_number: Number(field.field_number),
+        name: String(field.name || ''),
+        section: String(field.section || ''),
+        cardinality: String(field.cardinality || ''),
+        applies_to: Array.isArray(field.applies_to) ? field.applies_to.map(String) : [],
+      }))
+      .filter((field) => Number.isFinite(field.field_number) && field.field_number > 0);
+  }
+
+  const models = (rulebook as MofSourceRulebook)?.document_models;
+  if (!models || typeof models !== 'object') return [];
+
+  const merged = new Map<number, MofFieldEntry>();
+  Object.entries(models).forEach(([modelKey, model]) => {
+    const fields = model?.fields;
+    if (!fields || typeof fields !== 'object') return;
+
+    Object.values(fields).forEach((field) => {
+      const fieldNumber = Number(field?.field_id);
+      if (!Number.isFinite(fieldNumber) || fieldNumber <= 0) return;
+
+      const existing = merged.get(fieldNumber);
+      const appliesTo = [String(field?.document_type || modelKey)];
+
+      if (!existing) {
+        merged.set(fieldNumber, {
+          field_number: fieldNumber,
+          name: String(field?.field_name || `Field ${fieldNumber}`),
+          section: String(field?.section_id || ''),
+          cardinality: field?.mandatory ? '1..1' : '',
+          applies_to: appliesTo,
+        });
+        return;
+      }
+
+      existing.applies_to = Array.from(new Set([...existing.applies_to, ...appliesTo]));
+      if (!existing.section && field?.section_id) existing.section = String(field.section_id);
+      if ((!existing.name || existing.name === `Field ${fieldNumber}`) && field?.field_name) {
+        existing.name = String(field.field_name);
+      }
+      if (!existing.cardinality && field?.mandatory) existing.cardinality = '1..1';
+    });
+  });
+
+  return Array.from(merged.values()).sort((a, b) => a.field_number - b.field_number);
+}
+
 const SCENARIO_PARAM_KEYS: Record<keyof ScenarioLensFilters, string> = {
   documentType: 'slDoc',
   vatTreatment: 'slVat',
@@ -326,11 +408,7 @@ export default function TraceabilityPage() {
     [populations, exceptionCountsByDR]
   );
 
-  const mofFields = useMemo<MofFieldEntry[]>(() => {
-    const raw = (mofRulebookData as { field_dictionary?: { fields?: MofFieldEntry[] } })?.field_dictionary?.fields;
-    if (!Array.isArray(raw)) return [];
-    return raw;
-  }, []);
+  const mofFields = useMemo<MofFieldEntry[]>(() => normalizeMofFields(mofRulebookData), []);
 
   const mofOverlayRows = useMemo<MofOverlayRow[]>(() => {
     const byInternal = new Map<string, TraceabilityRow[]>();
