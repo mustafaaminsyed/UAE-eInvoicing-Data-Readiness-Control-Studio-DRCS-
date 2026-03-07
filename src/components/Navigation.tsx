@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Upload, Play, LayoutDashboard, AlertTriangle, Wand2, BarChart3, Briefcase, XCircle, Home, Shield, FileDown, BookCheck, FileClock, Search, Moon, Sun } from 'lucide-react';
+import { Upload, Play, LayoutDashboard, AlertTriangle, Wand2, BarChart3, Briefcase, XCircle, Home, Shield, FileDown, BookCheck, FileClock, Search, Moon, Sun, ChevronRight } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import { useCompliance } from '@/context/ComplianceContext';
@@ -77,7 +77,7 @@ function NavigationContent() {
         <div className="relative flex-1 min-w-0">
           <nav
             ref={navRef}
-            className="flex items-center gap-1 overflow-x-auto rounded-xl surface-glass px-2 py-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            className="flex flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden scroll-smooth touch-pan-x rounded-xl surface-glass px-2 py-1 pr-6 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
             aria-label="Primary navigation"
           >
             {effectiveNavItems.map((item) => {
@@ -106,8 +106,11 @@ function NavigationContent() {
               );
             })}
           </nav>
-          <div className="pointer-events-none absolute inset-y-0 left-0 w-4 bg-gradient-to-r from-background/80 to-transparent rounded-l-xl" />
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-4 bg-gradient-to-l from-background/80 to-transparent rounded-r-xl" />
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-5 bg-gradient-to-r from-background/85 to-transparent rounded-l-xl" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-9 bg-gradient-to-l from-background/95 via-background/75 to-transparent rounded-r-xl" />
+          <div className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 rounded-full bg-card/70 p-0.5">
+            <ChevronRight className="h-3 w-3 text-muted-foreground/80" aria-hidden="true" />
+          </div>
         </div>
 
         <div className="ml-auto flex items-center gap-2">
