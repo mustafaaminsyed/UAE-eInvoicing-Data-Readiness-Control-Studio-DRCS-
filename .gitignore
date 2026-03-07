@@ -27,3 +27,5 @@ review_free_llm_api_resources_20260224/
 *.njsproj
 *.sln
 *.sw?
+dev.err
+supabase/.temp/
