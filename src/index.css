@@ -95,6 +95,20 @@
     --border: 218 28% 19%;
     --input: 218 28% 19%;
     --ring: 142 50% 48%;
+
+    /* Severity Colors (dark mode-safe surfaces) */
+    --severity-critical: 0 84% 69%;
+    --severity-critical-bg: 0 42% 15%;
+    --severity-high: 25 95% 67%;
+    --severity-high-bg: 25 40% 16%;
+    --severity-medium: 45 93% 61%;
+    --severity-medium-bg: 45 34% 16%;
+    --severity-low: 197 83% 64%;
+    --severity-low-bg: 197 42% 15%;
+
+    /* Success */
+    --success: 142 66% 54%;
+    --success-bg: 142 34% 16%;
   }
 }
 

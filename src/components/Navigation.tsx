@@ -1,9 +1,10 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Upload, Play, LayoutDashboard, AlertTriangle, Wand2, BarChart3, Briefcase, XCircle, Home, Shield, FileDown, BookCheck, FileClock, Search, Moon, Sun } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Upload, Play, LayoutDashboard, AlertTriangle, Wand2, BarChart3, Briefcase, XCircle, Home, Shield, FileDown, BookCheck, FileClock, Search, Moon, Sun, ChevronRight } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import { useCompliance } from '@/context/ComplianceContext';
-import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import daribaLogo from '@/assets/dariba-logo.png';
 import { FEATURE_FLAGS } from '@/config/features';
 
@@ -32,6 +33,8 @@ const effectiveNavItems = FEATURE_FLAGS.casesMenu
 function NavigationContent() {
   const { isDataLoaded, isChecksRun } = useCompliance();
   const { resolvedTheme, setTheme } = useTheme();
+  const navRef = useRef<HTMLElement | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   const getItemState = (path: string) => {
     if (path === '/run' && !isDataLoaded) return 'disabled';
@@ -41,6 +44,22 @@ function NavigationContent() {
 
   const location = useLocation();
   const isDark = resolvedTheme === 'dark';
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const root = navRef.current;
+    if (!root) return;
+    const active = root.querySelector<HTMLElement>('[data-active="true"]');
+    active?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }, [location.pathname]);
+
+  const themeLabel = useMemo(() => {
+    if (!mounted) return 'Theme preference';
+    return isDark ? 'Dark mode enabled' : 'Light mode enabled';
+  }, [isDark, mounted]);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/80 bg-background/95 backdrop-blur-xl">
@@ -57,7 +76,8 @@ function NavigationContent() {
 
         <div className="relative flex-1 min-w-0">
           <nav
-            className="flex items-center gap-1 overflow-x-auto rounded-xl surface-glass px-2 py-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            ref={navRef}
+            className="flex flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden scroll-smooth touch-pan-x rounded-xl surface-glass px-2 py-1 pr-6 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
             aria-label="Primary navigation"
           >
             {effectiveNavItems.map((item) => {
@@ -69,6 +89,7 @@ function NavigationContent() {
                 <Link
                   key={item.path}
                   to={state === 'disabled' ? '#' : item.path}
+                  data-active={isActive ? 'true' : 'false'}
                   className={cn(
                     'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap',
                     isActive
@@ -85,23 +106,26 @@ function NavigationContent() {
               );
             })}
           </nav>
-          <div className="pointer-events-none absolute inset-y-0 left-0 w-4 bg-gradient-to-r from-background/80 to-transparent rounded-l-xl" />
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-4 bg-gradient-to-l from-background/80 to-transparent rounded-r-xl" />
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-5 bg-gradient-to-r from-background/85 to-transparent rounded-l-xl" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-9 bg-gradient-to-l from-background/95 via-background/75 to-transparent rounded-r-xl" />
+          <div className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 rounded-full bg-card/70 p-0.5">
+            <ChevronRight className="h-3 w-3 text-muted-foreground/80" aria-hidden="true" />
+          </div>
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => setTheme(isDark ? 'light' : 'dark')}
-            aria-label="Toggle dark mode"
-          >
-            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
           <span className="rounded-full border border-primary/20 bg-primary/5 px-2.5 py-1 text-[11px] font-semibold text-primary">
             Compliance Command Center
           </span>
+          <div className="flex items-center gap-2 rounded-full border border-border/70 bg-card/80 px-2 py-1">
+            <Sun className={cn('h-3.5 w-3.5', !isDark ? 'text-amber-500' : 'text-muted-foreground')} aria-hidden="true" />
+            <Switch
+              checked={mounted ? isDark : false}
+              onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
+              aria-label={themeLabel}
+            />
+            <Moon className={cn('h-3.5 w-3.5', isDark ? 'text-sky-400' : 'text-muted-foreground')} aria-hidden="true" />
+          </div>
         </div>
       </div>
     </header>

@@ -223,6 +223,14 @@ Latest checkpoint:
   - Last run context banner (Run Checks + Exceptions)
   - Safe UC1 sync behavior (no automatic overwrite of DB-managed check registry settings)
 
+Latest production updates (after the checkpoint above):
+- Traceability uses canonical MoF source registry overlay (`specs/uae/mof/source-schema-v1.json`) instead of legacy docs JSON.
+- Run Checks supports raw-template execution mode when canonical upload structure is already present.
+- `IBT-023` and `IBT-024` are classified as `system_default_allowed` (not generic ASP-derived), with strict PINT-AE validation still enforced.
+- Evidence/Traceability labels now distinguish:
+  - `System Default` fields (no upload column required, controlled default path)
+  - `ASP Derived` fields (technical/derived fields not expected from upload templates)
+
 Create a new checkpoint tag:
 
 ```bash
