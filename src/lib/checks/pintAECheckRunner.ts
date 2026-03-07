@@ -112,7 +112,6 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
 
     // Format Checks
     case 'UAE-UC1-CHK-003': // Date Format YYYY-MM-DD
-    case 'UAE-UC1-CHK-010': // Spec Identifier
       if (params.field && params.pattern) {
         const regex = new RegExp(params.pattern);
         data.headers.forEach(header => {
@@ -131,6 +130,47 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
           }
         });
       }
+      break;
+
+    // Specification identifier (IBT-024): mandatory + allowed prefixes
+    case 'UAE-UC1-CHK-010':
+      data.headers.forEach(header => {
+        const field = resolveFieldAlias(params.field || 'spec_id');
+        const value = getFieldValue(header, field);
+        const allowedPrefixes: string[] =
+          Array.isArray(params.allowed_prefixes) && params.allowed_prefixes.length > 0
+            ? params.allowed_prefixes
+            : ['urn:peppol:pint:billing-1@ae-1', 'urn:peppol:pint:selfbilling-1@ae-1'];
+
+        if (isEmpty(value)) {
+          exceptions.push(createException({
+            invoiceId: header.invoice_id,
+            invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn,
+            buyerId: header.buyer_id,
+            fieldName: field,
+            observedValue: '(empty)',
+            expectedValue: allowedPrefixes.join(' OR '),
+            message: `Invoice ${header.invoice_number}: Missing specification identifier`,
+          }));
+          return;
+        }
+
+        const normalized = String(value).trim();
+        const validPrefix = allowedPrefixes.some((prefix) => normalized.startsWith(prefix));
+        if (!validPrefix) {
+          exceptions.push(createException({
+            invoiceId: header.invoice_id,
+            invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn,
+            buyerId: header.buyer_id,
+            fieldName: field,
+            observedValue: normalized,
+            expectedValue: `Starts with: ${allowedPrefixes.join(' OR ')}`,
+            message: `Invoice ${header.invoice_number}: Invalid specification identifier "${normalized}"`,
+          }));
+        }
+      });
       break;
 
     // Currency ISO4217 codelist check from official PINT-AE resources
@@ -250,10 +290,26 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
       data.headers.forEach(header => {
         const field = resolveFieldAlias(params.field || 'business_process');
         const value = getFieldValue(header, field);
-        const allowed: string[] = Array.isArray(params.allowed_values) ? params.allowed_values : [];
-        // business_process is ASP-derived in this app's CSV templates.
-        // If customer input doesn't provide it, skip instead of raising a false-positive.
-        if (!isEmpty(value) && allowed.length > 0 && !allowed.includes(String(value))) {
+        const allowed: string[] =
+          Array.isArray(params.allowed_values) && params.allowed_values.length > 0
+            ? params.allowed_values
+            : ['urn:peppol:bis:billing', 'urn:peppol:bis:selfbilling'];
+
+        if (isEmpty(value)) {
+          exceptions.push(createException({
+            invoiceId: header.invoice_id,
+            invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn,
+            buyerId: header.buyer_id,
+            fieldName: field,
+            observedValue: '(empty)',
+            expectedValue: allowed.join(' OR '),
+            message: `Invoice ${header.invoice_number}: Missing business process type`,
+          }));
+          return;
+        }
+
+        if (!allowed.includes(String(value))) {
           exceptions.push(createException({
             invoiceId: header.invoice_id,
             invoiceNumber: header.invoice_number,

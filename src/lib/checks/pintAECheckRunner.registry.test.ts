@@ -80,4 +80,57 @@ describe('runPintAECheck executor registry parity', () => {
     expect(exceptions[0].field_name).toBe('currency');
     expect(exceptions[0].message).toContain('ISO4217 codelist');
   });
+
+  it('fails CHK-010 when specification identifier is missing', () => {
+    const check = getCheck('UAE-UC1-CHK-010');
+    const data = buildDataContext({ spec_id: '' });
+
+    const exceptions = runPintAECheck(check, data);
+
+    expect(exceptions).toHaveLength(1);
+    expect(exceptions[0].check_id).toBe('UAE-UC1-CHK-010');
+    expect(exceptions[0].field_name).toBe('spec_id');
+    expect(exceptions[0].message).toContain('Missing specification identifier');
+  });
+
+  it('fails CHK-010 when specification identifier has invalid prefix', () => {
+    const check = getCheck('UAE-UC1-CHK-010');
+    const data = buildDataContext({ spec_id: 'urn:peppol:pint:billing-1@uae-1' });
+
+    const exceptions = runPintAECheck(check, data);
+
+    expect(exceptions).toHaveLength(1);
+    expect(exceptions[0].check_id).toBe('UAE-UC1-CHK-010');
+    expect(exceptions[0].message).toContain('Invalid specification identifier');
+  });
+
+  it('passes CHK-010 when specification identifier starts with allowed prefix', () => {
+    const check = getCheck('UAE-UC1-CHK-010');
+    const data = buildDataContext({ spec_id: 'urn:peppol:pint:billing-1@ae-1#2.0' });
+
+    const exceptions = runPintAECheck(check, data);
+
+    expect(exceptions).toHaveLength(0);
+  });
+
+  it('fails CHK-011 when business process is missing', () => {
+    const check = getCheck('UAE-UC1-CHK-011');
+    const data = buildDataContext({ business_process: '' });
+
+    const exceptions = runPintAECheck(check, data);
+
+    expect(exceptions).toHaveLength(1);
+    expect(exceptions[0].check_id).toBe('UAE-UC1-CHK-011');
+    expect(exceptions[0].field_name).toBe('business_process');
+    expect(exceptions[0].message).toContain('Missing business process type');
+  });
+
+  it('passes CHK-011 for both allowed business process values', () => {
+    const check = getCheck('UAE-UC1-CHK-011');
+    const billing = buildDataContext({ business_process: 'urn:peppol:bis:billing' });
+    const selfBilling = buildDataContext({ business_process: 'urn:peppol:bis:selfbilling' });
+
+    expect(runPintAECheck(check, billing)).toHaveLength(0);
+    expect(runPintAECheck(check, selfBilling)).toHaveLength(0);
+  });
 });
