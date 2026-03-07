@@ -40,6 +40,9 @@ export interface MoFCoverageResult {
   mandatoryNotIngestible: number;
   mandatoryNoBridge: number;
   mandatoryCoveragePct: number;
+  mappableMandatoryFields: number;
+  mappableCoveredMandatory: number;
+  mappableMandatoryCoveragePct: number;
   rows: MoFCoverageRow[];
 }
 
@@ -207,7 +210,12 @@ export function computeMoFCoverage(
     mandatoryNotIngestible,
     mandatoryNoBridge,
     mandatoryCoveragePct: mandatory.length > 0 ? (coveredMandatory / mandatory.length) * 100 : 100,
+    mappableMandatoryFields: Math.max(mandatory.length - mandatoryNoBridge, 0),
+    mappableCoveredMandatory: coveredMandatory,
+    mappableMandatoryCoveragePct:
+      mandatory.length - mandatoryNoBridge > 0
+        ? (coveredMandatory / (mandatory.length - mandatoryNoBridge)) * 100
+        : 100,
     rows,
   };
 }
-

@@ -23,6 +23,9 @@ import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
 import { getSupabaseEnvStatus, shouldUseLocalDevFallback } from '@/lib/api/supabaseEnv';
 import { supabase } from '@/integrations/supabase/client';
 import { LastRunContextBanner } from '@/components/run/LastRunContextBanner';
+import { FEATURE_FLAGS } from '@/config/features';
+import { computeMoFCoverage } from '@/lib/coverage/mofCoverageEngine';
+import { PARSER_KNOWN_COLUMNS } from '@/lib/registry/drRegistry';
 
 type ConnectionTestStatus = 'idle' | 'running' | 'passed' | 'failed';
 
@@ -259,8 +262,6 @@ export default function RunChecksPage() {
     return headersCanonical && linesCanonical && buyersCanonical;
   }, [buyers, headers, lines, isDataLoaded]);
 
-  if (!isDataLoaded) return null;
-
   // Calculate coverage for selected template
   const selectedTemplate = mappingTemplates.find(t => t.id === selectedTemplateId);
   const mandatoryFields = PINT_AE_UC1_FIELDS.filter(f => f.isMandatory);
@@ -280,6 +281,85 @@ export default function RunChecksPage() {
   const hasCoverageWarning = selectedTemplate && mandatoryCoverage < 100;
   const mappingSatisfied = !noMappingProfile || canRunWithoutMapping;
   const readiness = checkRunReadiness(mappingSatisfied, mandatoryCoverage, null);
+
+  const mappedCanonicalColumnsByDataset = useMemo(() => {
+    const asSet = {
+      buyers: new Set<string>(),
+      headers: new Set<string>(),
+      lines: new Set<string>(),
+    };
+
+    if (selectedTemplate?.mappings?.length) {
+      selectedTemplate.mappings
+        .filter((mapping) => mapping.isConfirmed)
+        .forEach((mapping) => {
+          const targetId = mapping.targetField?.id;
+          if (!targetId) return;
+          if (PARSER_KNOWN_COLUMNS.buyers.has(targetId)) asSet.buyers.add(targetId);
+          if (PARSER_KNOWN_COLUMNS.headers.has(targetId)) asSet.headers.add(targetId);
+          if (PARSER_KNOWN_COLUMNS.lines.has(targetId)) asSet.lines.add(targetId);
+        });
+    } else if (canRunWithoutMapping) {
+      headers.forEach((header) =>
+        Object.keys(header).forEach((key) => {
+          if (PARSER_KNOWN_COLUMNS.headers.has(key)) asSet.headers.add(key);
+        })
+      );
+      buyers.forEach((buyer) =>
+        Object.keys(buyer).forEach((key) => {
+          if (PARSER_KNOWN_COLUMNS.buyers.has(key)) asSet.buyers.add(key);
+        })
+      );
+      lines.forEach((line) =>
+        Object.keys(line).forEach((key) => {
+          if (PARSER_KNOWN_COLUMNS.lines.has(key)) asSet.lines.add(key);
+        })
+      );
+    }
+
+    return {
+      buyers: Array.from(asSet.buyers),
+      headers: Array.from(asSet.headers),
+      lines: Array.from(asSet.lines),
+    };
+  }, [buyers, canRunWithoutMapping, headers, lines, selectedTemplate]);
+
+  const mofPreGate = useMemo(() => {
+    if (!FEATURE_FLAGS.mofMandatoryPreGateEnabled) {
+      return {
+        enabled: false,
+        passed: true,
+        reasons: [] as string[],
+      };
+    }
+
+    const result = computeMoFCoverage(
+      FEATURE_FLAGS.mofMandatoryPreGateDocumentType,
+      mappedCanonicalColumnsByDataset
+    );
+
+    const reasons: string[] = [];
+    if (result.mappableMandatoryCoveragePct < FEATURE_FLAGS.mofMandatoryPreGateThreshold) {
+      reasons.push(
+        `MoF mandatory baseline (${result.documentType}) mappable coverage is ${result.mappableMandatoryCoveragePct.toFixed(
+          0
+        )}% (required: ${FEATURE_FLAGS.mofMandatoryPreGateThreshold}%).`
+      );
+    }
+
+    if (FEATURE_FLAGS.mofMandatoryPreGateStrictNoBridge && result.mandatoryNoBridge > 0) {
+      reasons.push(
+        `MoF mandatory baseline (${result.documentType}) has ${result.mandatoryNoBridge} field(s) without approved source-to-template bridge policy.`
+      );
+    }
+
+    return {
+      enabled: true,
+      passed: reasons.length === 0,
+      reasons,
+    };
+  }, [mappedCanonicalColumnsByDataset]);
+
   const setupReasons = [
     ...(checksInfraError
       ? [{
@@ -299,7 +379,15 @@ export default function RunChecksPage() {
   const gateReasons = isLocalFallbackMode
     ? readiness.reasons
     : isSupabaseConfigured
-    ? [...setupReasons, ...readiness.reasons]
+    ? [
+      ...setupReasons,
+      ...readiness.reasons,
+      ...mofPreGate.reasons.map((message) => ({
+        message,
+        link: '/traceability',
+        linkLabel: 'Review MoF baseline',
+      })),
+    ]
     : [
       {
         message: `Supabase environment is not configured (${supabaseEnvStatus.issues.join(', ')})`,
@@ -308,9 +396,12 @@ export default function RunChecksPage() {
       },
     ];
   const hasSetupBlockers = setupReasons.length > 0;
+  const hasMoFPreGateBlockers = mofPreGate.enabled && !mofPreGate.passed;
   const isBlocked = isLocalFallbackMode
     ? !readiness.canRun
-    : (!isSupabaseConfigured || hasSetupBlockers || !readiness.canRun);
+    : (!isSupabaseConfigured || hasSetupBlockers || !readiness.canRun || hasMoFPreGateBlockers);
+
+  if (!isDataLoaded) return null;
 
   const handleRunChecks = async () => {
     if (hasCoverageWarning) {
@@ -743,6 +834,20 @@ export default function RunChecksPage() {
             <AlertTitle className="text-emerald-700">Running in raw template mode</AlertTitle>
             <AlertDescription className="text-emerald-700/90">
               No active mapping profile is selected. Checks can run because uploaded data already matches required canonical template fields.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {mofPreGate.enabled && (
+          <Alert className="mb-8 border-blue-500/20 bg-blue-500/5">
+            <Shield className="h-4 w-4 text-blue-600" />
+            <AlertTitle className="text-blue-700">MoF mandatory pre-gate is enabled</AlertTitle>
+            <AlertDescription className="text-blue-700/90">
+              Baseline document type: <strong>{FEATURE_FLAGS.mofMandatoryPreGateDocumentType}</strong>. Minimum mappable
+              mandatory coverage: <strong>{FEATURE_FLAGS.mofMandatoryPreGateThreshold}%</strong>.
+              {FEATURE_FLAGS.mofMandatoryPreGateStrictNoBridge
+                ? ' Strict no-bridge blocking is ON.'
+                : ' Strict no-bridge blocking is OFF.'}
             </AlertDescription>
           </Alert>
         )}
