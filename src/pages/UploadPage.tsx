@@ -308,7 +308,7 @@ export default function UploadPage() {
               {stats.headers ? (
                 <FileSummaryCard stats={stats.headers} type="headers" onRemove={() => handleFileSelect('headers', null)} />
               ) : (
-                <FileDropZone label="Invoice Headers File" description="invoice_id, invoice_number, issue_date, seller_trn, buyer_id, currency, ..." sampleType="headers" sampleScenario={sampleScenario} onFileSelect={(f) => handleFileSelect('headers', f)} />
+                <FileDropZone label="Invoice Headers File" description="invoice_id, invoice_number, issue_date, seller_trn, buyer_id, currency, ... (technical fields like business_process/spec_id can be system-derived)" sampleType="headers" sampleScenario={sampleScenario} onFileSelect={(f) => handleFileSelect('headers', f)} />
               )}
 
               <div className="border-t" />

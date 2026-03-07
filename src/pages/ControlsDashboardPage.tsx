@@ -299,7 +299,7 @@ export default function ControlsDashboardPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8 animate-slide-up">
           <StatsCard
-            title="DR Coverage (50)"
+            title={`DR Coverage (${drCoverageSummary.total})`}
             value={`${drCoverageSummary.percent.toFixed(1)}%`}
             subtitle={`${drCoverageSummary.covered} of ${drCoverageSummary.total} DRs covered by rule + control`}
             helpText="System-level traceability coverage across UAE PINT-AE data requirements. A DR is covered when at least one validation rule and one control are mapped to it."

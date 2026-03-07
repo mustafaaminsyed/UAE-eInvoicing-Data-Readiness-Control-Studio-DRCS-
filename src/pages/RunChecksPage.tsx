@@ -520,8 +520,9 @@ export default function RunChecksPage() {
             Run Compliance Checks
           </h1>
           <p className="text-muted-foreground max-w-xl mx-auto">
-            Execute the PINT-AE compliance check library against your uploaded data. 
-            This will validate {headers.length} invoices across {isLoadingChecks ? '...' : pintAEChecks.length} checks.
+            Execute layered UAE eInvoicing controls across your uploaded data: MoF mandatory baseline readiness and
+            PINT-AE technical conformance checks. This will validate {headers.length} invoices across{' '}
+            {isLoadingChecks ? '...' : pintAEChecks.length} checks.
           </p>
           <div className="mt-3 flex justify-center">
             <Badge variant="outline">Direction: {direction}</Badge>
@@ -818,7 +819,8 @@ export default function RunChecksPage() {
             <AlertTriangle className="h-4 w-4 text-amber-600" />
             <AlertTitle className="text-amber-700">Mapping required before running checks</AlertTitle>
             <AlertDescription className="text-amber-600">
-              No active mapping profile found. You must create and save a mapping template before running compliance checks.
+              No active mapping profile found. Create and save a mapping template if your source columns do not match
+              DRCS canonical template fields.
               <div className="mt-3">
                 <Button size="sm" onClick={() => navigate('/mapping?tab=create')}>
                   Go to Mapping Studio
@@ -833,7 +835,9 @@ export default function RunChecksPage() {
             <AlertCircle className="h-4 w-4 text-emerald-600" />
             <AlertTitle className="text-emerald-700">Running in raw template mode</AlertTitle>
             <AlertDescription className="text-emerald-700/90">
-              No active mapping profile is selected. Checks can run because uploaded data already matches required canonical template fields.
+              No active mapping profile is selected. Checks can run because uploaded data already matches required
+              canonical template fields. Technical fields like <code>business_process</code> and <code>spec_id</code>{' '}
+              can be resolved by approved system defaults when enabled.
             </AlertDescription>
           </Alert>
         )}

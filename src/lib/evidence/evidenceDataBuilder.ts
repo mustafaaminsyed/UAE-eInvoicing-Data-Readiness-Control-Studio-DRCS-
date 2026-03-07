@@ -45,6 +45,7 @@ export interface DRCoverageRow {
   population_percentage: number | null;
   coverage_status: CoverageStatus;
   asp_derived: boolean;
+  system_default_allowed: boolean;
 }
 
 // ── Tab C: Rules Execution ───────────────────────────────────────────
@@ -156,13 +157,14 @@ export function buildEvidencePackData(
       dr_id: r.dr_id,
       business_term: r.business_term,
       mandatory: r.mandatory,
-      template: r.dataset_file ?? 'asp_derived',
+      template: r.dataset_file ?? ((entry?.system_default_allowed ?? false) ? 'system_default' : 'asp_derived'),
       column_names: r.internal_columns.join('; '),
       rule_count: r.ruleIds.length,
       control_count: r.controlIds.length,
       population_percentage: r.populationPct,
       coverage_status: r.coverageStatus,
       asp_derived: entry?.asp_derived ?? false,
+      system_default_allowed: entry?.system_default_allowed ?? false,
     };
   });
 
@@ -233,7 +235,7 @@ export function buildEvidencePackData(
   const threshold = CONFORMANCE_CONFIG.populationWarningThreshold;
   const populationQuality: PopulationQualityRow[] = traceRows.map(r => {
     const entry = registry.find(e => e.dr_id === r.dr_id);
-    const isAspDerived = entry?.asp_derived ?? false;
+    const isAspDerived = (entry?.asp_derived ?? false) || (entry?.system_default_allowed ?? false);
     let pass_fail: 'Pass' | 'Fail' | 'N/A';
     if (isAspDerived || r.populationPct === null) {
       pass_fail = 'N/A';

@@ -143,7 +143,7 @@ export default function EvidencePackPage() {
       case 'gaps':
         return filtered.filter((r) => r.coverage_status === 'NO_RULE' || r.coverage_status === 'NO_CONTROL');
       case 'asp':
-        return filtered.filter((r) => r.asp_derived);
+        return filtered.filter((r) => r.asp_derived || r.system_default_allowed);
       default:
         return filtered;
     }
@@ -314,7 +314,7 @@ export default function EvidencePackPage() {
                 <Button size="sm" variant={drQuickFilter === 'all' ? 'secondary' : 'outline'} onClick={() => setDrQuickFilter('all')}>All</Button>
                 <Button size="sm" variant={drQuickFilter === 'mandatory' ? 'secondary' : 'outline'} onClick={() => setDrQuickFilter('mandatory')}>Mandatory</Button>
                 <Button size="sm" variant={drQuickFilter === 'gaps' ? 'secondary' : 'outline'} onClick={() => setDrQuickFilter('gaps')}>Gaps (No Rule/Control)</Button>
-                <Button size="sm" variant={drQuickFilter === 'asp' ? 'secondary' : 'outline'} onClick={() => setDrQuickFilter('asp')}>ASP Derived</Button>
+                <Button size="sm" variant={drQuickFilter === 'asp' ? 'secondary' : 'outline'} onClick={() => setDrQuickFilter('asp')}>System/ASP Derived</Button>
               </div>
             )}
             {activeTab === 'rules' && (
@@ -449,7 +449,15 @@ export default function EvidencePackPage() {
                             <TableCell className="text-xs font-mono">{r.dr_id}</TableCell>
                             <TableCell className="text-xs max-w-[200px] truncate">{r.business_term}</TableCell>
                             <TableCell className="text-xs">{r.mandatory ? 'Yes' : 'No'}</TableCell>
-                            <TableCell className="text-xs">{r.asp_derived ? <Badge variant="outline" className="text-xs">ASP</Badge> : r.template}</TableCell>
+                            <TableCell className="text-xs">
+                              {r.system_default_allowed ? (
+                                <Badge variant="outline" className="text-xs">System Default</Badge>
+                              ) : r.asp_derived ? (
+                                <Badge variant="outline" className="text-xs">ASP Derived</Badge>
+                              ) : (
+                                r.template
+                              )}
+                            </TableCell>
                             <TableCell className="text-xs font-mono max-w-[150px] truncate">{r.column_names || '-'}</TableCell>
                             <TableCell className="text-xs text-right">{r.rule_count}</TableCell>
                             <TableCell className="text-xs text-right">{r.control_count}</TableCell>

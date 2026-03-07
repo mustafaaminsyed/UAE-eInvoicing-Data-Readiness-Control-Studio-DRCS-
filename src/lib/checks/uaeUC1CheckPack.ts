@@ -185,6 +185,8 @@ export const UAE_UC1_CHECK_PACK: PintAECheck[] = [
     is_enabled: true,
     parameters: {
       field: 'spec_id',
+      allow_system_default: true,
+      system_default_value: 'urn:peppol:pint:billing-1@ae-1',
       allowed_prefixes: [
         'urn:peppol:pint:billing-1@ae-1',
         'urn:peppol:pint:selfbilling-1@ae-1',
@@ -209,6 +211,8 @@ export const UAE_UC1_CHECK_PACK: PintAECheck[] = [
     is_enabled: true,
     parameters: {
       field: 'business_process',
+      allow_system_default: true,
+      system_default_value: 'urn:peppol:bis:billing',
       allowed_values: ['urn:peppol:bis:billing', 'urn:peppol:bis:selfbilling'],
     },
   },

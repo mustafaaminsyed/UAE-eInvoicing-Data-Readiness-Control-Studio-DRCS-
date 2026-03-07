@@ -81,11 +81,27 @@ describe('runPintAECheck executor registry parity', () => {
     expect(exceptions[0].message).toContain('ISO4217 codelist');
   });
 
-  it('fails CHK-010 when specification identifier is missing', () => {
+  it('uses system default for CHK-010 when specification identifier is missing', () => {
     const check = getCheck('UAE-UC1-CHK-010');
     const data = buildDataContext({ spec_id: '' });
 
     const exceptions = runPintAECheck(check, data);
+
+    expect(exceptions).toHaveLength(0);
+  });
+
+  it('fails CHK-010 when missing and system default is disabled', () => {
+    const check = getCheck('UAE-UC1-CHK-010');
+    const strictCheck = {
+      ...check,
+      parameters: {
+        ...check.parameters,
+        allow_system_default: false,
+      },
+    };
+    const data = buildDataContext({ spec_id: '' });
+
+    const exceptions = runPintAECheck(strictCheck, data);
 
     expect(exceptions).toHaveLength(1);
     expect(exceptions[0].check_id).toBe('UAE-UC1-CHK-010');
@@ -113,11 +129,27 @@ describe('runPintAECheck executor registry parity', () => {
     expect(exceptions).toHaveLength(0);
   });
 
-  it('fails CHK-011 when business process is missing', () => {
+  it('uses system default for CHK-011 when business process is missing', () => {
     const check = getCheck('UAE-UC1-CHK-011');
     const data = buildDataContext({ business_process: '' });
 
     const exceptions = runPintAECheck(check, data);
+
+    expect(exceptions).toHaveLength(0);
+  });
+
+  it('fails CHK-011 when missing and system default is disabled', () => {
+    const check = getCheck('UAE-UC1-CHK-011');
+    const strictCheck = {
+      ...check,
+      parameters: {
+        ...check.parameters,
+        allow_system_default: false,
+      },
+    };
+    const data = buildDataContext({ business_process: '' });
+
+    const exceptions = runPintAECheck(strictCheck, data);
 
     expect(exceptions).toHaveLength(1);
     expect(exceptions[0].check_id).toBe('UAE-UC1-CHK-011');

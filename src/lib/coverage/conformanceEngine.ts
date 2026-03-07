@@ -42,6 +42,7 @@ export interface TraceabilityRow {
   lastRunPassRate: number | null;
   category: string;
   dataResponsibility: string;
+  systemDefaultAllowed: boolean;
   exceptionCount: number;
 }
 
@@ -141,6 +142,7 @@ export function computeTraceabilityMatrix(
       lastRunPassRate,
       category: entry.category,
       dataResponsibility: entry.data_responsibility,
+      systemDefaultAllowed: entry.system_default_allowed,
       exceptionCount,
     };
   });

@@ -3,6 +3,9 @@ import { DataContext, Severity } from '@/types/compliance';
 import { isCodeInCodelist } from '@/lib/pintAE/specCatalog';
 
 const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+const PROFILE_DEFAULTS_ENABLED = (import.meta.env.VITE_ENABLE_TECHNICAL_PROFILE_DEFAULTS || 'true').toLowerCase() === 'true';
+const DEFAULT_SPEC_ID = (import.meta.env.VITE_DEFAULT_SPEC_ID || 'urn:peppol:pint:billing-1@ae-1').trim();
+const DEFAULT_BUSINESS_PROCESS = (import.meta.env.VITE_DEFAULT_BUSINESS_PROCESS || 'urn:peppol:bis:billing').trim();
 
 function getFieldValue(record: any, fieldPath: string): any {
   const parts = fieldPath.split('.');
@@ -32,6 +35,20 @@ function resolveFieldAlias(field: string): string {
     seller_street: 'seller_address',
   };
   return aliases[field] || field;
+}
+
+function isSystemDefaultAllowed(params: Record<string, any>): boolean {
+  if (typeof params.allow_system_default === 'boolean') {
+    return params.allow_system_default;
+  }
+  return PROFILE_DEFAULTS_ENABLED;
+}
+
+function pickSystemDefault(params: Record<string, any>, envDefault: string): string {
+  if (typeof params.system_default_value === 'string' && params.system_default_value.trim()) {
+    return params.system_default_value.trim();
+  }
+  return envDefault;
 }
 
 function getDatasetForField(field: string, scope: PintAECheck['scope'], data: DataContext): any[] {
@@ -141,8 +158,12 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
           Array.isArray(params.allowed_prefixes) && params.allowed_prefixes.length > 0
             ? params.allowed_prefixes
             : ['urn:peppol:pint:billing-1@ae-1', 'urn:peppol:pint:selfbilling-1@ae-1'];
+        const allowSystemDefault = isSystemDefaultAllowed(params);
+        const resolved = isEmpty(value) && allowSystemDefault
+          ? pickSystemDefault(params, DEFAULT_SPEC_ID)
+          : String(value ?? '').trim();
 
-        if (isEmpty(value)) {
+        if (isEmpty(resolved)) {
           exceptions.push(createException({
             invoiceId: header.invoice_id,
             invoiceNumber: header.invoice_number,
@@ -156,8 +177,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
           return;
         }
 
-        const normalized = String(value).trim();
-        const validPrefix = allowedPrefixes.some((prefix) => normalized.startsWith(prefix));
+        const validPrefix = allowedPrefixes.some((prefix) => resolved.startsWith(prefix));
         if (!validPrefix) {
           exceptions.push(createException({
             invoiceId: header.invoice_id,
@@ -165,9 +185,9 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
             sellerTrn: header.seller_trn,
             buyerId: header.buyer_id,
             fieldName: field,
-            observedValue: normalized,
+            observedValue: resolved,
             expectedValue: `Starts with: ${allowedPrefixes.join(' OR ')}`,
-            message: `Invoice ${header.invoice_number}: Invalid specification identifier "${normalized}"`,
+            message: `Invoice ${header.invoice_number}: Invalid specification identifier "${resolved}"`,
           }));
         }
       });
@@ -294,8 +314,12 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
           Array.isArray(params.allowed_values) && params.allowed_values.length > 0
             ? params.allowed_values
             : ['urn:peppol:bis:billing', 'urn:peppol:bis:selfbilling'];
+        const allowSystemDefault = isSystemDefaultAllowed(params);
+        const resolved = isEmpty(value) && allowSystemDefault
+          ? pickSystemDefault(params, DEFAULT_BUSINESS_PROCESS)
+          : String(value ?? '').trim();
 
-        if (isEmpty(value)) {
+        if (isEmpty(resolved)) {
           exceptions.push(createException({
             invoiceId: header.invoice_id,
             invoiceNumber: header.invoice_number,
@@ -309,16 +333,16 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
           return;
         }
 
-        if (!allowed.includes(String(value))) {
+        if (!allowed.includes(resolved)) {
           exceptions.push(createException({
             invoiceId: header.invoice_id,
             invoiceNumber: header.invoice_number,
             sellerTrn: header.seller_trn,
             buyerId: header.buyer_id,
             fieldName: field,
-            observedValue: String(value),
+            observedValue: resolved,
             expectedValue: allowed.join(', '),
-            message: `Invoice ${header.invoice_number}: Invalid business process type "${value}"`,
+            message: `Invoice ${header.invoice_number}: Invalid business process type "${resolved}"`,
           }));
         }
       });

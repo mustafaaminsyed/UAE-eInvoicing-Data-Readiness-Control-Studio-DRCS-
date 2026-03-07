@@ -277,6 +277,10 @@ export default function CheckRegistryPage() {
           <p className="text-sm text-muted-foreground mt-1">
             Catalog of all active validation checks, rule references, and severity levels.
           </p>
+          <p className="text-xs text-muted-foreground mt-2">
+            Note: technical profile fields (for example IBT-023 / IBT-024) may be resolved by approved system defaults
+            when enabled; this does not reduce their compliance mandatory status.
+          </p>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">

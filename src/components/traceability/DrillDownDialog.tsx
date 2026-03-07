@@ -66,7 +66,7 @@ export function DrillDownDialog({ row, exceptions, open, onOpenChange }: DrillDo
             </div>
             <div>
               <span className="text-muted-foreground text-xs">Template</span>
-              <p className="font-medium">{row.dataset_file || 'ASP-derived'}</p>
+              <p className="font-medium">{row.dataset_file || (row.systemDefaultAllowed ? 'System default' : 'ASP-derived')}</p>
             </div>
             <div>
               <span className="text-muted-foreground text-xs">Column(s)</span>
