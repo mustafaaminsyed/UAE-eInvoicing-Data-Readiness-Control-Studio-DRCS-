@@ -19,6 +19,7 @@ export interface DRRegistryEntry {
   data_responsibility: string;
   pint_ae_reference: string; // UBL XML path or PINT-AE reference
   asp_derived: boolean;
+  system_default_allowed: boolean;
 }
 
 // Map from DR ID to internal column names and dataset file
@@ -103,9 +104,12 @@ function extractCodeListRef(field: SpecRegistryField): string | null {
 
 export function buildDRRegistry(): DRRegistryEntry[] {
   const fields = getRegistryFields();
-  const aspDerivedIds = new Set(['IBT-023', 'IBT-024', 'IBT-031-1', 'IBT-034-1', 'IBT-048-1', 'IBT-049-1', 'IBT-149']);
+  const systemDefaultAllowedIds = new Set(['IBT-023', 'IBT-024']);
+  const aspDerivedIds = new Set(['IBT-031-1', 'IBT-034-1', 'IBT-048-1', 'IBT-049-1', 'IBT-149']);
   return fields.map(field => {
     const mapping = DR_TO_COLUMN_MAP[field.dr_id];
+    const systemDefaultAllowed = systemDefaultAllowedIds.has(field.dr_id);
+    const aspDerived = aspDerivedIds.has(field.dr_id) || (field.data_responsibility.includes('ASP') && !systemDefaultAllowed);
     return {
       dr_id: field.dr_id,
       business_term: field.business_term,
@@ -119,7 +123,8 @@ export function buildDRRegistry(): DRRegistryEntry[] {
       vat_law_status: field.vat_law_status,
       data_responsibility: field.data_responsibility,
       pint_ae_reference: field.ubl_xml_path || '',
-      asp_derived: aspDerivedIds.has(field.dr_id) || field.data_responsibility.includes('ASP'),
+      asp_derived: aspDerived,
+      system_default_allowed: systemDefaultAllowed,
     };
   });
 }

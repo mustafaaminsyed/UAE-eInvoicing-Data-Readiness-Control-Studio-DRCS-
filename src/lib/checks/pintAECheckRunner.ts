@@ -3,6 +3,9 @@ import { DataContext, Severity } from '@/types/compliance';
 import { isCodeInCodelist } from '@/lib/pintAE/specCatalog';
 
 const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+const PROFILE_DEFAULTS_ENABLED = (import.meta.env.VITE_ENABLE_TECHNICAL_PROFILE_DEFAULTS || 'true').toLowerCase() === 'true';
+const DEFAULT_SPEC_ID = (import.meta.env.VITE_DEFAULT_SPEC_ID || 'urn:peppol:pint:billing-1@ae-1').trim();
+const DEFAULT_BUSINESS_PROCESS = (import.meta.env.VITE_DEFAULT_BUSINESS_PROCESS || 'urn:peppol:bis:billing').trim();
 
 function getFieldValue(record: any, fieldPath: string): any {
   const parts = fieldPath.split('.');
@@ -32,6 +35,20 @@ function resolveFieldAlias(field: string): string {
     seller_street: 'seller_address',
   };
   return aliases[field] || field;
+}
+
+function isSystemDefaultAllowed(params: Record<string, any>): boolean {
+  if (typeof params.allow_system_default === 'boolean') {
+    return params.allow_system_default;
+  }
+  return PROFILE_DEFAULTS_ENABLED;
+}
+
+function pickSystemDefault(params: Record<string, any>, envDefault: string): string {
+  if (typeof params.system_default_value === 'string' && params.system_default_value.trim()) {
+    return params.system_default_value.trim();
+  }
+  return envDefault;
 }
 
 function getDatasetForField(field: string, scope: PintAECheck['scope'], data: DataContext): any[] {
@@ -112,7 +129,6 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
 
     // Format Checks
     case 'UAE-UC1-CHK-003': // Date Format YYYY-MM-DD
-    case 'UAE-UC1-CHK-010': // Spec Identifier
       if (params.field && params.pattern) {
         const regex = new RegExp(params.pattern);
         data.headers.forEach(header => {
@@ -131,6 +147,50 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
           }
         });
       }
+      break;
+
+    // Specification identifier (IBT-024): mandatory + allowed prefixes
+    case 'UAE-UC1-CHK-010':
+      data.headers.forEach(header => {
+        const field = resolveFieldAlias(params.field || 'spec_id');
+        const value = getFieldValue(header, field);
+        const allowedPrefixes: string[] =
+          Array.isArray(params.allowed_prefixes) && params.allowed_prefixes.length > 0
+            ? params.allowed_prefixes
+            : ['urn:peppol:pint:billing-1@ae-1', 'urn:peppol:pint:selfbilling-1@ae-1'];
+        const allowSystemDefault = isSystemDefaultAllowed(params);
+        const resolved = isEmpty(value) && allowSystemDefault
+          ? pickSystemDefault(params, DEFAULT_SPEC_ID)
+          : String(value ?? '').trim();
+
+        if (isEmpty(resolved)) {
+          exceptions.push(createException({
+            invoiceId: header.invoice_id,
+            invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn,
+            buyerId: header.buyer_id,
+            fieldName: field,
+            observedValue: '(empty)',
+            expectedValue: allowedPrefixes.join(' OR '),
+            message: `Invoice ${header.invoice_number}: Missing specification identifier`,
+          }));
+          return;
+        }
+
+        const validPrefix = allowedPrefixes.some((prefix) => resolved.startsWith(prefix));
+        if (!validPrefix) {
+          exceptions.push(createException({
+            invoiceId: header.invoice_id,
+            invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn,
+            buyerId: header.buyer_id,
+            fieldName: field,
+            observedValue: resolved,
+            expectedValue: `Starts with: ${allowedPrefixes.join(' OR ')}`,
+            message: `Invoice ${header.invoice_number}: Invalid specification identifier "${resolved}"`,
+          }));
+        }
+      });
       break;
 
     // Currency ISO4217 codelist check from official PINT-AE resources
@@ -250,19 +310,39 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
       data.headers.forEach(header => {
         const field = resolveFieldAlias(params.field || 'business_process');
         const value = getFieldValue(header, field);
-        const allowed: string[] = Array.isArray(params.allowed_values) ? params.allowed_values : [];
-        // business_process is ASP-derived in this app's CSV templates.
-        // If customer input doesn't provide it, skip instead of raising a false-positive.
-        if (!isEmpty(value) && allowed.length > 0 && !allowed.includes(String(value))) {
+        const allowed: string[] =
+          Array.isArray(params.allowed_values) && params.allowed_values.length > 0
+            ? params.allowed_values
+            : ['urn:peppol:bis:billing', 'urn:peppol:bis:selfbilling'];
+        const allowSystemDefault = isSystemDefaultAllowed(params);
+        const resolved = isEmpty(value) && allowSystemDefault
+          ? pickSystemDefault(params, DEFAULT_BUSINESS_PROCESS)
+          : String(value ?? '').trim();
+
+        if (isEmpty(resolved)) {
           exceptions.push(createException({
             invoiceId: header.invoice_id,
             invoiceNumber: header.invoice_number,
             sellerTrn: header.seller_trn,
             buyerId: header.buyer_id,
             fieldName: field,
-            observedValue: String(value),
+            observedValue: '(empty)',
+            expectedValue: allowed.join(' OR '),
+            message: `Invoice ${header.invoice_number}: Missing business process type`,
+          }));
+          return;
+        }
+
+        if (!allowed.includes(resolved)) {
+          exceptions.push(createException({
+            invoiceId: header.invoice_id,
+            invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn,
+            buyerId: header.buyer_id,
+            fieldName: field,
+            observedValue: resolved,
             expectedValue: allowed.join(', '),
-            message: `Invoice ${header.invoice_number}: Invalid business process type "${value}"`,
+            message: `Invoice ${header.invoice_number}: Invalid business process type "${resolved}"`,
           }));
         }
       });

@@ -67,6 +67,7 @@ export async function generateEvidencePackZip(data: EvidencePackData): Promise<B
     'Template': r.template,
     'Column Names': r.column_names,
     'ASP Derived': r.asp_derived ? 'Yes' : 'No',
+    'System Default Allowed': r.system_default_allowed ? 'Yes' : 'No',
     'Rule Count': r.rule_count,
     'Control Count': r.control_count,
     'Population %': r.population_percentage !== null ? Number(r.population_percentage.toFixed(1)) : '',

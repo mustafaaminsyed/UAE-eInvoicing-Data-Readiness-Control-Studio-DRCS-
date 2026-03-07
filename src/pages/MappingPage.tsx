@@ -216,7 +216,7 @@ export default function MappingPage() {
             )}
           </div>
           <Badge variant="outline" className="text-xs font-normal text-muted-foreground">
-            PINT-AE 2025-Q2 | UAE DR v1.0.1
+            MoF baseline + PINT-AE technical layer
           </Badge>
         </div>
 
