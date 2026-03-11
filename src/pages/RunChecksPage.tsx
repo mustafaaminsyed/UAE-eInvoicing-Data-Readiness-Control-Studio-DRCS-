@@ -24,8 +24,8 @@ import { getSupabaseEnvStatus, shouldUseLocalDevFallback } from '@/lib/api/supab
 import { supabase } from '@/integrations/supabase/client';
 import { LastRunContextBanner } from '@/components/run/LastRunContextBanner';
 import { FEATURE_FLAGS } from '@/config/features';
-import { computeMoFCoverage } from '@/lib/coverage/mofCoverageEngine';
 import { PARSER_KNOWN_COLUMNS } from '@/lib/registry/drRegistry';
+import { defaultMoFReadinessRunner } from '@/engine/runners/mof';
 
 type ConnectionTestStatus = 'idle' | 'running' | 'passed' | 'failed';
 
@@ -325,39 +325,13 @@ export default function RunChecksPage() {
   }, [buyers, canRunWithoutMapping, headers, lines, selectedTemplate]);
 
   const mofPreGate = useMemo(() => {
-    if (!FEATURE_FLAGS.mofMandatoryPreGateEnabled) {
-      return {
-        enabled: false,
-        passed: true,
-        reasons: [] as string[],
-      };
-    }
-
-    const result = computeMoFCoverage(
-      FEATURE_FLAGS.mofMandatoryPreGateDocumentType,
-      mappedCanonicalColumnsByDataset
-    );
-
-    const reasons: string[] = [];
-    if (result.mappableMandatoryCoveragePct < FEATURE_FLAGS.mofMandatoryPreGateThreshold) {
-      reasons.push(
-        `MoF mandatory baseline (${result.documentType}) mappable coverage is ${result.mappableMandatoryCoveragePct.toFixed(
-          0
-        )}% (required: ${FEATURE_FLAGS.mofMandatoryPreGateThreshold}%).`
-      );
-    }
-
-    if (FEATURE_FLAGS.mofMandatoryPreGateStrictNoBridge && result.mandatoryNoBridge > 0) {
-      reasons.push(
-        `MoF mandatory baseline (${result.documentType}) has ${result.mandatoryNoBridge} field(s) without approved source-to-template bridge policy.`
-      );
-    }
-
-    return {
-      enabled: true,
-      passed: reasons.length === 0,
-      reasons,
-    };
+    return defaultMoFReadinessRunner.evaluate({
+      enabled: FEATURE_FLAGS.mofMandatoryPreGateEnabled,
+      documentType: FEATURE_FLAGS.mofMandatoryPreGateDocumentType,
+      threshold: FEATURE_FLAGS.mofMandatoryPreGateThreshold,
+      strictNoBridge: FEATURE_FLAGS.mofMandatoryPreGateStrictNoBridge,
+      mappedColumns: mappedCanonicalColumnsByDataset,
+    });
   }, [mappedCanonicalColumnsByDataset]);
 
   const setupReasons = [

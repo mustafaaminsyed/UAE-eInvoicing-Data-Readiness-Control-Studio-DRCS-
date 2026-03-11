@@ -1,11 +1,13 @@
 import { PARSER_KNOWN_COLUMNS } from '@/lib/registry/drRegistry';
 import { getMoFFields, getMoFMandatoryFields, getMoFSpecRegistry, MoFDocumentType } from '@/lib/registry/mofSpecRegistry';
+import { getMoFCrosswalkRow } from '@/lib/registry/mofCrosswalkRegistry';
 
 type DatasetFile = 'buyers' | 'headers' | 'lines';
 type MoFCoverageStatus = 'COVERED' | 'NOT_IN_TEMPLATE' | 'NOT_INGESTIBLE' | 'NO_BRIDGE';
 
 interface MoFBridge {
-  dataset: DatasetFile;
+  datasets: DatasetFile[];
+  primaryDataset: DatasetFile | null;
   columns: string[];
 }
 
@@ -46,82 +48,45 @@ export interface MoFCoverageResult {
   rows: MoFCoverageRow[];
 }
 
-const SHARED_CORE_FIELD_BRIDGE: Record<number, MoFBridge> = {
-  1: { dataset: 'headers', columns: ['invoice_number'] },
-  2: { dataset: 'headers', columns: ['issue_date'] },
-  3: { dataset: 'headers', columns: ['invoice_type'] },
-  4: { dataset: 'headers', columns: ['currency'] },
-  5: { dataset: 'headers', columns: ['transaction_type_code'] },
-  6: { dataset: 'headers', columns: ['payment_due_date'] },
-  7: { dataset: 'headers', columns: ['business_process'] },
-  8: { dataset: 'headers', columns: ['spec_id'] },
-  9: { dataset: 'headers', columns: ['payment_means_code'] },
-  10: { dataset: 'headers', columns: ['seller_name'] },
-  11: { dataset: 'headers', columns: ['seller_electronic_address'] },
-  12: { dataset: 'headers', columns: [] },
-  13: { dataset: 'headers', columns: ['seller_legal_reg_id'] },
-  14: { dataset: 'headers', columns: ['seller_legal_reg_id_type'] },
-  15: { dataset: 'headers', columns: ['seller_trn'] },
-  16: { dataset: 'headers', columns: [] },
-  17: { dataset: 'headers', columns: ['seller_address'] },
-  18: { dataset: 'headers', columns: ['seller_city'] },
-  19: { dataset: 'headers', columns: ['seller_subdivision'] },
-  20: { dataset: 'headers', columns: ['seller_country'] },
-  21: { dataset: 'buyers', columns: ['buyer_name'] },
-  22: { dataset: 'buyers', columns: ['buyer_electronic_address'] },
-  23: { dataset: 'buyers', columns: ['buyer_id'] },
-  24: { dataset: 'buyers', columns: ['buyer_trn'] },
-  25: { dataset: 'buyers', columns: [] },
-  26: { dataset: 'buyers', columns: ['buyer_address'] },
-  27: { dataset: 'buyers', columns: ['buyer_city'] },
-  28: { dataset: 'buyers', columns: ['buyer_subdivision'] },
-  29: { dataset: 'buyers', columns: ['buyer_country'] },
-  30: { dataset: 'headers', columns: ['total_excl_vat'] },
-  31: { dataset: 'headers', columns: ['total_excl_vat'] },
-  32: { dataset: 'headers', columns: ['vat_total'] },
-  33: { dataset: 'headers', columns: ['total_incl_vat'] },
-  34: { dataset: 'headers', columns: ['amount_due'] },
-  35: { dataset: 'headers', columns: ['tax_category_code'] },
-  36: { dataset: 'headers', columns: ['vat_total'] },
-  37: { dataset: 'headers', columns: ['tax_category_code'] },
-  38: { dataset: 'headers', columns: ['tax_category_rate'] },
-  39: { dataset: 'lines', columns: ['line_id'] },
-  40: { dataset: 'lines', columns: ['quantity'] },
-  41: { dataset: 'lines', columns: ['unit_of_measure'] },
-};
-
-const TAX_EXTENSION_FIELD_BRIDGE: Record<number, MoFBridge> = {
-  42: { dataset: 'lines', columns: ['line_total_excl_vat'] },
-  43: { dataset: 'lines', columns: ['unit_price'] },
-  44: { dataset: 'lines', columns: ['unit_price'] },
-  45: { dataset: 'lines', columns: [] },
-  46: { dataset: 'lines', columns: ['tax_category_code'] },
-  47: { dataset: 'lines', columns: ['vat_rate'] },
-  48: { dataset: 'lines', columns: ['vat_amount'] },
-  49: { dataset: 'headers', columns: [] },
-  50: { dataset: 'lines', columns: ['item_name'] },
-  51: { dataset: 'lines', columns: ['description'] },
-};
-
-const COMMERCIAL_EXTENSION_FIELD_BRIDGE: Record<number, MoFBridge> = {
-  42: { dataset: 'lines', columns: ['line_total_excl_vat'] },
-  43: { dataset: 'lines', columns: ['unit_price'] },
-  44: { dataset: 'lines', columns: ['unit_price'] },
-  45: { dataset: 'lines', columns: [] },
-  46: { dataset: 'lines', columns: ['tax_category_code'] },
-  47: { dataset: 'lines', columns: ['vat_rate'] },
-  48: { dataset: 'lines', columns: ['vat_amount'] },
-  49: { dataset: 'headers', columns: [] },
-};
-
 function getBridgeForField(documentType: MoFDocumentType, fieldId: number): MoFBridge | null {
-  if (fieldId <= 41) return SHARED_CORE_FIELD_BRIDGE[fieldId] ?? null;
-  if (documentType === 'tax_invoice') return TAX_EXTENSION_FIELD_BRIDGE[fieldId] ?? null;
-  return COMMERCIAL_EXTENSION_FIELD_BRIDGE[fieldId] ?? null;
+  const row = getMoFCrosswalkRow(documentType, fieldId);
+  if (!row || row.status === 'missing') return null;
+
+  return {
+    datasets: row.datasets,
+    primaryDataset: row.primaryDataset,
+    columns: Array.from(new Set(row.sourceColumns)),
+  };
 }
 
 function toSet(values?: string[]): Set<string> {
   return new Set((values || []).map((v) => v.trim()).filter(Boolean));
+}
+
+function resolveCandidateDatasets(bridge: MoFBridge, column: string): DatasetFile[] {
+  const candidates = bridge.datasets.filter((dataset) => PARSER_KNOWN_COLUMNS[dataset].has(column));
+  if (candidates.length > 0) return candidates;
+  return bridge.datasets;
+}
+
+function isMappedColumn(
+  bridge: MoFBridge,
+  column: string,
+  mappedColumns: Record<DatasetFile, Set<string>>
+): boolean {
+  const candidates = resolveCandidateDatasets(bridge, column);
+  if (candidates.length === 0) return false;
+  return candidates.some((dataset) => {
+    const map = mappedColumns[dataset];
+    if (map.size === 0) return true;
+    return map.has(column);
+  });
+}
+
+function isIngestibleColumn(bridge: MoFBridge, column: string): boolean {
+  const candidates = resolveCandidateDatasets(bridge, column);
+  if (candidates.length === 0) return false;
+  return candidates.some((dataset) => PARSER_KNOWN_COLUMNS[dataset].has(column));
 }
 
 export function computeMoFCoverage(
@@ -162,17 +127,9 @@ export function computeMoFCoverage(
       };
     }
 
-    const isMapped =
-      bridge.columns.length > 0 &&
-      bridge.columns.every((column) => {
-        const map = mappedColumns[bridge.dataset];
-        if (map.size === 0) return true;
-        return map.has(column);
-      });
+    const isMapped = bridge.columns.length > 0 && bridge.columns.every((column) => isMappedColumn(bridge, column, mappedColumns));
 
-    const ingestible =
-      bridge.columns.length > 0 &&
-      bridge.columns.every((column) => PARSER_KNOWN_COLUMNS[bridge.dataset].has(column));
+    const ingestible = bridge.columns.length > 0 && bridge.columns.every((column) => isIngestibleColumn(bridge, column));
 
     let status: MoFCoverageStatus = 'COVERED';
     if (!isMapped) status = 'NOT_IN_TEMPLATE';
@@ -191,7 +148,7 @@ export function computeMoFCoverage(
       sectionId: field.section_id,
       mandatory: field.mandatory,
       sourceStatus: field.source_status,
-      dataset: bridge.dataset,
+      dataset: bridge.primaryDataset,
       columns: bridge.columns,
       inTemplate: isMapped,
       ingestible,

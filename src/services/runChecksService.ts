@@ -24,6 +24,17 @@ import {
 import { saveCheckRun, saveEntityScores } from '@/lib/api/checksApi';
 import { calculateScore } from '@/types/customChecks';
 
+/**
+ * @deprecated Legacy/frozen compatibility module.
+ *
+ * Canonical runtime execution path is:
+ * `ComplianceContext.runChecks -> runChecksOrchestrator`.
+ *
+ * No new call sites should use this module. It is retained only for
+ * compatibility and regression coverage pending an explicit removal review.
+ */
+
+/** @deprecated Legacy/frozen service contract. */
 export type PersistencePhase =
   | 'saveCheckRun'
   | 'saveExceptions'
@@ -31,6 +42,7 @@ export type PersistencePhase =
   | 'saveRunSummary'
   | 'saveEntityScores';
 
+/** @deprecated Legacy/frozen service contract. */
 export interface RunLogStep {
   name: string;
   startedAt: string;
@@ -39,17 +51,20 @@ export interface RunLogStep {
   counts?: Record<string, number>;
 }
 
+/** @deprecated Legacy/frozen service contract. */
 export interface RunChecksPlan {
   readonly scope: DatasetRunScope;
   readonly datasetTypesRan: readonly DatasetType[];
 }
 
+/** @deprecated Legacy/frozen service contract. */
 export interface PlanRunChecksParams {
   options?: { scope?: DatasetRunScope };
   activeDatasetType: DatasetType;
   hasDatasetLoaded: (datasetType: DatasetType) => boolean;
 }
 
+/** @deprecated Legacy/frozen service contract. */
 export interface RunChecksPipelineParams {
   plan: RunChecksPlan;
   getDataForDataset: (datasetType: DatasetType) => ParsedData;
@@ -63,16 +78,19 @@ interface RunArtifactsBase {
   runLog?: RunLogStep[];
 }
 
+/** @deprecated Legacy/frozen service contract. */
 export interface RunArtifactsOk extends RunArtifactsBase {
   kind: 'ok';
 }
 
+/** @deprecated Legacy/frozen service contract. */
 export interface RunArtifactsPersistFailed extends RunArtifactsBase {
   kind: 'persist_failed';
   persistenceError: unknown;
   persistencePhase?: PersistencePhase;
 }
 
+/** @deprecated Legacy/frozen service contract. */
 export type RunArtifacts = RunArtifactsOk | RunArtifactsPersistFailed;
 
 function getDatasetScopeOrder(scope: DatasetRunScope): DatasetType[] {
@@ -210,6 +228,10 @@ function endStep(
   });
 }
 
+/**
+ * @deprecated Legacy/frozen API.
+ * Use orchestrator-driven runtime path for active execution.
+ */
 export function planRunChecks({
   options,
   activeDatasetType,
@@ -226,6 +248,10 @@ export function planRunChecks({
   };
 }
 
+/**
+ * @deprecated Legacy/frozen API.
+ * Use orchestrator-driven runtime path for active execution.
+ */
 export async function runChecksPipeline({
   plan,
   getDataForDataset,

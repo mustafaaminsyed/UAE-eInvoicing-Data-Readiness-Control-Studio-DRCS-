@@ -5,31 +5,27 @@ import {
   InvoiceLine, 
   Exception, 
   CheckResult,
-  DataContext,
   ParsedData,
   DashboardStats,
   Severity
 } from '@/types/compliance';
-import { PintAECheck, PintAEException, RunSummary } from '@/types/pintAE';
-import { runAllChecks } from '@/lib/checks/checksRegistry';
+import { PintAEException, RunSummary } from '@/types/pintAE';
 import { saveCheckRun, saveEntityScores } from '@/lib/api/checksApi';
 import { calculateScore } from '@/types/customChecks';
 import { DEFAULT_DIRECTION, Direction, OrganizationProfile } from '@/types/direction';
 import { 
-  fetchEnabledPintAEChecks, 
-  seedUC1CheckPack, 
   saveExceptions, 
   saveRunSummary,
   saveClientRiskScores,
   calculateClientScores,
   generateRunSummary
 } from '@/lib/api/pintAEApi';
-import { runAllPintAEChecks } from '@/lib/checks/pintAECheckRunner';
 import { NewUploadLogEntry, UploadLogEntry } from '@/types/uploadLog';
-import { buildOrganizationProfileExceptions, getRulesetForDirection, RULESET_VERSION } from '@/lib/validation/rulesetRouter';
+import { getRulesetForDirection, RULESET_VERSION } from '@/lib/validation/rulesetRouter';
 import { resolveDirection } from '@/lib/direction/directionUtils';
 import { DatasetType } from '@/types/datasets';
 import { InvestigationFlag } from '@/types/customChecks';
+import { runChecksOrchestrator } from '@/engine/orchestrator';
 
 interface ComplianceContextType {
   direction: Direction;
@@ -243,70 +239,23 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
 
   const runChecks = async (options?: { mappingProfileId?: string; mappingVersion?: number }) => {
     setIsRunning(true);
-    
-    const buyerMap = new Map(buyers.map(b => [b.buyer_id, b]));
-    const headerMap = new Map(headers.map(h => [h.invoice_id, h]));
-    const linesByInvoice = new Map<string, InvoiceLine[]>();
-    
-    lines.forEach(line => {
-      if (!linesByInvoice.has(line.invoice_id)) {
-        linesByInvoice.set(line.invoice_id, []);
-      }
-      linesByInvoice.get(line.invoice_id)!.push(line);
-    });
-
-    const dataContext: DataContext = { buyers, headers, lines, buyerMap, headerMap, linesByInvoice };
-
+    const activeMappingProfile = activeMappingProfileByDirection[direction];
+    const mappingProfileId = options?.mappingProfileId || activeMappingProfile?.id;
     const activeRuleset = getRulesetForDirection(direction);
 
-    // Run built-in checks
-    const builtInResults = runAllChecks(dataContext);
-    
-    // Ensure missing UC1 checks are inserted without overwriting DB-managed settings.
-    await seedUC1CheckPack(false);
-
-    // Fetch and run PINT-AE checks
-    const pintAEChecks = await fetchEnabledPintAEChecks();
-    const pintExceptions = runAllPintAEChecks(pintAEChecks, dataContext);
-    
-    // Convert PINT-AE exceptions to legacy format for backward compatibility
-    const legacyExceptions: Exception[] = pintExceptions.map(e => ({
-      id: e.id,
-      checkId: e.check_id,
-      checkName: e.check_name,
-      severity: e.severity,
-      message: e.message,
-      invoiceId: e.invoice_id,
-      invoiceNumber: e.invoice_number,
-      sellerTrn: e.seller_trn,
-      buyerId: e.buyer_id,
-      lineId: e.line_id,
-      field: e.field_name,
-      expectedValue: e.expected_value_or_rule,
-      actualValue: e.observed_value,
-    }));
-    
-    const orgProfileExceptions = buildOrganizationProfileExceptions(organizationProfile, {
+    const orchestrationResult = await runChecksOrchestrator({
       direction,
+      buyers,
       headers,
-      buyerMap,
+      lines,
+      organizationProfile,
       uploadSessionId: uploadSessionId || undefined,
       uploadManifestId: uploadManifestId || undefined,
-      mappingProfileId: options?.mappingProfileId || activeMappingProfileByDirection[direction]?.id,
+      mappingProfileId,
       rulesetVersion: RULESET_VERSION,
     });
 
-    const allExceptions = [...builtInResults.flatMap(r => r.exceptions), ...legacyExceptions, ...orgProfileExceptions].map((exception) => ({
-      ...exception,
-      datasetType: direction,
-      direction: resolveDirection(exception.direction || direction),
-      ruleId: exception.ruleId || exception.checkId,
-      uploadSessionId: exception.uploadSessionId || uploadSessionId || undefined,
-      uploadManifestId: exception.uploadManifestId || uploadManifestId || undefined,
-      mappingProfileId: exception.mappingProfileId || options?.mappingProfileId || activeMappingProfileByDirection[direction]?.id || undefined,
-      rulesetVersion: exception.rulesetVersion || RULESET_VERSION,
-      status: exception.status || 'Open',
-    }));
+    const { builtInResults, pintAEChecks, pintExceptions, allExceptions } = orchestrationResult;
     setCheckResults(builtInResults.map((result) => ({ ...result, direction, datasetType: direction })));
     setExceptions(allExceptions);
     setPintAEExceptions(pintExceptions);
@@ -332,8 +281,8 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
         rulesetVersion: RULESET_VERSION,
         uploadSessionId,
         uploadManifestId,
-        mappingProfileId: options?.mappingProfileId || activeMappingProfileByDirection[direction]?.id || null,
-        mappingVersion: options?.mappingVersion || activeMappingProfileByDirection[direction]?.version || null,
+        mappingProfileId: mappingProfileId || null,
+        mappingVersion: options?.mappingVersion || activeMappingProfile?.version || null,
       },
     });
 

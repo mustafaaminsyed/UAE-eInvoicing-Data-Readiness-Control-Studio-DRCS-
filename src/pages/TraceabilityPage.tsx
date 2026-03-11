@@ -33,68 +33,33 @@ import {
   getScenarioApplicabilityBadgeClass,
   getScenarioApplicabilityForDR,
 } from '@/modules/scenarioLens/drScenarioApplicability';
-import { getMoFFields } from '@/lib/registry/mofSpecRegistry';
+import { getMoFFields, MoFDocumentType } from '@/lib/registry/mofSpecRegistry';
+import {
+  getMoFCrosswalkDenominatorPolicy,
+  getMoFCrosswalkRow,
+} from '@/lib/registry/mofCrosswalkRegistry';
 
 type FilterType = 'all' | 'mandatory' | 'pint-new' | 'pint-legacy' | 'unmapped' | 'not-ingestible' | 'low-population' | 'no-rules' | 'no-controls' | 'covered';
 type TraceabilityViewMode = 'pint' | 'mof';
 
-const MOF_FIELD_TO_INTERNAL_COLUMN: Record<number, string | undefined> = {
-  1: 'invoice_number',
-  2: 'issue_date',
-  3: 'invoice_type',
-  4: 'currency',
-  5: 'transaction_type_code',
-  6: 'payment_due_date',
-  7: 'business_process',
-  8: 'spec_id',
-  9: 'payment_means_code',
-  10: 'seller_name',
-  11: 'seller_electronic_address',
-  13: 'seller_legal_reg_id',
-  14: 'seller_legal_reg_id_type',
-  15: 'seller_trn',
-  17: 'seller_address',
-  18: 'seller_city',
-  19: 'seller_subdivision',
-  20: 'seller_country',
-  21: 'buyer_name',
-  22: 'buyer_electronic_address',
-  26: 'buyer_address',
-  27: 'buyer_city',
-  28: 'buyer_subdivision',
-  29: 'buyer_country',
-  31: 'total_excl_vat',
-  32: 'vat_total',
-  33: 'total_incl_vat',
-  34: 'amount_due',
-  37: 'tax_category_code',
-  39: 'line_id',
-  40: 'quantity',
-  41: 'unit_of_measure',
-  42: 'line_total_excl_vat',
-  43: 'unit_price',
-  46: 'tax_category_code',
-  47: 'vat_rate',
-  48: 'vat_amount',
-  50: 'description',
-  51: 'item_name',
+const MOF_DOCUMENT_TYPES: MoFDocumentType[] = ['tax_invoice', 'commercial_xml'];
+const MOF_DOCUMENT_TYPE_LABEL: Record<MoFDocumentType, string> = {
+  tax_invoice: 'Tax',
+  commercial_xml: 'Commercial',
 };
 
 type MofFieldEntry = {
-  field_number: number;
-  name: string;
-  section: string;
-  cardinality: string;
-  applies_to: string[];
-};
-
-type MofOverlayRow = {
+  rowKey: string;
+  documentType: MoFDocumentType;
+  documentTypeLabel: string;
   fieldNumber: number;
   fieldName: string;
   section: string;
   cardinality: string;
-  appliesTo: string[];
-  internalColumn: string | null;
+  internalColumns: string[];
+};
+
+type MofOverlayRow = MofFieldEntry & {
   linkedDrIds: string[];
   inTemplate: boolean;
   ingestible: boolean;
@@ -291,7 +256,13 @@ export default function TraceabilityPage() {
 
   const populations = useMemo(() => {
     if (!isDataLoaded) return [];
-    const buyerRows = buyers.map(b => b as unknown as Record<string, string>);
+    const buyerRows = buyers.map((b) => {
+      const row: Record<string, string> = {};
+      for (const [k, v] of Object.entries(b)) {
+        row[k] = v !== undefined && v !== null ? String(v) : '';
+      }
+      return row;
+    });
     const headerRows = headers.map(h => {
       const row: Record<string, string> = {};
       for (const [k, v] of Object.entries(h)) {
@@ -326,29 +297,25 @@ export default function TraceabilityPage() {
     [populations, exceptionCountsByDR]
   );
 
+  const denominatorPolicy = useMemo(() => getMoFCrosswalkDenominatorPolicy(), []);
+
   const mofFields = useMemo<MofFieldEntry[]>(() => {
-    const merged = new Map<number, MofFieldEntry>();
-    const documentTypes: Array<'tax_invoice' | 'commercial_xml'> = ['tax_invoice', 'commercial_xml'];
-    documentTypes.forEach((documentType) => {
-      getMoFFields(documentType).forEach((field) => {
-        const existing = merged.get(field.field_id);
+    return MOF_DOCUMENT_TYPES.flatMap((documentType) =>
+      getMoFFields(documentType).map((field) => {
+        const crosswalk = getMoFCrosswalkRow(documentType, field.field_id);
         const cardinality = field.mandatory ? '1..1' : '';
-        if (!existing) {
-          merged.set(field.field_id, {
-            field_number: field.field_id,
-            name: field.field_name,
-            section: field.section_id,
-            cardinality,
-            applies_to: [documentType],
-          });
-          return;
-        }
-        existing.applies_to = Array.from(new Set([...existing.applies_to, documentType]));
-        if (!existing.cardinality && cardinality) existing.cardinality = cardinality;
-        if (!existing.section && field.section_id) existing.section = field.section_id;
-      });
-    });
-    return Array.from(merged.values()).sort((a, b) => a.field_number - b.field_number);
+        return {
+          rowKey: `${documentType}:${field.field_id}`,
+          documentType,
+          documentTypeLabel: MOF_DOCUMENT_TYPE_LABEL[documentType],
+          fieldNumber: field.field_id,
+          fieldName: field.field_name,
+          section: field.section_id,
+          cardinality,
+          internalColumns: crosswalk?.sourceColumns ?? [],
+        };
+      })
+    );
   }, []);
 
   const mofOverlayRows = useMemo<MofOverlayRow[]>(() => {
@@ -362,8 +329,7 @@ export default function TraceabilityPage() {
 
     return mofFields
       .map((field) => {
-        const internalColumn = MOF_FIELD_TO_INTERNAL_COLUMN[field.field_number] || null;
-        const linked = internalColumn ? byInternal.get(internalColumn) || [] : [];
+        const linked = field.internalColumns.flatMap((column) => byInternal.get(column) || []);
         const linkedDrIds = Array.from(new Set(linked.map((r) => r.dr_id)));
         const ruleIds = new Set<string>();
         const controlIds = new Set<string>();
@@ -373,20 +339,33 @@ export default function TraceabilityPage() {
         });
 
         return {
-          fieldNumber: field.field_number,
-          fieldName: field.name,
+          rowKey: field.rowKey,
+          documentType: field.documentType,
+          documentTypeLabel: field.documentTypeLabel,
+          fieldNumber: field.fieldNumber,
+          fieldName: field.fieldName,
           section: field.section,
           cardinality: field.cardinality,
-          appliesTo: field.applies_to || [],
-          internalColumn,
+          internalColumns: field.internalColumns,
           linkedDrIds,
-          inTemplate: linked.some((r) => r.inTemplate),
-          ingestible: linked.length > 0 && linked.every((r) => r.ingestible),
+          inTemplate: field.internalColumns.length > 0 && field.internalColumns.every((column) => {
+            const columnRows = byInternal.get(column) || [];
+            return columnRows.some((row) => row.inTemplate);
+          }),
+          ingestible: field.internalColumns.length > 0 && field.internalColumns.every((column) => {
+            const columnRows = byInternal.get(column) || [];
+            return columnRows.some((row) => row.ingestible);
+          }),
           ruleCount: ruleIds.size,
           controlCount: controlIds.size,
         };
       })
-      .sort((a, b) => a.fieldNumber - b.fieldNumber);
+      .sort((a, b) => {
+        if (a.documentType !== b.documentType) {
+          return a.documentType === 'tax_invoice' ? -1 : 1;
+        }
+        return a.fieldNumber - b.fieldNumber;
+      });
   }, [mofFields, rows]);
 
   const rowNumberByDrId = useMemo(() => {
@@ -425,9 +404,10 @@ export default function TraceabilityPage() {
       const q = search.toLowerCase();
       result = result.filter((row) =>
         String(row.fieldNumber).includes(q) ||
+        row.documentTypeLabel.toLowerCase().includes(q) ||
         row.fieldName.toLowerCase().includes(q) ||
         row.section.toLowerCase().includes(q) ||
-        (row.internalColumn || '').toLowerCase().includes(q) ||
+        row.internalColumns.some((column) => column.toLowerCase().includes(q)) ||
         row.linkedDrIds.some((id) => id.toLowerCase().includes(q))
       );
     }
@@ -439,7 +419,9 @@ export default function TraceabilityPage() {
     const linked = mofOverlayRows.filter((row) => row.linkedDrIds.length > 0).length;
     const inTemplate = mofOverlayRows.filter((row) => row.inTemplate).length;
     const ingestible = mofOverlayRows.filter((row) => row.ingestible).length;
-    return { total, linked, inTemplate, ingestible };
+    const taxRows = mofOverlayRows.filter((row) => row.documentType === 'tax_invoice').length;
+    const commercialRows = mofOverlayRows.filter((row) => row.documentType === 'commercial_xml').length;
+    return { total, linked, inTemplate, ingestible, taxRows, commercialRows };
   }, [mofOverlayRows]);
 
   const filters: { key: FilterType; label: string; count: number }[] = [
@@ -822,15 +804,16 @@ export default function TraceabilityPage() {
         {viewMode === 'mof' && (
           <div className="bg-card rounded-xl border shadow-sm overflow-hidden animate-slide-up">
             <div className="overflow-x-auto border-b bg-card">
-              <table className="w-full text-sm min-w-[1100px]">
+              <table className="w-full text-sm min-w-[1220px]">
                 <thead>
                   <tr className="border-b bg-card">
                     <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-16">#</th>
+                    <th className="h-12 px-4 text-left align-middle text-xs font-medium text-muted-foreground w-24">Doc Type</th>
                     <th className="h-12 px-4 text-left align-middle text-xs font-medium text-muted-foreground w-20">MoF #</th>
                     <th className="h-12 px-4 text-left align-middle text-xs font-medium text-muted-foreground">Field Name</th>
                     <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-20">Section</th>
                     <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-20">Card.</th>
-                    <th className="h-12 px-4 text-left align-middle text-xs font-medium text-muted-foreground w-24">Mapped Col</th>
+                    <th className="h-12 px-4 text-left align-middle text-xs font-medium text-muted-foreground w-32">Mapped Col(s)</th>
                     <th className="h-12 px-4 text-left align-middle text-xs font-medium text-muted-foreground w-24">Linked DR(s)</th>
                     <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-20">In Tmpl</th>
                     <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-20">Ingestible</th>
@@ -842,17 +825,32 @@ export default function TraceabilityPage() {
             </div>
 
             <div className="max-h-[68vh] overflow-auto">
-              <table className="w-full text-sm min-w-[1100px]">
+              <table className="w-full text-sm min-w-[1220px]">
                 <tbody className="[&_tr:last-child]:border-0">
                   {filteredMofRows.map((row, idx) => (
-                    <tr key={row.fieldNumber} className="border-b transition-colors hover:bg-muted/30">
+                    <tr key={row.rowKey} className="border-b transition-colors hover:bg-muted/30">
                       <td className="p-4 text-center align-middle text-xs text-muted-foreground w-16">{idx + 1}</td>
+                      <td className="p-4 align-middle text-xs w-24">
+                        <Badge variant="outline" className="text-[10px]">
+                          {row.documentTypeLabel}
+                        </Badge>
+                      </td>
                       <td className="p-4 align-middle font-mono text-xs font-medium text-primary w-20">{row.fieldNumber}</td>
                       <td className="p-4 align-middle text-sm">{row.fieldName}</td>
                       <td className="p-4 align-middle text-center text-xs w-20">{row.section}</td>
                       <td className="p-4 align-middle text-center text-xs w-20">{row.cardinality}</td>
-                      <td className="p-4 align-middle text-xs w-24">
-                        {row.internalColumn ? <code className="bg-muted px-1.5 py-0.5 rounded">{row.internalColumn}</code> : <span className="text-muted-foreground">-</span>}
+                      <td className="p-4 align-middle text-xs w-32">
+                        {row.internalColumns.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {row.internalColumns.map((column) => (
+                              <code key={`${row.rowKey}-${column}`} className="bg-muted px-1.5 py-0.5 rounded">
+                                {column}
+                              </code>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </td>
                       <td className="p-4 align-middle text-xs w-24">
                         {row.linkedDrIds.length > 0 ? (
@@ -877,7 +875,7 @@ export default function TraceabilityPage() {
                   ))}
                   {filteredMofRows.length === 0 && (
                     <tr className="border-b">
-                      <td colSpan={11} className="p-4 align-middle text-center text-muted-foreground py-12">
+                      <td colSpan={12} className="p-4 align-middle text-center text-muted-foreground py-12">
                         No matching MoF fields found
                       </td>
                     </tr>
@@ -890,22 +888,27 @@ export default function TraceabilityPage() {
 
         <div className="mt-4 text-xs text-muted-foreground text-center">
           {viewMode === 'pint' ? (
-            <>
+            <span data-testid="pint-view-summary">
               Showing {filteredRows.length} of {rows.length} data requirements |
               Population threshold: {CONFORMANCE_CONFIG.populationWarningThreshold}% |
               Consistency: {consistencyReport.passed} passed, {consistencyReport.failed} issues
               {FEATURE_FLAGS.scenarioLens && (
                 <> | Scenario selection: {scenarioInvoicesInSelection.length} invoice(s)</>
               )}
-            </>
+            </span>
           ) : (
-            <>
+            <span data-testid="mof-overlay-summary">
               Showing {filteredMofRows.length} of {mofOverlaySummary.total} MoF fields |
+              Tax rows: {mofOverlaySummary.taxRows} |
+              Commercial rows: {mofOverlaySummary.commercialRows} |
               Linked to DRs: {mofOverlaySummary.linked} |
               In template: {mofOverlaySummary.inTemplate} |
               Ingestible: {mofOverlaySummary.ingestible}
-            </>
+            </span>
           )}
+          <span data-testid="denominator-policy" className="block mt-1">
+            Denominators: MoF Tax {denominatorPolicy.mofTaxMandatoryFields} | MoF Commercial {denominatorPolicy.mofCommercialMandatoryFields} | PINT {denominatorPolicy.pintRegistryFields} | Ingestion {denominatorPolicy.ingestionSourceColumns}
+          </span>
         </div>
       </div>
 
