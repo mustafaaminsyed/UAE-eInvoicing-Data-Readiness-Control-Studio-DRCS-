@@ -1,0 +1,23 @@
+index_no,codelist_name,source_type,document_context,uc1_applicable,runtime_enforceable_now,bound_field,bound_pint_element,bound_mof_field,bound_check_id,reason_if_not_enforceable,target_phase,notes
+1,Aligned-TaxCategoryCodes,packaged_gc,both,yes,yes,headers.tax_category_code|lines.tax_category_code,IBT-118|IBT-151,tax#37|tax#46|commercial#37|commercial#46,UAE-UC1-CHK-041|UAE-UC1-CHK-042,Active,UC1,First-wave runtime codelist enforcement.
+2,Aligned-TaxExemptionCodes,packaged_gc,both,conditional,no,-,-,-,-,Deferred - scenario dependent,UC2,Requires explicit exemption reason source fields in invoice model.
+3,CreditReason,packaged_gc,credit_note,conditional,no,-,-,-,-,Deferred - scenario dependent,UC2,Credit-note reason code not modeled in current UC1 ingestion.
+4,eas,packaged_gc,both,conditional,conditional,headers.seller_endpoint_scheme_id|buyers.buyer_endpoint_scheme_id,IBT-034-1|IBT-049-1,tax#12|tax#23|commercial#12|commercial#23,-,Deferred - policy derived,future,Governed but non-runtime until endpoint scheme derivation contract is formalized.
+5,FreqBilling,packaged_gc,invoice,no,no,-,-,-,-,Deferred - not in UC1 scope,UC3,Recurring-billing frequency is outside UC1 baseline.
+6,GoodsType,packaged_gc,both,conditional,no,-,-,-,-,Deferred - scenario dependent,UC3,Requires reverse-charge goods typing fields not present in UC1 templates.
+7,ICD,packaged_gc,both,no,no,-,-,-,-,Deferred - missing source field,future,Participant scheme ICD inputs are not present in UC1 ingestion model.
+8,ISO3166,packaged_gc,both,yes,yes,headers.seller_country|buyers.buyer_country,IBT-040|IBT-055,tax#20|tax#29|commercial#20|commercial#29,UAE-UC1-CHK-043|UAE-UC1-CHK-044,Active,UC1,First-wave runtime codelist enforcement.
+9,ISO4217,derived_standard,both,yes,yes,headers.currency,IBT-005,tax#4|commercial#4,UAE-UC1-CHK-006,Active,UC1,Governed coded domain included for currency compliance.
+10,ItemType,packaged_gc,both,no,no,-,-,-,-,Deferred - not in UC1 scope,UC3,Item type codelist requires additional item-identification context.
+11,MimeCode,packaged_gc,both,no,no,-,-,-,-,Deferred - missing source field,future,Attachment MIME metadata is not modeled in UC1 templates.
+12,SEPA,packaged_gc,invoice,conditional,no,-,-,-,-,Deferred - scenario dependent,UC3,SEPA applicability depends on payment scenarios outside current UC1 baseline.
+13,transactiontype,packaged_gc,both,yes,conditional,headers.transaction_type_code,BTUAE-02,tax#5|commercial#5,-,Deferred - policy derived,future,Observed only until policy-to-runtime transform contract is locked.
+14,UNCL1001-cn,packaged_gc,credit_note,conditional,conditional,headers.invoice_type,IBT-003,tax#3|commercial#3,UAE-UC1-CHK-046,Active,UC1,Scenario-gated runtime enforcement for credit note context.
+15,UNCL1001-inv,packaged_gc,invoice,yes,yes,headers.invoice_type,IBT-003,tax#3|commercial#3,UAE-UC1-CHK-045,Active,UC1,First-wave runtime codelist enforcement for invoice context.
+16,UNCL1153,packaged_gc,both,no,no,-,-,-,-,Deferred - missing source field,future,Invoiced object identifier scheme is not captured in UC1 source model.
+17,UNCL2005,packaged_gc,both,no,no,-,-,-,-,Deferred - missing source field,future,Date-period function qualifier fields are not modeled in UC1 ingestion.
+18,UNCL4461,packaged_gc,both,conditional,conditional,headers.payment_means_code,IBT-081,tax#9|commercial#9,UAE-UC1-CHK-047,Active,UC1,Runtime enforced when payment means code is provided.
+19,UNCL5189,packaged_gc,both,conditional,no,lines.line_allowance_reason_code,IBT-148,tax#44|commercial#44,-,Deferred - missing transformation logic,UC2,Allowance reason coding requires explicit transform contract and source field.
+20,UNCL7143,packaged_gc,both,no,no,-,-,-,-,Deferred - missing source field,future,Item identification code-type fields are not in UC1 template set.
+21,UNCL7161,packaged_gc,both,conditional,no,-,-,-,-,Deferred - missing source field,UC2,Charge reason code source fields are not present in UC1 templates.
+22,UNECERec20,packaged_gc,both,yes,yes,lines.unit_of_measure,IBT-130,tax#41|commercial#41,UAE-UC1-CHK-048,Active,UC1,First-wave runtime codelist enforcement.

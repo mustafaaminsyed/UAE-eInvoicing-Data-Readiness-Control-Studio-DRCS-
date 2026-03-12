@@ -72,6 +72,37 @@ function getStringArray(value: unknown): string[] {
     .filter((item) => item.length > 0);
 }
 
+function isCreditNoteInvoiceType(value: string): boolean {
+  const token = normalizeToken(value);
+  if (!token) return false;
+  return token.startsWith('381') || token.includes('CREDIT');
+}
+
+function shouldRunCodelistForDocumentContext(
+  record: any,
+  data: DataContext,
+  params: Record<string, any>
+): boolean {
+  const context = normalizeToken(params.document_context || 'both');
+  if (!context || context === 'BOTH') return true;
+
+  const invoiceType = normalizeToken(
+    record?.invoice_type ??
+    data.headerMap.get(record?.invoice_id)?.invoice_type
+  );
+
+  if (context === 'CREDIT_NOTE') {
+    return isCreditNoteInvoiceType(invoiceType);
+  }
+
+  if (context === 'INVOICE') {
+    if (!invoiceType) return true;
+    return !isCreditNoteInvoiceType(invoiceType);
+  }
+
+  return true;
+}
+
 function isCommercialScopeApplicable(header: any, params: Record<string, any>): boolean {
   if (normalizeToken(params.apply_when_document_type) !== 'COMMERCIAL') return true;
 
@@ -1051,6 +1082,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
         const field = resolveFieldAlias(params.field);
         const dataset = getDatasetForField(field, check.scope, data);
         dataset.forEach((record: any) => {
+          if (!shouldRunCodelistForDocumentContext(record, data, params)) return;
           const value = getFieldValue(record, field);
           if (!isEmpty(value) && !isCodeInCodelist(String(params.codelist), String(value))) {
             const header = record.invoice_id ? data.headerMap.get(record.invoice_id) : undefined;

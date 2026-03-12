@@ -1,17 +1,19 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   BarChart3,
-  TrendingUp,
   AlertTriangle,
   Calendar,
   RefreshCw,
   Award,
-  XCircle,
   FilterX,
   Shield,
   FileCheck,
   Layers3,
   Info,
+  Activity,
+  Clock3,
+  FolderOpen,
+  Hash,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,6 +25,7 @@ import {
 } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { StatsCard } from '@/components/StatsCard';
+import ComplianceRadar from '@/components/dashboard/ComplianceRadar';
 import {
   LineChart,
   Line,
@@ -35,15 +38,18 @@ import {
   Bar,
 } from 'recharts';
 import { fetchCheckRuns, fetchLatestEntityScores } from '@/lib/api/checksApi';
-import { fetchClientHealthScores, getRejectionAnalytics } from '@/lib/api/casesApi';
+import { fetchClientHealthScores, getRejectionAnalytics, getSLAMetrics } from '@/lib/api/casesApi';
 import { CheckRun, EntityScore } from '@/types/customChecks';
-import { ClientHealth } from '@/types/cases';
+import { ClientHealth, SLAMetrics } from '@/types/cases';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { computeTraceabilityMatrix } from '@/lib/coverage/conformanceEngine';
 import { computeMoFCoverage } from '@/lib/coverage/mofCoverageEngine';
+import UAE_UC1_CHECK_PACK from '@/lib/checks/uaeUC1CheckPack';
+import { PINT_AE_CODELIST_GOVERNANCE_COUNTS, countRuntimeCodelistChecks } from '@/lib/pintAE/codelistGovernanceSummary';
+import { ComplianceRadarAxisKey, buildComplianceRadarResult } from '@/lib/analytics/complianceRadar';
 
-type InsightMode = 'none' | 'quality' | 'rejections' | 'repeat' | 'critical' | 'volume' | 'dr_coverage' | 'mof_coverage';
+type InsightMode = 'none' | 'quality' | 'repeat' | 'critical' | 'dr_coverage' | 'mof_coverage';
 
 function getScoreColor(score: number): string {
   if (score >= 90) return 'text-success';
@@ -65,6 +71,14 @@ export default function ControlsDashboardPage() {
   const [clientHealth, setClientHealth] = useState<ClientHealth[]>([]);
   const [topRiskSellers, setTopRiskSellers] = useState<EntityScore[]>([]);
   const [rejectionAnalytics, setRejectionAnalytics] = useState({ totalRejections: 0, repeatRate: 0 });
+  const [slaMetrics, setSlaMetrics] = useState<SLAMetrics>({
+    averageResolutionHours: {},
+    breachPercentage: 0,
+    totalCases: 0,
+    breachedCases: 0,
+    openCases: 0,
+    resolvedCases: 0,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | 'all'>('all');
@@ -105,16 +119,18 @@ export default function ControlsDashboardPage() {
     else setIsLoading(true);
 
     try {
-      const [runs, health, sellers, rejections] = await Promise.all([
+      const [runs, health, sellers, rejections, sla] = await Promise.all([
         fetchCheckRuns(20),
         fetchClientHealthScores(),
         fetchLatestEntityScores('seller', 10),
         getRejectionAnalytics(),
+        getSLAMetrics(),
       ]);
       setCheckRuns(runs);
       setClientHealth(health);
       setTopRiskSellers(sellers);
       setRejectionAnalytics(rejections);
+      setSlaMetrics(sla);
     } catch {
       toast({
         title: 'Failed to load controls data',
@@ -142,34 +158,81 @@ export default function ControlsDashboardPage() {
     })
     .reverse();
 
-  const trendData = filteredRuns.map((run) => ({
-    date: new Date(run.run_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    passRate: run.pass_rate,
-    exceptions: run.total_exceptions,
-    critical: run.critical_count,
-    nonCritical: Math.max(0, run.total_exceptions - run.critical_count),
-  }));
-
   const latestRun = filteredRuns.length > 0 ? filteredRuns[filteredRuns.length - 1] : undefined;
   const previousRun = filteredRuns.length > 1 ? filteredRuns[filteredRuns.length - 2] : undefined;
   const passRateTrend = latestRun && previousRun ? latestRun.pass_rate - previousRun.pass_rate : 0;
+  const periodRunCount = filteredRuns.length;
+
+  const periodTotals = useMemo(() => {
+    return filteredRuns.reduce(
+      (acc, run) => {
+        acc.invoices += run.total_invoices;
+        acc.exceptions += run.total_exceptions;
+        acc.critical += run.critical_count;
+        return acc;
+      },
+      { invoices: 0, exceptions: 0, critical: 0 }
+    );
+  }, [filteredRuns]);
 
   const avgHealthScore =
     clientHealth.length > 0 ? clientHealth.reduce((sum, c) => sum + c.score, 0) / clientHealth.length : null;
   const latestPassRate = latestRun?.pass_rate ?? null;
-  const periodRunCount = filteredRuns.length;
   const avgPassRatePeriod = periodRunCount > 0
     ? filteredRuns.reduce((sum, r) => sum + r.pass_rate, 0) / periodRunCount
     : null;
-  const exceptionsPerInvoice = latestRun && latestRun.total_invoices > 0
-    ? latestRun.total_exceptions / latestRun.total_invoices
+  const exceptionsPer100Invoices = periodTotals.invoices > 0
+    ? (periodTotals.exceptions / periodTotals.invoices) * 100
+    : null;
+  const criticalShare = periodTotals.exceptions > 0
+    ? (periodTotals.critical / periodTotals.exceptions) * 100
     : null;
   const criticalDensity = latestRun && latestRun.total_invoices > 0
     ? (latestRun.critical_count / latestRun.total_invoices) * 100
     : null;
+  const avgResolutionHours = useMemo(() => {
+    const values = Object.values(slaMetrics.averageResolutionHours).filter((v) => Number.isFinite(v));
+    if (values.length === 0) return null;
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+  }, [slaMetrics.averageResolutionHours]);
+  const runtimeCodelistChecks = useMemo(
+    () => countRuntimeCodelistChecks(UAE_UC1_CHECK_PACK.filter((check) => check.is_enabled)),
+    []
+  );
+  const radarProfile = useMemo(
+    () =>
+      buildComplianceRadarResult({
+        mandatoryCoveragePct: mofMandatoryCoveragePct,
+        drCoveragePct: drCoverageSummary.percent,
+        latestPassRatePct: latestPassRate,
+        avgPassRatePct: avgPassRatePeriod,
+        exceptionIntensityPer100: exceptionsPer100Invoices,
+        criticalSharePct: criticalShare,
+        latestCriticalPressurePct: criticalDensity,
+        repeatRejectionRatePct: rejectionAnalytics.repeatRate,
+        avgHealthScore,
+        slaBreachRatePct: slaMetrics.breachPercentage,
+        runtimeCodelistChecks,
+        governedCodedDomains: PINT_AE_CODELIST_GOVERNANCE_COUNTS.governedCodedDomains,
+      }),
+    [
+      avgHealthScore,
+      avgPassRatePeriod,
+      criticalDensity,
+      criticalShare,
+      drCoverageSummary.percent,
+      exceptionsPer100Invoices,
+      latestPassRate,
+      mofMandatoryCoveragePct,
+      rejectionAnalytics.repeatRate,
+      runtimeCodelistChecks,
+      slaMetrics.breachPercentage,
+    ]
+  );
 
   const formatPct = (value: number | null, digits = 1) => (value === null ? 'N/A' : `${value.toFixed(digits)}%`);
-  const formatNum = (value: number | null, digits = 1) => (value === null ? 'N/A' : value.toFixed(digits));
+  const formatHours = (value: number | null) => (value === null ? 'N/A' : `${value.toFixed(1)}h`);
+  const formatCount = (value: number) => value.toLocaleString('en-US');
 
   const readinessScore = useMemo(() => {
     const normalizedPassRate = latestPassRate ?? 0;
@@ -204,7 +267,7 @@ export default function ControlsDashboardPage() {
   }));
 
   const visibleClientHealth = (() => {
-    if (insightMode === 'rejections' || insightMode === 'repeat') {
+    if (insightMode === 'repeat') {
       return [...clientHealth]
         .filter((c) => c.total_rejections > 0)
         .sort((a, b) => b.total_rejections - a.total_rejections)
@@ -229,13 +292,26 @@ export default function ControlsDashboardPage() {
   const insightLabel: Record<InsightMode, string> = {
     none: 'None',
     quality: 'Quality Risk',
-    rejections: 'Rejection Risk',
     repeat: 'Repeat Failure Risk',
     critical: 'Critical Exceptions',
-    volume: 'Run Volume',
     dr_coverage: 'DR Coverage',
     mof_coverage: 'MoF Mandatory Coverage',
   };
+  const handleRadarDimensionClick = useCallback((axis: ComplianceRadarAxisKey) => {
+    if (axis === 'mandatory_coverage') {
+      setInsightMode('mof_coverage');
+      return;
+    }
+    if (axis === 'pint_structure_readiness') {
+      setInsightMode('dr_coverage');
+      return;
+    }
+    if (axis === 'exception_control_health' || axis === 'tax_logic_integrity') {
+      setInsightMode('critical');
+      return;
+    }
+    setInsightMode('quality');
+  }, []);
   const chartAnimationSeed = `${timeRange}-${insightMode}-${focusTrendData.length}`;
 
   if (isLoading) {
@@ -328,77 +404,180 @@ export default function ControlsDashboardPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-8 animate-slide-up">
-          <StatsCard
-            title="Latest Conformance Pass Rate"
-            value={formatPct(latestPassRate)}
-            subtitle={
-              latestPassRate === null
-                ? 'No run in selected period'
-                : passRateTrend !== 0
-                  ? `${passRateTrend > 0 ? '+' : ''}${passRateTrend.toFixed(1)}% vs previous run`
-                  : 'No movement vs previous run'
-            }
-            helpText="Percentage of validation checks that passed in the most recent run in the selected time range."
-            onClick={() => setInsightMode('quality')}
-            isActive={insightMode === 'quality'}
-            icon={<FileCheck className="w-5 h-5" />}
-            variant={latestPassRate === null ? 'default' : latestPassRate >= 90 ? 'success' : latestPassRate >= 70 ? 'warning' : 'danger'}
+        <div className="mb-8 animate-slide-up">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-foreground">Runtime Operations (Selected Period)</h2>
+            <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs text-primary">
+              Scope: Time filter applies
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <StatsCard
+              title="Runs Executed"
+              value={formatCount(periodRunCount)}
+              subtitle={timeRange === 'all' ? 'All recorded runs' : 'Runs within selected period'}
+              helpText="Number of check runs completed in the selected time window."
+              icon={<Hash className="w-5 h-5" />}
+            />
+            <StatsCard
+              title="Invoices Processed"
+              value={formatCount(periodTotals.invoices)}
+              subtitle="Total invoices across selected runs"
+              helpText="Total invoice volume processed by the validation engine for the selected period."
+              icon={<Activity className="w-5 h-5" />}
+            />
+            <StatsCard
+              title="Latest Conformance Pass Rate"
+              value={formatPct(latestPassRate)}
+              subtitle={
+                latestPassRate === null
+                  ? 'No run in selected period'
+                  : passRateTrend !== 0
+                    ? `${passRateTrend > 0 ? '+' : ''}${passRateTrend.toFixed(1)}% vs previous run`
+                    : 'No movement vs previous run'
+              }
+              helpText="Pass rate of the most recent run in the selected period."
+              onClick={() => setInsightMode('quality')}
+              isActive={insightMode === 'quality'}
+              icon={<FileCheck className="w-5 h-5" />}
+              variant={latestPassRate === null ? 'default' : latestPassRate >= 90 ? 'success' : latestPassRate >= 70 ? 'warning' : 'danger'}
+            />
+            <StatsCard
+              title="Average Pass Rate (Period)"
+              value={formatPct(avgPassRatePeriod)}
+              subtitle={`${formatCount(periodRunCount)} runs included`}
+              helpText="Average pass rate across all runs in the selected period."
+              onClick={() => setInsightMode('quality')}
+              isActive={insightMode === 'quality'}
+              icon={<Award className="w-5 h-5" />}
+              variant={avgPassRatePeriod === null ? 'default' : avgPassRatePeriod >= 90 ? 'success' : avgPassRatePeriod >= 70 ? 'warning' : 'danger'}
+            />
+            <StatsCard
+              title="Exception Intensity"
+              value={exceptionsPer100Invoices === null ? 'N/A' : `${exceptionsPer100Invoices.toFixed(1)}`}
+              subtitle={exceptionsPer100Invoices === null ? 'No invoice volume in period' : 'Exceptions per 100 invoices'}
+              helpText="Normalized exception load to compare quality across different invoice volumes."
+              icon={<BarChart3 className="w-5 h-5" />}
+              variant={exceptionsPer100Invoices === null ? 'default' : exceptionsPer100Invoices > 25 ? 'danger' : exceptionsPer100Invoices > 10 ? 'warning' : 'success'}
+            />
+            <StatsCard
+              title="Critical Share"
+              value={formatPct(criticalShare)}
+              subtitle={criticalShare === null ? 'No exceptions in period' : `${formatCount(periodTotals.critical)} critical exceptions`}
+              helpText="Critical exceptions as a percentage of all exceptions in the selected period."
+              onClick={() => setInsightMode('critical')}
+              isActive={insightMode === 'critical'}
+              icon={<AlertTriangle className="w-5 h-5" />}
+              variant={criticalShare === null ? 'default' : criticalShare > 30 ? 'danger' : criticalShare > 15 ? 'warning' : 'success'}
+            />
+          </div>
+        </div>
+
+        <div className="mb-8">
+          <ComplianceRadar
+            result={radarProfile}
+            title="Readiness Dimensions"
+            onDimensionClick={handleRadarDimensionClick}
           />
-          <StatsCard
-            title="PINT-AE DR Coverage"
-            value={`${drCoverageSummary.percent.toFixed(1)}%`}
-            subtitle={`${drCoverageSummary.covered} of ${drCoverageSummary.total} DRs have rule+control linkage`}
-            helpText="PINT-AE coverage across mapped data requirements. A DR is counted when linked to at least one validation rule and one control."
-            onClick={() => setInsightMode('dr_coverage')}
-            isActive={insightMode === 'dr_coverage'}
-            icon={<Shield className="w-5 h-5" />}
-            variant={drCoverageSummary.percent >= 90 ? 'success' : drCoverageSummary.percent >= 75 ? 'warning' : 'danger'}
-          />
-          <StatsCard
-            title="MoF Mandatory Coverage"
-            value={mofMandatoryCoveragePct === null ? 'N/A' : `${mofMandatoryCoveragePct.toFixed(1)}%`}
-            subtitle={
-              mofTaxCoverage && mofCommercialCoverage
-                ? `Tax ${mofTaxCoverage.coveredMandatory}/${mofTaxCoverage.mandatoryFields} | Commercial ${mofCommercialCoverage.coveredMandatory}/${mofCommercialCoverage.mandatoryFields}`
-                : 'MoF source coverage unavailable in current runtime'
-            }
-            helpText="Mandatory-field coverage using the MoF source-truth layer across tax_invoice and commercial_xml document types."
-            onClick={() => setInsightMode('mof_coverage')}
-            isActive={insightMode === 'mof_coverage'}
-            icon={<Layers3 className="w-5 h-5" />}
-            variant={mofMandatoryCoveragePct === null ? 'default' : mofMandatoryCoveragePct >= 90 ? 'success' : mofMandatoryCoveragePct >= 75 ? 'warning' : 'danger'}
-          />
-          <StatsCard
-            title="Critical Exception Pressure"
-            value={formatPct(criticalDensity)}
-            subtitle={criticalDensity === null ? 'No latest run data' : 'Critical exceptions per 100 invoices'}
-            helpText="Critical exception rate normalized by invoice volume, so risk can be compared across periods."
-            onClick={() => setInsightMode('critical')}
-            isActive={insightMode === 'critical'}
-            icon={<AlertTriangle className="w-5 h-5" />}
-            variant={criticalDensity === null ? 'default' : criticalDensity > 10 ? 'danger' : criticalDensity > 3 ? 'warning' : 'success'}
-          />
-          <StatsCard
-            title="Repeat Rejection Risk"
-            value={`${rejectionAnalytics.repeatRate.toFixed(1)}%`}
-            subtitle={`${rejectionAnalytics.totalRejections} rejected records in selected analytics scope`}
-            helpText="How often rejected issues reoccur. Higher values indicate unresolved root causes."
-            onClick={() => setInsightMode('repeat')}
-            isActive={insightMode === 'repeat'}
-            icon={<RefreshCw className="w-5 h-5" />}
-            variant={rejectionAnalytics.repeatRate > 20 ? 'danger' : rejectionAnalytics.repeatRate > 10 ? 'warning' : 'success'}
-          />
-          <StatsCard
-            title="Run Quality Signal"
-            value={avgHealthScore === null ? 'N/A' : avgHealthScore.toFixed(0)}
-            subtitle={avgHealthScore === null ? 'No client score data yet' : `${periodRunCount} runs | Avg pass ${formatPct(avgPassRatePeriod)}`}
-            helpText="Composite quality signal blending client health trend and recent run performance."
-            onClick={() => setInsightMode('quality')}
-            isActive={insightMode === 'quality'}
-            icon={<Award className="w-5 h-5" />}
-            variant={avgHealthScore === null ? 'default' : avgHealthScore >= 80 ? 'success' : avgHealthScore >= 60 ? 'warning' : 'danger'}
-          />
+        </div>
+
+        <div className="mb-8 animate-slide-up">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-foreground">Coverage Governance (Registry Scope)</h2>
+            <span className="rounded-full border border-muted-foreground/30 bg-muted/50 px-3 py-1 text-xs text-muted-foreground">
+              Scope: Source model coverage
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <StatsCard
+              title="PINT-AE DR Coverage"
+              value={`${drCoverageSummary.percent.toFixed(1)}%`}
+              subtitle={`${drCoverageSummary.covered} of ${drCoverageSummary.total} DRs have rule+control linkage`}
+              helpText="Registry-level coverage across PINT-AE data requirements. This is governance scope, not period runtime performance."
+              onClick={() => setInsightMode('dr_coverage')}
+              isActive={insightMode === 'dr_coverage'}
+              icon={<Shield className="w-5 h-5" />}
+              variant={drCoverageSummary.percent >= 90 ? 'success' : drCoverageSummary.percent >= 75 ? 'warning' : 'danger'}
+            />
+            <StatsCard
+              title="MoF Mandatory Coverage"
+              value={mofMandatoryCoveragePct === null ? 'N/A' : `${mofMandatoryCoveragePct.toFixed(1)}%`}
+              subtitle={
+                mofTaxCoverage && mofCommercialCoverage
+                  ? `Tax ${mofTaxCoverage.coveredMandatory}/${mofTaxCoverage.mandatoryFields} | Commercial ${mofCommercialCoverage.coveredMandatory}/${mofCommercialCoverage.mandatoryFields}`
+                  : 'MoF source coverage unavailable in current runtime'
+              }
+              helpText="Mandatory-field source coverage using the MoF crosswalk for both tax and commercial document types."
+              onClick={() => setInsightMode('mof_coverage')}
+              isActive={insightMode === 'mof_coverage'}
+              icon={<Layers3 className="w-5 h-5" />}
+              variant={mofMandatoryCoveragePct === null ? 'default' : mofMandatoryCoveragePct >= 90 ? 'success' : mofMandatoryCoveragePct >= 75 ? 'warning' : 'danger'}
+            />
+          </div>
+        </div>
+
+        <div className="mb-8 animate-slide-up">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-foreground">Operational Risk Snapshot</h2>
+            <span className="rounded-full border border-secondary/40 bg-secondary/20 px-3 py-1 text-xs text-muted-foreground">
+              Scope: Latest operational records
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <StatsCard
+              title="Repeat Rejection Risk"
+              value={`${rejectionAnalytics.repeatRate.toFixed(1)}%`}
+              subtitle={`${formatCount(rejectionAnalytics.totalRejections)} total rejection records`}
+              helpText="Global repeat rejection rate from rejection logs. High values suggest unresolved root causes."
+              onClick={() => setInsightMode('repeat')}
+              isActive={insightMode === 'repeat'}
+              icon={<RefreshCw className="w-5 h-5" />}
+              variant={rejectionAnalytics.repeatRate > 20 ? 'danger' : rejectionAnalytics.repeatRate > 10 ? 'warning' : 'success'}
+            />
+            <StatsCard
+              title="SLA Breach Rate"
+              value={`${slaMetrics.breachPercentage.toFixed(1)}%`}
+              subtitle={`${formatCount(slaMetrics.breachedCases)} breached of ${formatCount(slaMetrics.totalCases)} total cases`}
+              helpText="Percentage of cases currently breaching SLA commitments."
+              icon={<Clock3 className="w-5 h-5" />}
+              variant={slaMetrics.breachPercentage > 20 ? 'danger' : slaMetrics.breachPercentage > 10 ? 'warning' : 'success'}
+            />
+            <StatsCard
+              title="Open Cases"
+              value={formatCount(slaMetrics.openCases)}
+              subtitle={`${formatCount(slaMetrics.resolvedCases)} resolved cases`}
+              helpText="Current remediation workload from open exception cases."
+              icon={<FolderOpen className="w-5 h-5" />}
+              variant={slaMetrics.openCases > 30 ? 'danger' : slaMetrics.openCases > 10 ? 'warning' : 'success'}
+            />
+            <StatsCard
+              title="Average Resolution Time"
+              value={formatHours(avgResolutionHours)}
+              subtitle="Across severities with resolved cases"
+              helpText="Mean time to resolve cases, averaged across severities where resolved cases exist."
+              icon={<Clock3 className="w-5 h-5" />}
+            />
+            <StatsCard
+              title="Client Health Signal"
+              value={avgHealthScore === null ? 'N/A' : avgHealthScore.toFixed(0)}
+              subtitle={avgHealthScore === null ? 'No client score data yet' : `Latest portfolio average health score`}
+              helpText="Average client health score from the latest health records."
+              onClick={() => setInsightMode('quality')}
+              isActive={insightMode === 'quality'}
+              icon={<Award className="w-5 h-5" />}
+              variant={avgHealthScore === null ? 'default' : avgHealthScore >= 80 ? 'success' : avgHealthScore >= 60 ? 'warning' : 'danger'}
+            />
+            <StatsCard
+              title="Latest Critical Pressure"
+              value={formatPct(criticalDensity)}
+              subtitle={criticalDensity === null ? 'No latest run data' : 'Critical exceptions per 100 invoices (latest run)'}
+              helpText="Critical exception pressure from the most recent run, normalized by invoice volume."
+              onClick={() => setInsightMode('critical')}
+              isActive={insightMode === 'critical'}
+              icon={<AlertTriangle className="w-5 h-5" />}
+              variant={criticalDensity === null ? 'default' : criticalDensity > 10 ? 'danger' : criticalDensity > 3 ? 'warning' : 'success'}
+            />
+          </div>
         </div>
 
         {insightMode !== 'none' && (
@@ -512,7 +691,7 @@ export default function ControlsDashboardPage() {
             <div className="p-6 border-b">
               <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
                 <Award className="w-5 h-5 text-primary" />
-                {insightMode === 'rejections' || insightMode === 'repeat' ? 'Clients With Rejections' : insightMode === 'quality' ? 'Lowest Health Clients' : 'Client Health Leaderboard'}
+                {insightMode === 'repeat' ? 'Clients With Rejections' : insightMode === 'quality' ? 'Lowest Health Clients' : 'Client Health Leaderboard'}
               </h2>
             </div>
             <div className="divide-y">

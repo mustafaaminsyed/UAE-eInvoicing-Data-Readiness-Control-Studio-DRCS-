@@ -1,12 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
-import { BookCheck, Search } from "lucide-react";
+import { BookCheck, CircleHelp, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { checksRegistry } from "@/lib/checks/checksRegistry";
 import UAE_UC1_CHECK_PACK from "@/lib/checks/uaeUC1CheckPack";
 import { fetchAllCustomChecks } from "@/lib/api/checksApi";
 import type { CustomCheckConfig } from "@/types/customChecks";
+import {
+  PINT_AE_CODELIST_GOVERNANCE_COUNTS,
+  countRuntimeCodelistChecks,
+} from "@/lib/pintAE/codelistGovernanceSummary";
 
 type RegistrySource = "Built-in" | "UAE UC1" | "Custom";
 
@@ -263,8 +273,17 @@ export default function CheckRegistryPage() {
   const builtInCount = rows.filter((row) => row.source === "Built-in").length;
   const uc1Count = rows.filter((row) => row.source === "UAE UC1").length;
   const customCount = rows.filter((row) => row.source === "Custom").length;
+  const enabledTotalChecks = rows.filter((row) => row.enabled).length;
   const enabledUc1Count = rows.filter((row) => row.source === "UAE UC1" && row.enabled).length;
   const enabledCustomCount = rows.filter((row) => row.source === "Custom" && row.enabled).length;
+  const runtimeCodelistChecks = countRuntimeCodelistChecks(UAE_UC1_CHECK_PACK);
+  const governedCodedDomains = PINT_AE_CODELIST_GOVERNANCE_COUNTS.governedCodedDomains;
+  const codelistCoveragePct =
+    governedCodedDomains > 0
+      ? Math.round((runtimeCodelistChecks / governedCodedDomains) * 100)
+      : 0;
+  const derivedOrPolicyDomains =
+    governedCodedDomains - PINT_AE_CODELIST_GOVERNANCE_COUNTS.packagedPintCodelists;
 
   return (
     <div className="min-h-[calc(100vh-4rem)]">
@@ -283,14 +302,136 @@ export default function CheckRegistryPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
-          <SummaryCard label="Total Checks" value={rows.length} />
-          <SummaryCard label="Built-in Checks" value={builtInCount} />
-          <SummaryCard label="UAE UC1 Checks" value={uc1Count} />
-          <SummaryCard label="Custom Checks" value={customCount} />
-          <SummaryCard label="Enabled UC1" value={enabledUc1Count} />
-          <SummaryCard label="Enabled Custom" value={enabledCustomCount} />
+        <div className="rounded-lg border bg-muted/20 p-3 mb-4">
+          <p className="text-xs font-medium text-foreground">How to read these KPIs</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            These cards show runtime control maturity and governance coverage. They help you prioritize implementation
+            and remediation, but they are not a standalone legal compliance attestation.
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Coverage formula: runtime-enforced coded domains / total governed coded domains.
+          </p>
         </div>
+
+        <Card className="border shadow-sm mb-4">
+          <CardContent className="p-4 md:p-5">
+            <h2 className="text-sm font-semibold text-foreground">Runtime Validation Footprint</h2>
+            <p className="text-xs text-muted-foreground mt-1 mb-3">
+              Operational controls currently executed when users run checks.
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <SummaryCard
+                label="Active Runtime Checks"
+                value={enabledTotalChecks}
+                helper={`${rows.length} total checks in repository`}
+                definition="Total controls currently active in production validation runs."
+                formula="Count of enabled checks"
+              />
+              <SummaryCard
+                label="UAE UC1 Active"
+                value={`${enabledUc1Count}/${uc1Count}`}
+                helper="Enabled over available UAE UC1 checks"
+                definition="How much of the standard UAE UC1 pack is turned on right now."
+                formula="Enabled UAE UC1 / Total UAE UC1"
+              />
+              <SummaryCard
+                label="Built-in Core Checks"
+                value={builtInCount}
+                helper="Always-on baseline checks"
+                definition="Platform baseline checks that protect core data quality and integrity."
+              />
+              <SummaryCard
+                label="Custom Active"
+                value={`${enabledCustomCount}/${customCount}`}
+                helper="Enabled over configured custom checks"
+                definition="Customer-specific controls currently active versus what has been configured."
+                formula="Enabled Custom / Total Custom"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border shadow-sm mb-4">
+          <CardContent className="p-4 md:p-5">
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">Codelist Coverage Status</h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Governance tracks all coded domains; runtime enforces the currently safe subset.
+                </p>
+              </div>
+              <div className="md:text-right">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Runtime Coverage</p>
+                <p className="text-2xl font-semibold text-foreground">{codelistCoveragePct}%</p>
+                <p className="text-xs text-muted-foreground">
+                  {runtimeCodelistChecks}/{governedCodedDomains} governed domains
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 h-2 rounded-full bg-muted/60 overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all"
+                style={{ width: `${codelistCoveragePct}%` }}
+              />
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+              <SummaryCard
+                label="Implemented Codelist Checks"
+                value={runtimeCodelistChecks}
+                helper={`Across ${governedCodedDomains} governed domains`}
+                definition="Codelist validations already implemented and running in production execution."
+                formula="Implemented runtime codelist checks"
+              />
+              <SummaryCard
+                label="Unconditional Enforcement"
+                value={PINT_AE_CODELIST_GOVERNANCE_COUNTS.enforceableNow}
+                helper="Always evaluated during runtime"
+                definition="Governed domains validated in every relevant runtime scenario."
+              />
+              <SummaryCard
+                label="Conditional Enforcement"
+                value={PINT_AE_CODELIST_GOVERNANCE_COUNTS.conditional}
+                helper="Scenario or policy gated"
+                definition="Domains validated only when business scenario or policy conditions apply."
+              />
+              <SummaryCard
+                label="Deferred Domains"
+                value={PINT_AE_CODELIST_GOVERNANCE_COUNTS.deferredOrNonRuntime}
+                helper="Governed but not runtime-enforced yet"
+                definition="Governed domains intentionally tracked but not yet enforced in runtime."
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <details className="rounded-lg border bg-muted/20 p-3 mb-6">
+          <summary className="cursor-pointer text-xs font-medium text-foreground">
+            Governance Scope Details
+          </summary>
+          <p className="text-xs text-muted-foreground mt-2">
+            Shows what is sourced from packaged PINT resources versus additional governed policy domains.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
+            <SummaryCard
+              label="Governed Coded Domains"
+              value={governedCodedDomains}
+              helper="Total domains tracked in governance artifact"
+              definition="Full coded-domain universe tracked by governance, whether enforced now or deferred."
+            />
+            <SummaryCard
+              label="Packaged PINT .gc Lists"
+              value={PINT_AE_CODELIST_GOVERNANCE_COUNTS.packagedPintCodelists}
+              helper="Directly from PINT packaged resources"
+              definition="Official codelists supplied directly by packaged PINT-AE .gc resources."
+            />
+            <SummaryCard
+              label="Derived / Policy Domains"
+              value={derivedOrPolicyDomains}
+              helper="Governed domains outside packaged .gc lists"
+              definition="Additional governed domains sourced from enterprise policy or derived standards."
+            />
+          </div>
+        </details>
 
         <Card className="border shadow-sm mb-6">
           <CardContent className="p-4 md:p-5">
@@ -498,11 +639,49 @@ function SeverityGuideTile({
   );
 }
 
-function SummaryCard({ label, value }: { label: string; value: number }) {
+function SummaryCard({
+  label,
+  value,
+  helper,
+  definition,
+  formula,
+}: {
+  label: string;
+  value: number | string;
+  helper?: string;
+  definition?: string;
+  formula?: string;
+}) {
   return (
     <div className="rounded-lg border bg-muted/20 p-3">
-      <p className="text-[11px] text-muted-foreground">{label}</p>
+      <div className="flex items-center gap-1.5">
+        <p className="text-[11px] text-muted-foreground">{label}</p>
+        {definition && (
+          <TooltipProvider delayDuration={120}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={`${label} definition`}
+                  className="text-muted-foreground/80 hover:text-foreground transition-colors"
+                >
+                  <CircleHelp className="h-3.5 w-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-72 text-xs">
+                <p>{definition}</p>
+                {formula && (
+                  <p className="mt-1 text-muted-foreground">
+                    Formula: {formula}
+                  </p>
+                )}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+      </div>
       <p className="mt-1 text-xl font-semibold text-foreground">{value}</p>
+      {helper && <p className="mt-1 text-[11px] text-muted-foreground">{helper}</p>}
     </div>
   );
 }
