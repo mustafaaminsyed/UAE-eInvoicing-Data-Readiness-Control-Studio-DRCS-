@@ -61,6 +61,89 @@ function getDatasetForField(field: string, scope: PintAECheck['scope'], data: Da
   return data.headers;
 }
 
+function normalizeToken(value: unknown): string {
+  return String(value ?? '').trim().toUpperCase();
+}
+
+function getStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => String(item ?? '').trim())
+    .filter((item) => item.length > 0);
+}
+
+function isCreditNoteInvoiceType(value: string): boolean {
+  const token = normalizeToken(value);
+  if (!token) return false;
+  return token.startsWith('381') || token.includes('CREDIT');
+}
+
+function shouldRunCodelistForDocumentContext(
+  record: any,
+  data: DataContext,
+  params: Record<string, any>
+): boolean {
+  const context = normalizeToken(params.document_context || 'both');
+  if (!context || context === 'BOTH') return true;
+
+  const invoiceType = normalizeToken(
+    record?.invoice_type ??
+    data.headerMap.get(record?.invoice_id)?.invoice_type
+  );
+
+  if (context === 'CREDIT_NOTE') {
+    return isCreditNoteInvoiceType(invoiceType);
+  }
+
+  if (context === 'INVOICE') {
+    if (!invoiceType) return true;
+    return !isCreditNoteInvoiceType(invoiceType);
+  }
+
+  return true;
+}
+
+function isCommercialScopeApplicable(header: any, params: Record<string, any>): boolean {
+  if (normalizeToken(params.apply_when_document_type) !== 'COMMERCIAL') return true;
+
+  const explicitDocumentType = [
+    header?.document_type,
+    header?.documentType,
+    header?.mof_document_type,
+    header?.mofDocumentType,
+  ]
+    .map(normalizeToken)
+    .find((value) => value.length > 0);
+
+  if (explicitDocumentType === 'COMMERCIAL' || explicitDocumentType === 'COMMERCIAL_XML') {
+    return true;
+  }
+
+  const commercialInvoiceTypes = getStringArray(params.commercial_invoice_types).map(normalizeToken);
+  if (commercialInvoiceTypes.length === 0) return false;
+  return commercialInvoiceTypes.includes(normalizeToken(header?.invoice_type));
+}
+
+function pickFirstNonEmptyField(
+  records: Array<any | undefined>,
+  fields: string[]
+): { field?: string; value?: string } {
+  for (const field of fields) {
+    const resolvedField = resolveFieldAlias(field);
+    for (const record of records) {
+      if (!record) continue;
+      const value = getFieldValue(record, resolvedField);
+      if (!isEmpty(value)) {
+        return {
+          field: resolvedField,
+          value: String(value).trim(),
+        };
+      }
+    }
+  }
+  return {};
+}
+
 export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEException[] {
   const exceptions: PintAEException[] = [];
   const params = check.parameters || {};
@@ -590,6 +673,26 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
       });
       break;
 
+    // Unit of Measure Code Present
+    case 'UAE-UC1-CHK-033':
+      data.lines.forEach(line => {
+        const header = data.headerMap.get(line.invoice_id);
+        if (isEmpty(line.unit_of_measure)) {
+          exceptions.push(createException({
+            invoiceId: line.invoice_id,
+            invoiceNumber: header?.invoice_number,
+            sellerTrn: header?.seller_trn,
+            buyerId: header?.buyer_id,
+            lineId: line.line_id,
+            fieldName: 'unit_of_measure',
+            observedValue: '(empty)',
+            expectedValue: 'Required unit of measure code',
+            message: `Invoice ${header?.invoice_number || line.invoice_id}, Line ${line.line_number}: Missing unit of measure`,
+          }));
+        }
+      });
+      break;
+
     // Line Net Amount Formula
     case 'UAE-UC1-CHK-034':
       data.lines.forEach(line => {
@@ -609,6 +712,290 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
             observedValue: String(line.line_total_excl_vat),
             expectedValue: `(${line.quantity} x ${line.unit_price}) - ${discount} = ${expected.toFixed(2)}`,
             message: `Invoice ${header?.invoice_number}, Line ${line.line_number}: Net amount (${line.line_total_excl_vat}) != (Qty x Price) - Discount (${expected.toFixed(2)})`,
+          }));
+        }
+      });
+      break;
+
+    // Tax line amount must be derivable in AED
+    case 'UAE-UC1-CHK-035':
+      data.lines.forEach(line => {
+        const header = data.headerMap.get(line.invoice_id);
+        if (!header) return;
+
+        const currencyField = resolveFieldAlias(params.currency_field || 'currency');
+        const fxField = resolveFieldAlias(params.fx_field || 'fx_rate');
+        const amountField = resolveFieldAlias(params.amount_field || 'line_total_excl_vat');
+        const baseCurrency = normalizeToken(params.base_currency || 'AED');
+        const requireNonNegative = params.require_non_negative !== false;
+
+        const currency = normalizeToken(getFieldValue(header, currencyField));
+        const amountRaw = getFieldValue(line, amountField);
+        const amount = Number(amountRaw);
+
+        if (!Number.isFinite(amount)) {
+          exceptions.push(createException({
+            invoiceId: line.invoice_id,
+            invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn,
+            buyerId: header.buyer_id,
+            lineId: line.line_id,
+            fieldName: amountField,
+            observedValue: String(amountRaw ?? '(empty)'),
+            expectedValue: 'Numeric line amount',
+            message: `Invoice ${header.invoice_number}, Line ${line.line_number}: Line amount is not numeric and cannot be converted to AED`,
+          }));
+          return;
+        }
+
+        if (isEmpty(currency)) {
+          exceptions.push(createException({
+            invoiceId: line.invoice_id,
+            invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn,
+            buyerId: header.buyer_id,
+            lineId: line.line_id,
+            fieldName: currencyField,
+            observedValue: '(empty)',
+            expectedValue: `Currency code (${baseCurrency} or non-${baseCurrency} with FX)`,
+            message: `Invoice ${header.invoice_number}, Line ${line.line_number}: Currency is missing so AED line amount cannot be derived`,
+          }));
+          return;
+        }
+
+        if (currency === baseCurrency) {
+          if (requireNonNegative && amount < 0) {
+            exceptions.push(createException({
+              invoiceId: line.invoice_id,
+              invoiceNumber: header.invoice_number,
+              sellerTrn: header.seller_trn,
+              buyerId: header.buyer_id,
+              lineId: line.line_id,
+              fieldName: amountField,
+              observedValue: String(amount),
+              expectedValue: 'Non-negative AED line amount',
+              message: `Invoice ${header.invoice_number}, Line ${line.line_number}: AED line amount cannot be negative under current policy`,
+            }));
+          }
+          return;
+        }
+
+        const fxRaw = getFieldValue(header, fxField);
+        const fx = Number(fxRaw);
+        if (!Number.isFinite(fx) || fx <= 0) {
+          exceptions.push(createException({
+            invoiceId: line.invoice_id,
+            invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn,
+            buyerId: header.buyer_id,
+            lineId: line.line_id,
+            fieldName: fxField,
+            observedValue: String(fxRaw ?? '(empty)'),
+            expectedValue: `Positive FX rate to ${baseCurrency}`,
+            message: `Invoice ${header.invoice_number}, Line ${line.line_number}: Positive FX rate is required to derive AED line amount from ${currency}`,
+          }));
+          return;
+        }
+
+        const amountInAed = amount * fx;
+        if (!Number.isFinite(amountInAed) || (requireNonNegative && amountInAed < 0)) {
+          exceptions.push(createException({
+            invoiceId: line.invoice_id,
+            invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn,
+            buyerId: header.buyer_id,
+            lineId: line.line_id,
+            fieldName: amountField,
+            observedValue: `${amount} @ FX ${fx}`,
+            expectedValue: `Derivable non-negative ${baseCurrency} line amount`,
+            message: `Invoice ${header.invoice_number}, Line ${line.line_number}: AED line amount derivation is invalid under current currency policy`,
+          }));
+        }
+      });
+      break;
+
+    // Commercial buyer legal registration identifier presence
+    case 'UAE-UC1-CHK-036':
+      data.headers.forEach(header => {
+        if (!isCommercialScopeApplicable(header, params)) return;
+        const buyer = data.buyerMap.get(header.buyer_id);
+        const identifierFields = getStringArray(params.buyer_identifier_fields);
+        const fieldsToUse = identifierFields.length > 0 ? identifierFields : ['buyer_legal_reg_id', 'buyer_trn'];
+        const identifier = pickFirstNonEmptyField([buyer, header], fieldsToUse);
+
+        if (isEmpty(identifier.value)) {
+          exceptions.push(createException({
+            invoiceId: header.invoice_id,
+            invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn,
+            buyerId: header.buyer_id,
+            fieldName: fieldsToUse.join('|'),
+            observedValue: '(empty)',
+            expectedValue: 'Buyer legal registration identifier for commercial invoice',
+            message: `Invoice ${header.invoice_number}: Buyer legal registration identifier is missing for commercial invoice profile`,
+          }));
+        }
+      });
+      break;
+
+    // Commercial buyer legal registration identifier type policy
+    case 'UAE-UC1-CHK-037':
+      data.headers.forEach(header => {
+        if (!isCommercialScopeApplicable(header, params)) return;
+        const buyer = data.buyerMap.get(header.buyer_id);
+
+        const identifierFields = getStringArray(params.buyer_identifier_fields);
+        const fieldsToUse = identifierFields.length > 0 ? identifierFields : ['buyer_legal_reg_id', 'buyer_trn'];
+        const identifier = pickFirstNonEmptyField([buyer, header], fieldsToUse);
+        if (isEmpty(identifier.value)) return; // Presence handled by CHK-036
+
+        const typeFields = getStringArray(params.type_fields);
+        const typeFieldList = typeFields.length > 0 ? typeFields : ['buyer_legal_reg_id_type', 'buyer_reg_id_type'];
+        const explicitType = pickFirstNonEmptyField([buyer, header], typeFieldList);
+        const allowDefault = params.allow_default_identifier_type !== false;
+        const defaultType = String(params.default_identifier_type || '').trim();
+        const resolvedType = !isEmpty(explicitType.value)
+          ? String(explicitType.value).trim()
+          : (allowDefault ? defaultType : '');
+
+        if (isEmpty(resolvedType)) {
+          exceptions.push(createException({
+            invoiceId: header.invoice_id,
+            invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn,
+            buyerId: header.buyer_id,
+            fieldName: typeFieldList.join('|'),
+            observedValue: '(empty)',
+            expectedValue: 'Buyer legal registration identifier type',
+            message: `Invoice ${header.invoice_number}: Buyer legal registration identifier type is missing for commercial invoice profile`,
+          }));
+          return;
+        }
+
+        const allowedTypes = getStringArray(params.allowed_identifier_types).map(normalizeToken);
+        if (allowedTypes.length > 0 && !allowedTypes.includes(normalizeToken(resolvedType))) {
+          exceptions.push(createException({
+            invoiceId: header.invoice_id,
+            invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn,
+            buyerId: header.buyer_id,
+            fieldName: typeFieldList.join('|'),
+            observedValue: resolvedType,
+            expectedValue: allowedTypes.join(', '),
+            message: `Invoice ${header.invoice_number}: Buyer legal registration identifier type "${resolvedType}" is not allowed for commercial invoice profile`,
+          }));
+        }
+      });
+      break;
+
+    // Item name presence with description fallback
+    case 'UAE-UC1-CHK-038':
+      data.lines.forEach(line => {
+        const header = data.headerMap.get(line.invoice_id);
+        const primaryField = resolveFieldAlias(params.primary_field || 'item_name');
+        const fallbackField = resolveFieldAlias(params.fallback_field || 'description');
+        const primaryValue = getFieldValue(line, primaryField);
+        const fallbackValue = getFieldValue(line, fallbackField);
+
+        if (isEmpty(primaryValue) && isEmpty(fallbackValue)) {
+          exceptions.push(createException({
+            invoiceId: line.invoice_id,
+            invoiceNumber: header?.invoice_number,
+            sellerTrn: header?.seller_trn,
+            buyerId: header?.buyer_id,
+            lineId: line.line_id,
+            fieldName: `${primaryField}|${fallbackField}`,
+            observedValue: '(both empty)',
+            expectedValue: 'Item name or description fallback',
+            message: `Invoice ${header?.invoice_number || line.invoice_id}, Line ${line.line_number}: Missing item name (description fallback also empty)`,
+          }));
+        }
+      });
+      break;
+
+    // Item description presence with item-name fallback
+    case 'UAE-UC1-CHK-039':
+      data.lines.forEach(line => {
+        const header = data.headerMap.get(line.invoice_id);
+        const primaryField = resolveFieldAlias(params.primary_field || 'description');
+        const fallbackField = resolveFieldAlias(params.fallback_field || 'item_name');
+        const primaryValue = getFieldValue(line, primaryField);
+        const fallbackValue = getFieldValue(line, fallbackField);
+
+        if (isEmpty(primaryValue) && isEmpty(fallbackValue)) {
+          exceptions.push(createException({
+            invoiceId: line.invoice_id,
+            invoiceNumber: header?.invoice_number,
+            sellerTrn: header?.seller_trn,
+            buyerId: header?.buyer_id,
+            lineId: line.line_id,
+            fieldName: `${primaryField}|${fallbackField}`,
+            observedValue: '(both empty)',
+            expectedValue: 'Item description or item-name fallback',
+            message: `Invoice ${header?.invoice_number || line.invoice_id}, Line ${line.line_number}: Missing item description (item name fallback also empty)`,
+          }));
+        }
+      });
+      break;
+
+    // Item price base quantity policy
+    case 'UAE-UC1-CHK-040':
+      data.lines.forEach(line => {
+        const header = data.headerMap.get(line.invoice_id);
+        const baseFields = getStringArray(params.base_quantity_fields);
+        const baseFieldList = baseFields.length > 0
+          ? baseFields
+          : ['price_base_quantity', 'line_base_quantity', 'item_price_base_quantity'];
+        const explicitBase = pickFirstNonEmptyField([line], baseFieldList);
+
+        let resolvedBaseRaw = explicitBase.value;
+        let resolvedBaseSource = explicitBase.field || 'price_base_quantity';
+        if (isEmpty(resolvedBaseRaw) && params.allow_default_base_quantity !== false) {
+          resolvedBaseRaw = String(params.default_base_quantity ?? 1);
+          resolvedBaseSource = 'default_base_quantity_policy';
+        }
+
+        const resolvedBase = Number(resolvedBaseRaw);
+        if (isEmpty(resolvedBaseRaw) || !Number.isFinite(resolvedBase)) {
+          exceptions.push(createException({
+            invoiceId: line.invoice_id,
+            invoiceNumber: header?.invoice_number,
+            sellerTrn: header?.seller_trn,
+            buyerId: header?.buyer_id,
+            lineId: line.line_id,
+            fieldName: baseFieldList.join('|'),
+            observedValue: String(resolvedBaseRaw ?? '(empty)'),
+            expectedValue: 'Positive base quantity (explicit or approved default)',
+            message: `Invoice ${header?.invoice_number || line.invoice_id}, Line ${line.line_number}: Item price base quantity policy is unresolved`,
+          }));
+          return;
+        }
+
+        if (resolvedBase <= 0) {
+          exceptions.push(createException({
+            invoiceId: line.invoice_id,
+            invoiceNumber: header?.invoice_number,
+            sellerTrn: header?.seller_trn,
+            buyerId: header?.buyer_id,
+            lineId: line.line_id,
+            fieldName: resolvedBaseSource,
+            observedValue: String(resolvedBase),
+            expectedValue: 'Base quantity > 0',
+            message: `Invoice ${header?.invoice_number || line.invoice_id}, Line ${line.line_number}: Item price base quantity must be greater than zero`,
+          }));
+        }
+
+        if (params.require_positive_quantity && (!Number.isFinite(Number(line.quantity)) || Number(line.quantity) <= 0)) {
+          exceptions.push(createException({
+            invoiceId: line.invoice_id,
+            invoiceNumber: header?.invoice_number,
+            sellerTrn: header?.seller_trn,
+            buyerId: header?.buyer_id,
+            lineId: line.line_id,
+            fieldName: 'quantity',
+            observedValue: String(line.quantity),
+            expectedValue: 'Quantity > 0 when base quantity policy applies',
+            message: `Invoice ${header?.invoice_number || line.invoice_id}, Line ${line.line_number}: Quantity must be positive for base quantity policy`,
           }));
         }
       });
@@ -695,6 +1082,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
         const field = resolveFieldAlias(params.field);
         const dataset = getDatasetForField(field, check.scope, data);
         dataset.forEach((record: any) => {
+          if (!shouldRunCodelistForDocumentContext(record, data, params)) return;
           const value = getFieldValue(record, field);
           if (!isEmpty(value) && !isCodeInCodelist(String(params.codelist), String(value))) {
             const header = record.invoice_id ? data.headerMap.get(record.invoice_id) : undefined;

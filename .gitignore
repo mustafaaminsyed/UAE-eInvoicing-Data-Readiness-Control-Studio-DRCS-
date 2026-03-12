@@ -29,3 +29,5 @@ review_free_llm_api_resources_20260224/
 *.sw?
 dev.err
 supabase/.temp/
+test-results/
+playwright-report/

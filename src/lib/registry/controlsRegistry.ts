@@ -47,14 +47,14 @@ const CONTROLS_DEFINITION: Omit<ControlEntry, 'covered_dr_ids'>[] = [
     control_name: 'Seller Identity Verification',
     control_type: 'preventive',
     description: 'Ensures seller name, TRN, electronic address, and address are complete and valid',
-    covered_rule_ids: ['UAE-UC1-CHK-012', 'UAE-UC1-CHK-013', 'UAE-UC1-CHK-014', 'UAE-UC1-CHK-015'],
+    covered_rule_ids: ['UAE-UC1-CHK-012', 'UAE-UC1-CHK-013', 'UAE-UC1-CHK-014', 'UAE-UC1-CHK-015', 'UAE-UC1-CHK-043'],
   },
   {
     control_id: 'CTRL-005',
     control_name: 'Buyer Identity Verification',
     control_type: 'preventive',
-    description: 'Ensures buyer name, TRN format, electronic address, and address are valid',
-    covered_rule_ids: ['UAE-UC1-CHK-017', 'UAE-UC1-CHK-018', 'UAE-UC1-CHK-019', 'UAE-UC1-CHK-020'],
+    description: 'Ensures buyer name, TRN/legal registration identity, electronic address, and address are valid',
+    covered_rule_ids: ['UAE-UC1-CHK-017', 'UAE-UC1-CHK-018', 'UAE-UC1-CHK-019', 'UAE-UC1-CHK-020', 'UAE-UC1-CHK-036', 'UAE-UC1-CHK-037', 'UAE-UC1-CHK-044'],
   },
   {
     control_id: 'CTRL-006',
@@ -75,7 +75,7 @@ const CONTROLS_DEFINITION: Omit<ControlEntry, 'covered_dr_ids'>[] = [
     control_name: 'Transaction Type Code Validation',
     control_type: 'preventive',
     description: 'Validates BTUAE-02 transaction type code format and presence',
-    covered_rule_ids: ['UAE-UC1-CHK-004'], // Transaction type is validated as part of mandatory header fields
+    covered_rule_ids: ['UAE-UC1-CHK-004', 'UAE-UC1-CHK-045', 'UAE-UC1-CHK-046'], // Invoice type codelist enforcement
   },
 
   // ── Detective Controls ──
@@ -83,8 +83,8 @@ const CONTROLS_DEFINITION: Omit<ControlEntry, 'covered_dr_ids'>[] = [
     control_id: 'CTRL-009',
     control_name: 'Invoice Totals Reconciliation',
     control_type: 'detective',
-    description: 'Detects mismatches between line sums and header totals',
-    covered_rule_ids: ['UAE-UC1-CHK-021', 'UAE-UC1-CHK-025', 'UAE-UC1-CHK-029'],
+    description: 'Detects mismatches between line sums, tax totals, and AED derivation expectations',
+    covered_rule_ids: ['UAE-UC1-CHK-021', 'UAE-UC1-CHK-025', 'UAE-UC1-CHK-029', 'UAE-UC1-CHK-035'],
   },
   {
     control_id: 'CTRL-010',
@@ -98,28 +98,28 @@ const CONTROLS_DEFINITION: Omit<ControlEntry, 'covered_dr_ids'>[] = [
     control_name: 'Tax Calculation Verification',
     control_type: 'detective',
     description: 'Verifies tax category amounts match taxable base × rate formula',
-    covered_rule_ids: ['UAE-UC1-CHK-027', 'UAE-UC1-CHK-028'],
+    covered_rule_ids: ['UAE-UC1-CHK-027', 'UAE-UC1-CHK-028', 'UAE-UC1-CHK-041', 'UAE-UC1-CHK-042'],
   },
   {
     control_id: 'CTRL-012',
     control_name: 'Line Item Completeness Check',
     control_type: 'detective',
-    description: 'Ensures every invoice has at least one line and each line has required identifiers and quantities',
-    covered_rule_ids: ['UAE-UC1-CHK-030', 'UAE-UC1-CHK-031', 'UAE-UC1-CHK-032', 'UAE-UC1-CHK-033'],
+    description: 'Ensures every invoice has line-level identifiers, quantities, UOM, and item naming content',
+    covered_rule_ids: ['UAE-UC1-CHK-030', 'UAE-UC1-CHK-031', 'UAE-UC1-CHK-032', 'UAE-UC1-CHK-033', 'UAE-UC1-CHK-038', 'UAE-UC1-CHK-039', 'UAE-UC1-CHK-048'],
   },
   {
     control_id: 'CTRL-013',
     control_name: 'Line Net Amount Reconciliation',
     control_type: 'detective',
-    description: 'Validates line net amount = (quantity × unit price) - discounts + charges',
-    covered_rule_ids: ['UAE-UC1-CHK-034'],
+    description: 'Validates line net amount and base-quantity pricing policy consistency',
+    covered_rule_ids: ['UAE-UC1-CHK-034', 'UAE-UC1-CHK-040'],
   },
   {
     control_id: 'CTRL-014',
     control_name: 'Payment Terms Consistency',
     control_type: 'detective',
     description: 'Ensures payment due date is present when amount due > 0 and is not before issue date',
-    covered_rule_ids: ['UAE-UC1-CHK-009'],
+    covered_rule_ids: ['UAE-UC1-CHK-009', 'UAE-UC1-CHK-047'],
   },
 ];
 
