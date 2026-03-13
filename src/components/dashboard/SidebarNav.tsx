@@ -9,6 +9,7 @@ import {
   FileDown,
   BookCheck,
   Gauge,
+  Shield,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -32,6 +33,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { label: 'Cases', path: '/cases', icon: Briefcase, phase: 'processing' },
   { label: 'Evidence', path: '/evidence-pack', icon: FileDown, phase: 'output', inFlow: true },
   { label: 'Check Registry', path: '/check-registry', icon: BookCheck, phase: 'reference' },
+  { label: 'Traceability', path: '/traceability', icon: Shield, phase: 'reference' },
   { label: 'Control Dashboard', path: '/settings', icon: Gauge, phase: 'output' },
 ];
 

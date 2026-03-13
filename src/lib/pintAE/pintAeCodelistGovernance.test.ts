@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { parseCSV } from '@/lib/csvParser';
 import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
 import { PINT_AE_CODELISTS } from '@/lib/pintAE/generated/codelists';
+import { countRuntimeCodelistDomains } from '@/lib/pintAE/codelistGovernanceSummary';
 
 type GovernanceRow = {
   index_no: string;
@@ -90,5 +91,9 @@ describe('PINT-AE codelist governance artifact', () => {
 
       expect(explicitlyNonRuntimeStates.has(reason)).toBe(true);
     }
+  });
+
+  it('counts unique runtime codelist domains rather than duplicate check rows', () => {
+    expect(countRuntimeCodelistDomains(UAE_UC1_CHECK_PACK)).toBe(7);
   });
 });

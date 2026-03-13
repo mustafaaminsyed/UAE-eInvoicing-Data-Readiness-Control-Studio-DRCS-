@@ -54,11 +54,28 @@ function saveLocalEntityScores(scores: Omit<EntityScore, 'id' | 'created_at'>[])
   writeLocalJson(LOCAL_ENTITY_SCORES_KEY, next);
 }
 
-function fetchLocalCheckRuns(limit = 20): CheckRun[] {
+function fetchLocalCheckRuns(limit?: number): CheckRun[] {
   const runs = readLocalJson<CheckRun[]>(LOCAL_CHECK_RUNS_KEY, []);
-  return [...runs]
-    .sort((a, b) => new Date(b.run_date).getTime() - new Date(a.run_date).getTime())
-    .slice(0, limit);
+  const sortedRuns = [...runs].sort(
+    (a, b) => new Date(b.run_date).getTime() - new Date(a.run_date).getTime()
+  );
+  return typeof limit === 'number' ? sortedRuns.slice(0, limit) : sortedRuns;
+}
+
+function mapCheckRunRow(row: any): CheckRun {
+  return {
+    id: row.id,
+    run_date: row.run_date,
+    dataset_type: (row.dataset_type as any) || 'AR',
+    total_invoices: row.total_invoices,
+    total_exceptions: row.total_exceptions,
+    critical_count: row.critical_count,
+    high_count: row.high_count,
+    medium_count: row.medium_count,
+    low_count: row.low_count,
+    pass_rate: Number(row.pass_rate),
+    results_summary: row.results_summary,
+  };
 }
 
 function fetchLocalEntityScores(runId: string, entityType?: string): EntityScore[] {
@@ -313,35 +330,47 @@ export async function saveEntityScores(
   return true;
 }
 
-export async function fetchCheckRuns(limit: number = 20): Promise<CheckRun[]> {
+export async function fetchCheckRuns(limit?: number): Promise<CheckRun[]> {
   if (shouldUseLocalDevFallback()) {
     return fetchLocalCheckRuns(limit);
   }
 
-  const { data, error } = await supabase
-    .from('check_runs')
-    .select('*')
-    .order('run_date', { ascending: false })
-    .limit(limit);
+  if (typeof limit === 'number') {
+    const { data, error } = await supabase
+      .from('check_runs')
+      .select('*')
+      .order('run_date', { ascending: false })
+      .limit(limit);
 
-  if (error) {
-    console.error('Error fetching check runs:', error);
-    return [];
+    if (error) {
+      console.error('Error fetching check runs:', error);
+      return [];
+    }
+
+    return (data || []).map(mapCheckRunRow);
   }
 
-  return (data || []).map((row) => ({
-    id: row.id,
-    run_date: row.run_date,
-    dataset_type: (row.dataset_type as any) || 'AR',
-    total_invoices: row.total_invoices,
-    total_exceptions: row.total_exceptions,
-    critical_count: row.critical_count,
-    high_count: row.high_count,
-    medium_count: row.medium_count,
-    low_count: row.low_count,
-    pass_rate: Number(row.pass_rate),
-    results_summary: row.results_summary,
-  }));
+  const pageSize = 1000;
+  const rows: any[] = [];
+
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase
+      .from('check_runs')
+      .select('*')
+      .order('run_date', { ascending: false })
+      .range(offset, offset + pageSize - 1);
+
+    if (error) {
+      console.error('Error fetching check runs:', error);
+      return [];
+    }
+
+    const batch = data || [];
+    rows.push(...batch);
+    if (batch.length < pageSize) break;
+  }
+
+  return rows.map(mapCheckRunRow);
 }
 
 export async function saveInvestigationFlags(

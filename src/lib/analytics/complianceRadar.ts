@@ -6,6 +6,77 @@ export type ComplianceRadarAxisKey =
   | 'master_data_quality'
   | 'exception_control_health';
 
+export type ReadinessBand = 'critical' | 'exposed' | 'watch' | 'controlled';
+
+export interface ComplianceRadarDimensionDefinition {
+  key: ComplianceRadarAxisKey;
+  label: string;
+  explanation: string;
+}
+
+export interface ReadinessBandDefinition {
+  key: ReadinessBand;
+  label: string;
+  min: number;
+  max: number;
+}
+
+export const COMPLIANCE_RADAR_DIMENSIONS: ComplianceRadarDimensionDefinition[] = [
+  {
+    key: 'mandatory_coverage',
+    label: 'Mandatory Field Coverage',
+    explanation: 'MoF mandatory-field source coverage with DR-linkage weighting.',
+  },
+  {
+    key: 'pint_structure_readiness',
+    label: 'PINT Structure Readiness',
+    explanation: 'PINT-AE DR linkage readiness blended with period run quality.',
+  },
+  {
+    key: 'tax_logic_integrity',
+    label: 'Tax Logic Integrity',
+    explanation: 'Pass-rate strength adjusted by critical and exception load pressure.',
+  },
+  {
+    key: 'codelist_conformance',
+    label: 'Code List Conformance',
+    explanation: 'Runtime codelist enforcement coverage balanced with run quality.',
+  },
+  {
+    key: 'master_data_quality',
+    label: 'Master Data Quality',
+    explanation: 'Client health signal adjusted for repeat rejection and pressure.',
+  },
+  {
+    key: 'exception_control_health',
+    label: 'Exception Control Health',
+    explanation: 'Inverse risk from critical mix, exception intensity, and SLA breaches.',
+  },
+];
+
+export const READINESS_BANDS: ReadinessBandDefinition[] = [
+  { key: 'critical', label: 'Critical', min: 0, max: 59.9999 },
+  { key: 'exposed', label: 'Exposed', min: 60, max: 74.9999 },
+  { key: 'watch', label: 'Watch', min: 75, max: 89.9999 },
+  { key: 'controlled', label: 'Controlled', min: 90, max: 100 },
+];
+
+export function getReadinessBand(score: number): ReadinessBand {
+  if (score >= 90) return 'controlled';
+  if (score >= 75) return 'watch';
+  if (score >= 60) return 'exposed';
+  return 'critical';
+}
+
+export function getComplianceRadarDimensionDefinition(
+  key: ComplianceRadarAxisKey
+): ComplianceRadarDimensionDefinition {
+  return (
+    COMPLIANCE_RADAR_DIMENSIONS.find((dimension) => dimension.key === key) ||
+    COMPLIANCE_RADAR_DIMENSIONS[0]
+  );
+}
+
 export interface ComplianceRadarInput {
   mandatoryCoveragePct: number | null;
   drCoveragePct: number | null;
@@ -92,19 +163,6 @@ export function buildComplianceRadarResult(input: ComplianceRadarInput): Complia
       ? Math.max(0, input.governedCodedDomains)
       : null;
 
-  const availableSignalCount = [
-    mandatoryCoverage,
-    drCoverage,
-    latestPassRate,
-    avgPassRate,
-    exceptionIntensity,
-    criticalShare,
-    latestCriticalPressure,
-    repeatRejectionRate,
-    avgHealth,
-    slaBreachRate,
-  ].filter((value) => value !== null).length;
-
   const baseQuality = latestPassRate ?? avgPassRate ?? 50;
   const inverseCriticalShare = inversePercent(criticalShare);
   const inverseExceptionLoad = inverseScaled(exceptionIntensity, 2);
@@ -147,6 +205,20 @@ export function buildComplianceRadarResult(input: ComplianceRadarInput): Complia
       ? clamp((runtimeCodelistChecks / governedCodedDomains) * 100)
       : null;
 
+  const availableSignalCount = [
+    mandatoryCoverage,
+    drCoverage,
+    latestPassRate,
+    avgPassRate,
+    exceptionIntensity,
+    criticalShare,
+    latestCriticalPressure,
+    repeatRejectionRate,
+    avgHealth,
+    slaBreachRate,
+    runtimeCodelistCoveragePct,
+  ].filter((value) => value !== null).length;
+
   // Codelist Conformance: direct runtime codelist enforcement coverage plus observed run quality.
   const codelistConformanceScore = weightedAverageOrFallback(
     [
@@ -177,44 +249,21 @@ export function buildComplianceRadarResult(input: ComplianceRadarInput): Complia
     inverseCriticalPressure ?? baseQuality
   );
 
-  const dimensions: ComplianceRadarDimension[] = [
-    {
-      key: 'mandatory_coverage',
-      label: 'Mandatory Field Coverage',
-      score: mandatoryCoverageScore,
-      explanation: 'MoF mandatory-field source coverage with DR-linkage weighting.',
-    },
-    {
-      key: 'pint_structure_readiness',
-      label: 'PINT Structure Readiness',
-      score: pintStructureScore,
-      explanation: 'PINT-AE DR linkage readiness blended with period run quality.',
-    },
-    {
-      key: 'tax_logic_integrity',
-      label: 'Tax Logic Integrity',
-      score: taxLogicScore,
-      explanation: 'Pass-rate strength adjusted by critical and exception load pressure.',
-    },
-    {
-      key: 'codelist_conformance',
-      label: 'Code List Conformance',
-      score: codelistConformanceScore,
-      explanation: 'Runtime codelist enforcement coverage balanced with run quality.',
-    },
-    {
-      key: 'master_data_quality',
-      label: 'Master Data Quality',
-      score: masterDataQualityScore,
-      explanation: 'Client health signal adjusted for repeat rejection and pressure.',
-    },
-    {
-      key: 'exception_control_health',
-      label: 'Exception Control Health',
-      score: exceptionControlHealthScore,
-      explanation: 'Inverse risk from critical mix, exception intensity, and SLA breaches.',
-    },
-  ];
+  const scoreByKey: Record<ComplianceRadarAxisKey, number> = {
+    mandatory_coverage: mandatoryCoverageScore,
+    pint_structure_readiness: pintStructureScore,
+    tax_logic_integrity: taxLogicScore,
+    codelist_conformance: codelistConformanceScore,
+    master_data_quality: masterDataQualityScore,
+    exception_control_health: exceptionControlHealthScore,
+  };
+
+  const dimensions: ComplianceRadarDimension[] = COMPLIANCE_RADAR_DIMENSIONS.map((definition) => ({
+    key: definition.key,
+    label: definition.label,
+    score: scoreByKey[definition.key],
+    explanation: definition.explanation,
+  }));
 
   const overallScore = clamp(
     dimensions.reduce((sum, dimension) => sum + dimension.score, 0) / dimensions.length
