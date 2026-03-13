@@ -77,7 +77,7 @@ function NavigationContent() {
         <div className="relative flex-1 min-w-0">
           <nav
             ref={navRef}
-            className="flex flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden scroll-smooth touch-pan-x rounded-xl surface-glass px-2 py-1 pr-6 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            className="flex flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden scroll-smooth touch-pan-x rounded-xl surface-glass px-2 py-1 pr-6 pb-2 [scrollbar-width:thin] [scrollbar-color:hsl(var(--border))_transparent] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border/80 hover:[&::-webkit-scrollbar-thumb]:bg-border"
             aria-label="Primary navigation"
           >
             {effectiveNavItems.map((item) => {

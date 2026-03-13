@@ -26,6 +26,12 @@ import {
 import { ValidationExplainMode, ValidationExplanation } from '@/types/validationExplain';
 import { ExplanationPackPanel } from '@/components/explanations/ExplanationPackPanel';
 import { LastRunContextBanner } from '@/components/run/LastRunContextBanner';
+import {
+  COMPLIANCE_RADAR_DIMENSIONS,
+  getComplianceRadarDimensionDefinition,
+  type ComplianceRadarAxisKey,
+} from '@/lib/analytics/complianceRadar';
+import { matchesEntityRiskMatrixDimension } from '@/lib/analytics/entityRiskMatrixMappings';
 
 export default function ExceptionsPage() {
   const navigate = useNavigate();
@@ -44,6 +50,20 @@ export default function ExceptionsPage() {
   const [selectedExplanation, setSelectedExplanation] = useState<ValidationExplanation | null>(null);
   const [explanationLoading, setExplanationLoading] = useState(false);
   const [explanationError, setExplanationError] = useState<string | null>(null);
+  const sellerContext = searchParams.get('seller');
+  const dimensionContextRaw = searchParams.get('dimension');
+  const dimensionContext = useMemo(() => {
+    if (!dimensionContextRaw) return null;
+    return COMPLIANCE_RADAR_DIMENSIONS.some((dimension) => dimension.key === dimensionContextRaw)
+      ? (dimensionContextRaw as ComplianceRadarAxisKey)
+      : null;
+  }, [dimensionContextRaw]);
+  const drillDownContext = searchParams.get('context');
+  const drillDownPrecision = searchParams.get('precision');
+  const dimensionDefinition = useMemo(() => {
+    if (!dimensionContext) return null;
+    return getComplianceRadarDimensionDefinition(dimensionContext);
+  }, [dimensionContext]);
 
   useEffect(() => {
     if (!isChecksRun) navigate('/');
@@ -60,6 +80,14 @@ export default function ExceptionsPage() {
     return exceptions.filter((exception) => {
       const exceptionDataset = exception.datasetType || 'AR';
       if (exceptionDataset !== datasetFilter) return false;
+      if (sellerContext && exception.sellerTrn !== sellerContext) return false;
+      if (
+        dimensionContext &&
+        drillDownPrecision === 'precise' &&
+        !matchesEntityRiskMatrixDimension(exception, dimensionContext)
+      ) {
+        return false;
+      }
 
       const searchLower = search.toLowerCase();
       const matchesSearch =
@@ -73,7 +101,25 @@ export default function ExceptionsPage() {
       const matchesCheck = checkFilter === 'all' || exception.checkId === checkFilter;
       return matchesSearch && matchesSeverity && matchesCheck;
     });
-  }, [exceptions, search, severityFilter, checkFilter, datasetFilter]);
+  }, [
+    checkFilter,
+    datasetFilter,
+    dimensionContext,
+    drillDownPrecision,
+    exceptions,
+    search,
+    sellerContext,
+    severityFilter,
+  ]);
+
+  const clearDrillDownContext = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('seller');
+    next.delete('dimension');
+    next.delete('context');
+    next.delete('precision');
+    setSearchParams(next, { replace: true });
+  };
 
   const handleExport = () => {
     const csvContent = [
@@ -213,6 +259,21 @@ export default function ExceptionsPage() {
           exceptionsCount={exceptions.length}
           showWhenEmpty
         />
+
+        {drillDownContext === 'entity-risk-matrix' && sellerContext && dimensionDefinition ? (
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 animate-fade-in">
+            <p className="text-sm text-foreground">
+              Entity risk drill-down: <span className="font-semibold">{sellerContext}</span> in{' '}
+              <span className="font-semibold">{dimensionDefinition.label}</span>.{' '}
+              {drillDownPrecision === 'precise'
+                ? 'The list is filtered to mapped exceptions for this dimension.'
+                : 'The list is seller-filtered and retains dimension context because this score is estimated from related signals.'}
+            </p>
+            <Button variant="outline" size="sm" onClick={clearDrillDownContext}>
+              Clear drill-down
+            </Button>
+          </div>
+        ) : null}
 
         <div className="surface-glass rounded-2xl border border-white/70 shadow-sm p-4 mb-6 animate-slide-up">
           <div className="flex items-center gap-2 mb-4">

@@ -48,8 +48,13 @@ export const PINT_AE_CODELIST_GOVERNANCE_COUNTS = {
   ).length,
 } as const;
 
-export function countRuntimeCodelistChecks(checks: PintAECheck[]): number {
-  return checks.filter(
-    (check) => check.rule_type === 'CodeList' && typeof check.parameters?.codelist === 'string'
-  ).length;
+export function countRuntimeCodelistDomains(checks: PintAECheck[]): number {
+  return new Set(
+    checks
+      .filter(
+        (check) => check.rule_type === 'CodeList' && typeof check.parameters?.codelist === 'string'
+      )
+      .map((check) => String(check.parameters?.codelist).trim())
+      .filter((codelist) => codelist.length > 0)
+  ).size;
 }

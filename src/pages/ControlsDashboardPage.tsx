@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   BarChart3,
   AlertTriangle,
@@ -26,6 +27,7 @@ import {
 import { Progress } from '@/components/ui/progress';
 import { StatsCard } from '@/components/StatsCard';
 import ComplianceRadar from '@/components/dashboard/ComplianceRadar';
+import EntityRiskMatrixHeatmap from '@/components/dashboard/EntityRiskMatrixHeatmap';
 import {
   LineChart,
   Line,
@@ -43,13 +45,20 @@ import { CheckRun, EntityScore } from '@/types/customChecks';
 import { ClientHealth, SLAMetrics } from '@/types/cases';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { useCompliance } from '@/context/ComplianceContext';
 import { computeTraceabilityMatrix } from '@/lib/coverage/conformanceEngine';
 import { computeMoFCoverage } from '@/lib/coverage/mofCoverageEngine';
 import UAE_UC1_CHECK_PACK from '@/lib/checks/uaeUC1CheckPack';
-import { PINT_AE_CODELIST_GOVERNANCE_COUNTS, countRuntimeCodelistChecks } from '@/lib/pintAE/codelistGovernanceSummary';
+import { PINT_AE_CODELIST_GOVERNANCE_COUNTS, countRuntimeCodelistDomains } from '@/lib/pintAE/codelistGovernanceSummary';
 import { ComplianceRadarAxisKey, buildComplianceRadarResult } from '@/lib/analytics/complianceRadar';
+import {
+  applyEntityRiskMatrixFilters,
+  buildEntityRiskMatrixResult,
+} from '@/lib/analytics/entityRiskMatrix';
+import type { EntityRiskMatrixFilters, EntityRiskMatrixFocus } from '@/types/entityRiskMatrix';
 
 type InsightMode = 'none' | 'quality' | 'repeat' | 'critical' | 'dr_coverage' | 'mof_coverage';
+const TOP_RISK_SELLER_POOL_SIZE = 50;
 
 function getScoreColor(score: number): string {
   if (score >= 90) return 'text-success';
@@ -66,7 +75,9 @@ function getScoreBgColor(score: number): string {
 }
 
 export default function ControlsDashboardPage() {
+  const navigate = useNavigate();
   const { toast } = useToast();
+  const { activeDatasetType, direction, exceptions, headers } = useCompliance();
   const [checkRuns, setCheckRuns] = useState<CheckRun[]>([]);
   const [clientHealth, setClientHealth] = useState<ClientHealth[]>([]);
   const [topRiskSellers, setTopRiskSellers] = useState<EntityScore[]>([]);
@@ -83,6 +94,12 @@ export default function ControlsDashboardPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | 'all'>('all');
   const [insightMode, setInsightMode] = useState<InsightMode>('none');
+  const [entityRiskFilters, setEntityRiskFilters] = useState<EntityRiskMatrixFilters>({
+    search: '',
+    sortBy: 'lowest_score',
+    rowLimit: 25,
+    elevatedRiskOnly: false,
+  });
 
   const drCoverageSummary = useMemo(() => {
     const { gaps } = computeTraceabilityMatrix([]);
@@ -120,9 +137,9 @@ export default function ControlsDashboardPage() {
 
     try {
       const [runs, health, sellers, rejections, sla] = await Promise.all([
-        fetchCheckRuns(20),
+        fetchCheckRuns(),
         fetchClientHealthScores(),
-        fetchLatestEntityScores('seller', 10),
+        fetchLatestEntityScores('seller', TOP_RISK_SELLER_POOL_SIZE),
         getRejectionAnalytics(),
         getSLAMetrics(),
       ]);
@@ -195,10 +212,11 @@ export default function ControlsDashboardPage() {
     if (values.length === 0) return null;
     return values.reduce((sum, value) => sum + value, 0) / values.length;
   }, [slaMetrics.averageResolutionHours]);
-  const runtimeCodelistChecks = useMemo(
-    () => countRuntimeCodelistChecks(UAE_UC1_CHECK_PACK.filter((check) => check.is_enabled)),
+  const runtimeCodelistDomains = useMemo(
+    () => countRuntimeCodelistDomains(UAE_UC1_CHECK_PACK.filter((check) => check.is_enabled)),
     []
   );
+  const runSampleSubtitle = timeRange === 'all' ? 'All recorded runs' : 'Runs within selected period';
   const radarProfile = useMemo(
     () =>
       buildComplianceRadarResult({
@@ -212,7 +230,7 @@ export default function ControlsDashboardPage() {
         repeatRejectionRatePct: rejectionAnalytics.repeatRate,
         avgHealthScore,
         slaBreachRatePct: slaMetrics.breachPercentage,
-        runtimeCodelistChecks,
+        runtimeCodelistChecks: runtimeCodelistDomains,
         governedCodedDomains: PINT_AE_CODELIST_GOVERNANCE_COUNTS.governedCodedDomains,
       }),
     [
@@ -225,9 +243,30 @@ export default function ControlsDashboardPage() {
       latestPassRate,
       mofMandatoryCoveragePct,
       rejectionAnalytics.repeatRate,
-      runtimeCodelistChecks,
+      runtimeCodelistDomains,
       slaMetrics.breachPercentage,
     ]
+  );
+  const entityRiskMatrix = useMemo(
+    () =>
+      buildEntityRiskMatrixResult({
+        portfolio: {
+          dimensions: radarProfile.dimensions,
+        },
+        entities: {
+          sellers: topRiskSellers,
+          clientHealth,
+        },
+        operational: {
+          exceptions,
+          headers,
+        },
+      }),
+    [clientHealth, exceptions, headers, radarProfile.dimensions, topRiskSellers]
+  );
+  const visibleEntityRiskRows = useMemo(
+    () => applyEntityRiskMatrixFilters(entityRiskMatrix.rows, entityRiskFilters),
+    [entityRiskFilters, entityRiskMatrix.rows]
   );
 
   const formatPct = (value: number | null, digits = 1) => (value === null ? 'N/A' : `${value.toFixed(digits)}%`);
@@ -312,6 +351,18 @@ export default function ControlsDashboardPage() {
     }
     setInsightMode('quality');
   }, []);
+  const handleEntityRiskCellClick = useCallback(
+    (focus: EntityRiskMatrixFocus) => {
+      const params = new URLSearchParams();
+      params.set('dataset', activeDatasetType || direction);
+      params.set('seller', focus.entityId);
+      params.set('dimension', focus.dimension);
+      params.set('context', 'entity-risk-matrix');
+      params.set('precision', focus.drillDownMode);
+      navigate(`/exceptions?${params.toString()}`);
+    },
+    [activeDatasetType, direction, navigate]
+  );
   const chartAnimationSeed = `${timeRange}-${insightMode}-${focusTrendData.length}`;
 
   if (isLoading) {
@@ -415,7 +466,7 @@ export default function ControlsDashboardPage() {
             <StatsCard
               title="Runs Executed"
               value={formatCount(periodRunCount)}
-              subtitle={timeRange === 'all' ? 'All recorded runs' : 'Runs within selected period'}
+              subtitle={runSampleSubtitle}
               helpText="Number of check runs completed in the selected time window."
               icon={<Hash className="w-5 h-5" />}
             />
@@ -478,6 +529,16 @@ export default function ControlsDashboardPage() {
             result={radarProfile}
             title="Readiness Dimensions"
             onDimensionClick={handleRadarDimensionClick}
+          />
+        </div>
+
+        <div className="mb-8">
+          <EntityRiskMatrixHeatmap
+            result={entityRiskMatrix}
+            rows={visibleEntityRiskRows}
+            filters={entityRiskFilters}
+            onFiltersChange={setEntityRiskFilters}
+            onCellClick={handleEntityRiskCellClick}
           />
         </div>
 
@@ -583,7 +644,7 @@ export default function ControlsDashboardPage() {
         {insightMode !== 'none' && (
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 animate-fade-in">
             <p className="text-sm text-foreground">
-              Insight focus: <span className="font-semibold">{insightLabel[insightMode]}</span>. Charts and leaderboards are filtered for this view.
+              Insight focus: <span className="font-semibold">{insightLabel[insightMode]}</span>. Leaderboards and relevant charts are narrowed for this view.
             </p>
             <Button variant="outline" size="sm" className="gap-2" onClick={() => setInsightMode('none')}>
               <FilterX className="w-4 h-4" />

@@ -4,12 +4,17 @@ import {
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
+  Clock3,
+  CalendarDays,
   Database,
   BookCheck,
+  CircuitBoard,
   FileCode2,
+  Globe2,
   LayoutDashboard,
   Moon,
   Play,
+  ServerCog,
   ShieldCheck,
   Sun,
   Upload,
@@ -28,6 +33,10 @@ import { cn } from "@/lib/utils";
 import daribaLogo from "@/assets/dariba-logo.png";
 import type { MappingTemplate } from "@/types/fieldMapping";
 import type { Case } from "@/types/cases";
+
+type ClientEnvironment = "DEV" | "PROD";
+
+const ENVIRONMENT_STORAGE_KEY = "drcs.preview_environment_v1";
 
 const heroBullets = [
   "Pinpoint mandatory-field readiness before technical conformance execution",
@@ -110,16 +119,58 @@ const modules = [
   },
 ];
 
+const environmentOptions: Array<{
+  key: ClientEnvironment;
+  label: string;
+  caption: string;
+}> = [
+  {
+    key: "DEV",
+    label: "Dev",
+    caption: "Sandbox client access lane",
+  },
+  {
+    key: "PROD",
+    label: "Prod",
+    caption: "Production client access lane",
+  },
+];
+
 export default function LandingPage() {
   const { resolvedTheme, setTheme } = useTheme();
   const { isDataLoaded, isChecksRun, headers } = useCompliance();
   const [activeTemplates, setActiveTemplates] = useState<MappingTemplate[]>([]);
   const [cases, setCases] = useState<Case[]>([]);
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+  const [clientEnvironment, setClientEnvironment] = useState<ClientEnvironment>(() => {
+    try {
+      const stored = localStorage.getItem(ENVIRONMENT_STORAGE_KEY);
+      return stored === "PROD" ? "PROD" : "DEV";
+    } catch {
+      return "DEV";
+    }
+  });
 
   useEffect(() => {
     fetchActiveTemplates().then(setActiveTemplates);
     fetchCases().then(setCases);
   }, []);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setCurrentTime(new Date());
+    }, 30000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(ENVIRONMENT_STORAGE_KEY, clientEnvironment);
+    } catch {
+      // Ignore local preference persistence issues.
+    }
+  }, [clientEnvironment]);
 
   const isDark = resolvedTheme === "dark";
   const hasActiveMapping = activeTemplates.length > 0;
@@ -129,6 +180,28 @@ export default function LandingPage() {
   const blockingGaps = coverage?.unmappedMandatory.length ?? 0;
   const openCases = cases.filter((c) => c.status === "Open" || c.status === "In Progress");
   const criticalCases = openCases.filter((c) => c.severity === "Critical");
+  const activeEnvironmentConfig =
+    environmentOptions.find((option) => option.key === clientEnvironment) ?? environmentOptions[0];
+  const operatingContext = useMemo(() => {
+    const timeZone = "Asia/Dubai";
+    return {
+      region: "United Arab Emirates",
+      timezoneLabel: "GST • UTC+04:00",
+      time: new Intl.DateTimeFormat("en-AE", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+        timeZone,
+      }).format(currentTime),
+      date: new Intl.DateTimeFormat("en-AE", {
+        weekday: "short",
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        timeZone,
+      }).format(currentTime),
+    };
+  }, [currentTime]);
 
   const nextAction = useMemo(() => {
     if (!isDataLoaded) return { label: "Start with data ingestion", path: "/upload" };
@@ -149,15 +222,21 @@ export default function LandingPage() {
                 <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
                   UAE eInvoicing Data Readiness Control Studio
                 </div>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setTheme(isDark ? "light" : "dark")}
-                  aria-label="Toggle dark mode"
-                >
-                  {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <EnvironmentAccessToggle
+                    value={clientEnvironment}
+                    onChange={setClientEnvironment}
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setTheme(isDark ? "light" : "dark")}
+                    aria-label="Toggle dark mode"
+                  >
+                    {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                  </Button>
+                </div>
               </div>
 
               <div className="mb-6 flex items-center gap-3">
@@ -165,6 +244,54 @@ export default function LandingPage() {
                 <div>
                   <p className="font-display text-xl font-semibold text-foreground">Controls Studio</p>
                   <p className="text-sm text-muted-foreground">Enterprise e-invoicing readiness</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Badge
+                      variant="outline"
+                      className="rounded-full border-primary/20 bg-primary/5 px-2.5 py-1 text-[10px] tracking-[0.16em] text-primary"
+                    >
+                      {clientEnvironment} ACCESS
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">{activeEnvironmentConfig.caption}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-6 rounded-2xl border border-white/10 bg-background/40 p-2.5 shadow-[0_18px_40px_-30px_rgba(5,16,28,0.85)] backdrop-blur">
+                <div className="mb-2 flex items-center justify-between gap-3 px-2">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary/90">
+                      Operating context
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Active regional clock and business calendar for platform operations
+                    </p>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className="rounded-full border-white/10 bg-background/60 px-2.5 py-1 text-[10px] tracking-[0.16em] text-muted-foreground"
+                  >
+                    LIVE
+                  </Badge>
+                </div>
+                <div className="grid gap-2 md:grid-cols-3">
+                  <ContextStat
+                    icon={Globe2}
+                    label="Region"
+                    value={operatingContext.region}
+                    detail={operatingContext.timezoneLabel}
+                  />
+                  <ContextStat
+                    icon={Clock3}
+                    label="Local time"
+                    value={operatingContext.time}
+                    detail="Dubai operating clock"
+                  />
+                  <ContextStat
+                    icon={CalendarDays}
+                    label="Business date"
+                    value={operatingContext.date}
+                    detail="Regional compliance calendar"
+                  />
                 </div>
               </div>
 
@@ -212,6 +339,38 @@ export default function LandingPage() {
                   <SignalCard label="Open Cases" value={String(openCases.length)} />
                   <SignalCard label="Critical" value={String(criticalCases.length)} />
                   <SignalCard label="Coverage" value={`${Math.round(mandatoryCoverage)}%`} />
+                </div>
+
+                <div className="mt-5 rounded-2xl border border-primary/15 bg-primary/5 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-primary/90">
+                        Client access route
+                      </p>
+                      <p className="mt-1 text-sm text-foreground">
+                        {clientEnvironment === "DEV" ? "DEV sandbox lane selected" : "PROD production lane selected"}
+                      </p>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className="rounded-full border-primary/20 bg-background/50 px-2.5 py-1 text-[10px] tracking-[0.16em] text-primary"
+                    >
+                      PREVIEW ONLY
+                    </Badge>
+                  </div>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-[auto_1fr] sm:items-center">
+                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-primary/20 bg-background/60 text-primary">
+                      {clientEnvironment === "DEV" ? (
+                        <CircuitBoard className="h-5 w-5" />
+                      ) : (
+                        <ServerCog className="h-5 w-5" />
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      This selector does not change routing yet. It demonstrates future multi-environment client access
+                      across DEV and PROD server lanes once backend environment wiring is in place.
+                    </p>
+                  </div>
                 </div>
 
                 <div className="mt-5 rounded-2xl border border-white/10 bg-background/40 p-4">
@@ -413,6 +572,81 @@ function IntelPill({
         <Icon className="h-4 w-4 shrink-0 text-primary" />
       </div>
       <p className="mt-2 font-display text-lg font-semibold text-foreground">{value}</p>
+    </div>
+  );
+}
+
+function ContextStat({
+  icon: Icon,
+  label,
+  value,
+  detail,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-background/55 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+          <p className="mt-2 text-sm font-semibold text-foreground md:text-base">{value}</p>
+        </div>
+        <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
+          <Icon className="h-4 w-4" />
+        </div>
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">{detail}</p>
+    </div>
+  );
+}
+
+function EnvironmentAccessToggle({
+  value,
+  onChange,
+}: {
+  value: ClientEnvironment;
+  onChange: (next: ClientEnvironment) => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-background/70 p-1.5 shadow-[0_12px_32px_-22px_rgba(14,24,38,0.9)] backdrop-blur">
+      <div className="mb-1 flex items-center justify-between gap-3 px-2">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          Client access
+        </span>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">{value}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-1">
+        {environmentOptions.map((option) => {
+          const isActive = option.key === value;
+          return (
+            <button
+              key={option.key}
+              type="button"
+              onClick={() => onChange(option.key)}
+              aria-pressed={isActive}
+              className={cn(
+                "min-w-[88px] rounded-xl px-3 py-2 text-left transition-all",
+                isActive
+                  ? "bg-primary text-primary-foreground shadow-[0_12px_24px_-18px_hsl(var(--primary))]"
+                  : "bg-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+              )}
+            >
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.16em]">{option.key}</span>
+              <span
+                className={cn(
+                  "mt-1 block text-[11px]",
+                  isActive ? "text-primary-foreground/80" : "text-muted-foreground"
+                )}
+              >
+                {option.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -76,4 +76,24 @@ describe('buildComplianceRadarResult', () => {
     expect(result.overallScore).toBeGreaterThanOrEqual(0);
     expect(result.overallScore).toBeLessThanOrEqual(100);
   });
+
+  it('treats codelist coverage as a valid runtime signal for fallback handling', () => {
+    const result = buildComplianceRadarResult({
+      mandatoryCoveragePct: null,
+      drCoveragePct: null,
+      latestPassRatePct: null,
+      avgPassRatePct: null,
+      exceptionIntensityPer100: null,
+      criticalSharePct: null,
+      latestCriticalPressurePct: null,
+      repeatRejectionRatePct: null,
+      avgHealthScore: null,
+      slaBreachRatePct: null,
+      runtimeCodelistChecks: 7,
+      governedCodedDomains: 22,
+    });
+
+    expect(result.availableSignalCount).toBe(1);
+    expect(result.isFallback).toBe(false);
+  });
 });

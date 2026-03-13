@@ -15,7 +15,7 @@ import { fetchAllCustomChecks } from "@/lib/api/checksApi";
 import type { CustomCheckConfig } from "@/types/customChecks";
 import {
   PINT_AE_CODELIST_GOVERNANCE_COUNTS,
-  countRuntimeCodelistChecks,
+  countRuntimeCodelistDomains,
 } from "@/lib/pintAE/codelistGovernanceSummary";
 
 type RegistrySource = "Built-in" | "UAE UC1" | "Custom";
@@ -276,11 +276,11 @@ export default function CheckRegistryPage() {
   const enabledTotalChecks = rows.filter((row) => row.enabled).length;
   const enabledUc1Count = rows.filter((row) => row.source === "UAE UC1" && row.enabled).length;
   const enabledCustomCount = rows.filter((row) => row.source === "Custom" && row.enabled).length;
-  const runtimeCodelistChecks = countRuntimeCodelistChecks(UAE_UC1_CHECK_PACK);
+  const runtimeCodelistDomains = countRuntimeCodelistDomains(UAE_UC1_CHECK_PACK);
   const governedCodedDomains = PINT_AE_CODELIST_GOVERNANCE_COUNTS.governedCodedDomains;
   const codelistCoveragePct =
     governedCodedDomains > 0
-      ? Math.round((runtimeCodelistChecks / governedCodedDomains) * 100)
+      ? Math.round((runtimeCodelistDomains / governedCodedDomains) * 100)
       : 0;
   const derivedOrPolicyDomains =
     governedCodedDomains - PINT_AE_CODELIST_GOVERNANCE_COUNTS.packagedPintCodelists;
@@ -364,7 +364,7 @@ export default function CheckRegistryPage() {
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Runtime Coverage</p>
                 <p className="text-2xl font-semibold text-foreground">{codelistCoveragePct}%</p>
                 <p className="text-xs text-muted-foreground">
-                  {runtimeCodelistChecks}/{governedCodedDomains} governed domains
+                  {runtimeCodelistDomains}/{governedCodedDomains} governed domains
                 </p>
               </div>
             </div>
@@ -376,11 +376,11 @@ export default function CheckRegistryPage() {
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
               <SummaryCard
-                label="Implemented Codelist Checks"
-                value={runtimeCodelistChecks}
+                label="Implemented Codelist Domains"
+                value={runtimeCodelistDomains}
                 helper={`Across ${governedCodedDomains} governed domains`}
-                definition="Codelist validations already implemented and running in production execution."
-                formula="Implemented runtime codelist checks"
+                definition="Unique governed codelist domains already implemented and running in production execution."
+                formula="Implemented runtime codelist domains"
               />
               <SummaryCard
                 label="Unconditional Enforcement"

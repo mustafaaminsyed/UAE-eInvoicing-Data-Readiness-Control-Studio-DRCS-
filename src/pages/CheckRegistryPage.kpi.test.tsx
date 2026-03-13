@@ -26,14 +26,14 @@ describe('CheckRegistryPage KPI summaries', () => {
       expectSummaryCard('Built-in Core Checks', 10);
       expectSummaryCard('Custom Active', '0/0');
 
-      expectSummaryCard('Implemented Codelist Checks', 9);
+      expectSummaryCard('Implemented Codelist Domains', 7);
       expectSummaryCard('Unconditional Enforcement', 5);
       expectSummaryCard('Conditional Enforcement', 4);
       expectSummaryCard('Deferred Domains', 13);
 
       expect(screen.getByText('Runtime Coverage')).toBeInTheDocument();
-      expect(screen.getByText('41%')).toBeInTheDocument();
-      expect(screen.getByText('9/22 governed domains')).toBeInTheDocument();
+      expect(screen.getByText('32%')).toBeInTheDocument();
+      expect(screen.getByText('7/22 governed domains')).toBeInTheDocument();
     });
   });
 });
