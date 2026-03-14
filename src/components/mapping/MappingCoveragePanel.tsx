@@ -4,37 +4,79 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { FieldMapping, PINT_AE_UC1_FIELDS } from '@/types/fieldMapping';
+import { DatasetType, FieldMapping, normalizeFieldMappings } from '@/types/fieldMapping';
 import { analyzeCoverage, getCoverageStats, analyzeRegistryCoverage, getRegistryCoverageStats } from '@/lib/mapping/coverageAnalyzer';
 import { getDRRuleTraceability } from '@/lib/registry/specRegistry';
+import { getDatasetConditionalFieldIds } from '@/lib/mapping/datasetFieldCatalog';
 
 interface MappingCoveragePanelProps {
   mappings: FieldMapping[];
+  datasetType?: DatasetType;
+  totalSourceColumns?: number;
   onFieldClick?: (fieldId: string) => void;
 }
 
-export function MappingCoveragePanel({ mappings, onFieldClick }: MappingCoveragePanelProps) {
-  const confirmedMappings = mappings.filter(m => m.isConfirmed);
-  const coverage = useMemo(() => analyzeCoverage(confirmedMappings), [confirmedMappings]);
+export function MappingCoveragePanel({
+  mappings,
+  datasetType = 'combined',
+  totalSourceColumns,
+  onFieldClick,
+}: MappingCoveragePanelProps) {
+  const confirmedMappings = useMemo(
+    () => normalizeFieldMappings(mappings.filter((mapping) => mapping.isConfirmed)),
+    [mappings]
+  );
+  const coverage = useMemo(
+    () => analyzeCoverage(confirmedMappings, datasetType),
+    [confirmedMappings, datasetType]
+  );
   const stats = useMemo(() => getCoverageStats(coverage), [coverage]);
 
   // Registry-based coverage (authoritative 50-field spec)
-  const regCoverage = useMemo(() => analyzeRegistryCoverage(confirmedMappings), [confirmedMappings]);
+  const regCoverage = useMemo(
+    () => analyzeRegistryCoverage(confirmedMappings, datasetType),
+    [confirmedMappings, datasetType]
+  );
   const regStats = useMemo(() => getRegistryCoverageStats(regCoverage), [regCoverage]);
 
-  const conditionalFields = PINT_AE_UC1_FIELDS.filter(f => !f.isMandatory);
   const mappedConditionalIds = new Set(confirmedMappings.map(m => m.targetField.id));
-  const conditionalMapped = conditionalFields.filter(f => mappedConditionalIds.has(f.id)).length;
-  const conditionalPct = conditionalFields.length > 0 ? Math.round((conditionalMapped / conditionalFields.length) * 100) : 100;
+  const conditionalFieldIds = getDatasetConditionalFieldIds(datasetType);
+  const conditionalMapped = Array.from(conditionalFieldIds).filter((id) => mappedConditionalIds.has(id)).length;
+  const conditionalPct = conditionalFieldIds.size > 0 ? Math.round((conditionalMapped / conditionalFieldIds.size) * 100) : 100;
+  const sourceColumnsMapped = confirmedMappings.length;
+  const sourceColumnsTotal = totalSourceColumns ?? confirmedMappings.length;
+  const sourceColumnsPct = sourceColumnsTotal > 0 ? Math.round((sourceColumnsMapped / sourceColumnsTotal) * 100) : 100;
 
   return (
     <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <CheckCircle className="h-4 w-4" />
+            Uploaded File Fit
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-medium">Mapped uploaded columns</span>
+              <span className="text-xs font-bold">{sourceColumnsMapped}/{sourceColumnsTotal}</span>
+            </div>
+            <Progress value={sourceColumnsPct} className="h-2" />
+          </div>
+          <p className="text-[11px] leading-5 text-muted-foreground">
+            This measures how completely the uploaded file mapped. It is separate from dataset and registry coverage,
+            which reflect the broader fields and DRs the platform supports.
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Coverage Summary */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">
             <Target className="h-4 w-4" />
-            Mapping Coverage
+            Supported Dataset Coverage
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -51,7 +93,7 @@ export function MappingCoveragePanel({ mappings, onFieldClick }: MappingCoverage
           <div>
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-medium">Conditional</span>
-              <span className="text-xs font-bold">{conditionalMapped}/{conditionalFields.length}</span>
+              <span className="text-xs font-bold">{conditionalMapped}/{conditionalFieldIds.size}</span>
             </div>
             <Progress value={conditionalPct} className="h-2 [&>div]:bg-blue-500" />
           </div>
@@ -79,6 +121,10 @@ export function MappingCoveragePanel({ mappings, onFieldClick }: MappingCoverage
               </div>
             )}
           </div>
+          <p className="text-[11px] leading-5 text-muted-foreground">
+            This shows how much of the selected dataset model is covered, including optional supported fields that may
+            not appear in your uploaded file.
+          </p>
         </CardContent>
       </Card>
 
@@ -101,7 +147,7 @@ export function MappingCoveragePanel({ mappings, onFieldClick }: MappingCoverage
           </div>
           <div>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-medium">Overall (50 DRs)</span>
+              <span className="text-xs font-medium">Overall ({regStats.overallTotal} DRs)</span>
               <span className="text-xs font-bold">{regStats.overallMapped}/{regStats.overallTotal}</span>
             </div>
             <Progress value={regCoverage.overallCoveragePct} className="h-2" />
@@ -119,11 +165,15 @@ export function MappingCoveragePanel({ mappings, onFieldClick }: MappingCoverage
               </div>
             )}
           </div>
+          <p className="text-[11px] leading-5 text-muted-foreground">
+            Registry coverage is the DR-level view. It can remain below 100% even when the uploaded file mapped
+            cleanly, because some DRs are optional, derived, or system-owned.
+          </p>
         </CardContent>
       </Card>
 
       {/* Unmapped Mandatory DRs */}
-      {coverage.unmappedMandatory.length > 0 && (
+      {regCoverage.unmappedMandatory.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-amber-600 flex items-center gap-2">
@@ -134,20 +184,20 @@ export function MappingCoveragePanel({ mappings, onFieldClick }: MappingCoverage
           <CardContent className="p-0">
             <ScrollArea className="max-h-[280px]">
               <div className="divide-y">
-                {coverage.unmappedMandatory.map(field => {
-                  const trace = getDRRuleTraceability(field.ibtReference);
+                {regCoverage.unmappedMandatory.map((field) => {
+                  const trace = getDRRuleTraceability(field.dr_id);
                   return (
                     <button
-                      key={field.id}
-                      onClick={() => onFieldClick?.(field.id)}
+                      key={field.dr_id}
+                      onClick={() => onFieldClick?.(field.dr_id)}
                       className="w-full text-left px-4 py-2.5 hover:bg-muted/50 transition-colors"
                     >
                       <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-xs font-mono shrink-0">{field.ibtReference}</Badge>
-                        <span className="text-sm font-medium truncate">{field.name}</span>
+                        <Badge variant="outline" className="text-xs font-mono shrink-0">{field.dr_id}</Badge>
+                        <span className="text-sm font-medium truncate">{field.business_term}</span>
                       </div>
                       <p className="text-xs text-muted-foreground mt-0.5 pl-0.5">
-                        {field.isMandatory ? 'Required for all invoices' : field.description}
+                        {field.error_message_text || field.validation_logic || 'Required for the current use case'}
                       </p>
                       {trace && trace.linkedCheckIds.length > 0 && (
                         <div className="flex items-center gap-1 mt-1 pl-0.5">

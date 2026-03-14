@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { runChecksOrchestrator } from '@/engine/orchestrator';
-import { runAllChecks } from '@/lib/checks/checksRegistry';
-import { runAllPintAEChecks } from '@/lib/checks/pintAECheckRunner';
+import { runAllChecksWithTelemetry } from '@/lib/checks/checksRegistry';
+import { runAllPintAEChecksWithTelemetry } from '@/lib/checks/pintAECheckRunner';
 import { buildOrganizationProfileExceptions } from '@/lib/validation/rulesetRouter';
 import { fetchEnabledPintAEChecks, seedUC1CheckPack } from '@/lib/api/pintAEApi';
 import { CheckResult, Exception, ParsedData } from '@/types/compliance';
@@ -9,11 +9,11 @@ import { PintAECheck, PintAEException } from '@/types/pintAE';
 import { OrganizationProfile } from '@/types/direction';
 
 vi.mock('@/lib/checks/checksRegistry', () => ({
-  runAllChecks: vi.fn(),
+  runAllChecksWithTelemetry: vi.fn(),
 }));
 
 vi.mock('@/lib/checks/pintAECheckRunner', () => ({
-  runAllPintAEChecks: vi.fn(),
+  runAllPintAEChecksWithTelemetry: vi.fn(),
 }));
 
 vi.mock('@/lib/validation/rulesetRouter', () => ({
@@ -26,8 +26,8 @@ vi.mock('@/lib/api/pintAEApi', () => ({
 }));
 
 describe('runChecksOrchestrator', () => {
-  const mockedRunAllChecks = vi.mocked(runAllChecks);
-  const mockedRunAllPintAEChecks = vi.mocked(runAllPintAEChecks);
+  const mockedRunAllChecksWithTelemetry = vi.mocked(runAllChecksWithTelemetry);
+  const mockedRunAllPintAEChecksWithTelemetry = vi.mocked(runAllPintAEChecksWithTelemetry);
   const mockedBuildOrganizationProfileExceptions = vi.mocked(buildOrganizationProfileExceptions);
   const mockedFetchEnabledPintAEChecks = vi.mocked(fetchEnabledPintAEChecks);
   const mockedSeedUC1CheckPack = vi.mocked(seedUC1CheckPack);
@@ -66,8 +66,8 @@ describe('runChecksOrchestrator', () => {
     vi.resetAllMocks();
     mockedSeedUC1CheckPack.mockResolvedValue({ success: true, message: 'ok' });
     mockedFetchEnabledPintAEChecks.mockResolvedValue([]);
-    mockedRunAllChecks.mockReturnValue([]);
-    mockedRunAllPintAEChecks.mockReturnValue([]);
+    mockedRunAllChecksWithTelemetry.mockReturnValue({ checkResults: [], telemetry: [] });
+    mockedRunAllPintAEChecksWithTelemetry.mockReturnValue({ exceptions: [], telemetry: [] });
     mockedBuildOrganizationProfileExceptions.mockReturnValue([]);
   });
 
@@ -114,7 +114,8 @@ describe('runChecksOrchestrator', () => {
         check_id: 'UAE-UC1-CHK-001',
         check_name: 'Invoice Number Present',
         scope: 'Header',
-        rule_type: 'Presence',
+        rule_type: 'structural_rule',
+        execution_layer: 'schema',
         severity: 'Critical',
         pint_reference_terms: ['IBT-001'],
         owner_team_default: 'Client Finance',
@@ -130,7 +131,8 @@ describe('runChecksOrchestrator', () => {
         check_name: 'Invoice Number Present',
         severity: 'Critical',
         scope: 'Header',
-        rule_type: 'Presence',
+        rule_type: 'structural_rule',
+        execution_layer: 'schema',
         pint_reference_terms: ['IBT-001'],
         invoice_id: 'INV-1',
         invoice_number: 'A-1001',
@@ -157,9 +159,35 @@ describe('runChecksOrchestrator', () => {
       },
     ];
 
-    mockedRunAllChecks.mockReturnValue(builtInResults);
+    mockedRunAllChecksWithTelemetry.mockReturnValue({
+      checkResults: builtInResults,
+      telemetry: [
+        {
+          rule_id: 'buyer_trn_missing',
+          execution_count: 1,
+          failure_count: 1,
+          execution_source: 'runtime',
+        },
+        {
+          rule_id: 'duplicate_invoice_number',
+          execution_count: 1,
+          failure_count: 1,
+          execution_source: 'runtime',
+        },
+      ],
+    });
     mockedFetchEnabledPintAEChecks.mockResolvedValue(pintChecks);
-    mockedRunAllPintAEChecks.mockReturnValue(pintExceptions);
+    mockedRunAllPintAEChecksWithTelemetry.mockReturnValue({
+      exceptions: pintExceptions,
+      telemetry: [
+        {
+          rule_id: 'UAE-UC1-CHK-001',
+          execution_count: 1,
+          failure_count: 1,
+          execution_source: 'runtime',
+        },
+      ],
+    });
     mockedBuildOrganizationProfileExceptions.mockReturnValue(orgExceptions);
 
     const result = await runChecksOrchestrator({
@@ -180,10 +208,10 @@ describe('runChecksOrchestrator', () => {
       'org_profile_our_entity_alignment',
     ]);
 
-    const runAllChecksOrder = mockedRunAllChecks.mock.invocationCallOrder[0];
+    const runAllChecksOrder = mockedRunAllChecksWithTelemetry.mock.invocationCallOrder[0];
     const seedOrder = mockedSeedUC1CheckPack.mock.invocationCallOrder[0];
     const fetchChecksOrder = mockedFetchEnabledPintAEChecks.mock.invocationCallOrder[0];
-    const runPintOrder = mockedRunAllPintAEChecks.mock.invocationCallOrder[0];
+    const runPintOrder = mockedRunAllPintAEChecksWithTelemetry.mock.invocationCallOrder[0];
     const orgProfileOrder = mockedBuildOrganizationProfileExceptions.mock.invocationCallOrder[0];
     expect(runAllChecksOrder).toBeLessThan(seedOrder);
     expect(seedOrder).toBeLessThan(fetchChecksOrder);
@@ -218,7 +246,8 @@ describe('runChecksOrchestrator', () => {
         check_name: 'Specification Identifier',
         severity: 'High',
         scope: 'Header',
-        rule_type: 'Format',
+        rule_type: 'structural_rule',
+        execution_layer: 'national_rule',
         pint_reference_terms: ['IBT-024'],
         message: 'Invalid specification identifier',
         root_cause_category: 'Unclassified',
@@ -237,8 +266,28 @@ describe('runChecksOrchestrator', () => {
       },
     ];
 
-    mockedRunAllChecks.mockReturnValue(builtInResults);
-    mockedRunAllPintAEChecks.mockReturnValue(pintExceptions);
+    mockedRunAllChecksWithTelemetry.mockReturnValue({
+      checkResults: builtInResults,
+      telemetry: [
+        {
+          rule_id: 'missing_mandatory_fields',
+          execution_count: 1,
+          failure_count: 1,
+          execution_source: 'runtime',
+        },
+      ],
+    });
+    mockedRunAllPintAEChecksWithTelemetry.mockReturnValue({
+      exceptions: pintExceptions,
+      telemetry: [
+        {
+          rule_id: 'UAE-UC1-CHK-010',
+          execution_count: 1,
+          failure_count: 1,
+          execution_source: 'runtime',
+        },
+      ],
+    });
     mockedBuildOrganizationProfileExceptions.mockReturnValue(orgExceptions);
 
     const result = await runChecksOrchestrator({
@@ -251,7 +300,23 @@ describe('runChecksOrchestrator', () => {
     });
 
     expect(result.builtInResults).toEqual(builtInResults);
+    expect(result.coreTelemetry).toEqual([
+      {
+        rule_id: 'missing_mandatory_fields',
+        execution_count: 1,
+        failure_count: 1,
+        execution_source: 'runtime',
+      },
+    ]);
     expect(result.pintExceptions).toEqual(pintExceptions);
+    expect(result.pintTelemetry).toEqual([
+      {
+        rule_id: 'UAE-UC1-CHK-010',
+        execution_count: 1,
+        failure_count: 1,
+        execution_source: 'runtime',
+      },
+    ]);
     expect(result.orgProfileExceptions).toEqual(orgExceptions);
     expect(result.legacyPintExceptions).toEqual([
       {
@@ -273,41 +338,62 @@ describe('runChecksOrchestrator', () => {
   });
 
   it('produces canonical findings that map back to existing outputs', async () => {
-    mockedRunAllChecks.mockReturnValue([
-      {
-        checkId: 'buyer_trn_missing',
-        checkName: 'Buyer TRN Missing',
-        severity: 'Critical',
-        passed: 0,
-        failed: 1,
-        exceptions: [
-          {
-            id: 'core-find-1',
-            checkId: 'buyer_trn_missing',
-            checkName: 'Buyer TRN Missing',
-            severity: 'Critical',
-            message: 'Buyer missing TRN',
-          },
-        ],
-      },
-    ]);
-    mockedRunAllPintAEChecks.mockReturnValue([
-      {
-        id: 'pint-find-1',
-        timestamp: '2026-03-11T01:00:00.000Z',
-        check_id: 'UAE-UC1-CHK-001',
-        check_name: 'Invoice Number Present',
-        severity: 'Critical',
-        scope: 'Header',
-        rule_type: 'Presence',
-        pint_reference_terms: ['IBT-001'],
-        message: 'Invoice number missing',
-        root_cause_category: 'Unclassified',
-        owner_team: 'Client Finance',
-        sla_target_hours: 4,
-        case_status: 'Open',
-      },
-    ]);
+    mockedRunAllChecksWithTelemetry.mockReturnValue({
+      checkResults: [
+        {
+          checkId: 'buyer_trn_missing',
+          checkName: 'Buyer TRN Missing',
+          severity: 'Critical',
+          passed: 0,
+          failed: 1,
+          exceptions: [
+            {
+              id: 'core-find-1',
+              checkId: 'buyer_trn_missing',
+              checkName: 'Buyer TRN Missing',
+              severity: 'Critical',
+              message: 'Buyer missing TRN',
+            },
+          ],
+        },
+      ],
+      telemetry: [
+        {
+          rule_id: 'buyer_trn_missing',
+          execution_count: 1,
+          failure_count: 1,
+          execution_source: 'runtime',
+        },
+      ],
+    });
+    mockedRunAllPintAEChecksWithTelemetry.mockReturnValue({
+      exceptions: [
+        {
+          id: 'pint-find-1',
+          timestamp: '2026-03-11T01:00:00.000Z',
+          check_id: 'UAE-UC1-CHK-001',
+          check_name: 'Invoice Number Present',
+          severity: 'Critical',
+          scope: 'Header',
+          rule_type: 'structural_rule',
+          execution_layer: 'schema',
+          pint_reference_terms: ['IBT-001'],
+          message: 'Invoice number missing',
+          root_cause_category: 'Unclassified',
+          owner_team: 'Client Finance',
+          sla_target_hours: 4,
+          case_status: 'Open',
+        },
+      ],
+      telemetry: [
+        {
+          rule_id: 'UAE-UC1-CHK-001',
+          execution_count: 1,
+          failure_count: 1,
+          execution_source: 'runtime',
+        },
+      ],
+    });
     mockedBuildOrganizationProfileExceptions.mockReturnValue([
       {
         id: 'org-find-1',

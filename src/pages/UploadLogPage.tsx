@@ -1,5 +1,5 @@
 import { Trash2, FileClock, Database, CalendarClock, Files, RotateCcw } from 'lucide-react';
-import { useCompliance } from '@/context/ComplianceContext';
+import { useUploadLogs } from '@/context/UploadLogContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,7 @@ function formatDateTime(value: string): string {
 }
 
 export default function UploadLogPage() {
-  const { uploadLogs, deleteUploadLogEntry, clearUploadLogs } = useCompliance();
+  const { uploadLogs, deleteUploadLogEntry, clearUploadLogs } = useUploadLogs();
 
   const totalUploads = uploadLogs.length;
   const totalFiles = uploadLogs.reduce((sum, log) => sum + log.fileCount, 0);

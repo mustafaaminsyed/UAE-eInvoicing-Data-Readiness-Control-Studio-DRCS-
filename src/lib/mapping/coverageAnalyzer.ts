@@ -1,26 +1,29 @@
 import { 
+  DatasetType,
   FieldMapping, 
   CoverageAnalysis, 
   ValidationResult, 
-  PINT_AE_UC1_FIELDS 
+  normalizeFieldMappings,
 } from '@/types/fieldMapping';
-import { 
-  getRegistryFields, 
-  isMandatoryField, 
-  computeRegistryCoverage,
-  type RegistryCoverageResult 
+import {
+  getRegistryFieldByDR,
+  type RegistryCoverageResult,
 } from '@/lib/registry/specRegistry';
+import { getDRRegistry } from '@/lib/registry/drRegistry';
+import { getDatasetMandatoryFieldIds, getDatasetTargetFields } from '@/lib/mapping/datasetFieldCatalog';
 
 // Re-export registry coverage for convenience
 export type { RegistryCoverageResult };
-export { computeRegistryCoverage };
 
 // Analyze mapping coverage (original logic, still used by existing components)
-export function analyzeCoverage(mappings: FieldMapping[]): CoverageAnalysis {
-  const mappedFieldIds = new Set(mappings.map(m => m.targetField.id));
-  
-  const mandatoryFields = PINT_AE_UC1_FIELDS.filter(f => f.isMandatory);
-  const optionalFields = PINT_AE_UC1_FIELDS.filter(f => !f.isMandatory);
+export function analyzeCoverage(mappings: FieldMapping[], datasetType: DatasetType = 'combined'): CoverageAnalysis {
+  const normalizedMappings = normalizeFieldMappings(mappings);
+  const mappedFieldIds = new Set(normalizedMappings.map(m => m.targetField.id));
+
+  const datasetFields = getDatasetTargetFields(datasetType);
+  const mandatoryFieldIds = getDatasetMandatoryFieldIds(datasetType);
+  const mandatoryFields = datasetFields.filter((field) => mandatoryFieldIds.has(field.id));
+  const optionalFields = datasetFields.filter((field) => !mandatoryFieldIds.has(field.id));
   
   const mappedMandatory = mandatoryFields.filter(f => mappedFieldIds.has(f.id));
   const unmappedMandatory = mandatoryFields.filter(f => !mappedFieldIds.has(f.id));
@@ -31,8 +34,8 @@ export function analyzeCoverage(mappings: FieldMapping[]): CoverageAnalysis {
     ? (mappedMandatory.length / mandatoryFields.length) * 100 
     : 100;
   
-  const totalCoverage = PINT_AE_UC1_FIELDS.length > 0
-    ? (mappings.length / PINT_AE_UC1_FIELDS.length) * 100
+  const totalCoverage = datasetFields.length > 0
+    ? ((mappedMandatory.length + mappedOptional.length) / datasetFields.length) * 100
     : 100;
   
   return {
@@ -46,10 +49,76 @@ export function analyzeCoverage(mappings: FieldMapping[]): CoverageAnalysis {
 }
 
 // Registry-aware coverage: uses the authoritative 50-field spec as source of truth
-export function analyzeRegistryCoverage(mappings: FieldMapping[]): RegistryCoverageResult {
-  // Build a set of DR IDs that have been mapped (using ibtReference from the target field)
-  const mappedDrIds = new Set(mappings.map(m => m.targetField.ibtReference));
-  return computeRegistryCoverage(mappedDrIds);
+export function analyzeRegistryCoverage(
+  mappings: FieldMapping[],
+  datasetType: DatasetType = 'combined'
+): RegistryCoverageResult {
+  const normalizedMappings = normalizeFieldMappings(mappings);
+  const mappedColumns = new Set(normalizedMappings.map((mapping) => mapping.targetField.id));
+  const datasetFiles =
+    datasetType === 'combined'
+      ? new Set(['headers', 'lines'])
+      : datasetType === 'header'
+        ? new Set(['headers'])
+        : datasetType === 'lines'
+          ? new Set(['lines'])
+          : new Set(['buyers']);
+
+  const registryEntries = getDRRegistry().filter((entry) => {
+    if (!entry.dataset_file) return false;
+    return datasetFiles.has(entry.dataset_file);
+  });
+  const registryFields = registryEntries
+    .map((entry) => getRegistryFieldByDR(entry.dr_id))
+    .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+
+  const mandatory = registryFields.filter((field) => {
+    const bridge = registryEntries.find((entry) => entry.dr_id === field.dr_id);
+    return bridge?.mandatory_for_default_use_case;
+  });
+  const conditional = registryFields.filter((field) => {
+    const bridge = registryEntries.find((entry) => entry.dr_id === field.dr_id);
+    return bridge && !bridge.mandatory_for_default_use_case;
+  });
+  const mappedMandatory = mandatory.filter((field) =>
+    registryEntries
+      .find((entry) => entry.dr_id === field.dr_id)
+      ?.internal_column_names.some((column) => mappedColumns.has(column))
+  );
+  const unmappedMandatory = mandatory.filter((field) =>
+    !registryEntries
+      .find((entry) => entry.dr_id === field.dr_id)
+      ?.internal_column_names.some((column) => mappedColumns.has(column))
+  );
+  const mappedConditional = conditional.filter((field) =>
+    registryEntries
+      .find((entry) => entry.dr_id === field.dr_id)
+      ?.internal_column_names.some((column) => mappedColumns.has(column))
+  );
+  const unmappedConditional = conditional.filter((field) =>
+    !registryEntries
+      .find((entry) => entry.dr_id === field.dr_id)
+      ?.internal_column_names.some((column) => mappedColumns.has(column))
+  );
+
+  const mandatoryCoveragePct =
+    mandatory.length > 0 ? (mappedMandatory.length / mandatory.length) * 100 : 100;
+  const overallCoveragePct =
+    registryFields.length > 0
+      ? ((mappedMandatory.length + mappedConditional.length) / registryFields.length) * 100
+      : 100;
+
+  return {
+    totalRegistryFields: registryFields.length,
+    mandatoryRegistryFields: mandatory.length,
+    mappedMandatory,
+    unmappedMandatory,
+    mappedConditional,
+    unmappedConditional,
+    mandatoryCoveragePct,
+    overallCoveragePct,
+    isReadyForActivation: unmappedMandatory.length === 0,
+  };
 }
 
 // Get registry-based stats summary
@@ -202,7 +271,7 @@ export function getCoverageStats(analysis: CoverageAnalysis) {
     optionalMapped: analysis.mappedOptional.length,
     optionalTotal: analysis.mappedOptional.length + analysis.unmappedOptional.length,
     overallMapped: analysis.mappedMandatory.length + analysis.mappedOptional.length,
-    overallTotal: PINT_AE_UC1_FIELDS.length,
+    overallTotal: analysis.mappedMandatory.length + analysis.unmappedMandatory.length + analysis.mappedOptional.length + analysis.unmappedOptional.length,
     isReadyForValidation: analysis.unmappedMandatory.length === 0,
   };
 }

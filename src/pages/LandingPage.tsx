@@ -3,18 +3,16 @@ import { Link } from "react-router-dom";
 import {
   AlertTriangle,
   ArrowRight,
+  ArrowUpRight,
   CheckCircle2,
   Clock3,
-  CalendarDays,
   Database,
-  BookCheck,
-  CircuitBoard,
   FileCode2,
-  Globe2,
+  FileDown,
   LayoutDashboard,
   Moon,
   Play,
-  ServerCog,
+  Search,
   ShieldCheck,
   Sun,
   Upload,
@@ -25,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
 import { useCompliance } from "@/context/ComplianceContext";
 import { fetchActiveTemplates } from "@/lib/api/mappingApi";
 import { fetchCases } from "@/lib/api/casesApi";
@@ -38,57 +37,50 @@ type ClientEnvironment = "DEV" | "PROD";
 
 const ENVIRONMENT_STORAGE_KEY = "drcs.preview_environment_v1";
 
-const heroBullets = [
-  "Pinpoint mandatory-field readiness before technical conformance execution",
-  "Align ERP source structures to UAE and PINT-AE canonical invoice fields",
-  "Run compliance checks with explainable exceptions and severity context",
-  "Operate remediation through controls, evidence, and case-level governance",
-  "Present audit-ready traceability across data, rules, outcomes, and actions",
+const heroNavLinks = [
+  { label: "Upload Audit", path: "/upload-audit" },
+  { label: "Mapping", path: "/mapping" },
+  { label: "Traceability", path: "/traceability" },
+  { label: "Run Checks", path: "/run" },
+  { label: "Check Registry", path: "/check-registry" },
+];
+
+const trustPills = [
+  "UAE MoF baseline aligned",
+  "PINT-AE traceability",
+  "Control-grade evidence",
+];
+
+const heroMessages = [
+  "Validate source data before transmission and expose blocking gaps early.",
+  "Trace every canonical field from source mapping to control, exception, and evidence.",
+  "Improve readiness, conformance coverage, and operational risk visibility in one place.",
 ];
 
 const capabilityCards = [
   {
     title: "Data Ingestion & Readiness",
     description:
-      "Ingest AR/AP invoice datasets, validate structural integrity, and profile readiness at source-field level.",
+      "Profile source data quality, mandatory coverage, and structural readiness before transmission.",
     icon: Database,
   },
   {
     title: "Schema Mapping & Alignment",
     description:
-      "Map customer fields into canonical invoice structures with controlled templates and confidence visibility.",
+      "Map ERP fields into canonical UAE invoice structures with controlled templates and confidence visibility.",
     icon: Wand2,
   },
   {
     title: "Validation & Exception Controls",
     description:
-      "Execute check packs, classify exceptions by severity, and route findings into operational control workflows.",
+      "Execute check packs, classify failed records, and move findings into operational review faster.",
     icon: CheckCircle2,
   },
   {
-    title: "Evidence, Traceability & Reconciliation",
+    title: "Evidence & Traceability",
     description:
-      "Produce explainable evidence trails from requirement baseline through rule outcomes and remediation actions.",
+      "Connect requirements, validations, controls, and evidence outputs into one explainable compliance view.",
     icon: ShieldCheck,
-  },
-];
-
-const workflowSteps = [
-  {
-    title: "Ingest",
-    detail: "Bring in buyers, headers, and lines from source systems.",
-  },
-  {
-    title: "Align",
-    detail: "Map fields to canonical UAE/PINT-AE structures.",
-  },
-  {
-    title: "Validate",
-    detail: "Run compliance checks and capture rule-level outcomes.",
-  },
-  {
-    title: "Control",
-    detail: "Prioritize exceptions, track remediation, and evidence closure.",
   },
 ];
 
@@ -112,8 +104,8 @@ const modules = [
     icon: Play,
   },
   {
-    title: "Control & Resolve",
-    description: "Manage exceptions, evidence outputs, and control operations.",
+    title: "Control Workspace",
+    description: "Review exceptions, evidence, and operational control posture.",
     path: "/dashboard",
     icon: LayoutDashboard,
   },
@@ -182,11 +174,12 @@ export default function LandingPage() {
   const criticalCases = openCases.filter((c) => c.severity === "Critical");
   const activeEnvironmentConfig =
     environmentOptions.find((option) => option.key === clientEnvironment) ?? environmentOptions[0];
+
   const operatingContext = useMemo(() => {
     const timeZone = "Asia/Dubai";
     return {
       region: "United Arab Emirates",
-      timezoneLabel: "GST • UTC+04:00",
+      timezoneLabel: "GST / UTC+04:00",
       time: new Intl.DateTimeFormat("en-AE", {
         hour: "2-digit",
         minute: "2-digit",
@@ -213,206 +206,307 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen">
       <div className="container mx-auto max-w-7xl px-4 py-8 md:py-12">
-        <section className="relative overflow-hidden rounded-3xl surface-glass border border-white/70 px-6 py-8 md:px-10 md:py-10">
-          <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
-          <div className="absolute -left-20 bottom-0 h-56 w-56 rounded-full bg-accent/15 blur-3xl" />
-          <div className="relative z-10 grid items-stretch gap-8 lg:grid-cols-[1.2fr_0.8fr]">
-            <div>
-              <div className="mb-5 flex items-center justify-between gap-3">
-                <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                  UAE eInvoicing Data Readiness Control Studio
+        <div className="sticky top-4 z-40 mb-6">
+          <div className="mx-auto max-w-6xl rounded-[1.65rem] border border-white/80 bg-white/68 px-4 py-4 shadow-[0_20px_45px_-36px_rgba(9,28,42,0.5)] backdrop-blur-xl dark:border-emerald-900/25 dark:bg-[#0f1917]/84 dark:shadow-[0_24px_52px_-36px_rgba(0,0,0,0.78)] md:px-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl border border-white/80 bg-white/85 p-2 shadow-sm dark:border-emerald-900/20 dark:bg-white/[0.04]">
+                  <img src={daribaLogo} alt="Dariba Tech" className="h-9 w-auto" />
                 </div>
-                <div className="flex items-center gap-2">
-                  <EnvironmentAccessToggle
-                    value={clientEnvironment}
-                    onChange={setClientEnvironment}
-                  />
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setTheme(isDark ? "light" : "dark")}
-                    aria-label="Toggle dark mode"
-                  >
-                    {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="mb-6 flex items-center gap-3">
-                <img src={daribaLogo} alt="Dariba Tech" className="h-20 w-auto shrink-0" />
                 <div>
-                  <p className="font-display text-xl font-semibold text-foreground">Controls Studio</p>
-                  <p className="text-sm text-muted-foreground">Enterprise e-invoicing readiness</p>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <Badge
-                      variant="outline"
-                      className="rounded-full border-primary/20 bg-primary/5 px-2.5 py-1 text-[10px] tracking-[0.16em] text-primary"
-                    >
-                      {clientEnvironment} ACCESS
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">{activeEnvironmentConfig.caption}</span>
-                  </div>
+                  <p className="font-display text-lg font-semibold text-foreground">Controls Studio</p>
+                  <p className="text-sm text-muted-foreground">UAE eInvoicing Compliance</p>
                 </div>
               </div>
 
-              <div className="mb-6 rounded-2xl border border-white/10 bg-background/40 p-2.5 shadow-[0_18px_40px_-30px_rgba(5,16,28,0.85)] backdrop-blur">
-                <div className="mb-2 flex items-center justify-between gap-3 px-2">
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary/90">
-                      Operating context
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Active regional clock and business calendar for platform operations
-                    </p>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className="rounded-full border-white/10 bg-background/60 px-2.5 py-1 text-[10px] tracking-[0.16em] text-muted-foreground"
+              <nav className="flex flex-1 flex-wrap items-center justify-center gap-2 lg:gap-3">
+                {heroNavLinks.map((item) => (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className="rounded-full border border-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/15 hover:bg-white/75 hover:text-foreground dark:hover:border-emerald-800/30 dark:hover:bg-emerald-500/[0.08] dark:hover:text-emerald-50"
                   >
-                    LIVE
-                  </Badge>
-                </div>
-                <div className="grid gap-2 md:grid-cols-3">
-                  <ContextStat
-                    icon={Globe2}
-                    label="Region"
-                    value={operatingContext.region}
-                    detail={operatingContext.timezoneLabel}
+                    {item.label}
+                  </Link>
+                ))}
+              </nav>
+
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <span className="rounded-full border border-primary/20 bg-primary/8 px-3 py-1.5 text-xs font-semibold text-primary dark:border-emerald-700/30 dark:bg-emerald-500/[0.08] dark:text-emerald-300">
+                  Compliance Command Center
+                </span>
+                <EnvironmentAccessToggle value={clientEnvironment} onChange={setClientEnvironment} />
+                <div className="flex items-center gap-2 rounded-full border border-white/80 bg-white/80 px-2 py-1 shadow-sm dark:border-emerald-900/25 dark:bg-white/[0.04]">
+                  <Sun className={cn("h-3.5 w-3.5", !isDark ? "text-amber-500" : "text-muted-foreground")} />
+                  <Switch
+                    checked={isDark}
+                    onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+                    aria-label={isDark ? "Dark mode enabled" : "Light mode enabled"}
                   />
-                  <ContextStat
-                    icon={Clock3}
-                    label="Local time"
-                    value={operatingContext.time}
-                    detail="Dubai operating clock"
-                  />
-                  <ContextStat
-                    icon={CalendarDays}
-                    label="Business date"
-                    value={operatingContext.date}
-                    detail="Regional compliance calendar"
-                  />
+                  <Moon className={cn("h-3.5 w-3.5", isDark ? "text-emerald-300" : "text-muted-foreground")} />
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
 
-              <h1 className="font-display text-3xl font-semibold leading-tight text-foreground md:text-5xl">
-                The enterprise control plane for UAE eInvoicing data readiness
+        <section className="relative overflow-hidden rounded-[2rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,249,252,0.95))] px-5 py-5 shadow-[0_38px_90px_-46px_rgba(14,35,52,0.35)] dark:border-emerald-900/30 dark:bg-[linear-gradient(180deg,rgba(14,22,20,0.96),rgba(9,15,14,0.99))] dark:shadow-[0_42px_100px_-52px_rgba(0,0,0,0.8)] md:px-8 md:py-7">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_8%_20%,rgba(102,208,255,0.25),transparent_24%),radial-gradient(circle_at_92%_18%,rgba(93,196,255,0.22),transparent_22%),radial-gradient(circle_at_50%_100%,rgba(54,163,111,0.12),transparent_32%)] dark:bg-[radial-gradient(circle_at_10%_18%,rgba(47,153,95,0.18),transparent_26%),radial-gradient(circle_at_88%_12%,rgba(29,92,72,0.14),transparent_24%),radial-gradient(circle_at_50%_100%,rgba(36,130,76,0.1),transparent_34%)]" />
+          <div
+            className="absolute inset-3 rounded-[1.7rem] border border-white/70 bg-white/18 backdrop-blur-[1px] dark:border-emerald-900/20 dark:bg-white/[0.02]"
+            aria-hidden="true"
+          />
+          <div className="absolute left-[22%] top-0 hidden h-full w-px bg-gradient-to-b from-transparent via-sky-200/70 to-transparent dark:hidden lg:block" />
+          <div className="absolute left-[72%] top-0 hidden h-full w-px bg-gradient-to-b from-transparent via-sky-200/60 to-transparent dark:hidden lg:block" />
+
+          <div className="relative z-10">
+            <div className="mx-auto mt-8 max-w-4xl text-center">
+              <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-white/78 px-4 py-1.5 text-xs font-semibold text-primary shadow-sm dark:border-emerald-700/25 dark:bg-emerald-500/[0.06] dark:text-emerald-300">
+                <span className="h-2 w-2 rounded-full bg-accent" />
+                Trusted for UAE readiness, traceability, and control evidence
+              </div>
+
+              <h1 className="mx-auto mt-6 max-w-4xl font-display text-4xl font-semibold leading-[0.95] tracking-[-0.05em] text-foreground md:text-6xl xl:text-[4.9rem]">
+                Turn invoice data into compliance intelligence.
               </h1>
-              <p className="mt-4 max-w-2xl text-sm text-muted-foreground md:text-base">
-                DRCS helps teams align mandatory data baselines, technical conformance standards, and operational
-                controls so invoice populations are ready before regulatory and platform deadlines.
+
+              <p className="mx-auto mt-5 max-w-3xl text-base leading-7 text-muted-foreground md:text-lg">
+                Validate data before transmission, trace every field from source to control to exception,
+                and improve UAE e-Invoicing readiness, conformance coverage, and operational risk visibility in one premium workspace.
               </p>
 
-              <ul className="mt-5 space-y-2">
-                {heroBullets.map((bullet) => (
-                  <li key={bullet} className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <span>{bullet}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <div className="mt-6 flex flex-wrap items-center gap-3">
-                <Button asChild size="lg" className="rounded-xl gap-2 font-semibold">
+              <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+                <Button asChild size="lg" className="rounded-full px-7 shadow-[0_22px_40px_-26px_hsl(var(--primary))]">
                   <Link to={nextAction.path}>
                     {nextAction.label}
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </Button>
-                <Button asChild variant="outline" size="lg" className="rounded-xl">
-                  <Link to="/traceability">Explore Traceability</Link>
-                </Button>
-                <Button asChild variant="outline" size="lg" className="rounded-xl gap-2">
-                  <Link to="/check-registry">
-                    <BookCheck className="h-4 w-4" />
-                    Check Registry
+                <Button
+                  asChild
+                  size="lg"
+                  variant="outline"
+                  className="rounded-full border-white/90 bg-white/78 px-7 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.35)] dark:border-emerald-900/20 dark:bg-white/[0.04] dark:text-emerald-50 dark:hover:bg-emerald-500/[0.08]"
+                >
+                  <Link to="/traceability">
+                    Explore traceability
+                    <ArrowUpRight className="h-4 w-4" />
                   </Link>
                 </Button>
               </div>
+
+              <div className="mt-7 flex flex-wrap items-center justify-center gap-2">
+                {trustPills.map((pill) => (
+                  <Badge
+                    key={pill}
+                    variant="outline"
+                    className="rounded-full border-white/75 bg-white/58 px-3 py-1 text-[11px] font-medium text-muted-foreground dark:border-emerald-900/20 dark:bg-white/[0.04] dark:text-emerald-100/80"
+                  >
+                    {pill}
+                  </Badge>
+                ))}
+              </div>
             </div>
 
-            <Card className="surface-glass border-white/70">
-              <CardContent className="p-6">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Platform signal</p>
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <SignalCard label="Invoices" value={String(headers.length)} />
-                  <SignalCard label="Open Cases" value={String(openCases.length)} />
-                  <SignalCard label="Critical" value={String(criticalCases.length)} />
-                  <SignalCard label="Coverage" value={`${Math.round(mandatoryCoverage)}%`} />
-                </div>
-
-                <div className="mt-5 rounded-2xl border border-primary/15 bg-primary/5 p-4">
-                  <div className="flex items-start justify-between gap-3">
+            <div className="mx-auto mt-10 max-w-6xl rounded-[2rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.8),rgba(246,250,253,0.96))] p-3 shadow-[0_34px_70px_-42px_rgba(11,36,59,0.42)] backdrop-blur dark:border-emerald-900/25 dark:bg-[linear-gradient(180deg,rgba(15,24,21,0.88),rgba(10,16,15,0.98))] dark:shadow-[0_42px_82px_-42px_rgba(0,0,0,0.84)]">
+              <div className="rounded-[1.65rem] border border-white/85 bg-white/92 p-4 shadow-inner dark:border-emerald-900/20 dark:bg-[#101917]/88 md:p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="h-3 w-3 rounded-full bg-slate-300/80" />
+                      <span className="h-3 w-3 rounded-full bg-slate-300/80" />
+                      <span className="h-3 w-3 rounded-full bg-slate-300/80" />
+                    </div>
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-primary/90">
-                        Client access route
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/90">
+                        Executive preview
                       </p>
-                      <p className="mt-1 text-sm text-foreground">
-                        {clientEnvironment === "DEV" ? "DEV sandbox lane selected" : "PROD production lane selected"}
+                      <p className="mt-1 text-sm font-semibold text-foreground">
+                        UAE readiness and control intelligence
                       </p>
                     </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
                     <Badge
                       variant="outline"
-                      className="rounded-full border-primary/20 bg-background/50 px-2.5 py-1 text-[10px] tracking-[0.16em] text-primary"
+                      className="rounded-full border-primary/15 bg-primary/6 px-3 py-1 text-[11px] font-semibold text-primary dark:border-emerald-700/30 dark:bg-emerald-500/[0.08] dark:text-emerald-300"
                     >
-                      PREVIEW ONLY
+                      {clientEnvironment} access
                     </Badge>
-                  </div>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-[auto_1fr] sm:items-center">
-                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-primary/20 bg-background/60 text-primary">
-                      {clientEnvironment === "DEV" ? (
-                        <CircuitBoard className="h-5 w-5" />
-                      ) : (
-                        <ServerCog className="h-5 w-5" />
-                      )}
+                    <div className="flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1.5 text-xs text-muted-foreground dark:border-emerald-900/20 dark:bg-white/[0.04] dark:text-emerald-50/75">
+                      <Search className="h-3.5 w-3.5" />
+                      Search readiness, controls, or exceptions
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      This selector does not change routing yet. It demonstrates future multi-environment client access
-                      across DEV and PROD server lanes once backend environment wiring is in place.
-                    </p>
                   </div>
                 </div>
 
-                <div className="mt-5 rounded-2xl border border-white/10 bg-background/40 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Readiness posture</p>
-                  <div className="mt-2 flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Mandatory coverage</span>
-                    <span className="font-semibold text-foreground">{Math.round(mandatoryCoverage)}%</span>
+                <div className="mt-4 space-y-4">
+                  <div className="grid gap-3 md:grid-cols-4">
+                    <PreviewMetricCard
+                      title="Mandatory coverage"
+                      value={`${Math.round(mandatoryCoverage)}%`}
+                      detail={blockingGaps > 0 ? `${blockingGaps} blocking gap(s)` : "No blocking gaps"}
+                      icon={Wand2}
+                    />
+                    <PreviewMetricCard
+                      title="Open control cases"
+                      value={String(openCases.length)}
+                      detail={
+                        criticalCases.length > 0 ? `${criticalCases.length} critical case(s)` : "No critical escalations"
+                      }
+                      icon={AlertTriangle}
+                    />
+                    <PreviewMetricCard
+                      title="Observed invoices"
+                      value={String(headers.length)}
+                      detail={isChecksRun ? "Latest validation executed" : "Ready for next run"}
+                      icon={Database}
+                    />
+                    <PreviewMetricCard
+                      title="Regional clock"
+                      value={operatingContext.time}
+                      detail={`${operatingContext.date} / ${operatingContext.timezoneLabel}`}
+                      icon={Clock3}
+                    />
                   </div>
-                  <Progress value={mandatoryCoverage} className="mt-2 h-2" />
-                  <div className="mt-3 flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Blocking gaps</span>
-                    <span className={cn("font-semibold", blockingGaps > 0 ? "text-destructive" : "text-primary")}>
-                      {blockingGaps}
-                    </span>
-                  </div>
-                </div>
 
-                <div className="mt-4 rounded-2xl border border-white/10 bg-background/40 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Operating model</p>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    MoF baseline determines what must exist, PINT-AE defines technical behavior, and DRCS determines
-                    if data can pass controls at scale.
-                  </p>
+                  <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+                    <div className="rounded-[1.35rem] border border-border/60 bg-slate-950/[0.03] p-5 dark:border-emerald-900/20 dark:bg-white/[0.025]">
+                      <div className="mb-4 flex items-center justify-between">
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                            Source to control flow
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-foreground">
+                            One operating model from ingestion to evidence
+                          </p>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className="rounded-full border-white/85 bg-white/75 px-3 py-1 text-[11px] dark:border-emerald-900/20 dark:bg-white/[0.04] dark:text-emerald-50/85"
+                        >
+                          {hasActiveMapping ? "Mapping active" : "Mapping pending"}
+                        </Badge>
+                      </div>
+
+                      <div className="space-y-3">
+                        {heroMessages.map((message, index) => (
+                          <div
+                            key={message}
+                            className="flex items-start gap-3 rounded-2xl border border-white/75 bg-white/76 p-4 shadow-[0_16px_34px_-34px_rgba(15,23,42,0.6)] dark:border-emerald-900/20 dark:bg-white/[0.04]"
+                          >
+                            <div className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-primary/15 bg-primary/8 text-sm font-semibold text-primary">
+                              {index + 1}
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-foreground">{message}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {index === 0 &&
+                                  "Detect missing mandatory fields, structural issues, and source-data blockers before transmission."}
+                                {index === 1 &&
+                                  "Maintain authoritative links between validation, coverage, control ownership, and evidence outputs."}
+                                {index === 2 &&
+                                  "Provide one view of readiness, exception posture, and conformance risk for executive review."}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="mt-4 rounded-2xl border border-primary/15 bg-primary/6 p-4 dark:border-emerald-700/25 dark:bg-emerald-500/[0.08]">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Readiness signal</span>
+                          <span className="font-semibold text-foreground">{Math.round(mandatoryCoverage)}%</span>
+                        </div>
+                        <Progress value={mandatoryCoverage} className="mt-2 h-2.5" />
+                        <p className="mt-3 text-xs text-muted-foreground">
+                          {isChecksRun
+                            ? "The latest validation run has completed and evidence outputs are available."
+                            : "Run the latest check pack to generate traceability and evidence outputs."}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="rounded-[1.35rem] border border-border/60 bg-slate-950/[0.03] p-5 dark:border-emerald-900/20 dark:bg-white/[0.025]">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                          Next recommended action
+                        </p>
+                        <p className="mt-2 text-lg font-semibold text-foreground">{nextAction.label}</p>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          Move directly into the next operational step for this workspace.
+                        </p>
+                        <Button asChild className="mt-4 w-full rounded-2xl">
+                          <Link to={nextAction.path}>
+                            Continue workflow
+                            <ArrowRight className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+                        <div className="rounded-2xl border border-white/75 bg-white/82 p-4 dark:border-emerald-900/20 dark:bg-white/[0.04]">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                            Operating context
+                          </p>
+                          <p className="mt-2 font-display text-xl font-semibold text-foreground">
+                            {activeEnvironmentConfig.label}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">{activeEnvironmentConfig.caption}</p>
+                        </div>
+
+                        <div className="rounded-2xl border border-white/75 bg-white/82 p-4 dark:border-emerald-900/20 dark:bg-white/[0.04]">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                            Evidence posture
+                          </p>
+                          <p className="mt-2 font-display text-xl font-semibold text-foreground">
+                            {isChecksRun ? "Ready" : "Pending"}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {isChecksRun ? "Traceability and Evidence Pack available" : "Awaiting validation run"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-white/75 bg-white/82 p-4 dark:border-emerald-900/20 dark:bg-white/[0.04]">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                              Local clock
+                            </p>
+                            <p className="mt-2 font-display text-2xl font-semibold text-foreground">
+                              {operatingContext.time}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {operatingContext.date} / {operatingContext.timezoneLabel}
+                            </p>
+                          </div>
+                          <ShieldCheck className="h-5 w-5 text-primary" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         </section>
 
         <section className="mt-10">
           <div className="mb-5 max-w-3xl">
-            <h2 className="font-display text-2xl font-semibold text-foreground md:text-3xl">Core platform capabilities</h2>
+            <h2 className="font-display text-2xl font-semibold text-foreground md:text-3xl">
+              Core platform capabilities
+            </h2>
             <p className="mt-2 text-sm text-muted-foreground md:text-base">
-              DRCS combines readiness diagnostics, canonical alignment, check orchestration, and control intelligence
-              into one integrated enterprise workflow.
+              DRCS combines readiness diagnostics, canonical alignment, validation control, and evidence-grade traceability in one operating model.
             </p>
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {capabilityCards.map((capability) => {
               const Icon = capability.icon;
               return (
-                <Card key={capability.title} className="surface-glass border-white/60">
+                <Card key={capability.title} className="surface-glass border-white/70 dark:border-white/10 dark:bg-white/[0.04]">
                   <CardContent className="p-5">
                     <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
                       <Icon className="h-5 w-5" />
@@ -426,117 +520,41 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="mt-10 rounded-3xl border border-white/10 bg-card/60 p-6 md:p-8">
-          <div className="mb-5 max-w-3xl">
-            <h2 className="font-display text-2xl font-semibold text-foreground md:text-3xl">How it works</h2>
-            <p className="mt-2 text-sm text-muted-foreground md:text-base">
-              The workflow follows a controlled sequence from source-data intake to governance-grade outcome management.
-            </p>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {workflowSteps.map((step, index) => (
-              <div key={step.title} className="rounded-2xl border border-white/10 bg-background/50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-primary/90">Step {index + 1}</p>
-                <p className="mt-1 font-display text-lg font-semibold text-foreground">{step.title}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{step.detail}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="mt-10">
-          <div className="mb-5 max-w-3xl">
-            <h2 className="font-display text-2xl font-semibold text-foreground md:text-3xl">Product modules</h2>
-            <p className="mt-2 text-sm text-muted-foreground md:text-base">
-              Navigate directly into the operational modules that power invoice readiness, conformance checks, and
-              controlled remediation.
-            </p>
-          </div>
-          <div className="grid gap-4 lg:grid-cols-4">
-            {modules.map((module) => {
-              const Icon = module.icon;
-              return (
-                <Link key={module.title} to={module.path} className="group block">
-                  <div className="h-full rounded-2xl border border-white/10 bg-card/70 p-5 transition-all hover:-translate-y-0.5 hover:border-primary/30">
-                    <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <p className="font-display text-lg font-semibold text-foreground">{module.title}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">{module.description}</p>
-                    <p className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
-                      Open module <ArrowRight className="h-4 w-4" />
-                    </p>
+        <section className="mt-10 grid gap-4 lg:grid-cols-4">
+          {modules.map((module) => {
+            const Icon = module.icon;
+            return (
+              <Link key={module.title} to={module.path} className="group block">
+                <div className="h-full rounded-3xl border border-white/70 bg-card/76 p-5 shadow-[0_24px_48px_-40px_rgba(15,23,42,0.4)] transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[0_28px_54px_-38px_rgba(15,23,42,0.4)] dark:border-white/10 dark:bg-white/[0.04]">
+                  <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
+                    <Icon className="h-5 w-5" />
                   </div>
-                </Link>
-              );
-            })}
-          </div>
+                  <p className="font-display text-lg font-semibold text-foreground">{module.title}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{module.description}</p>
+                  <p className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
+                    Open module <ArrowRight className="h-4 w-4" />
+                  </p>
+                </div>
+              </Link>
+            );
+          })}
         </section>
 
-        <section className="mt-10 grid gap-4 lg:grid-cols-[1.3fr_1fr]">
-          <Card className="surface-glass border-white/70">
-            <CardContent className="p-6">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trust, readiness and control intelligence</p>
-              <h3 className="mt-2 font-display text-2xl font-semibold text-foreground">Operational confidence with regulatory context</h3>
-              <p className="mt-2 text-sm text-muted-foreground">
-                DRCS provides a single control model connecting mandatory data coverage, mapping confidence, check
-                execution quality, and exception governance signals.
-              </p>
-
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <IntelPill icon={ShieldCheck} label="Mandatory baseline coverage" value={`${Math.round(mandatoryCoverage)}%`} />
-                <IntelPill icon={AlertTriangle} label="Open operational cases" value={String(openCases.length)} />
-                <IntelPill icon={Database} label="Invoice population observed" value={String(headers.length)} />
-                <IntelPill icon={CheckCircle2} label="Checks runtime status" value={isChecksRun ? "Executed" : "Pending"} />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="surface-glass border-white/70">
-            <CardContent className="p-6">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Control outcomes</p>
-              <h3 className="mt-2 font-display text-xl font-semibold text-foreground">Current readiness posture</h3>
-              <ul className="mt-4 space-y-3 text-sm text-muted-foreground">
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
-                  Readiness scoring anchored to active mapping and mandatory coverage.
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
-                  Exception load surfaced for faster triage and control prioritization.
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
-                  Traceability and evidence paths available for governance walkthroughs.
-                </li>
-              </ul>
-              <div className="mt-5 flex flex-wrap gap-2">
-                <Button asChild className="rounded-xl">
-                  <Link to="/dashboard">Open Control Dashboard</Link>
-                </Button>
-                <Button asChild variant="outline" className="rounded-xl">
-                  <Link to="/evidence">View Evidence</Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </section>
-
-        <section className="mt-10 rounded-3xl border border-primary/20 bg-primary/5 p-6 md:p-8">
+        <section className="mt-10 rounded-3xl border border-primary/20 bg-primary/5 p-6 dark:border-primary/20 dark:bg-primary/8 md:p-8">
           <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
             <div className="max-w-3xl">
               <h2 className="font-display text-2xl font-semibold text-foreground md:text-3xl">
                 Start your UAE eInvoicing readiness cycle with controlled execution
               </h2>
               <p className="mt-2 text-sm text-muted-foreground md:text-base">
-                Move from data intake to evidence-ready control outputs using one enterprise workflow.
+                Move from data intake to validation, traceability, and evidence outputs using one enterprise workflow.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Button asChild size="lg" className="rounded-xl">
+              <Button asChild size="lg" className="rounded-full px-6">
                 <Link to={nextAction.path}>Get Started</Link>
               </Button>
-              <Button asChild variant="outline" size="lg" className="rounded-xl">
+              <Button asChild variant="outline" size="lg" className="rounded-full px-6">
                 <Link to="/run">Open Run Checks</Link>
               </Button>
             </div>
@@ -547,54 +565,25 @@ export default function LandingPage() {
   );
 }
 
-function SignalCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-background/40 p-3">
-      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-1 font-display text-xl font-semibold text-foreground">{value}</p>
-    </div>
-  );
-}
-
-function IntelPill({
+function PreviewMetricCard({
   icon: Icon,
-  label,
-  value,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-background/40 p-3">
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <Icon className="h-4 w-4 shrink-0 text-primary" />
-      </div>
-      <p className="mt-2 font-display text-lg font-semibold text-foreground">{value}</p>
-    </div>
-  );
-}
-
-function ContextStat({
-  icon: Icon,
-  label,
+  title,
   value,
   detail,
 }: {
   icon: ComponentType<{ className?: string }>;
-  label: string;
+  title: string;
   value: string;
   detail: string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-background/55 p-3">
+    <div className="rounded-2xl border border-white/78 bg-white/82 p-4 shadow-[0_18px_34px_-36px_rgba(15,23,42,0.65)] dark:border-white/10 dark:bg-white/5 dark:shadow-[0_18px_34px_-36px_rgba(0,0,0,0.8)]">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
-          <p className="mt-2 text-sm font-semibold text-foreground md:text-base">{value}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{title}</p>
+          <p className="mt-2 font-display text-2xl font-semibold text-foreground">{value}</p>
         </div>
-        <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
+        <div className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-primary/15 bg-primary/6 text-primary">
           <Icon className="h-4 w-4" />
         </div>
       </div>
@@ -611,14 +600,8 @@ function EnvironmentAccessToggle({
   onChange: (next: ClientEnvironment) => void;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-background/70 p-1.5 shadow-[0_12px_32px_-22px_rgba(14,24,38,0.9)] backdrop-blur">
-      <div className="mb-1 flex items-center justify-between gap-3 px-2">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Client access
-        </span>
-        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">{value}</span>
-      </div>
-      <div className="grid grid-cols-2 gap-1">
+    <div className="rounded-full border border-white/80 bg-white/80 p-1.5 shadow-sm dark:border-white/10 dark:bg-white/6">
+      <div className="flex items-center gap-1">
         {environmentOptions.map((option) => {
           const isActive = option.key === value;
           return (
@@ -628,21 +611,13 @@ function EnvironmentAccessToggle({
               onClick={() => onChange(option.key)}
               aria-pressed={isActive}
               className={cn(
-                "min-w-[88px] rounded-xl px-3 py-2 text-left transition-all",
+                "min-w-[70px] rounded-full px-3 py-1.5 text-center transition-all",
                 isActive
                   ? "bg-primary text-primary-foreground shadow-[0_12px_24px_-18px_hsl(var(--primary))]"
-                  : "bg-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                  : "text-muted-foreground hover:bg-muted/65 hover:text-foreground"
               )}
             >
               <span className="block text-[11px] font-semibold uppercase tracking-[0.16em]">{option.key}</span>
-              <span
-                className={cn(
-                  "mt-1 block text-[11px]",
-                  isActive ? "text-primary-foreground/80" : "text-muted-foreground"
-                )}
-              >
-                {option.label}
-              </span>
             </button>
           );
         })}

@@ -18,4 +18,22 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/jspdf') || id.includes('node_modules/jspdf-autotable')) {
+            return 'vendor-pdf';
+          }
+          if (
+            id.includes('node_modules/xlsx') ||
+            id.includes('node_modules/jszip') ||
+            id.includes('node_modules/html2canvas')
+          ) {
+            return 'vendor-evidence-export';
+          }
+        },
+      },
+    },
+  },
 }));

@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { MappingTemplate, FieldMapping } from '@/types/fieldMapping';
+import { MappingTemplate, FieldMapping, normalizeFieldMappings } from '@/types/fieldMapping';
 import { Json } from '@/integrations/supabase/types';
 import { Direction } from '@/types/direction';
 import { parseDirectionFromDescription, withDirectionTag } from '@/lib/direction/directionUtils';
@@ -9,7 +9,7 @@ import { getSupabaseEnvStatus } from '@/lib/api/supabaseEnv';
 function parseMappings(mappings: Json | null): FieldMapping[] {
   if (!mappings) return [];
   if (Array.isArray(mappings)) {
-    return mappings as unknown as FieldMapping[];
+    return normalizeFieldMappings(mappings as unknown as FieldMapping[]);
   }
   return [];
 }
@@ -105,7 +105,7 @@ export async function saveMappingTemplate(template: MappingTemplate, direction?:
     document_type: template.documentType,
     version: template.version,
     is_active: template.isActive,
-    mappings: template.mappings as unknown as Json,
+    mappings: normalizeFieldMappings(template.mappings) as unknown as Json,
   };
 
   const { data, error } = await supabase
@@ -139,7 +139,9 @@ export async function updateMappingTemplate(id: string, template: Partial<Mappin
   if (template.documentType !== undefined) updateData.document_type = template.documentType;
   if (template.version !== undefined) updateData.version = template.version;
   if (template.isActive !== undefined) updateData.is_active = template.isActive;
-  if (template.mappings !== undefined) updateData.mappings = template.mappings as unknown as Record<string, unknown>[];
+  if (template.mappings !== undefined) {
+    updateData.mappings = normalizeFieldMappings(template.mappings) as unknown as Record<string, unknown>[];
+  }
 
   const { error } = await supabase
     .from('mapping_templates')
@@ -195,7 +197,7 @@ export async function createTemplateVersion(baseTemplateId: string, updatedMappi
     document_type: baseTemplate.document_type,
     version: baseTemplate.version + 1,
     is_active: true,
-    mappings: updatedMappings as unknown as Json,
+    mappings: normalizeFieldMappings(updatedMappings) as unknown as Json,
   };
 
   const { data, error } = await supabase

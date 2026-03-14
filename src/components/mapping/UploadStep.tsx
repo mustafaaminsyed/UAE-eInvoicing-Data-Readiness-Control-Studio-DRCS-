@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { Upload, FileSpreadsheet, AlertCircle, Database, Calendar, Hash, Type, HelpCircle } from 'lucide-react';
+import React, { useState, useCallback, useRef } from 'react';
+import { Upload, FileSpreadsheet, AlertCircle, Database, Calendar, Hash, Type, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +13,7 @@ import { parseCSV } from '@/lib/csvParser';
 interface UploadStepProps {
   onDataLoaded: (data: ERPPreviewData) => void;
   previewData: ERPPreviewData | null;
+  onReset?: () => void;
 }
 
 const DATASET_TYPES: { value: DatasetType; label: string; description: string }[] = [
@@ -56,11 +57,12 @@ function getTypeIcon(type: string) {
   }
 }
 
-export function UploadStep({ onDataLoaded, previewData }: UploadStepProps) {
+export function UploadStep({ onDataLoaded, previewData, onReset }: UploadStepProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDatasetType, setSelectedDatasetType] = useState<DatasetType>('combined');
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const processFile = useCallback(async (file: File) => {
     setIsLoading(true);
@@ -122,6 +124,15 @@ export function UploadStep({ onDataLoaded, previewData }: UploadStepProps) {
     if (file) processFile(file);
   }, [processFile]);
 
+  const handleReupload = useCallback(() => {
+    setError(null);
+    onReset?.();
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+      fileInputRef.current.click();
+    }
+  }, [onReset]);
+
   const handleDatasetTypeChange = (value: DatasetType) => {
     setSelectedDatasetType(value);
     if (previewData) {
@@ -167,13 +178,23 @@ export function UploadStep({ onDataLoaded, previewData }: UploadStepProps) {
       {/* Upload Area */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Upload className="h-5 w-5" />
-            Upload ERP Extract
-          </CardTitle>
-          <CardDescription>
-            Upload a sample CSV file from your ERP system. We'll analyze the columns and suggest mappings to PINT-AE fields.
-          </CardDescription>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Upload className="h-5 w-5" />
+                Upload ERP Extract
+              </CardTitle>
+              <CardDescription>
+                Upload a sample CSV file from your ERP system. We'll analyze the columns and suggest mappings to PINT-AE fields.
+              </CardDescription>
+            </div>
+            {previewData && (
+              <Button type="button" variant="outline" size="sm" onClick={handleReupload}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Re-upload file
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div
@@ -196,6 +217,7 @@ export function UploadStep({ onDataLoaded, previewData }: UploadStepProps) {
               accept=".csv,.txt"
               className="hidden"
               id="erp-file-input"
+              ref={fileInputRef}
               onChange={handleFileInput}
             />
             <Button asChild variant="outline" disabled={isLoading}>

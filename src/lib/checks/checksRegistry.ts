@@ -1,4 +1,5 @@
 import { ComplianceCheck, DataContext, Exception, CheckResult, InvoiceHeader } from '@/types/compliance';
+import { EvidenceRuleExecutionTelemetryRow } from '@/types/evidence';
 
 const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
@@ -363,4 +364,28 @@ export function runAllChecks(data: DataContext): CheckResult[] {
       exceptions,
     };
   });
+}
+
+export function runAllChecksWithTelemetry(
+  data: DataContext
+): { checkResults: CheckResult[]; telemetry: EvidenceRuleExecutionTelemetryRow[] } {
+  const checkResults = runAllChecks(data);
+  const telemetry = checksRegistry.map((check) => {
+    const result = checkResults.find((entry) => entry.checkId === check.id);
+    const executionCount =
+      check.category === 'buyer'
+        ? data.buyers.length
+        : check.category === 'line'
+          ? data.lines.length
+          : data.headers.length;
+
+    return {
+      rule_id: check.id,
+      execution_count: executionCount,
+      failure_count: result?.failed ?? 0,
+      execution_source: 'runtime' as const,
+    };
+  });
+
+  return { checkResults, telemetry };
 }

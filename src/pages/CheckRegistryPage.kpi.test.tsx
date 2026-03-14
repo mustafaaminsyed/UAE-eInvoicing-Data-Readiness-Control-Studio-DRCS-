@@ -21,19 +21,19 @@ describe('CheckRegistryPage KPI summaries', () => {
     render(<CheckRegistryPage />);
 
     await waitFor(() => {
-      expectSummaryCard('Active Runtime Checks', 58);
-      expectSummaryCard('UAE UC1 Active', '48/48');
+      expectSummaryCard('Active Runtime Checks', 64);
+      expectSummaryCard('UAE UC1 Active', '54/54');
       expectSummaryCard('Built-in Core Checks', 10);
       expectSummaryCard('Custom Active', '0/0');
 
-      expectSummaryCard('Implemented Codelist Domains', 7);
+      expectSummaryCard('Implemented Codelist Domains', 9);
       expectSummaryCard('Unconditional Enforcement', 5);
       expectSummaryCard('Conditional Enforcement', 4);
       expectSummaryCard('Deferred Domains', 13);
 
       expect(screen.getByText('Runtime Coverage')).toBeInTheDocument();
-      expect(screen.getByText('32%')).toBeInTheDocument();
-      expect(screen.getByText('7/22 governed domains')).toBeInTheDocument();
+      expect(screen.getByText('41%')).toBeInTheDocument();
+      expect(screen.getByText('9/22 governed domains')).toBeInTheDocument();
     });
   });
 });

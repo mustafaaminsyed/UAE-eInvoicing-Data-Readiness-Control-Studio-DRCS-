@@ -72,10 +72,10 @@ const CONTROLS_DEFINITION: Omit<ControlEntry, 'covered_dr_ids'>[] = [
   },
   {
     control_id: 'CTRL-008',
-    control_name: 'Transaction Type Code Validation',
+    control_name: 'Invoice Type Code Validation',
     control_type: 'preventive',
-    description: 'Validates BTUAE-02 transaction type code format and presence',
-    covered_rule_ids: ['UAE-UC1-CHK-004', 'UAE-UC1-CHK-045', 'UAE-UC1-CHK-046'], // Invoice type codelist enforcement
+    description: 'Validates invoice type code presence and UNCL1001 context-specific codelist compliance',
+    covered_rule_ids: ['UAE-UC1-CHK-004', 'UAE-UC1-CHK-045', 'UAE-UC1-CHK-046'],
   },
 
   // ── Detective Controls ──
@@ -120,6 +120,27 @@ const CONTROLS_DEFINITION: Omit<ControlEntry, 'covered_dr_ids'>[] = [
     control_type: 'detective',
     description: 'Ensures payment due date is present when amount due > 0 and is not before issue date',
     covered_rule_ids: ['UAE-UC1-CHK-009', 'UAE-UC1-CHK-047'],
+  },
+  {
+    control_id: 'CTRL-015',
+    control_name: 'VAT Exemption Dependency Enforcement',
+    control_type: 'preventive',
+    description: 'Requires exempt VAT lines to carry a compliant exemption reason and validates that reason code against the UAE exemption list',
+    covered_rule_ids: ['UAE-UC1-CHK-049', 'UAE-UC1-CHK-050'],
+  },
+  {
+    control_id: 'CTRL-016',
+    control_name: 'Reverse Charge Goods Type Enforcement',
+    control_type: 'preventive',
+    description: 'Requires reverse-charge lines to provide a compliant goods or services type and validates it against the governed UAE list',
+    covered_rule_ids: ['UAE-UC1-CHK-051', 'UAE-UC1-CHK-052'],
+  },
+  {
+    control_id: 'CTRL-017',
+    control_name: 'VAT Semantic Consistency Review',
+    control_type: 'detective',
+    description: 'Detects semantic contradictions between VAT category, VAT rate, VAT amounts, and header breakdown behaviour',
+    covered_rule_ids: ['UAE-UC1-CHK-053', 'UAE-UC1-CHK-054'],
   },
 ];
 

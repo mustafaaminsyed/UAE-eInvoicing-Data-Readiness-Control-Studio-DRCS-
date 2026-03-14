@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { CheckCircle, XCircle, AlertTriangle, HelpCircle, ChevronDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -10,12 +9,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { 
   FieldMapping, 
   ERPPreviewData, 
-  CoverageAnalysis, 
-  ValidationResult,
-  ConditionalQuestion,
   CONDITIONAL_QUESTIONS,
-  PINT_AE_UC1_FIELDS 
+  getPintFieldById,
 } from '@/types/fieldMapping';
+import { getDatasetTargetFields } from '@/lib/mapping/datasetFieldCatalog';
 import { analyzeCoverage, validateMappedData, getCoverageStats } from '@/lib/mapping/coverageAnalyzer';
 
 interface AnalysisStepProps {
@@ -34,8 +31,22 @@ export function AnalysisStep({
   const [showAllValidation, setShowAllValidation] = useState(false);
 
   // Calculate coverage analysis
-  const coverage = useMemo(() => analyzeCoverage(mappings), [mappings]);
+  const coverage = useMemo(
+    () => analyzeCoverage(mappings, previewData.datasetType),
+    [mappings, previewData.datasetType]
+  );
   const stats = useMemo(() => getCoverageStats(coverage), [coverage]);
+  const datasetFieldIds = useMemo(
+    () => new Set(getDatasetTargetFields(previewData.datasetType).map((field) => field.id)),
+    [previewData.datasetType]
+  );
+  const applicableQuestions = useMemo(
+    () =>
+      CONDITIONAL_QUESTIONS.filter((question) =>
+        question.fieldIds.some((fieldId) => datasetFieldIds.has(fieldId))
+      ),
+    [datasetFieldIds]
+  );
 
   // Run validation
   const validationResults = useMemo(() => 
@@ -66,6 +77,9 @@ export function AnalysisStep({
   const passCount = validationResults.filter(r => r.status === 'pass').length;
   const warnCount = validationResults.filter(r => r.status === 'warning').length;
   const errorCount = validationResults.filter(r => r.status === 'error').length;
+  const mappedUploadedColumns = mappings.filter((mapping) => mapping.isConfirmed).length;
+  const uploadedColumnsPct =
+    previewData.columns.length > 0 ? Math.round((mappedUploadedColumns / previewData.columns.length) * 100) : 100;
 
   const filteredValidation = showAllValidation 
     ? validationResults 
@@ -86,15 +100,59 @@ export function AnalysisStep({
       <div className="grid grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Mandatory Field Coverage</CardTitle>
-            <CardDescription>Required fields for UC1 Standard Tax Invoice</CardDescription>
+            <CardTitle>Uploaded File Fit</CardTitle>
+            <CardDescription>
+              How completely the uploaded {previewData.datasetType} file mapped to supported target fields
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div>
                 <div className="flex justify-between mb-2">
                   <span className="text-sm font-medium">
-                    {stats.mandatoryMapped} of {stats.mandatoryTotal} fields mapped
+                    {mappedUploadedColumns} of {previewData.columns.length} uploaded columns mapped
+                  </span>
+                  <span className="text-sm font-bold">
+                    {uploadedColumnsPct}%
+                  </span>
+                </div>
+                <Progress value={uploadedColumnsPct} className="h-3" />
+              </div>
+              
+              {mappedUploadedColumns === previewData.columns.length ? (
+                <div className="flex items-center gap-2 text-green-600 p-3 bg-green-50 rounded-lg">
+                  <CheckCircle className="h-5 w-5" />
+                  <span className="font-medium">All uploaded columns are mapped.</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-yellow-600 p-3 bg-yellow-50 rounded-lg">
+                  <AlertTriangle className="h-5 w-5" />
+                  <span className="font-medium">
+                    {previewData.columns.length - mappedUploadedColumns} uploaded column(s) still need mapping
+                  </span>
+                </div>
+              )}
+              <p className="text-xs leading-5 text-muted-foreground">
+                This measures template fit. It is separate from dataset coverage, which reflects the broader field model
+                the platform supports for this dataset.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Mandatory Dataset Coverage</CardTitle>
+            <CardDescription>
+              Required fields for the selected {previewData.datasetType} dataset
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm font-medium">
+                    {stats.mandatoryMapped} of {stats.mandatoryTotal} required dataset fields mapped
                   </span>
                   <span className="text-sm font-bold">
                     {Math.round(coverage.mandatoryCoverage)}%
@@ -102,47 +160,47 @@ export function AnalysisStep({
                 </div>
                 <Progress value={coverage.mandatoryCoverage} className="h-3" />
               </div>
-              
+
               {stats.isReadyForValidation ? (
                 <div className="flex items-center gap-2 text-green-600 p-3 bg-green-50 rounded-lg">
                   <CheckCircle className="h-5 w-5" />
-                  <span className="font-medium">All mandatory fields mapped!</span>
+                  <span className="font-medium">All required dataset fields are covered.</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 text-yellow-600 p-3 bg-yellow-50 rounded-lg">
                   <AlertTriangle className="h-5 w-5" />
                   <span className="font-medium">
-                    {applicableUnmappedMandatory.length} mandatory field(s) still need mapping
+                    {applicableUnmappedMandatory.length} required dataset field(s) still need mapping
                   </span>
                 </div>
               )}
             </div>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Validation Summary</CardTitle>
-            <CardDescription>Sample data quality check</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">{passCount}</div>
-                <div className="text-sm text-muted-foreground">Passed</div>
-              </div>
-              <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                <div className="text-2xl font-bold text-yellow-600">{warnCount}</div>
-                <div className="text-sm text-muted-foreground">Warnings</div>
-              </div>
-              <div className="text-center p-4 bg-red-50 rounded-lg">
-                <div className="text-2xl font-bold text-red-600">{errorCount}</div>
-                <div className="text-sm text-muted-foreground">Errors</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Validation Summary</CardTitle>
+          <CardDescription>Sample data quality check</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center p-4 bg-green-50 rounded-lg">
+              <div className="text-2xl font-bold text-green-600">{passCount}</div>
+              <div className="text-sm text-muted-foreground">Passed</div>
+            </div>
+            <div className="text-center p-4 bg-yellow-50 rounded-lg">
+              <div className="text-2xl font-bold text-yellow-600">{warnCount}</div>
+              <div className="text-sm text-muted-foreground">Warnings</div>
+            </div>
+            <div className="text-center p-4 bg-red-50 rounded-lg">
+              <div className="text-2xl font-bold text-red-600">{errorCount}</div>
+              <div className="text-sm text-muted-foreground">Errors</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Conditional Fields Questionnaire */}
       <Card>
@@ -157,7 +215,7 @@ export function AnalysisStep({
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {CONDITIONAL_QUESTIONS.map(question => (
+            {applicableQuestions.map(question => (
               <div key={question.id} className="flex items-center justify-between p-4 border rounded-lg">
                 <div>
                   <Label htmlFor={question.id} className="text-sm font-medium">
@@ -165,7 +223,7 @@ export function AnalysisStep({
                   </Label>
                   <p className="text-xs text-muted-foreground mt-1">
                     Affects: {question.fieldIds.map(id => 
-                      PINT_AE_UC1_FIELDS.find(f => f.id === id)?.name
+                      getPintFieldById(id)?.name
                     ).filter(Boolean).join(', ')}
                   </p>
                 </div>
@@ -186,7 +244,7 @@ export function AnalysisStep({
           <CardHeader>
             <CardTitle className="text-yellow-700">Unmapped Mandatory Fields</CardTitle>
             <CardDescription className="text-yellow-600">
-              These fields are required for UC1 Standard Tax Invoice but haven't been mapped yet.
+              These fields are required for the selected dataset but haven't been mapped yet.
             </CardDescription>
           </CardHeader>
           <CardContent>

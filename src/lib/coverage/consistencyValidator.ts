@@ -1,11 +1,18 @@
 // =============================================================================
-// Part K: Safety Checks - Internal Consistency Validator
-// Ensures registry, rules, controls, and templates are internally consistent
+// Safety Checks - Internal Consistency Validator and Rule Integrity Gate
 // =============================================================================
 
+import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
 import { getDRRegistry } from '@/lib/registry/drRegistry';
+import {
+  getDRCoverageMaturity,
+  VALIDATION_TO_DR_MAP,
+  ValidationDRMapEntry,
+} from '@/lib/registry/validationToDRMap';
 import { getRuleTraceability } from '@/lib/rules/ruleTraceability';
 import { getControlsRegistry } from '@/lib/registry/controlsRegistry';
+import { PintAECheck } from '@/types/pintAE';
+import { assertPintAETaxonomy } from '@/lib/validation/pintAERuleMetadata';
 
 export type ConsistencyLevel = 'error' | 'warning' | 'info';
 
@@ -23,113 +30,149 @@ export interface ConsistencyReport {
   timestamp: string;
 }
 
-// These references are intentionally outside the 50 customer DR registry.
-// They are meta/group/derived terms used by checks, so they should not block export.
-const NON_BLOCKING_RULE_REFERENCES = new Set<string>([
-  'IBG-23',
-  'IBG-25',
-  'IBT-006',
-  'IBT-007',
-  'BTUAE-001',
-  'BTUAE-002',
-  'BTUAE-003',
-  'BTUAE-004',
-  'BTUAE-005',
-]);
+export interface ConsistencyCheckOptions {
+  checks?: PintAECheck[];
+  validationMap?: ValidationDRMapEntry[];
+}
 
-export function runConsistencyChecks(): ConsistencyReport {
-  const issues: ConsistencyIssue[] = [];
-  let passed = 0;
+function buildValidationMapIndex(validationMap: ValidationDRMapEntry[]): Map<string, ValidationDRMapEntry> {
+  return new Map(validationMap.map((entry) => [entry.validation_id, entry]));
+}
 
-  const registry = getDRRegistry();
-  const rules = getRuleTraceability();
-  const controls = getControlsRegistry();
+function findFieldBindingIssues(
+  validationMap: ValidationDRMapEntry[],
+  registry = getDRRegistry()
+): { errors: string[]; warnings: string[] } {
+  const registryMap = new Map(registry.map((entry) => [entry.dr_id, entry]));
+  const errors: string[] = [];
+  const warnings: string[] = [];
 
-  const allDrIds = new Set(registry.map((e) => e.dr_id));
-  const mandatoryDrs = registry.filter((e) => e.mandatory_for_default_use_case);
+  for (const entry of validationMap) {
+    for (const target of entry.dr_targets) {
+      const drEntry = registryMap.get(target.dr_id);
+      if (!drEntry) {
+        errors.push(`${entry.validation_id} -> ${target.dr_id}`);
+        continue;
+      }
 
-  // 1. All mandatory DRs appear in dr_registry
-  if (mandatoryDrs.length > 0) passed++;
+      if (drEntry.internal_column_names.length === 0) {
+        continue;
+      }
 
-  // 2. All rules reference valid DR IDs
-  const invalidRuleDRs: string[] = [];
-  const nonBlockingRuleDRs: string[] = [];
-  for (const rule of rules) {
-    for (const drId of rule.affected_dr_ids) {
-      if (!allDrIds.has(drId)) {
-        const trace = `${rule.rule_id} -> ${drId}`;
-        if (NON_BLOCKING_RULE_REFERENCES.has(drId)) {
-          nonBlockingRuleDRs.push(trace);
+      const hasFieldMatch = target.validated_fields.some((field) =>
+        drEntry.internal_column_names.includes(field)
+      );
+
+      if (!hasFieldMatch) {
+        const issue = `${entry.validation_id} -> ${target.dr_id} [${target.validated_fields.join(', ')} vs ${drEntry.internal_column_names.join(', ')}]`;
+        if (target.mapping_type === 'reference_only') {
+          warnings.push(issue);
         } else {
-          invalidRuleDRs.push(trace);
+          errors.push(issue);
         }
       }
     }
   }
-  if (nonBlockingRuleDRs.length > 0) {
-    issues.push({
-      level: 'warning',
-      category: 'Rule-DR Integrity',
-      message: `${nonBlockingRuleDRs.length} rule reference(s) are outside the customer DR registry (non-blocking meta/derived terms)`,
-      affected_ids: nonBlockingRuleDRs,
-    });
-  }
-  if (invalidRuleDRs.length > 0) {
+
+  return { errors, warnings };
+}
+
+export function runConsistencyChecks(options: ConsistencyCheckOptions = {}): ConsistencyReport {
+  const issues: ConsistencyIssue[] = [];
+  let passed = 0;
+
+  const checks = options.checks ?? UAE_UC1_CHECK_PACK;
+  const validationMap = options.validationMap ?? VALIDATION_TO_DR_MAP;
+  const registry = getDRRegistry();
+  const controls = getControlsRegistry();
+  const ruleTrace = getRuleTraceability();
+  const checkMap = new Map(checks.map((check) => [check.check_id, check]));
+  const validationMapIndex = buildValidationMapIndex(validationMap);
+
+  try {
+    assertPintAETaxonomy(checks);
+    passed++;
+  } catch (error) {
     issues.push({
       level: 'error',
-      category: 'Rule-DR Integrity',
-      message: `${invalidRuleDRs.length} rule(s) reference DR IDs not in registry`,
-      affected_ids: invalidRuleDRs,
+      category: 'Rule Taxonomy',
+      message: error instanceof Error ? error.message : String(error),
+      affected_ids: checks.map((check) => check.check_id),
+    });
+  }
+
+  const invalidMappedRules = validationMap
+    .map((entry) => entry.validation_id)
+    .filter((validationId) => !checkMap.has(validationId));
+  if (invalidMappedRules.length > 0) {
+    issues.push({
+      level: 'error',
+      category: 'Validation Registry',
+      message: `${invalidMappedRules.length} validation mapping(s) reference non-existent checks`,
+      affected_ids: invalidMappedRules,
     });
   } else {
     passed++;
   }
 
-  // 3. All template columns reference valid DR IDs (via DR_TO_COLUMN_MAP)
-  // Checked implicitly: every DR in registry with columns has valid dr_id
-  const orphanColumns = registry.filter(
-    (e) => e.internal_column_names.length > 0 && !allDrIds.has(e.dr_id)
+  const { errors: fieldBindingErrors, warnings: fieldBindingWarnings } = findFieldBindingIssues(
+    validationMap,
+    registry
   );
-  if (orphanColumns.length > 0) {
-    issues.push({
-      level: 'error',
-      category: 'Template-DR Integrity',
-      message: `${orphanColumns.length} template column mapping(s) reference invalid DR IDs`,
-      affected_ids: orphanColumns.map((e) => e.dr_id),
-    });
-  } else {
-    passed++;
-  }
-
-  // 4. No DR is marked COVERED without at least one rule and one control
-  const ruledDRs = new Set<string>();
-  rules.forEach((r) => r.affected_dr_ids.forEach((id) => ruledDRs.add(id)));
-  const controlledDRs = new Set<string>();
-  controls.forEach((c) => c.covered_dr_ids.forEach((id) => controlledDRs.add(id)));
-
-  const falseCovered = registry.filter((e) => {
-    const hasRule = ruledDRs.has(e.dr_id);
-    const hasControl = controlledDRs.has(e.dr_id);
-    return e.internal_column_names.length > 0 && hasRule && !hasControl;
-  });
-  if (falseCovered.length > 0) {
+  if (fieldBindingWarnings.length > 0) {
     issues.push({
       level: 'warning',
-      category: 'Coverage Integrity',
-      message: `${falseCovered.length} DR(s) have rules but no control linked`,
-      affected_ids: falseCovered.map((e) => e.dr_id),
+      category: 'Rule Field Mapping',
+      message: `${fieldBindingWarnings.length} reference-only mapping(s) do not align to the DR registry columns`,
+      affected_ids: fieldBindingWarnings,
+    });
+  }
+  if (fieldBindingErrors.length > 0) {
+    issues.push({
+      level: 'error',
+      category: 'Rule Field Mapping',
+      message: `${fieldBindingErrors.length} validation mapping(s) do not match the DR field binding`,
+      affected_ids: fieldBindingErrors,
     });
   } else {
     passed++;
   }
 
-  // 5. Controls reference valid rule IDs
-  const allRuleIds = new Set(rules.map((r) => r.rule_id));
+  const runtimeEnforcedWithoutRule = registry
+    .filter((entry) => getDRCoverageMaturity(entry.dr_id) === 'runtime_enforced')
+    .filter((entry) => !ruleTrace.some((rule) => rule.affected_dr_ids.includes(entry.dr_id)))
+    .map((entry) => entry.dr_id);
+  if (runtimeEnforcedWithoutRule.length > 0) {
+    issues.push({
+      level: 'error',
+      category: 'Rule Integrity Gate',
+      message: `${runtimeEnforcedWithoutRule.length} runtime-enforced DR(s) have no executable validation`,
+      affected_ids: runtimeEnforcedWithoutRule,
+    });
+  } else {
+    passed++;
+  }
+
+  const rulesWithoutClassification = checks
+    .filter((check) => !check.rule_type || !check.execution_layer)
+    .map((check) => check.check_id);
+  if (rulesWithoutClassification.length > 0) {
+    issues.push({
+      level: 'error',
+      category: 'Rule Integrity Gate',
+      message: `${rulesWithoutClassification.length} rule(s) are missing rule_type or execution_layer metadata`,
+      affected_ids: rulesWithoutClassification,
+    });
+  } else {
+    passed++;
+  }
+
   const invalidControlRules: string[] = [];
-  for (const ctrl of controls) {
-    for (const ruleId of ctrl.covered_rule_ids) {
+  const allRuleIds = new Set(checks.map((check) => check.check_id));
+  for (const control of controls) {
+    for (const ruleId of control.covered_rule_ids) {
       if (!allRuleIds.has(ruleId)) {
-        invalidControlRules.push(`${ctrl.control_id} -> ${ruleId}`);
+        invalidControlRules.push(`${control.control_id} -> ${ruleId}`);
       }
     }
   }
@@ -137,21 +180,22 @@ export function runConsistencyChecks(): ConsistencyReport {
     issues.push({
       level: 'error',
       category: 'Control-Rule Integrity',
-      message: `${invalidControlRules.length} control(s) reference rule IDs not in check pack`,
+      message: `${invalidControlRules.length} control(s) reference rule IDs not in the active validation pack`,
       affected_ids: invalidControlRules,
     });
   } else {
     passed++;
   }
 
-  // 6. Mandatory DRs without any rule mapping
-  const mandatoryNoRules = mandatoryDrs.filter((d) => !ruledDRs.has(d.dr_id));
-  if (mandatoryNoRules.length > 0) {
+  const rulesWithoutExplicitMapping = checks
+    .filter((check) => !validationMapIndex.has(check.check_id))
+    .map((check) => check.check_id);
+  if (rulesWithoutExplicitMapping.length > 0) {
     issues.push({
       level: 'warning',
-      category: 'Mandatory Coverage',
-      message: `${mandatoryNoRules.length} mandatory DR(s) have no validation rule`,
-      affected_ids: mandatoryNoRules.map((d) => d.dr_id),
+      category: 'Validation Mapping',
+      message: `${rulesWithoutExplicitMapping.length} rule(s) have no explicit validation-to-DR mapping entry`,
+      affected_ids: rulesWithoutExplicitMapping,
     });
   } else {
     passed++;
@@ -163,4 +207,12 @@ export function runConsistencyChecks(): ConsistencyReport {
     failed: issues.length,
     timestamp: new Date().toISOString(),
   };
+}
+
+export function runRuleIntegrityGate(options: ConsistencyCheckOptions = {}): void {
+  const report = runConsistencyChecks(options);
+  const errors = report.issues.filter((issue) => issue.level === 'error');
+  if (errors.length > 0) {
+    throw new Error(errors.map((issue) => issue.message).join('; '));
+  }
 }

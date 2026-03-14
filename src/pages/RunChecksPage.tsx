@@ -14,7 +14,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { fetchEnabledPintAEChecks, getChecksDiagnostics, seedUC1CheckPack, ChecksDiagnostics } from '@/lib/api/pintAEApi';
 import { fetchActiveTemplates } from '@/lib/api/mappingApi';
 import { PintAECheck } from '@/types/pintAE';
-import { MappingTemplate, PINT_AE_UC1_FIELDS } from '@/types/fieldMapping';
+import { MappingTemplate, normalizeFieldMappings } from '@/types/fieldMapping';
 import { getPintAeSpecMetadata } from '@/lib/pintAE/specCatalog';
 import { checkRunReadiness } from '@/lib/coverage/conformanceEngine';
 import { toast } from 'sonner';
@@ -26,6 +26,8 @@ import { LastRunContextBanner } from '@/components/run/LastRunContextBanner';
 import { FEATURE_FLAGS } from '@/config/features';
 import { PARSER_KNOWN_COLUMNS } from '@/lib/registry/drRegistry';
 import { defaultMoFReadinessRunner } from '@/engine/runners/mof';
+import { getAffectedDRIdsForRule } from '@/lib/rules/ruleTraceability';
+import { analyzeCoverage } from '@/lib/mapping/coverageAnalyzer';
 
 type ConnectionTestStatus = 'idle' | 'running' | 'passed' | 'failed';
 
@@ -35,6 +37,32 @@ type ConnectionTestResult = {
   details: string[];
   checkedAt: string | null;
 };
+
+const ruleTypeDisplayLabels: Record<string, string> = {
+  dynamic_codelist: 'Dynamic Codelist',
+  fixed_literal: 'Fixed Literal',
+  enumeration: 'Enumeration',
+  dependency_rule: 'Dependency Rule',
+  structural_rule: 'Structural Rule',
+};
+
+const executionLayerDisplayLabels: Record<string, string> = {
+  schema: 'Schema',
+  codelist: 'Codelist',
+  national_rule: 'National Rule',
+  dependency_rule: 'Dependency',
+  semantic_rule: 'Semantic',
+};
+
+function formatRuleTypeLabel(ruleType?: string): string {
+  if (!ruleType) return 'Unclassified';
+  return ruleTypeDisplayLabels[ruleType] ?? ruleType.replace(/_/g, ' ');
+}
+
+function formatExecutionLayerLabel(executionLayer?: string): string {
+  if (!executionLayer) return 'Unclassified';
+  return executionLayerDisplayLabels[executionLayer] ?? executionLayer.replace(/_/g, ' ');
+}
 
 export default function RunChecksPage() {
   const navigate = useNavigate();
@@ -264,20 +292,16 @@ export default function RunChecksPage() {
 
   // Calculate coverage for selected template
   const selectedTemplate = mappingTemplates.find(t => t.id === selectedTemplateId);
-  const mandatoryFields = PINT_AE_UC1_FIELDS.filter(f => f.isMandatory);
-  const mappedMandatoryCount = selectedTemplate 
-    ? selectedTemplate.mappings.filter(m => 
-        m.isConfirmed && mandatoryFields.some(f => f.id === m.targetField.id)
-      ).length
-    : 0;
-  const mandatoryCoverage = selectedTemplate 
-    ? Math.round((mappedMandatoryCount / mandatoryFields.length) * 100)
-    : 100;
-  const unmappedMandatory = selectedTemplate 
-    ? mandatoryFields.filter(f => 
-        !selectedTemplate.mappings.some(m => m.isConfirmed && m.targetField.id === f.id)
-      )
-    : [];
+  const normalizedTemplateMappings = useMemo(
+    () => (selectedTemplate ? normalizeFieldMappings(selectedTemplate.mappings) : []),
+    [selectedTemplate]
+  );
+  const mappingCoverage = useMemo(
+    () => analyzeCoverage(normalizedTemplateMappings.filter((mapping) => mapping.isConfirmed)),
+    [normalizedTemplateMappings]
+  );
+  const mandatoryCoverage = selectedTemplate ? Math.round(mappingCoverage.mandatoryCoverage) : 100;
+  const unmappedMandatory = selectedTemplate ? mappingCoverage.unmappedMandatory : [];
   const hasCoverageWarning = selectedTemplate && mandatoryCoverage < 100;
   const mappingSatisfied = !noMappingProfile || canRunWithoutMapping;
   const readiness = checkRunReadiness(mappingSatisfied, mandatoryCoverage, null);
@@ -289,8 +313,8 @@ export default function RunChecksPage() {
       lines: new Set<string>(),
     };
 
-    if (selectedTemplate?.mappings?.length) {
-      selectedTemplate.mappings
+    if (normalizedTemplateMappings.length) {
+      normalizedTemplateMappings
         .filter((mapping) => mapping.isConfirmed)
         .forEach((mapping) => {
           const targetId = mapping.targetField?.id;
@@ -322,7 +346,7 @@ export default function RunChecksPage() {
       headers: Array.from(asSet.headers),
       lines: Array.from(asSet.lines),
     };
-  }, [buyers, canRunWithoutMapping, headers, lines, selectedTemplate]);
+  }, [buyers, canRunWithoutMapping, headers, lines, normalizedTemplateMappings]);
 
   const mofPreGate = useMemo(() => {
     return defaultMoFReadinessRunner.evaluate({
@@ -601,7 +625,8 @@ export default function RunChecksPage() {
                     className={`h-2 ${mandatoryCoverage === 100 ? '' : '[&>div]:bg-yellow-500'}`}
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    {mappedMandatoryCount}/{mandatoryFields.length} mandatory fields mapped
+                    {mappingCoverage.mappedMandatory.length}/
+                    {mappingCoverage.mappedMandatory.length + mappingCoverage.unmappedMandatory.length} mandatory fields mapped
                   </p>
                 </div>
               )}
@@ -669,6 +694,9 @@ export default function RunChecksPage() {
               </div>
               <p className="text-sm text-muted-foreground mt-1">
                 PINT-AE / UAE MoF aligned compliance checks from database
+              </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Authoritative DR coverage is mapping-driven. Reference terms remain metadata context only.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -747,7 +775,9 @@ export default function RunChecksPage() {
                 </Button>
               </div>
             ) : (
-              pintAEChecks.map((check) => (
+              pintAEChecks.map((check) => {
+                const mappedDrIds = getAffectedDRIdsForRule(check.check_id);
+                return (
                 <div key={check.check_id} className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
                   <div className="flex items-center gap-4 flex-1 min-w-0">
                     <CheckCircle className="w-5 h-5 text-muted-foreground flex-shrink-0" />
@@ -759,18 +789,40 @@ export default function RunChecksPage() {
                         </code>
                       </div>
                       <p className="text-sm text-muted-foreground truncate">{check.description}</p>
+                      {mappedDrIds.length > 0 && (
+                        <div className="mt-1">
+                          <p className="text-[11px] text-muted-foreground">Authoritative coverage</p>
+                          <div className="flex gap-1 mt-1 flex-wrap">
+                            {mappedDrIds.slice(0, 3).map((term) => (
+                              <Badge key={`${check.check_id}-coverage-${term}`} variant="outline" className="text-xs">
+                                {term}
+                              </Badge>
+                            ))}
+                            {mappedDrIds.length > 3 && (
+                              <Badge variant="outline" className="text-xs">
+                                +{mappedDrIds.length - 3}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      )}
                       {check.pint_reference_terms && check.pint_reference_terms.length > 0 && (
-                        <div className="flex gap-1 mt-1 flex-wrap">
-                          {check.pint_reference_terms.slice(0, 3).map((term, idx) => (
-                            <Badge key={idx} variant="secondary" className="text-xs">
-                              {term}
-                            </Badge>
-                          ))}
-                          {check.pint_reference_terms.length > 3 && (
-                            <Badge variant="secondary" className="text-xs">
-                              +{check.pint_reference_terms.length - 3}
-                            </Badge>
-                          )}
+                        <div className="mt-1">
+                          <p className="text-[11px] text-muted-foreground">
+                            Reference terms <span className="text-muted-foreground/80">(metadata only)</span>
+                          </p>
+                          <div className="flex gap-1 mt-1 flex-wrap">
+                            {check.pint_reference_terms.slice(0, 3).map((term, idx) => (
+                              <Badge key={idx} variant="secondary" className="text-xs">
+                                {term}
+                              </Badge>
+                            ))}
+                            {check.pint_reference_terms.length > 3 && (
+                              <Badge variant="secondary" className="text-xs">
+                                +{check.pint_reference_terms.length - 3}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -779,10 +831,16 @@ export default function RunChecksPage() {
                     <Badge variant="outline" className="text-xs">
                       {check.scope}
                     </Badge>
+                    <Badge variant="secondary" className="text-xs">
+                      {formatRuleTypeLabel(check.rule_type)}
+                    </Badge>
+                    <Badge variant="secondary" className="text-xs">
+                      {formatExecutionLayerLabel(check.execution_layer)}
+                    </Badge>
                     <SeverityBadge severity={check.severity} />
                   </div>
                 </div>
-              ))
+              )})
             )}
           </div>
         </div>

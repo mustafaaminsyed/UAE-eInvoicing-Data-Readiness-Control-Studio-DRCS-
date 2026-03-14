@@ -15,6 +15,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:integrity": "vitest run tests/integrityGate.test.ts tests/ruleTaxonomy.test.ts",
+    "test:performance-validation": "vitest run tests/performanceValidation.test.ts",
+    "test:compliance-architecture": "npm run test:integrity && npm run test:performance-validation",
     "test:e2e:smoke": "playwright test e2e/upload-run-codelist-smoke.spec.ts",
     "generate:pint-spec": "node scripts/import-pint-ae-resources.mjs"
   },

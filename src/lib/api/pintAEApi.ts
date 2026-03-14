@@ -10,6 +10,9 @@ import {
 import { Severity } from '@/types/compliance';
 import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
 import { getSupabaseEnvStatus, shouldUseLocalDevFallback } from '@/lib/api/supabaseEnv';
+import { getFailureClassForRule } from '@/lib/validation/pintAERuleMetadata';
+
+const UC1_CHECK_LOOKUP = new Map(UAE_UC1_CHECK_PACK.map((check) => [check.check_id, check]));
 
 // ============ PINT-AE Checks CRUD ============
 
@@ -34,27 +37,33 @@ export async function fetchPintAEChecks(): Promise<PintAECheck[]> {
       return [];
     }
 
-    return (data || []).map(row => ({
-      id: row.id,
-      check_id: row.check_id,
-      check_name: row.check_name,
-      description: row.description || undefined,
-      scope: row.scope as PintAECheck['scope'],
-      rule_type: row.rule_type as PintAECheck['rule_type'],
-      severity: row.severity as Severity,
-      use_case: row.use_case || undefined,
-      pint_reference_terms: row.pint_reference_terms || [],
-      mof_rule_reference: row.mof_rule_reference || undefined,
-      pass_condition: row.pass_condition || undefined,
-      fail_condition: row.fail_condition || undefined,
-      owner_team_default: row.owner_team_default as PintAECheck['owner_team_default'],
-      suggested_fix: row.suggested_fix || undefined,
-      evidence_required: row.evidence_required || undefined,
-      is_enabled: row.is_enabled,
-      parameters: (row.parameters as Record<string, any>) || {},
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-    }));
+    return (data || []).map((row) => {
+      const fallback = UC1_CHECK_LOOKUP.get(row.check_id);
+      return {
+        id: row.id,
+        check_id: row.check_id,
+        check_name: row.check_name,
+        description: row.description || undefined,
+        scope: row.scope as PintAECheck['scope'],
+        rule_type:
+          ((row as any).rule_type as PintAECheck['rule_type']) || fallback?.rule_type || 'structural_rule',
+        execution_layer:
+          ((row as any).execution_layer as PintAECheck['execution_layer']) || fallback?.execution_layer || 'schema',
+        severity: row.severity as Severity,
+        use_case: row.use_case || undefined,
+        pint_reference_terms: row.pint_reference_terms || [],
+        mof_rule_reference: row.mof_rule_reference || undefined,
+        pass_condition: row.pass_condition || undefined,
+        fail_condition: row.fail_condition || undefined,
+        owner_team_default: row.owner_team_default as PintAECheck['owner_team_default'],
+        suggested_fix: row.suggested_fix || undefined,
+        evidence_required: row.evidence_required || undefined,
+        is_enabled: row.is_enabled,
+        parameters: (row.parameters as Record<string, any>) || {},
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      };
+    });
   } catch (error) {
     console.error('Error fetching PINT-AE checks:', error);
     return [];
@@ -83,27 +92,33 @@ export async function fetchEnabledPintAEChecks(): Promise<PintAECheck[]> {
       return [];
     }
 
-    return (data || []).map(row => ({
-      id: row.id,
-      check_id: row.check_id,
-      check_name: row.check_name,
-      description: row.description || undefined,
-      scope: row.scope as PintAECheck['scope'],
-      rule_type: row.rule_type as PintAECheck['rule_type'],
-      severity: row.severity as Severity,
-      use_case: row.use_case || undefined,
-      pint_reference_terms: row.pint_reference_terms || [],
-      mof_rule_reference: row.mof_rule_reference || undefined,
-      pass_condition: row.pass_condition || undefined,
-      fail_condition: row.fail_condition || undefined,
-      owner_team_default: row.owner_team_default as PintAECheck['owner_team_default'],
-      suggested_fix: row.suggested_fix || undefined,
-      evidence_required: row.evidence_required || undefined,
-      is_enabled: row.is_enabled,
-      parameters: (row.parameters as Record<string, any>) || {},
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-    }));
+    return (data || []).map((row) => {
+      const fallback = UC1_CHECK_LOOKUP.get(row.check_id);
+      return {
+        id: row.id,
+        check_id: row.check_id,
+        check_name: row.check_name,
+        description: row.description || undefined,
+        scope: row.scope as PintAECheck['scope'],
+        rule_type:
+          ((row as any).rule_type as PintAECheck['rule_type']) || fallback?.rule_type || 'structural_rule',
+        execution_layer:
+          ((row as any).execution_layer as PintAECheck['execution_layer']) || fallback?.execution_layer || 'schema',
+        severity: row.severity as Severity,
+        use_case: row.use_case || undefined,
+        pint_reference_terms: row.pint_reference_terms || [],
+        mof_rule_reference: row.mof_rule_reference || undefined,
+        pass_condition: row.pass_condition || undefined,
+        fail_condition: row.fail_condition || undefined,
+        owner_team_default: row.owner_team_default as PintAECheck['owner_team_default'],
+        suggested_fix: row.suggested_fix || undefined,
+        evidence_required: row.evidence_required || undefined,
+        is_enabled: row.is_enabled,
+        parameters: (row.parameters as Record<string, any>) || {},
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      };
+    });
   } catch (error) {
     console.error('Error fetching enabled PINT-AE checks:', error);
     return [];
@@ -380,34 +395,43 @@ export async function fetchExceptionsByRun(runId: string): Promise<PintAEExcepti
     return [];
   }
 
-  return (data || []).map(row => ({
-    id: row.id,
-    run_id: row.run_id || undefined,
-    timestamp: row.timestamp,
-    dataset_type: (row.dataset_type as any) || undefined,
-    check_id: row.check_id,
-    check_name: row.check_name,
-    severity: row.severity as Severity,
-    scope: row.scope as PintAEException['scope'],
-    rule_type: row.rule_type as PintAEException['rule_type'],
-    use_case: row.use_case || undefined,
-    pint_reference_terms: row.pint_reference_terms || [],
-    invoice_id: row.invoice_id || undefined,
-    invoice_number: row.invoice_number || undefined,
-    seller_trn: row.seller_trn || undefined,
-    buyer_id: row.buyer_id || undefined,
-    line_id: row.line_id || undefined,
-    field_name: row.field_name || undefined,
-    observed_value: row.observed_value || undefined,
-    expected_value_or_rule: row.expected_value_or_rule || undefined,
-    message: row.message,
-    suggested_fix: row.suggested_fix || undefined,
-    root_cause_category: (row.root_cause_category || 'Unclassified') as PintAEException['root_cause_category'],
-    owner_team: (row.owner_team || 'ASP Ops') as PintAEException['owner_team'],
-    sla_target_hours: row.sla_target_hours || 24,
-    case_status: (row.case_status || 'Open') as PintAEException['case_status'],
-    case_id: row.case_id || undefined,
-  }));
+  return (data || []).map((row) => {
+    const fallback = UC1_CHECK_LOOKUP.get(row.check_id);
+    const ruleType = (row.rule_type as PintAEException['rule_type']) || fallback?.rule_type;
+    const executionLayer =
+      ((row as any).execution_layer as PintAEException['execution_layer']) || fallback?.execution_layer;
+    return {
+      id: row.id,
+      run_id: row.run_id || undefined,
+      timestamp: row.timestamp,
+      dataset_type: (row.dataset_type as any) || undefined,
+      check_id: row.check_id,
+      check_name: row.check_name,
+      severity: row.severity as Severity,
+      scope: row.scope as PintAEException['scope'],
+      rule_type: ruleType,
+      execution_layer: executionLayer,
+      failure_class:
+        ruleType && executionLayer ? getFailureClassForRule(ruleType, executionLayer) : undefined,
+      use_case: row.use_case || undefined,
+      pint_reference_terms: row.pint_reference_terms || [],
+      invoice_id: row.invoice_id || undefined,
+      invoice_number: row.invoice_number || undefined,
+      seller_trn: row.seller_trn || undefined,
+      buyer_id: row.buyer_id || undefined,
+      line_id: row.line_id || undefined,
+      field_name: row.field_name || undefined,
+      observed_value: row.observed_value || undefined,
+      expected_value_or_rule: row.expected_value_or_rule || undefined,
+      message: row.message,
+      suggested_fix: row.suggested_fix || undefined,
+      root_cause_category: (row.root_cause_category || 'Unclassified') as PintAEException['root_cause_category'],
+      owner_team: (row.owner_team || 'ASP Ops') as PintAEException['owner_team'],
+      sla_target_hours: row.sla_target_hours || 24,
+      case_status: (row.case_status || 'Open') as PintAEException['case_status'],
+      case_id: row.case_id || undefined,
+    };
+  });
 }
 
 // ============ Run Summary ============

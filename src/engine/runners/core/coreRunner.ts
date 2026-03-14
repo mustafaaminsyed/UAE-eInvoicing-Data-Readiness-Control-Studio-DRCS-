@@ -1,10 +1,8 @@
 import { CoreRunner } from '@/engine/contracts';
-import { runAllChecks } from '@/lib/checks/checksRegistry';
+import { runAllChecksWithTelemetry } from '@/lib/checks/checksRegistry';
 
 export const defaultCoreRunner: CoreRunner = {
   run({ dataContext }) {
-    return {
-      checkResults: runAllChecks(dataContext),
-    };
+    return runAllChecksWithTelemetry(dataContext);
   },
 };

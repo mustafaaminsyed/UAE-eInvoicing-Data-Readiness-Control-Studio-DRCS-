@@ -5,7 +5,29 @@ import { DatasetType } from './datasets';
 export type CheckScope = 'Header' | 'Lines' | 'Party' | 'Cross';
 
 // PINT-AE Rule Types
-export type RuleType = 'Presence' | 'Format' | 'CodeList' | 'Math' | 'Dependency' | 'CrossCheck';
+export type RuleType =
+  | 'dynamic_codelist'
+  | 'fixed_literal'
+  | 'enumeration'
+  | 'dependency_rule'
+  | 'structural_rule';
+
+export type LegacyRuleType = 'Presence' | 'Format' | 'CodeList' | 'Math' | 'Dependency' | 'CrossCheck';
+
+export type ExecutionLayer =
+  | 'schema'
+  | 'codelist'
+  | 'national_rule'
+  | 'dependency_rule'
+  | 'semantic_rule';
+
+export type FailureClass =
+  | 'codelist_failure'
+  | 'fixed_rule_failure'
+  | 'enumeration_failure'
+  | 'dependency_failure'
+  | 'semantic_failure'
+  | 'structural_failure';
 
 // Owner Teams
 export type OwnerTeam = 'ASP Ops' | 'Client Finance' | 'Client IT' | 'Buyer-side';
@@ -32,6 +54,7 @@ export interface PintAECheck {
   description?: string;
   scope: CheckScope;
   rule_type: RuleType;
+  execution_layer: ExecutionLayer;
   severity: Severity;
   use_case?: string;
   pint_reference_terms: string[];
@@ -58,6 +81,8 @@ export interface PintAEException {
   severity: Severity;
   scope?: CheckScope;
   rule_type?: RuleType;
+  execution_layer?: ExecutionLayer;
+  failure_class?: FailureClass;
   use_case?: string;
   pint_reference_terms: string[];
   invoice_id?: string;

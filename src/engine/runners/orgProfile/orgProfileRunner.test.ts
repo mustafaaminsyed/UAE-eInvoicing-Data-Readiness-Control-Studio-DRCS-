@@ -66,6 +66,16 @@ describe('defaultOrgProfileRunner', () => {
       mappingProfileId: 'map-1',
       rulesetVersion: 'v1.0.0',
     });
-    expect(result).toEqual({ exceptions });
+    expect(result).toEqual({
+      exceptions,
+      telemetry: [
+        {
+          rule_id: 'org_profile_our_entity_alignment',
+          execution_count: 1,
+          failure_count: 1,
+          execution_source: 'runtime',
+        },
+      ],
+    });
   });
 });

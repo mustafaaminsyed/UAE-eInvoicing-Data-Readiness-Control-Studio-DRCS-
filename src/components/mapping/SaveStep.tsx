@@ -17,7 +17,8 @@ import {
   TransformationType,
   ERPPreviewData,
   ERP_TYPES,
-  DOCUMENT_TYPES 
+  DOCUMENT_TYPES,
+  normalizeFieldMappings,
 } from '@/types/fieldMapping';
 import { saveMappingTemplate } from '@/lib/api/mappingApi';
 import { applyTransformations } from '@/lib/mapping/transformationEngine';
@@ -66,7 +67,10 @@ export function SaveStep({ mappings, previewData, direction, onMappingsChange, o
     notes: '',
   });
 
-  const confirmedMappings = mappings.filter(m => m.isConfirmed);
+  const confirmedMappings = useMemo(
+    () => normalizeFieldMappings(mappings.filter((mapping) => mapping.isConfirmed)),
+    [mappings]
+  );
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -167,7 +171,10 @@ export function SaveStep({ mappings, previewData, direction, onMappingsChange, o
     }
   };
 
-  const coverage = useMemo(() => analyzeCoverage(confirmedMappings), [confirmedMappings]);
+  const coverage = useMemo(
+    () => analyzeCoverage(confirmedMappings, previewData?.datasetType ?? 'combined'),
+    [confirmedMappings, previewData?.datasetType]
+  );
   const hasBlockingGaps = coverage.unmappedMandatory.length > 0;
 
   const handleSave = async (activate: boolean = false) => {

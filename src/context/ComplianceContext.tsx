@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { 
   Buyer, 
   InvoiceHeader, 
@@ -26,6 +26,10 @@ import { resolveDirection } from '@/lib/direction/directionUtils';
 import { DatasetType } from '@/types/datasets';
 import { InvestigationFlag } from '@/types/customChecks';
 import { runChecksOrchestrator } from '@/engine/orchestrator';
+import { buildEvidenceRunSnapshot } from '@/lib/evidence/evidenceRunSnapshot';
+import { EvidenceRuleExecutionTelemetryRow } from '@/types/evidence';
+import { WorkspaceProvider, useWorkspace } from '@/context/WorkspaceContext';
+import { UploadLogProvider, useUploadLogs } from '@/context/UploadLogContext';
 
 interface ComplianceContextType {
   direction: Direction;
@@ -46,6 +50,7 @@ interface ComplianceContextType {
   investigationFlags: InvestigationFlag[];
   pintAEExceptions: PintAEException[];
   runSummary: RunSummary | null;
+  lastPintRuleTelemetry: EvidenceRuleExecutionTelemetryRow[];
   lastChecksRunAt: string | null;
   lastChecksRunDatasetType: DatasetType | null;
   isDataLoaded: boolean;
@@ -71,43 +76,33 @@ interface ComplianceContextType {
 }
 
 const ComplianceContext = createContext<ComplianceContextType | undefined>(undefined);
-const UPLOAD_LOGS_STORAGE_KEY = 'drcs_upload_logs_v1';
-const DIRECTION_STORAGE_KEY = 'drcs_direction_v1';
-const ORG_PROFILE_STORAGE_KEY = 'drcs_org_profile_v1';
-const ACTIVE_MAPPING_STORAGE_KEY = 'drcs_active_mapping_profiles_v1';
 
 export function ComplianceProvider({ children }: { children: ReactNode }) {
-  const [direction, setDirectionState] = useState<Direction>(() => {
-    try {
-      const stored = localStorage.getItem(DIRECTION_STORAGE_KEY);
-      return resolveDirection(stored);
-    } catch {
-      return DEFAULT_DIRECTION;
-    }
-  });
-  const [organizationProfile, setOrganizationProfile] = useState<OrganizationProfile>(() => {
-    const envTRNs = (import.meta.env.VITE_OUR_ENTITY_TRNS as string | undefined)?.split(',').map((v) => v.trim()).filter(Boolean) || [];
-    try {
-      const stored = localStorage.getItem(ORG_PROFILE_STORAGE_KEY);
-      if (!stored) return { ourEntityTRNs: envTRNs };
-      const parsed = JSON.parse(stored) as OrganizationProfile;
-      return { ourEntityTRNs: parsed.ourEntityTRNs || envTRNs, entityIds: parsed.entityIds || [] };
-    } catch {
-      return { ourEntityTRNs: envTRNs };
-    }
-  });
-  const [uploadSessionId, setUploadSessionId] = useState<string | null>(null);
-  const [uploadManifestId, setUploadManifestId] = useState<string | null>(null);
-  const [activeMappingProfileByDirection, setActiveMappingProfileByDirection] = useState<Record<Direction, { id: string; version: number } | null>>(() => {
-    try {
-      const stored = localStorage.getItem(ACTIVE_MAPPING_STORAGE_KEY);
-      if (!stored) return { AR: null, AP: null };
-      const parsed = JSON.parse(stored) as Record<Direction, { id: string; version: number } | null>;
-      return { AR: parsed.AR || null, AP: parsed.AP || null };
-    } catch {
-      return { AR: null, AP: null };
-    }
-  });
+  return (
+    <WorkspaceProvider>
+      <UploadLogProvider>
+        <ComplianceStateProvider>{children}</ComplianceStateProvider>
+      </UploadLogProvider>
+    </WorkspaceProvider>
+  );
+}
+
+function ComplianceStateProvider({ children }: { children: ReactNode }) {
+  const {
+    direction,
+    activeDatasetType,
+    setDirection: setWorkspaceDirection,
+    setActiveDatasetType: setWorkspaceActiveDatasetType,
+    organizationProfile,
+    setOrganizationProfile,
+    uploadSessionId,
+    setUploadSessionId,
+    uploadManifestId,
+    setUploadManifestId,
+    activeMappingProfileByDirection,
+    setActiveMappingProfileForDirection,
+  } = useWorkspace();
+  const { uploadLogs, addUploadLogEntry, deleteUploadLogEntry, clearUploadLogs } = useUploadLogs();
   const [buyers, setBuyers] = useState<Buyer[]>([]);
   const [headers, setHeaders] = useState<InvoiceHeader[]>([]);
   const [lines, setLines] = useState<InvoiceLine[]>([]);
@@ -116,49 +111,16 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
   const [investigationFlags] = useState<InvestigationFlag[]>([]);
   const [pintAEExceptions, setPintAEExceptions] = useState<PintAEException[]>([]);
   const [runSummary, setRunSummary] = useState<RunSummary | null>(null);
+  const [lastPintRuleTelemetry, setLastPintRuleTelemetry] = useState<EvidenceRuleExecutionTelemetryRow[]>([]);
   const [lastChecksRunAt, setLastChecksRunAt] = useState<string | null>(null);
   const [lastChecksRunDatasetType, setLastChecksRunDatasetType] = useState<DatasetType | null>(null);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [isChecksRun, setIsChecksRun] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
-  const [uploadLogs, setUploadLogs] = useState<UploadLogEntry[]>([]);
   const [dataByDirection, setDataByDirection] = useState<Record<Direction, ParsedData>>({
     AR: { buyers: [], headers: [], lines: [], direction: 'AR' },
     AP: { buyers: [], headers: [], lines: [], direction: 'AP' },
   });
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(UPLOAD_LOGS_STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as UploadLogEntry[];
-      if (Array.isArray(parsed)) {
-        setUploadLogs(parsed);
-      }
-    } catch (error) {
-      console.warn('[Compliance] Failed to load upload logs:', error);
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(UPLOAD_LOGS_STORAGE_KEY, JSON.stringify(uploadLogs));
-    } catch (error) {
-      console.warn('[Compliance] Failed to persist upload logs:', error);
-    }
-  }, [uploadLogs]);
-
-  useEffect(() => {
-    localStorage.setItem(DIRECTION_STORAGE_KEY, direction);
-  }, [direction]);
-
-  useEffect(() => {
-    localStorage.setItem(ORG_PROFILE_STORAGE_KEY, JSON.stringify(organizationProfile));
-  }, [organizationProfile]);
-
-  useEffect(() => {
-    localStorage.setItem(ACTIVE_MAPPING_STORAGE_KEY, JSON.stringify(activeMappingProfileByDirection));
-  }, [activeMappingProfileByDirection]);
 
   // Intentionally do not auto-seed on mount.
   // Check-pack synchronization is handled explicitly in Run Checks workflow.
@@ -174,7 +136,7 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
 
   const applyDatasetToVisibleState = (datasetType: DatasetType) => {
     const target = getDataForDataset(datasetType);
-    setDirectionState(datasetType);
+    setWorkspaceDirection(datasetType);
     setBuyers(target.buyers);
     setHeaders(target.headers);
     setLines(target.lines);
@@ -182,6 +144,7 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
   };
 
   const setActiveDatasetType = (datasetType: DatasetType) => {
+    setWorkspaceActiveDatasetType(datasetType);
     applyDatasetToVisibleState(datasetType);
   };
 
@@ -223,7 +186,7 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
     };
 
     setDataByDirection((prev) => ({ ...prev, [resolvedDirection]: normalizedData }));
-    setDirectionState(resolvedDirection);
+    setWorkspaceDirection(resolvedDirection);
     setBuyers(normalizedData.buyers);
     setHeaders(normalizedData.headers);
     setLines(normalizedData.lines);
@@ -255,16 +218,26 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
       rulesetVersion: RULESET_VERSION,
     });
 
-    const { builtInResults, pintAEChecks, pintExceptions, allExceptions } = orchestrationResult;
+    const {
+      builtInResults,
+      coreTelemetry,
+      pintAEChecks,
+      pintExceptions,
+      pintTelemetry,
+      orgProfileTelemetry,
+      allExceptions,
+    } = orchestrationResult;
     setCheckResults(builtInResults.map((result) => ({ ...result, direction, datasetType: direction })));
     setExceptions(allExceptions);
     setPintAEExceptions(pintExceptions);
+    setLastPintRuleTelemetry([...coreTelemetry, ...pintTelemetry, ...orgProfileTelemetry]);
     setIsChecksRun(true);
     setLastChecksRunAt(new Date().toISOString());
     setLastChecksRunDatasetType(direction);
 
     // Calculate and save scores
     const stats = calculateStats(allExceptions, headers.length);
+    const evidenceSnapshot = buildEvidenceRunSnapshot(buyers, headers, lines);
     const runId = await saveCheckRun({
       run_date: new Date().toISOString(),
       total_invoices: headers.length,
@@ -283,6 +256,8 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
         uploadManifestId,
         mappingProfileId: mappingProfileId || null,
         mappingVersion: options?.mappingVersion || activeMappingProfile?.version || null,
+        evidenceSnapshot,
+        evidenceRuleExecutionTelemetry: [...coreTelemetry, ...pintTelemetry, ...orgProfileTelemetry],
       },
     });
 
@@ -362,32 +337,12 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
     setBuyers([]); setHeaders([]); setLines([]);
     setCheckResults([]); setExceptions([]); setPintAEExceptions([]);
     setRunSummary(null);
+    setLastPintRuleTelemetry([]);
     setLastChecksRunAt(null);
     setLastChecksRunDatasetType(null);
     setIsDataLoaded(false); setIsChecksRun(false);
     setUploadSessionId(null);
     setUploadManifestId(null);
-  };
-
-  const setActiveMappingProfileForDirection = (targetDirection: Direction, profile: { id: string; version: number } | null) => {
-    setActiveMappingProfileByDirection((prev) => ({ ...prev, [targetDirection]: profile }));
-  };
-
-  const addUploadLogEntry = (entry: NewUploadLogEntry) => {
-    const newEntry: UploadLogEntry = {
-      ...entry,
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      uploadedAt: new Date().toISOString(),
-    };
-    setUploadLogs((prev) => [newEntry, ...prev]);
-  };
-
-  const deleteUploadLogEntry = (id: string) => {
-    setUploadLogs((prev) => prev.filter((entry) => entry.id !== id));
-  };
-
-  const clearUploadLogs = () => {
-    setUploadLogs([]);
   };
 
   const getDashboardStats = (directionFilter: Direction | 'all' = direction): DashboardStats => {
@@ -414,7 +369,7 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
   return (
     <ComplianceContext.Provider value={{
       direction,
-      activeDatasetType: direction,
+      activeDatasetType,
       setDirection,
       setActiveDatasetType,
       organizationProfile,
@@ -423,7 +378,7 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
       uploadManifestId,
       activeMappingProfileByDirection,
       setActiveMappingProfileForDirection,
-      buyers, headers, lines, checkResults, exceptions, investigationFlags, pintAEExceptions, runSummary, lastChecksRunAt, lastChecksRunDatasetType,
+      buyers, headers, lines, checkResults, exceptions, investigationFlags, pintAEExceptions, runSummary, lastPintRuleTelemetry, lastChecksRunAt, lastChecksRunDatasetType,
       isDataLoaded, isChecksRun, isRunning,
       uploadLogs,
       setData, runChecks, clearData,

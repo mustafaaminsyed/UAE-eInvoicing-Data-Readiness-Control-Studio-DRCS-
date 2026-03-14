@@ -2,6 +2,7 @@ import { Buyer, DataContext, CheckResult, Exception, InvoiceHeader } from '@/typ
 import { MoFCoverageResult, MoFMappedColumnsInput } from '@/lib/coverage/mofCoverageEngine';
 import { PintAECheck, PintAEException } from '@/types/pintAE';
 import { Direction, OrganizationProfile } from '@/types/direction';
+import { EvidenceRuleExecutionTelemetryRow } from '@/types/evidence';
 
 export interface CoreRunnerInput {
   dataContext: DataContext;
@@ -9,6 +10,7 @@ export interface CoreRunnerInput {
 
 export interface CoreRunnerOutput {
   checkResults: CheckResult[];
+  telemetry: EvidenceRuleExecutionTelemetryRow[];
 }
 
 export interface CoreRunner {
@@ -22,6 +24,7 @@ export interface PintRunnerInput {
 export interface PintRunnerOutput {
   checks: PintAECheck[];
   exceptions: PintAEException[];
+  telemetry: EvidenceRuleExecutionTelemetryRow[];
 }
 
 export interface PintRunner {
@@ -61,6 +64,7 @@ export interface OrgProfileRunnerInput {
 
 export interface OrgProfileRunnerOutput {
   exceptions: Exception[];
+  telemetry: EvidenceRuleExecutionTelemetryRow[];
 }
 
 export interface OrgProfileRunner {

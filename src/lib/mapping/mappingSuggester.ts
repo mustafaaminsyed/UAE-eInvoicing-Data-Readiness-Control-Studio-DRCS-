@@ -1,9 +1,12 @@
 import { 
+  DatasetType,
   PintAEField, 
   MappingSuggestion, 
   FieldMapping,
-  PINT_AE_UC1_FIELDS 
+  getPintFieldById,
+  normalizeFieldMappings,
 } from '@/types/fieldMapping';
+import { getDatasetAvailableTargetFields, getDatasetTargetFields, getExactCanonicalField } from '@/lib/mapping/datasetFieldCatalog';
 
 // Common ERP column name patterns mapped to PINT-AE fields
 const COLUMN_PATTERNS: Record<string, string[]> = {
@@ -16,22 +19,27 @@ const COLUMN_PATTERNS: Record<string, string[]> = {
   
   seller_name: ['seller_name', 'vendor_name', 'supplier_name', 'company_name', 'seller', 'vendor', 'supplier'],
   seller_trn: ['seller_trn', 'vendor_trn', 'supplier_trn', 'tax_id', 'trn', 'vat_number', 'tax_number', 'seller_vat'],
-  seller_street: ['seller_address', 'seller_street', 'vendor_address', 'supplier_address', 'company_address', 'address1'],
+  seller_address: ['seller_address', 'seller_street', 'vendor_address', 'supplier_address', 'company_address', 'address1'],
   seller_city: ['seller_city', 'vendor_city', 'supplier_city', 'city'],
   seller_country: ['seller_country', 'vendor_country', 'supplier_country', 'country', 'country_code'],
+  seller_electronic_address: ['seller_electronic_address', 'seller_endpoint', 'vendor_endpoint', 'supplier_endpoint', 'peppol_id', 'participant_id'],
   
   buyer_name: ['buyer_name', 'customer_name', 'client_name', 'cust_name', 'buyer', 'customer', 'client', 'bill_to_name'],
   buyer_trn: ['buyer_trn', 'customer_trn', 'client_trn', 'customer_tax_id', 'buyer_vat', 'cust_trn'],
   buyer_address: ['buyer_address', 'customer_address', 'client_address', 'bill_to_address', 'ship_to_address'],
   buyer_country: ['buyer_country', 'customer_country', 'client_country', 'bill_to_country'],
+  buyer_electronic_address: ['buyer_electronic_address', 'buyer_endpoint', 'customer_endpoint', 'client_endpoint', 'buyer_peppol_id'],
   
   line_id: ['line_id', 'line_number', 'line_no', 'item_id', 'seq', 'line_num', 'row_number'],
-  line_quantity: ['quantity', 'qty', 'line_qty', 'units', 'amount', 'line_quantity'],
-  line_unit_price: ['unit_price', 'price', 'rate', 'item_price', 'unit_rate', 'net_price'],
-  line_net_amount: ['line_total', 'line_amount', 'net_amount', 'line_net', 'extended_amount', 'line_value'],
-  line_description: ['description', 'item_description', 'product_name', 'item_name', 'line_desc', 'product', 'item'],
-  line_vat_rate: ['vat_rate', 'tax_rate', 'tax_percent', 'tax_pct', 'vat_percent', 'tax_%'],
-  line_vat_amount: ['vat_amount', 'tax_amount', 'line_tax', 'line_vat', 'tax'],
+  quantity: ['quantity', 'qty', 'line_qty', 'units', 'amount', 'line_quantity'],
+  unit_price: ['unit_price', 'price', 'rate', 'item_price', 'unit_rate', 'net_price'],
+  line_total_excl_vat: ['line_total_excl_vat', 'line_total', 'line_amount', 'net_amount', 'line_net', 'extended_amount', 'line_value'],
+  description: ['description', 'item_description', 'product_name', 'item_name', 'line_desc', 'product', 'item'],
+  vat_rate: ['vat_rate', 'tax_rate', 'tax_percent', 'tax_pct', 'vat_percent', 'tax_%'],
+  vat_amount: ['vat_amount', 'tax_amount', 'line_tax', 'line_vat', 'tax'],
+  exemption_reason_code: ['exemption_reason_code', 'vat_exemption_reason_code', 'exempt_reason_code', 'tax_exemption_code'],
+  exemption_reason_text: ['exemption_reason_text', 'vat_exemption_reason_text', 'exempt_reason_text', 'tax_exemption_reason'],
+  goods_service_type: ['goods_service_type', 'reverse_charge_goods_type', 'goods_type', 'service_type'],
   
   total_excl_vat: ['total_excl_vat', 'net_total', 'subtotal', 'total_net', 'invoice_net', 'amount_excl_tax', 'net_amount'],
   vat_total: ['vat_total', 'tax_total', 'total_vat', 'total_tax', 'invoice_tax', 'tax_amount'],
@@ -114,10 +122,12 @@ function detectDataType(values: string[]): 'string' | 'number' | 'date' | 'boole
 // Generate mapping suggestions
 export function generateMappingSuggestions(
   erpColumns: string[],
-  sampleData: Record<string, string>[]
+  sampleData: Record<string, string>[],
+  datasetType: DatasetType
 ): MappingSuggestion[] {
   const suggestions: MappingSuggestion[] = [];
   const usedTargetFields = new Set<string>();
+  const datasetFields = getDatasetTargetFields(datasetType);
   
   // First pass: exact pattern matches
   for (let colIndex = 0; colIndex < erpColumns.length; colIndex++) {
@@ -126,9 +136,24 @@ export function generateMappingSuggestions(
     const sampleValues = sampleData.slice(0, 5).map(row => row[column] || '');
     
     let bestMatch: { fieldId: string; confidence: number; reason: string } | null = null;
+
+    const exactCanonicalField = getExactCanonicalField(column, datasetType);
+    if (exactCanonicalField && !usedTargetFields.has(exactCanonicalField.id)) {
+      usedTargetFields.add(exactCanonicalField.id);
+      suggestions.push({
+        erpColumn: column,
+        erpColumnIndex: colIndex,
+        targetField: exactCanonicalField,
+        confidence: 1,
+        reason: 'Exact canonical column match',
+        sampleValues,
+      });
+      continue;
+    }
     
     for (const [fieldId, patterns] of Object.entries(COLUMN_PATTERNS)) {
       if (usedTargetFields.has(fieldId)) continue;
+      if (!datasetFields.some((field) => field.id === fieldId)) continue;
       
       for (const pattern of patterns) {
         const normalizedPattern = pattern.toLowerCase().replace(/[_\-\s]/g, '');
@@ -153,7 +178,7 @@ export function generateMappingSuggestions(
     
     // If no pattern match, try similarity with field names
     if (!bestMatch || bestMatch.confidence < 0.7) {
-      for (const field of PINT_AE_UC1_FIELDS) {
+      for (const field of datasetFields) {
         if (usedTargetFields.has(field.id)) continue;
         
         const nameSimilarity = stringSimilarity(column, field.name);
@@ -172,7 +197,7 @@ export function generateMappingSuggestions(
     
     // Data type validation boost
     if (bestMatch) {
-      const targetField = PINT_AE_UC1_FIELDS.find(f => f.id === bestMatch!.fieldId);
+        const targetField = getPintFieldById(bestMatch!.fieldId);
       if (targetField) {
         const detectedType = detectDataType(sampleValues);
         if (detectedType === targetField.dataType) {
@@ -199,7 +224,7 @@ export function generateMappingSuggestions(
 
 // Convert suggestions to mappings
 export function suggestionsToMappings(suggestions: MappingSuggestion[]): FieldMapping[] {
-  return suggestions.map((s, index) => ({
+  return normalizeFieldMappings(suggestions.map((s, index) => ({
     id: `mapping-${index}`,
     erpColumn: s.erpColumn,
     erpColumnIndex: s.erpColumnIndex,
@@ -208,17 +233,16 @@ export function suggestionsToMappings(suggestions: MappingSuggestion[]): FieldMa
     isConfirmed: s.confidence >= 0.9,
     transformations: [],
     sampleValues: s.sampleValues,
-  }));
+  })));
 }
 
 // Get unmapped mandatory fields
 export function getUnmappedMandatoryFields(mappings: FieldMapping[]): PintAEField[] {
-  const mappedFieldIds = new Set(mappings.map(m => m.targetField.id));
-  return PINT_AE_UC1_FIELDS.filter(f => f.isMandatory && !mappedFieldIds.has(f.id));
+  const mappedFieldIds = new Set(normalizeFieldMappings(mappings).map(m => m.targetField.id));
+  return getDatasetTargetFields('combined').filter(f => f.isMandatory && !mappedFieldIds.has(f.id));
 }
 
 // Get all available target fields not yet mapped
-export function getAvailableTargetFields(mappings: FieldMapping[]): PintAEField[] {
-  const mappedFieldIds = new Set(mappings.map(m => m.targetField.id));
-  return PINT_AE_UC1_FIELDS.filter(f => !mappedFieldIds.has(f.id));
+export function getAvailableTargetFields(mappings: FieldMapping[], datasetType: DatasetType): PintAEField[] {
+  return getDatasetAvailableTargetFields(datasetType, mappings);
 }

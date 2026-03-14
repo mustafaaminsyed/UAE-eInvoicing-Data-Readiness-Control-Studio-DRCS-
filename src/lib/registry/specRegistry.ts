@@ -123,8 +123,8 @@ export function computeRegistryCoverage(
 }
 
 // ── DR → Rule traceability ───────────────────────────────────────────
-// Given a DR ID, find all check_ids in the check pack that reference it
-import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
+// Given a DR ID, find all executable rules linked via the authoritative traceability model.
+import { getRulesForDR } from '@/lib/rules/ruleTraceability';
 
 export interface DRRuleTrace {
   dr_id: string;
@@ -138,17 +138,13 @@ export function getDRRuleTraceability(drId: string): DRRuleTrace | null {
   const regField = registry.fields.find(f => f.dr_id === drId);
   if (!regField) return null;
 
-  const linkedChecks = UAE_UC1_CHECK_PACK.filter(
-    chk =>
-      chk.pint_reference_terms?.includes(drId) ||
-      chk.parameters?.field === getPintFieldForDR(drId)?.id
-  );
+  const linkedChecks = getRulesForDR(drId);
 
   return {
     dr_id: drId,
     business_term: regField.business_term,
-    linkedCheckIds: linkedChecks.map(c => c.check_id),
-    linkedCheckNames: linkedChecks.map(c => c.check_name),
+    linkedCheckIds: linkedChecks.map((c) => c.rule_id),
+    linkedCheckNames: linkedChecks.map((c) => c.rule_name),
     registryField: regField,
   };
 }
