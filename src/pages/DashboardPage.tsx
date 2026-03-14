@@ -32,6 +32,7 @@ import { getUploadAuditLogs } from '@/lib/uploadAudit';
 import { LifecycleMetrics, SLAMetrics, InvoiceStatus } from '@/types/cases';
 import { CheckRun } from '@/types/customChecks';
 import { PipelineProgress, PipelineStep, PipelineState } from '@/components/dashboard/PipelineProgress';
+import { resolveDirection } from '@/lib/direction/directionUtils';
 
 const SEVERITY_COLORS = {
   Critical: 'hsl(0, 84%, 60%)',
@@ -59,10 +60,12 @@ export default function DashboardPage() {
     isChecksRun,
     isDataLoaded,
     isRunning,
+    direction,
     activeDatasetType,
     setActiveDatasetType,
     getDashboardStats,
     checkResults,
+    exceptions,
     runSummary,
     buyers,
     headers,
@@ -111,16 +114,55 @@ export default function DashboardPage() {
       color: SEVERITY_COLORS[severity as keyof typeof SEVERITY_COLORS],
     }));
 
-  const checkData = checkResults
-    .filter((r) => r.failed > 0)
-    .sort((a, b) => b.failed - a.failed)
-    .slice(0, 6)
-    .map((r) => ({
-      name: r.checkName.substring(0, 20),
-      fullName: r.checkName,
-      exceptions: r.failed,
-      severity: r.severity,
-    }));
+  const checkData = useMemo(() => {
+    const grouped = new Map<
+      string,
+      {
+        fullName: string;
+        exceptions: number;
+        severity: string;
+      }
+    >();
+
+    const severityRank: Record<string, number> = {
+      Critical: 4,
+      High: 3,
+      Medium: 2,
+      Low: 1,
+    };
+
+    exceptions
+      .filter((exception) => {
+        const exceptionDataset = exception.datasetType || resolveDirection(exception.direction || direction);
+        return exceptionDataset === activeDatasetType;
+      })
+      .forEach((exception) => {
+        const existing = grouped.get(exception.checkId);
+        if (!existing) {
+          grouped.set(exception.checkId, {
+            fullName: exception.checkName,
+            exceptions: 1,
+            severity: exception.severity,
+          });
+          return;
+        }
+
+        existing.exceptions += 1;
+        if ((severityRank[exception.severity] ?? 0) > (severityRank[existing.severity] ?? 0)) {
+          existing.severity = exception.severity;
+        }
+      });
+
+    return Array.from(grouped.values())
+      .sort((left, right) => right.exceptions - left.exceptions)
+      .slice(0, 6)
+      .map((entry) => ({
+        name: entry.fullName.substring(0, 20),
+        fullName: entry.fullName,
+        exceptions: entry.exceptions,
+        severity: entry.severity,
+      }));
+  }, [activeDatasetType, direction, exceptions]);
 
   const lifecycleData = lifecycleMetrics
     ? Object.entries(lifecycleMetrics.statusCounts)

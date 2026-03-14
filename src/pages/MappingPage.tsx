@@ -25,7 +25,7 @@ import { analyzeCoverage } from '@/lib/mapping/coverageAnalyzer';
 import { fetchMappingTemplates, deleteMappingTemplate } from '@/lib/api/mappingApi';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { useCompliance } from '@/context/ComplianceContext';
+import { useWorkspace } from '@/context/WorkspaceContext';
 
 const STEPS: { id: MappingWizardStep; label: string }[] = [
   { id: 'upload', label: 'Upload Sample' },
@@ -38,7 +38,7 @@ export default function MappingPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
-  const { direction, setDirection, setActiveMappingProfileForDirection } = useCompliance();
+  const { direction, setDirection, setActiveMappingProfileForDirection } = useWorkspace();
   
   // Tab state
   const activeTab = searchParams.get('tab') || 'templates';

@@ -106,6 +106,14 @@ describe('ComplianceContext.runChecks delegation', () => {
           ],
         },
       ],
+      coreTelemetry: [
+        {
+          rule_id: 'buyer_trn_missing',
+          execution_count: 1,
+          failure_count: 1,
+          execution_source: 'runtime',
+        },
+      ],
       pintAEChecks: [
         {
           check_id: 'UAE-UC1-CHK-001',
@@ -145,8 +153,24 @@ describe('ComplianceContext.runChecks delegation', () => {
           case_status: 'Open',
         },
       ],
+      pintTelemetry: [
+        {
+          rule_id: 'UAE-UC1-CHK-001',
+          execution_count: 1,
+          failure_count: 1,
+          execution_source: 'runtime',
+        },
+      ],
       legacyPintExceptions: [],
       orgProfileExceptions: [],
+      orgProfileTelemetry: [
+        {
+          rule_id: 'org_profile_our_entity_alignment',
+          execution_count: 1,
+          failure_count: 0,
+          execution_source: 'runtime',
+        },
+      ],
       allExceptions: [
         {
           id: 'core-1',
@@ -204,6 +228,34 @@ describe('ComplianceContext.runChecks delegation', () => {
     expect(saveCheckRunPayload.total_exceptions).toBe(1);
     expect(saveCheckRunPayload.results_summary.checkCount).toBe(2);
     expect(saveCheckRunPayload.results_summary.rulesetVersion).toBe('v1.0.0');
+    expect(saveCheckRunPayload.results_summary.evidenceSnapshot).toMatchObject({
+      version: 1,
+      counts: {
+        totalInvoices: 1,
+        totalBuyers: 1,
+        totalLines: 1,
+      },
+    });
+    expect(saveCheckRunPayload.results_summary.evidenceRuleExecutionTelemetry).toEqual([
+      {
+        rule_id: 'buyer_trn_missing',
+        execution_count: 1,
+        failure_count: 1,
+        execution_source: 'runtime',
+      },
+      {
+        rule_id: 'UAE-UC1-CHK-001',
+        execution_count: 1,
+        failure_count: 1,
+        execution_source: 'runtime',
+      },
+      {
+        rule_id: 'org_profile_our_entity_alignment',
+        execution_count: 1,
+        failure_count: 0,
+        execution_source: 'runtime',
+      },
+    ]);
 
     expect(mockedSaveExceptions).toHaveBeenCalledTimes(1);
     expect(mockedSaveClientRiskScores).toHaveBeenCalledTimes(1);

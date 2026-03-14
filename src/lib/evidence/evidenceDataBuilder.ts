@@ -14,6 +14,16 @@ import { Buyer, InvoiceHeader, InvoiceLine } from '@/types/compliance';
 import { getValidationDRTargets } from '@/lib/registry/validationToDRMap';
 import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
 import { getFailureClassForRule } from '@/lib/validation/pintAERuleMetadata';
+import { EvidenceRuleExecutionTelemetryRow } from '@/types/evidence';
+import { checksRegistry } from '@/lib/checks/checksRegistry';
+
+export interface EvidencePackBuildOverrides {
+  datasetName?: string;
+  totalInvoices?: number;
+  totalBuyers?: number;
+  totalLines?: number;
+  executionTelemetry?: EvidenceRuleExecutionTelemetryRow[];
+}
 
 // ── Tab A: Overview ──────────────────────────────────────────────────
 export interface EvidenceOverview {
@@ -62,7 +72,7 @@ export interface RuleExecutionRow {
   linked_dr_ids: string;
   execution_count: number;
   failure_count: number;
-  execution_source: 'estimated';
+  execution_source: 'estimated' | 'runtime';
 }
 
 // ── Tab D: Exceptions & Cases ────────────────────────────────────────
@@ -112,6 +122,55 @@ export interface EvidencePackData {
   traceabilityRows: TraceabilityRow[];
 }
 
+type EvidenceRuleCatalogEntry = {
+  rule_id: string;
+  rule_name: string;
+  severity: string;
+  rule_type: RuleType;
+  execution_layer: ExecutionLayer;
+  linked_dr_ids: string;
+};
+
+const CORE_RULE_METADATA_OVERRIDES: Partial<Record<string, Pick<EvidenceRuleCatalogEntry, 'rule_type' | 'execution_layer'>>> = {
+  buyer_trn_missing: { rule_type: 'structural_rule', execution_layer: 'schema' },
+  buyer_trn_invalid_format: { rule_type: 'structural_rule', execution_layer: 'schema' },
+  duplicate_invoice_number: { rule_type: 'structural_rule', execution_layer: 'semantic_rule' },
+  header_totals_mismatch: { rule_type: 'structural_rule', execution_layer: 'semantic_rule' },
+  line_totals_mismatch: { rule_type: 'structural_rule', execution_layer: 'semantic_rule' },
+  vat_calc_mismatch: { rule_type: 'structural_rule', execution_layer: 'semantic_rule' },
+  negative_without_credit_note: { rule_type: 'structural_rule', execution_layer: 'semantic_rule' },
+  buyer_not_found: { rule_type: 'structural_rule', execution_layer: 'schema' },
+  missing_mandatory_fields: { rule_type: 'structural_rule', execution_layer: 'schema' },
+  mixed_vat_rates_no_total: { rule_type: 'structural_rule', execution_layer: 'semantic_rule' },
+};
+
+function buildSupplementalRuleCatalog(): Map<string, EvidenceRuleCatalogEntry> {
+  const catalog = new Map<string, EvidenceRuleCatalogEntry>();
+
+  checksRegistry.forEach((check) => {
+    const override = CORE_RULE_METADATA_OVERRIDES[check.id];
+    catalog.set(check.id, {
+      rule_id: check.id,
+      rule_name: check.name,
+      severity: check.severity,
+      rule_type: override?.rule_type ?? 'structural_rule',
+      execution_layer: override?.execution_layer ?? 'schema',
+      linked_dr_ids: '',
+    });
+  });
+
+  catalog.set('org_profile_our_entity_alignment', {
+    rule_id: 'org_profile_our_entity_alignment',
+    rule_name: 'Our-side TRN Alignment',
+    severity: 'Critical',
+    rule_type: 'enumeration',
+    execution_layer: 'national_rule',
+    linked_dr_ids: '',
+  });
+
+  return catalog;
+}
+
 export function buildEvidencePackData(
   runId: string,
   runTimestamp: string,
@@ -120,11 +179,22 @@ export function buildEvidencePackData(
   lines: InvoiceLine[],
   pintAEExceptions: PintAEException[],
   populations: DatasetPopulation[],
+  overrides: EvidencePackBuildOverrides = {},
 ): EvidencePackData {
   const registry = getDRRegistry();
   const rules = getRuleTraceability();
   const controls = getControlsRegistry();
   const checkMap = new Map(UAE_UC1_CHECK_PACK.map((check) => [check.check_id, check]));
+  const totalInvoices = overrides.totalInvoices ?? headers.length;
+  const totalBuyers = overrides.totalBuyers ?? buyers.length;
+  const totalLines = overrides.totalLines ?? lines.length;
+  const hasRuntimeTelemetry = Object.prototype.hasOwnProperty.call(overrides, 'executionTelemetry');
+  const telemetryByRule = new Map(
+    (overrides.executionTelemetry ?? []).map((row) => [row.rule_id, row])
+  );
+  const supplementalRuleCatalog = buildSupplementalRuleCatalog();
+  const datasetName =
+    overrides.datasetName ?? (headers.length > 0 ? (headers[0].seller_name ?? headers[0].seller_trn) : 'Unknown');
 
   // Build exception counts by DR for the conformance engine
   const exceptionCountsByDR = new Map<string, { pass: number; fail: number }>();
@@ -146,11 +216,11 @@ export function buildEvidencePackData(
     scope: CONFORMANCE_CONFIG.defaultUseCase,
     specVersion: 'PINT-AE 2025-Q2',
     drVersion: 'UAE DR v1.0.1',
-    datasetName: headers.length > 0 ? (headers[0].seller_name ?? headers[0].seller_trn) : 'Unknown',
+    datasetName,
     counts: {
-      totalInvoices: headers.length,
-      totalBuyers: buyers.length,
-      totalLines: lines.length,
+      totalInvoices,
+      totalBuyers,
+      totalLines,
       totalDRs: gaps.totalDRs,
       mandatoryDRs: gaps.mandatoryDRs,
       coveredDRs: gaps.drsCovered,
@@ -192,25 +262,49 @@ export function buildEvidencePackData(
   // Count executions as total invoices tested per rule scope
   for (const rule of rules) {
     const counts = ruleExecMap.get(rule.rule_id)!;
-    if (rule.scope === 'Header' || rule.scope === 'Party' || rule.scope === 'Cross') {
-      counts.executions = headers.length;
+    if (rule.scope === 'Header' || rule.scope === 'Cross') {
+      counts.executions = totalInvoices;
+    } else if (rule.scope === 'Party') {
+      counts.executions = totalBuyers;
     } else if (rule.scope === 'Lines') {
-      counts.executions = lines.length;
+      counts.executions = totalLines;
     }
   }
 
-  const ruleExecution: RuleExecutionRow[] = rules.map(r => ({
-    rule_id: r.rule_id,
-    rule_name: r.rule_name,
-    severity: r.severity,
-    rule_type: r.rule_type,
-    execution_layer: r.execution_layer,
-    failure_class: getFailureClassForRule(r.rule_type, r.execution_layer),
-    linked_dr_ids: r.affected_dr_ids.join('; '),
-    execution_count: ruleExecMap.get(r.rule_id)?.executions ?? 0,
-    failure_count: ruleExecMap.get(r.rule_id)?.failures ?? 0,
-    execution_source: 'estimated',
-  }));
+  const ruleExecution: RuleExecutionRow[] = rules.map((r) => {
+    const telemetry = telemetryByRule.get(r.rule_id);
+    return {
+      rule_id: r.rule_id,
+      rule_name: r.rule_name,
+      severity: r.severity,
+      rule_type: r.rule_type,
+      execution_layer: r.execution_layer,
+      failure_class: getFailureClassForRule(r.rule_type, r.execution_layer),
+      linked_dr_ids: r.affected_dr_ids.join('; '),
+      execution_count: telemetry?.execution_count ?? ruleExecMap.get(r.rule_id)?.executions ?? 0,
+      failure_count: telemetry?.failure_count ?? ruleExecMap.get(r.rule_id)?.failures ?? 0,
+      execution_source: telemetry?.execution_source ?? (hasRuntimeTelemetry ? 'runtime' : 'estimated'),
+    };
+  });
+
+  for (const telemetry of telemetryByRule.values()) {
+    if (ruleExecution.some((row) => row.rule_id === telemetry.rule_id)) continue;
+    const supplementalRule = supplementalRuleCatalog.get(telemetry.rule_id);
+    if (!supplementalRule) continue;
+
+    ruleExecution.push({
+      rule_id: supplementalRule.rule_id,
+      rule_name: supplementalRule.rule_name,
+      severity: supplementalRule.severity,
+      rule_type: supplementalRule.rule_type,
+      execution_layer: supplementalRule.execution_layer,
+      failure_class: getFailureClassForRule(supplementalRule.rule_type, supplementalRule.execution_layer),
+      linked_dr_ids: supplementalRule.linked_dr_ids,
+      execution_count: telemetry.execution_count,
+      failure_count: telemetry.failure_count,
+      execution_source: telemetry.execution_source,
+    });
+  }
 
   // ── Tab D ──
   const exceptions: ExceptionRow[] = pintAEExceptions.map(e => {

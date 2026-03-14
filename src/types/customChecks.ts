@@ -1,5 +1,6 @@
 import { Severity } from '@/types/compliance';
 import { DatasetType } from '@/types/datasets';
+import { CheckRunResultsSummary } from '@/types/evidence';
 
 export type CheckType = 'VALIDATION' | 'SEARCH_CHECK';
 
@@ -84,7 +85,7 @@ export interface CheckRun {
   medium_count: number;
   low_count: number;
   pass_rate: number;
-  results_summary?: any;
+  results_summary?: CheckRunResultsSummary;
 }
 
 export interface EntityScore {

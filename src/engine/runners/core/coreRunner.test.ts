@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { runAllChecks } from '@/lib/checks/checksRegistry';
+import { runAllChecksWithTelemetry } from '@/lib/checks/checksRegistry';
 import { defaultCoreRunner } from '@/engine/runners/core';
 import { DataContext } from '@/types/compliance';
 
 vi.mock('@/lib/checks/checksRegistry', () => ({
-  runAllChecks: vi.fn(),
+  runAllChecksWithTelemetry: vi.fn(),
 }));
 
 describe('defaultCoreRunner', () => {
@@ -28,12 +28,22 @@ describe('defaultCoreRunner', () => {
       },
     ];
 
-    vi.mocked(runAllChecks).mockReturnValue(expected);
+    const telemetry = [
+      {
+        rule_id: 'missing_mandatory_fields',
+        execution_count: 0,
+        failure_count: 1,
+        execution_source: 'runtime' as const,
+      },
+    ];
+
+    vi.mocked(runAllChecksWithTelemetry).mockReturnValue({ checkResults: expected, telemetry });
 
     const output = defaultCoreRunner.run({ dataContext });
 
-    expect(runAllChecks).toHaveBeenCalledTimes(1);
-    expect(runAllChecks).toHaveBeenCalledWith(dataContext);
+    expect(runAllChecksWithTelemetry).toHaveBeenCalledTimes(1);
+    expect(runAllChecksWithTelemetry).toHaveBeenCalledWith(dataContext);
     expect(output.checkResults).toEqual(expected);
+    expect(output.telemetry).toEqual(telemetry);
   });
 });

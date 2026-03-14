@@ -125,8 +125,8 @@ export function SidebarNav() {
   };
 
   return (
-    <aside className="relative isolate overflow-hidden rounded-xl border border-border/70 bg-card shadow-lg p-3">
-      <div className="pointer-events-none absolute inset-0 bg-card/95" aria-hidden="true" />
+    <aside className="relative isolate overflow-hidden rounded-2xl border border-border/70 bg-card/95 p-3 shadow-[0_18px_48px_-28px_rgba(15,23,42,0.35)] backdrop-blur-sm">
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-background/30 via-transparent to-transparent" aria-hidden="true" />
       <p className="relative z-10 px-2 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         Control Workspace
       </p>

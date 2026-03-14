@@ -7,6 +7,7 @@ import { DataContext, Exception, Severity, CheckResult, Buyer, InvoiceHeader, In
 import { Direction, OrganizationProfile } from '@/types/direction';
 import { PintAECheck, PintAEException } from '@/types/pintAE';
 import { resolveDirection } from '@/lib/direction/directionUtils';
+import { EvidenceRuleExecutionTelemetryRow } from '@/types/evidence';
 
 type OrchestratorOptions = {
   direction: Direction;
@@ -23,10 +24,13 @@ type OrchestratorOptions = {
 export interface RunChecksOrchestrationResult {
   dataContext: DataContext;
   builtInResults: CheckResult[];
+  coreTelemetry: EvidenceRuleExecutionTelemetryRow[];
   pintAEChecks: PintAECheck[];
   pintExceptions: PintAEException[];
+  pintTelemetry: EvidenceRuleExecutionTelemetryRow[];
   legacyPintExceptions: Exception[];
   orgProfileExceptions: Exception[];
+  orgProfileTelemetry: EvidenceRuleExecutionTelemetryRow[];
   allExceptions: Exception[];
   runArtifact: RunArtifact;
 }
@@ -114,11 +118,18 @@ export async function runChecksOrchestrator(
   const dataContext = buildDataContext(options.buyers, options.headers, options.lines);
 
   // Keep execution order identical to current active flow.
-  const builtInResults = defaultCoreRunner.run({ dataContext }).checkResults;
+  const {
+    checkResults: builtInResults,
+    telemetry: coreTelemetry,
+  } = defaultCoreRunner.run({ dataContext });
   await defaultPintRunner.seedCheckPack(false);
-  const { checks: pintAEChecks, exceptions: pintExceptions } = await defaultPintRunner.run({ dataContext });
+  const {
+    checks: pintAEChecks,
+    exceptions: pintExceptions,
+    telemetry: pintTelemetry,
+  } = await defaultPintRunner.run({ dataContext });
   const legacyPintExceptions = mapPintExceptionsToLegacyExceptions(pintExceptions);
-  const { exceptions: orgProfileExceptions } = defaultOrgProfileRunner.run({
+  const { exceptions: orgProfileExceptions, telemetry: orgProfileTelemetry } = defaultOrgProfileRunner.run({
     organizationProfile: options.organizationProfile,
     direction: options.direction,
     headers: options.headers,
@@ -166,9 +177,12 @@ export async function runChecksOrchestrator(
     findings,
     metadata: {
       builtInResults: builtInResults.length,
+      coreTelemetryRules: coreTelemetry.length,
       pintChecks: pintAEChecks.length,
       pintExceptions: pintExceptions.length,
+      pintTelemetryRules: pintTelemetry.length,
       orgProfileExceptions: orgProfileExceptions.length,
+      orgProfileTelemetryRules: orgProfileTelemetry.length,
       allExceptions: allExceptions.length,
     },
   };
@@ -176,10 +190,13 @@ export async function runChecksOrchestrator(
   return {
     dataContext,
     builtInResults,
+    coreTelemetry,
     pintAEChecks,
     pintExceptions,
+    pintTelemetry,
     legacyPintExceptions,
     orgProfileExceptions,
+    orgProfileTelemetry,
     allExceptions,
     runArtifact,
   };

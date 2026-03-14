@@ -3,6 +3,18 @@ import { DataContext, Severity } from '@/types/compliance';
 import { isCodeInCodelist } from '@/lib/pintAE/specCatalog';
 import { getFailureClassForRule } from '@/lib/validation/pintAERuleMetadata';
 
+export interface PintAECheckTelemetry {
+  rule_id: string;
+  execution_count: number;
+  failure_count: number;
+  execution_source: 'runtime';
+}
+
+export interface PintAECheckRunResult {
+  exceptions: PintAEException[];
+  telemetry: PintAECheckTelemetry;
+}
+
 const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 const PROFILE_DEFAULTS_ENABLED = (import.meta.env.VITE_ENABLE_TECHNICAL_PROFILE_DEFAULTS || 'true').toLowerCase() === 'true';
 const DEFAULT_SPEC_ID = (import.meta.env.VITE_DEFAULT_SPEC_ID || 'urn:peppol:pint:billing-1@ae-1').trim();
@@ -195,23 +207,25 @@ function runConditionalFieldRequirement(
     expectedValue?: string;
     message: string;
   }) => PintAEException
-): PintAEException[] {
+): { exceptions: PintAEException[]; executionCount: number } {
   const params = check.parameters || {};
   const conditions = Array.isArray(params.when) ? (params.when as DependencyCondition[]) : [];
   const requiredFields = getStringArray(params.require_any_of);
   const primaryField = resolveFieldAlias(params.field || requiredFields[0] || '');
 
   if (conditions.length === 0 || requiredFields.length === 0 || !primaryField) {
-    return [];
+    return { exceptions: [], executionCount: 0 };
   }
 
   const dataset = getDatasetForField(primaryField, check.scope, data);
   const exceptions: PintAEException[] = [];
+  let executionCount = 0;
 
   dataset.forEach((record: any) => {
     if (!recordMatchesConditions(record, conditions)) {
       return;
     }
+    executionCount++;
 
     const matchedRequirement = requiredFields.some((field) => !isEmpty(getFieldValue(record, resolveFieldAlias(field))));
     if (matchedRequirement) {
@@ -236,13 +250,14 @@ function runConditionalFieldRequirement(
     );
   });
 
-  return exceptions;
+  return { exceptions, executionCount };
 }
 
-export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEException[] {
+export function runPintAECheckWithTelemetry(check: PintAECheck, data: DataContext): PintAECheckRunResult {
   const exceptions: PintAEException[] = [];
   const params = check.parameters || {};
   const timestamp = new Date().toISOString();
+  let executionCount = 0;
 
   const createException = (opts: {
     invoiceId?: string;
@@ -290,6 +305,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     case 'UAE-UC1-CHK-004': // Invoice Type Present
     case 'UAE-UC1-CHK-005': // Currency Present
       data.headers.forEach(header => {
+        executionCount++;
         const field = params.field;
         const value = getFieldValue(header, field);
         if (isEmpty(value)) {
@@ -312,6 +328,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
       if (params.field && params.pattern) {
         const regex = new RegExp(params.pattern);
         data.headers.forEach(header => {
+          executionCount++;
           const value = getFieldValue(header, params.field);
           if (!isEmpty(value) && !regex.test(String(value))) {
             exceptions.push(createException({
@@ -332,6 +349,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     // Specification identifier (IBT-024): mandatory + allowed prefixes
     case 'UAE-UC1-CHK-010':
       data.headers.forEach(header => {
+        executionCount++;
         const field = resolveFieldAlias(params.field || 'spec_id');
         const value = getFieldValue(header, field);
         const allowedPrefixes: string[] =
@@ -376,6 +394,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     // Currency ISO4217 codelist check from official PINT-AE resources
     case 'UAE-UC1-CHK-006':
       data.headers.forEach(header => {
+        executionCount++;
         const field = params.field || 'currency';
         const value = getFieldValue(header, field);
         if (!isEmpty(value) && !isCodeInCodelist('ISO4217', String(value))) {
@@ -396,6 +415,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     // Tax accounting currency must be AED
     case 'UAE-UC1-CHK-007':
       data.headers.forEach(header => {
+        executionCount++;
         const baseCurrency = String(params.tax_currency || 'AED').toUpperCase();
         const invoiceCurrency = String(header.currency || '').toUpperCase();
         const taxCurrency = String(header.tax_currency || '').toUpperCase();
@@ -429,6 +449,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     // FX rate required when invoice currency is not AED
     case 'UAE-UC1-CHK-008':
       data.headers.forEach(header => {
+        executionCount++;
         const currencyField = resolveFieldAlias(params.currency_field || 'currency');
         const fxField = resolveFieldAlias(params.fx_field || 'fx_rate');
         const baseCurrency = String(params.base_currency || 'AED').toUpperCase();
@@ -452,6 +473,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     // Payment due date required when amount due > 0
     case 'UAE-UC1-CHK-009':
       data.headers.forEach(header => {
+        executionCount++;
         const amountDue = Number(header.amount_due || 0);
         const dueDate = header.payment_due_date;
         if (amountDue > 0 && isEmpty(dueDate)) {
@@ -488,6 +510,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     // Business process type in allowed values
     case 'UAE-UC1-CHK-011':
       data.headers.forEach(header => {
+        executionCount++;
         const field = resolveFieldAlias(params.field || 'business_process');
         const value = getFieldValue(header, field);
         const allowed: string[] =
@@ -531,6 +554,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     // Seller TRN Pattern
     case 'UAE-UC1-CHK-013':
       data.headers.forEach(header => {
+        executionCount++;
         const trn = header.seller_trn;
         if (!isEmpty(trn) && !/^\d{15}$/.test(trn)) {
           exceptions.push(createException({
@@ -550,6 +574,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     // Seller address mandatory fields
     case 'UAE-UC1-CHK-015':
       data.headers.forEach(header => {
+        executionCount++;
         const fields: string[] = Array.isArray(params.fields) ? params.fields : ['seller_address', 'seller_city', 'seller_country'];
         fields.map(resolveFieldAlias).forEach((field) => {
           const value = getFieldValue(header, field);
@@ -572,6 +597,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     // UAE subdivision code allowed values
     case 'UAE-UC1-CHK-016':
       data.headers.forEach(header => {
+        executionCount++;
         const field = resolveFieldAlias(params.field || 'seller_subdivision');
         const value = getFieldValue(header, field);
         const allowed: string[] = Array.isArray(params.allowed_values) ? params.allowed_values : [];
@@ -593,6 +619,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     // Buyer TRN Pattern (allow empty)
     case 'UAE-UC1-CHK-018':
       data.buyers.forEach(buyer => {
+        executionCount++;
         const trn = buyer.buyer_trn;
         if (!isEmpty(trn) && !/^\d{15}$/.test(trn)) {
           exceptions.push(createException({
@@ -609,6 +636,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     // Buyer Name Present
     case 'UAE-UC1-CHK-017':
       data.buyers.forEach(buyer => {
+        executionCount++;
         if (isEmpty(buyer.buyer_name)) {
           exceptions.push(createException({
             buyerId: buyer.buyer_id,
@@ -624,6 +652,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     // Buyer address mandatory fields
     case 'UAE-UC1-CHK-020':
       data.buyers.forEach(buyer => {
+        executionCount++;
         const fields: string[] = Array.isArray(params.fields) ? params.fields : ['buyer_address', 'buyer_country'];
         fields.map(resolveFieldAlias).forEach((field) => {
           const value = getFieldValue(buyer, field);
@@ -643,6 +672,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     // Total With Tax = Without Tax + Tax
     case 'UAE-UC1-CHK-025':
       data.headers.forEach(header => {
+        executionCount++;
         if (header.total_incl_vat !== undefined && 
             header.total_excl_vat !== undefined && 
             header.vat_total !== undefined) {
@@ -668,6 +698,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     // Sum of Line Net Amounts Matches Header
     case 'UAE-UC1-CHK-021':
       data.headers.forEach(header => {
+        executionCount++;
         const invoiceLines = data.linesByInvoice.get(header.invoice_id) || [];
         const lineSum = invoiceLines.reduce((sum, l) => sum + (l.line_total_excl_vat || 0), 0);
         const headerTotal = header.total_excl_vat || 0;
@@ -691,6 +722,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     // Tax Total = Sum of Tax Breakdown Amounts
     case 'UAE-UC1-CHK-029':
       data.headers.forEach(header => {
+        executionCount++;
         const invoiceLines = data.linesByInvoice.get(header.invoice_id) || [];
         const taxSum = invoiceLines.reduce((sum, l) => sum + (l.vat_amount || 0), 0);
         const headerTax = header.vat_total || 0;
@@ -714,6 +746,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     // Invoice Must Have >=1 Line
     case 'UAE-UC1-CHK-030':
       data.headers.forEach(header => {
+        executionCount++;
         const invoiceLines = data.linesByInvoice.get(header.invoice_id) || [];
         if (invoiceLines.length === 0) {
           exceptions.push(createException({
@@ -733,6 +766,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     // Line Identifier Present
     case 'UAE-UC1-CHK-031':
       data.lines.forEach(line => {
+        executionCount++;
         const header = data.headerMap.get(line.invoice_id);
         if (isEmpty(line.line_number)) {
           exceptions.push(createException({
@@ -753,6 +787,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     // Invoiced Quantity Present
     case 'UAE-UC1-CHK-032':
       data.lines.forEach(line => {
+        executionCount++;
         const header = data.headerMap.get(line.invoice_id);
         if (line.quantity === undefined || line.quantity === null) {
           exceptions.push(createException({
@@ -773,6 +808,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     // Unit of Measure Code Present
     case 'UAE-UC1-CHK-033':
       data.lines.forEach(line => {
+        executionCount++;
         const header = data.headerMap.get(line.invoice_id);
         if (isEmpty(line.unit_of_measure)) {
           exceptions.push(createException({
@@ -793,6 +829,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     // Line Net Amount Formula
     case 'UAE-UC1-CHK-034':
       data.lines.forEach(line => {
+        executionCount++;
         const header = data.headerMap.get(line.invoice_id);
         const discount = line.line_discount || 0;
         const expected = (line.quantity * line.unit_price) - discount;
@@ -817,6 +854,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     // Tax line amount must be derivable in AED
     case 'UAE-UC1-CHK-035':
       data.lines.forEach(line => {
+        executionCount++;
         const header = data.headerMap.get(line.invoice_id);
         if (!header) return;
 
@@ -915,6 +953,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     case 'UAE-UC1-CHK-036':
       data.headers.forEach(header => {
         if (!isCommercialScopeApplicable(header, params)) return;
+        executionCount++;
         const buyer = data.buyerMap.get(header.buyer_id);
         const identifierFields = getStringArray(params.buyer_identifier_fields);
         const fieldsToUse = identifierFields.length > 0 ? identifierFields : ['buyer_legal_reg_id', 'buyer_trn'];
@@ -939,6 +978,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     case 'UAE-UC1-CHK-037':
       data.headers.forEach(header => {
         if (!isCommercialScopeApplicable(header, params)) return;
+        executionCount++;
         const buyer = data.buyerMap.get(header.buyer_id);
 
         const identifierFields = getStringArray(params.buyer_identifier_fields);
@@ -988,6 +1028,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     // Item name presence with description fallback
     case 'UAE-UC1-CHK-038':
       data.lines.forEach(line => {
+        executionCount++;
         const header = data.headerMap.get(line.invoice_id);
         const primaryField = resolveFieldAlias(params.primary_field || 'item_name');
         const fallbackField = resolveFieldAlias(params.fallback_field || 'description');
@@ -1013,6 +1054,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     // Item description presence with item-name fallback
     case 'UAE-UC1-CHK-039':
       data.lines.forEach(line => {
+        executionCount++;
         const header = data.headerMap.get(line.invoice_id);
         const primaryField = resolveFieldAlias(params.primary_field || 'description');
         const fallbackField = resolveFieldAlias(params.fallback_field || 'item_name');
@@ -1038,6 +1080,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     // Item price base quantity policy
     case 'UAE-UC1-CHK-040':
       data.lines.forEach(line => {
+        executionCount++;
         const header = data.headerMap.get(line.invoice_id);
         const baseFields = getStringArray(params.base_quantity_fields);
         const baseFieldList = baseFields.length > 0
@@ -1105,6 +1148,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     case 'UAE-UC1-CHK-026':
       if (params.field && params.max_decimals !== undefined) {
         data.headers.forEach(header => {
+          executionCount++;
           const value = getFieldValue(header, params.field);
           if (value !== undefined && value !== null) {
             const decimals = countDecimals(Number(value));
@@ -1128,6 +1172,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     // Tax breakdown must exist when taxable amounts are present
     case 'UAE-UC1-CHK-027':
       data.headers.forEach(header => {
+        executionCount++;
         const invoiceLines = data.linesByInvoice.get(header.invoice_id) || [];
         const hasHeaderBreakdown =
           !isEmpty(header.tax_category_code) &&
@@ -1153,6 +1198,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     // VAT Calculation Check
     case 'UAE-UC1-CHK-028':
       data.lines.forEach(line => {
+        executionCount++;
         const header = data.headerMap.get(line.invoice_id);
         const expected = line.line_total_excl_vat * (line.vat_rate / 100);
         const diff = Math.abs(line.vat_amount - expected);
@@ -1179,6 +1225,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
       const zeroRateCategories = getStringArray(params.zero_rate_categories);
 
       data.lines.forEach(line => {
+        executionCount++;
         const header = data.headerMap.get(line.invoice_id);
         const category = normalizeToken(line.tax_category_code);
         const rate = Number(line.vat_rate);
@@ -1237,6 +1284,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
       const zeroRateCategories = getStringArray(params.zero_rate_categories);
 
       data.headers.forEach(header => {
+        executionCount++;
         const invoiceLines = data.linesByInvoice.get(header.invoice_id) || [];
         const headerCategory = normalizeToken(header.tax_category_code);
         const headerRate = Number(header.tax_category_rate);
@@ -1309,6 +1357,7 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
         dataset.forEach((record: any) => {
           if (!shouldRunCodelistForDocumentContext(record, data, params)) return;
           if (conditions.length > 0 && !recordMatchesConditions(record, conditions)) return;
+          executionCount++;
           const value = getFieldValue(record, field);
           if (!isEmpty(value) && !isCodeInCodelist(String(params.codelist), String(value))) {
             const header = record.invoice_id ? data.headerMap.get(record.invoice_id) : undefined;
@@ -1325,11 +1374,14 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
           }
         });
       } else if (check.rule_type === 'dependency_rule' && Array.isArray(params.when) && Array.isArray(params.require_any_of)) {
-        exceptions.push(...runConditionalFieldRequirement(check, data, createException));
+        const dependencyResult = runConditionalFieldRequirement(check, data, createException);
+        executionCount += dependencyResult.executionCount;
+        exceptions.push(...dependencyResult.exceptions);
       } else if (check.rule_type === 'structural_rule' && params.field) {
         const field = resolveFieldAlias(params.field);
         const dataset = getDatasetForField(field, check.scope, data);
         dataset.forEach((record: any) => {
+          executionCount++;
           const value = getFieldValue(record, field);
           if (isEmpty(value)) {
             const header = record.invoice_id ? data.headerMap.get(record.invoice_id) : undefined;
@@ -1350,16 +1402,38 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
       break;
   }
 
-  return exceptions;
+  return {
+    exceptions,
+    telemetry: {
+      rule_id: check.check_id,
+      execution_count: executionCount,
+      failure_count: exceptions.length,
+      execution_source: 'runtime',
+    },
+  };
+}
+
+export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEException[] {
+  return runPintAECheckWithTelemetry(check, data).exceptions;
 }
 
 export function runAllPintAEChecks(checks: PintAECheck[], data: DataContext): PintAEException[] {
+  return runAllPintAEChecksWithTelemetry(checks, data).exceptions;
+}
+
+export function runAllPintAEChecksWithTelemetry(
+  checks: PintAECheck[],
+  data: DataContext
+): { exceptions: PintAEException[]; telemetry: PintAECheckTelemetry[] } {
   const enabledChecks = checks.filter(c => c.is_enabled);
   const allExceptions: PintAEException[] = [];
+  const telemetry: PintAECheckTelemetry[] = [];
   
   for (const check of enabledChecks) {
-    allExceptions.push(...runPintAECheck(check, data));
+    const result = runPintAECheckWithTelemetry(check, data);
+    allExceptions.push(...result.exceptions);
+    telemetry.push(result.telemetry);
   }
   
-  return allExceptions;
+  return { exceptions: allExceptions, telemetry };
 }

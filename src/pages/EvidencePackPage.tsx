@@ -17,6 +17,7 @@ import { computeAllDatasetPopulations } from '@/lib/coverage/populationCoverage'
 import { buildEvidencePackData, EvidencePackData } from '@/lib/evidence/evidenceDataBuilder';
 import { validateBeforeExport, generateEvidencePackZip, generateEvidencePackPdf, downloadBlob } from '@/lib/evidence/evidenceExporter';
 import { buildEvidenceSummary } from '@/lib/evidence/evidenceSummary';
+import { getEvidenceRuleExecutionTelemetry, getEvidenceRunSnapshot } from '@/lib/evidence/evidenceRunSnapshot';
 import { fetchCheckRuns } from '@/lib/api/checksApi';
 import { fetchExceptionsByRun } from '@/lib/api/pintAEApi';
 import { CheckRun } from '@/types/customChecks';
@@ -63,7 +64,7 @@ function formatFailureClassLabel(value: string): string {
 }
 
 export default function EvidencePackPage() {
-  const { buyers, headers, lines, pintAEExceptions, isChecksRun, runSummary } = useCompliance();
+  const { buyers, headers, lines, pintAEExceptions, isChecksRun, runSummary, lastPintRuleTelemetry } = useCompliance();
   const { toast } = useToast();
   const [exporting, setExporting] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
@@ -87,6 +88,20 @@ export default function EvidencePackPage() {
     fetchCheckRuns(25).then((data) => setRuns(data));
   }, []);
 
+  const selectedRun = useMemo(
+    () => runs.find((run) => run.id === selectedRunId) ?? null,
+    [runs, selectedRunId]
+  );
+
+  const selectedRunSnapshot = useMemo(
+    () => getEvidenceRunSnapshot(selectedRun),
+    [selectedRun]
+  );
+  const selectedRunTelemetry = useMemo(
+    () => getEvidenceRuleExecutionTelemetry(selectedRun),
+    [selectedRun]
+  );
+
   useEffect(() => {
     const fallbackRunId = runSummary?.run_id || '';
     const initial = fallbackRunId || runs[0]?.id || '';
@@ -97,8 +112,7 @@ export default function EvidencePackPage() {
 
   useEffect(() => {
     if (!selectedRunId) return;
-    const selected = runs.find((r) => r.id === selectedRunId);
-    setSelectedRunDate(selected?.run_date ?? null);
+    setSelectedRunDate(selectedRun?.run_date ?? null);
 
     if (runSummary?.run_id && selectedRunId === runSummary.run_id) {
       setSelectedRunExceptions(pintAEExceptions);
@@ -106,15 +120,22 @@ export default function EvidencePackPage() {
     }
 
     fetchExceptionsByRun(selectedRunId).then((excs) => setSelectedRunExceptions(excs));
-  }, [selectedRunId, runs, runSummary?.run_id, pintAEExceptions]);
+  }, [selectedRunId, selectedRun, runSummary?.run_id, pintAEExceptions]);
 
   const runId = selectedRunId || runSummary?.run_id || `run-${Date.now()}`;
   const runTimestamp = selectedRunDate || new Date().toISOString();
-  const isCurrentContextRun = runSummary?.run_id && selectedRunId === runSummary.run_id;
+  const isCurrentContextRun = Boolean(runSummary?.run_id && selectedRunId === runSummary.run_id);
+  const isHistoricalRun = Boolean(selectedRunId && !isCurrentContextRun);
+  const canUseHistoricalSnapshot = Boolean(isHistoricalRun && selectedRunSnapshot);
+  const isHistoricalSnapshotMissing = Boolean(isHistoricalRun && !selectedRunSnapshot);
+  const canBuildEvidence = (isChecksRun && isCurrentContextRun) || canUseHistoricalSnapshot;
 
   // Build populations from raw data for evidence
   const populations = useMemo(() => {
-    if (!isChecksRun) return [];
+    if (canUseHistoricalSnapshot && selectedRunSnapshot) {
+      return selectedRunSnapshot.populations;
+    }
+    if (!(isChecksRun && isCurrentContextRun)) return [];
     // We need raw row data for population; approximate from typed data
     const toRaw = (arr: Record<string, any>[]) =>
       arr.map(item => {
@@ -129,14 +150,44 @@ export default function EvidencePackPage() {
       headers: toRaw(headers),
       lines: toRaw(lines),
     });
-  }, [buyers, headers, lines, isChecksRun]);
+  }, [buyers, headers, lines, isChecksRun, isCurrentContextRun, canUseHistoricalSnapshot, selectedRunSnapshot]);
 
   const evidence: EvidencePackData | null = useMemo(() => {
-    if (!isChecksRun) return null;
+    if (!canBuildEvidence) return null;
     return buildEvidencePackData(
-      runId, runTimestamp, buyers, headers, lines, selectedRunExceptions, populations
+      runId,
+      runTimestamp,
+      canUseHistoricalSnapshot ? [] : buyers,
+      canUseHistoricalSnapshot ? [] : headers,
+      canUseHistoricalSnapshot ? [] : lines,
+      selectedRunExceptions,
+      populations,
+      selectedRunSnapshot
+        ? {
+            datasetName: selectedRunSnapshot.dataset_name,
+            totalInvoices: selectedRunSnapshot.counts.totalInvoices,
+            totalBuyers: selectedRunSnapshot.counts.totalBuyers,
+            totalLines: selectedRunSnapshot.counts.totalLines,
+            executionTelemetry: canUseHistoricalSnapshot ? selectedRunTelemetry : lastPintRuleTelemetry,
+          }
+        : {
+            executionTelemetry: lastPintRuleTelemetry,
+          }
     );
-  }, [isChecksRun, runId, runTimestamp, buyers, headers, lines, selectedRunExceptions, populations]);
+  }, [
+    canBuildEvidence,
+    runId,
+    runTimestamp,
+    canUseHistoricalSnapshot,
+    buyers,
+    headers,
+    lines,
+    selectedRunExceptions,
+    populations,
+    selectedRunSnapshot,
+    selectedRunTelemetry,
+    lastPintRuleTelemetry,
+  ]);
 
   const evidenceSummary = useMemo(
     () => (evidence ? buildEvidenceSummary(evidence) : null),
@@ -280,7 +331,7 @@ export default function EvidencePackPage() {
     }
   }, [q, evidence, populationQuickFilter]);
 
-  if (!isChecksRun || !evidence) {
+  if (!evidence) {
     return (
       <div className="min-h-[calc(100vh-4rem)] bg-background">
         <div className="container py-12 max-w-5xl">
@@ -289,10 +340,21 @@ export default function EvidencePackPage() {
               <FileDown className="w-8 h-8 text-primary" />
             </div>
             <h1 className="text-3xl font-bold text-foreground mb-2">Evidence Pack</h1>
-            <p className="text-muted-foreground mb-6">
-              Run compliance checks first to generate the evidence pack.
-            </p>
-            <Badge variant="secondary">Upload data {'->'} Run Checks {'->'} Generate Evidence</Badge>
+            {isHistoricalSnapshotMissing ? (
+              <>
+                <p className="text-muted-foreground mb-4">
+                  This historical run does not have a persisted evidence snapshot, so DRCS cannot produce a defensible export without mixing old exceptions and current in-memory data.
+                </p>
+                <Badge variant="destructive">Historical export blocked until a run snapshot exists</Badge>
+              </>
+            ) : (
+              <>
+                <p className="text-muted-foreground mb-6">
+                  Run compliance checks first to generate the evidence pack.
+                </p>
+                <Badge variant="secondary">Upload data {'->'} Run Checks {'->'} Generate Evidence</Badge>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -331,6 +393,19 @@ export default function EvidencePackPage() {
             </Button>
           </div>
         </div>
+
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm font-medium text-foreground">
+              {canUseHistoricalSnapshot
+                ? 'This evidence pack is being reconstructed from the persisted snapshot captured for the selected run.'
+                : 'This evidence pack is being generated from the current in-memory run context.'}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Historical runs no longer fall back to current loaded data for population and supporting evidence context.
+            </p>
+          </CardContent>
+        </Card>
 
         {/* Run Selector / Info Bar */}
         <Card>

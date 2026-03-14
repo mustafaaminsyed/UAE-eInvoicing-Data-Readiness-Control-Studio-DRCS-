@@ -36,8 +36,8 @@ vi.mock('@/lib/api/mappingApi', () => ({
   deleteMappingTemplate: vi.fn(async () => true),
 }));
 
-vi.mock('@/context/ComplianceContext', () => ({
-  useCompliance: () => ({
+vi.mock('@/context/WorkspaceContext', () => ({
+  useWorkspace: () => ({
     direction: 'AR',
     setDirection: vi.fn(),
     setActiveMappingProfileForDirection: vi.fn(),

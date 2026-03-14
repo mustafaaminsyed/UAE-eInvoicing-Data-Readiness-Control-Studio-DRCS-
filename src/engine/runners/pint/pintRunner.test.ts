@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchEnabledPintAEChecks, seedUC1CheckPack } from '@/lib/api/pintAEApi';
-import { runAllPintAEChecks } from '@/lib/checks/pintAECheckRunner';
+import { runAllPintAEChecksWithTelemetry } from '@/lib/checks/pintAECheckRunner';
 import { defaultPintRunner } from '@/engine/runners/pint';
 import { DataContext } from '@/types/compliance';
 
@@ -10,7 +10,7 @@ vi.mock('@/lib/api/pintAEApi', () => ({
 }));
 
 vi.mock('@/lib/checks/pintAECheckRunner', () => ({
-  runAllPintAEChecks: vi.fn(),
+  runAllPintAEChecksWithTelemetry: vi.fn(),
 }));
 
 describe('defaultPintRunner', () => {
@@ -67,19 +67,27 @@ describe('defaultPintRunner', () => {
         case_status: 'Open' as const,
       },
     ];
+    const telemetry = [
+      {
+        rule_id: 'UAE-UC1-CHK-001',
+        execution_count: 5,
+        failure_count: 1,
+        execution_source: 'runtime' as const,
+      },
+    ];
 
     vi.mocked(fetchEnabledPintAEChecks).mockResolvedValue(checks);
-    vi.mocked(runAllPintAEChecks).mockReturnValue(exceptions);
+    vi.mocked(runAllPintAEChecksWithTelemetry).mockReturnValue({ exceptions, telemetry });
 
     const output = await defaultPintRunner.run({ dataContext });
 
     expect(fetchEnabledPintAEChecks).toHaveBeenCalledTimes(1);
-    expect(runAllPintAEChecks).toHaveBeenCalledTimes(1);
-    expect(runAllPintAEChecks).toHaveBeenCalledWith(checks, dataContext);
-    expect(output).toEqual({ checks, exceptions });
+    expect(runAllPintAEChecksWithTelemetry).toHaveBeenCalledTimes(1);
+    expect(runAllPintAEChecksWithTelemetry).toHaveBeenCalledWith(checks, dataContext);
+    expect(output).toEqual({ checks, exceptions, telemetry });
 
     const fetchOrder = vi.mocked(fetchEnabledPintAEChecks).mock.invocationCallOrder[0];
-    const runOrder = vi.mocked(runAllPintAEChecks).mock.invocationCallOrder[0];
+    const runOrder = vi.mocked(runAllPintAEChecksWithTelemetry).mock.invocationCallOrder[0];
     expect(fetchOrder).toBeLessThan(runOrder);
   });
 });

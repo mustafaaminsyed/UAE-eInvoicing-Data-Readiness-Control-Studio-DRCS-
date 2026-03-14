@@ -12,16 +12,25 @@ export const defaultOrgProfileRunner: OrgProfileRunner = {
     mappingProfileId,
     rulesetVersion,
   }) {
+    const exceptions = buildOrganizationProfileExceptions(organizationProfile, {
+      direction,
+      headers,
+      buyerMap,
+      uploadSessionId,
+      uploadManifestId,
+      mappingProfileId,
+      rulesetVersion,
+    });
     return {
-      exceptions: buildOrganizationProfileExceptions(organizationProfile, {
-        direction,
-        headers,
-        buyerMap,
-        uploadSessionId,
-        uploadManifestId,
-        mappingProfileId,
-        rulesetVersion,
-      }),
+      exceptions,
+      telemetry: [
+        {
+          rule_id: 'org_profile_our_entity_alignment',
+          execution_count: headers.length,
+          failure_count: exceptions.length,
+          execution_source: 'runtime',
+        },
+      ],
     };
   },
 };
