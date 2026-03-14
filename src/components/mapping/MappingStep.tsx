@@ -5,30 +5,38 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
+  DatasetType,
   FieldMapping, 
   ERPPreviewData, 
-  MappingSuggestion,
-  PINT_AE_UC1_FIELDS 
+  getPintFieldById,
+  normalizeFieldMappings,
 } from '@/types/fieldMapping';
 import { 
   generateMappingSuggestions, 
   suggestionsToMappings,
   getAvailableTargetFields 
 } from '@/lib/mapping/mappingSuggester';
+import { detectLikelyDatasetType, getDatasetTypeLabel } from '@/lib/mapping/datasetFieldCatalog';
 
 interface MappingStepProps {
   previewData: ERPPreviewData;
   mappings: FieldMapping[];
   onMappingsChange: (mappings: FieldMapping[]) => void;
+  onDatasetTypeChange?: (datasetType: DatasetType) => void;
 }
 
-export function MappingStep({ previewData, mappings, onMappingsChange }: MappingStepProps) {
+export function MappingStep({
+  previewData,
+  mappings,
+  onMappingsChange,
+  onDatasetTypeChange,
+}: MappingStepProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showOnlyPending, setShowOnlyPending] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -38,12 +46,12 @@ export function MappingStep({ previewData, mappings, onMappingsChange }: Mapping
   const handleGenerateSuggestions = useCallback(() => {
     setIsGenerating(true);
     setTimeout(() => {
-      const newSuggestions = generateMappingSuggestions(previewData.columns, previewData.rows);
+      const newSuggestions = generateMappingSuggestions(previewData.columns, previewData.rows, previewData.datasetType);
       const newMappings = suggestionsToMappings(newSuggestions);
-      onMappingsChange(newMappings);
+      onMappingsChange(normalizeFieldMappings(newMappings));
       setIsGenerating(false);
     }, 500);
-  }, [previewData.columns, previewData.rows, onMappingsChange]);
+  }, [previewData.columns, previewData.datasetType, previewData.rows, onMappingsChange]);
 
   useEffect(() => {
     if (mappings.length === 0) {
@@ -55,12 +63,12 @@ export function MappingStep({ previewData, mappings, onMappingsChange }: Mapping
     const updated = mappings.map(m => 
       m.id === mappingId ? { ...m, isConfirmed: true } : m
     );
-    onMappingsChange(updated);
+    onMappingsChange(normalizeFieldMappings(updated));
   };
 
   const handleRejectMapping = (mappingId: string) => {
     const updated = mappings.filter(m => m.id !== mappingId);
-    onMappingsChange(updated);
+    onMappingsChange(normalizeFieldMappings(updated));
   };
 
   const handleChangeTargetField = (mappingId: string, targetFieldId: string) => {
@@ -70,30 +78,30 @@ export function MappingStep({ previewData, mappings, onMappingsChange }: Mapping
     );
     
     if (existingMapping) {
-      setDuplicateError(`"${PINT_AE_UC1_FIELDS.find(f => f.id === targetFieldId)?.name}" is already mapped to "${existingMapping.erpColumn}"`);
+      setDuplicateError(`"${getPintFieldById(targetFieldId)?.name}" is already mapped to "${existingMapping.erpColumn}"`);
       setTimeout(() => setDuplicateError(null), 5000);
       return;
     }
 
-    const targetField = PINT_AE_UC1_FIELDS.find(f => f.id === targetFieldId);
+    const targetField = getPintFieldById(targetFieldId);
     if (!targetField) return;
 
     const updated = mappings.map(m => 
       m.id === mappingId ? { ...m, targetField, isConfirmed: true } : m
     );
-    onMappingsChange(updated);
+    onMappingsChange(normalizeFieldMappings(updated));
   };
 
   const handleAddManualMapping = (erpColumn: string, targetFieldId: string) => {
     // Check for duplicates
     const existingMapping = mappings.find(m => m.targetField.id === targetFieldId);
     if (existingMapping) {
-      setDuplicateError(`"${PINT_AE_UC1_FIELDS.find(f => f.id === targetFieldId)?.name}" is already mapped to "${existingMapping.erpColumn}"`);
+      setDuplicateError(`"${getPintFieldById(targetFieldId)?.name}" is already mapped to "${existingMapping.erpColumn}"`);
       setTimeout(() => setDuplicateError(null), 5000);
       return;
     }
 
-    const targetField = PINT_AE_UC1_FIELDS.find(f => f.id === targetFieldId);
+    const targetField = getPintFieldById(targetFieldId);
     if (!targetField) return;
 
     const colIndex = previewData.columns.indexOf(erpColumn);
@@ -110,7 +118,7 @@ export function MappingStep({ previewData, mappings, onMappingsChange }: Mapping
       sampleValues,
     };
 
-    onMappingsChange([...mappings, newMapping]);
+    onMappingsChange(normalizeFieldMappings([...mappings, newMapping]));
   };
 
   const handleBulkAcceptHighConfidence = () => {
@@ -118,7 +126,7 @@ export function MappingStep({ previewData, mappings, onMappingsChange }: Mapping
       ...m,
       isConfirmed: m.confidence >= 0.85 ? true : m.isConfirmed,
     }));
-    onMappingsChange(updated);
+    onMappingsChange(normalizeFieldMappings(updated));
   };
 
   const getConfidenceBadge = (confidence: number) => {
@@ -127,7 +135,10 @@ export function MappingStep({ previewData, mappings, onMappingsChange }: Mapping
     return <Badge variant="outline" className="text-orange-500 border-orange-500/30">Low ({Math.round(confidence * 100)}%)</Badge>;
   };
 
-  const availableTargetFields = useMemo(() => getAvailableTargetFields(mappings), [mappings]);
+  const availableTargetFields = useMemo(
+    () => getAvailableTargetFields(mappings, previewData.datasetType),
+    [mappings, previewData.datasetType]
+  );
   const unmappedColumns = useMemo(() => {
     const mappedColumns = new Set(mappings.map(m => m.erpColumn));
     return previewData.columns.filter(c => !mappedColumns.has(c));
@@ -146,6 +157,28 @@ export function MappingStep({ previewData, mappings, onMappingsChange }: Mapping
   const confirmedCount = mappings.filter(m => m.isConfirmed).length;
   const pendingCount = mappings.filter(m => !m.isConfirmed).length;
   const highConfidenceUnconfirmed = mappings.filter(m => m.confidence >= 0.85 && !m.isConfirmed).length;
+  const recommendedDatasetType = useMemo(() => detectLikelyDatasetType(previewData.columns), [previewData.columns]);
+  const shouldSuggestDatasetTypeChange =
+    recommendedDatasetType !== null && recommendedDatasetType !== previewData.datasetType;
+
+  const renderTargetFieldSummary = (fieldId: string) => {
+    const field = getPintFieldById(fieldId);
+    if (!field) return null;
+
+    return (
+      <div className="flex min-w-0 items-center gap-2 pr-2">
+        {field.isMandatory && (
+          <Badge variant="destructive" className="h-5 shrink-0 rounded-full px-1.5 text-[10px] leading-none">
+            REQ
+          </Badge>
+        )}
+        <div className="min-w-0 flex flex-1 items-center gap-2">
+          <span className="truncate text-sm font-medium leading-5">{field.name}</span>
+          <span className="shrink-0 text-[11px] text-muted-foreground">{field.ibtReference}</span>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -154,6 +187,28 @@ export function MappingStep({ previewData, mappings, onMappingsChange }: Mapping
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>{duplicateError}</AlertDescription>
+        </Alert>
+      )}
+
+      {shouldSuggestDatasetTypeChange && (
+        <Alert className="border-amber-500/30 bg-amber-500/10">
+          <AlertTriangle className="h-4 w-4 text-amber-500" />
+          <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-sm text-amber-100">
+              This file looks closer to <strong>{getDatasetTypeLabel(recommendedDatasetType)}</strong>, but the wizard
+              is currently set to <strong>{getDatasetTypeLabel(previewData.datasetType)}</strong>. That can cause poor
+              suggestions like buyer columns mapping to seller fields.
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="border-amber-400/40 bg-transparent text-amber-100 hover:bg-amber-500/10 hover:text-amber-50"
+              onClick={() => recommendedDatasetType && onDatasetTypeChange?.(recommendedDatasetType)}
+            >
+              Use {getDatasetTypeLabel(recommendedDatasetType)}
+            </Button>
+          </AlertDescription>
         </Alert>
       )}
 
@@ -229,17 +284,17 @@ export function MappingStep({ previewData, mappings, onMappingsChange }: Mapping
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="border rounded-lg overflow-auto max-h-[500px]">
+          <div className="border rounded-lg overflow-auto max-h-[560px]">
             <Table>
               <TableHeader className="sticky top-0 bg-background z-10">
                 <TableRow>
                   <TableHead className="w-[200px]">ERP Column</TableHead>
                   <TableHead className="w-12 text-center">-&gt;</TableHead>
-                  <TableHead className="w-[280px]">PINT-AE Field</TableHead>
-                  <TableHead className="w-[100px]">Confidence</TableHead>
-                  <TableHead className="w-[200px]">Sample Values</TableHead>
-                  <TableHead className="w-[100px]">Status</TableHead>
-                  <TableHead className="w-[100px]">Actions</TableHead>
+                  <TableHead className="w-[320px]">PINT-AE Field</TableHead>
+                  <TableHead className="w-[120px]">Confidence</TableHead>
+                  <TableHead className="w-[240px]">Sample Values</TableHead>
+                  <TableHead className="w-[120px]">Status</TableHead>
+                  <TableHead className="w-[110px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -251,45 +306,33 @@ export function MappingStep({ previewData, mappings, onMappingsChange }: Mapping
                   </TableRow>
                 ) : (
                   filteredMappings.map((mapping) => (
-                    <TableRow key={mapping.id} className={mapping.isConfirmed ? 'bg-green-50/30' : ''}>
-                      <TableCell className="font-mono text-sm">{mapping.erpColumn}</TableCell>
-                      <TableCell className="text-center">
+                    <TableRow key={mapping.id} className="hover:bg-white/5">
+                      <TableCell className="align-middle font-mono text-sm">{mapping.erpColumn}</TableCell>
+                      <TableCell className="align-middle text-center">
                         <ArrowRight className="h-4 w-4 mx-auto text-muted-foreground" />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="align-middle">
                         <Select
                           value={mapping.targetField.id}
                           onValueChange={(v) => handleChangeTargetField(mapping.id, v)}
                         >
-                          <SelectTrigger className="w-full">
-                            <SelectValue />
+                          <SelectTrigger className="h-10 w-full bg-background/70 text-left">
+                            {renderTargetFieldSummary(mapping.targetField.id)}
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value={mapping.targetField.id}>
-                              <div className="flex items-center gap-2">
-                                {mapping.targetField.isMandatory && (
-                                  <Badge variant="destructive" className="text-xs px-1">REQ</Badge>
-                                )}
-                                {mapping.targetField.name}
-                                <span className="text-muted-foreground text-xs">({mapping.targetField.ibtReference})</span>
-                              </div>
+                              {renderTargetFieldSummary(mapping.targetField.id)}
                             </SelectItem>
                             {availableTargetFields.map(f => (
                               <SelectItem key={f.id} value={f.id}>
-                                <div className="flex items-center gap-2">
-                                  {f.isMandatory && (
-                                    <Badge variant="destructive" className="text-xs px-1">REQ</Badge>
-                                  )}
-                                  {f.name}
-                                  <span className="text-muted-foreground text-xs">({f.ibtReference})</span>
-                                </div>
+                                {renderTargetFieldSummary(f.id)}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </TableCell>
-                      <TableCell>{getConfidenceBadge(mapping.confidence)}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground max-w-[200px]">
+                      <TableCell className="align-middle">{getConfidenceBadge(mapping.confidence)}</TableCell>
+                      <TableCell className="align-middle max-w-[240px] text-xs text-muted-foreground">
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -303,21 +346,21 @@ export function MappingStep({ previewData, mappings, onMappingsChange }: Mapping
                           </Tooltip>
                         </TooltipProvider>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="align-middle">
                         {mapping.isConfirmed ? (
                           <Badge className="bg-green-500/10 text-green-600 border-green-500/20">Confirmed</Badge>
                         ) : (
                           <Badge variant="outline">Pending</Badge>
                         )}
                       </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
+                      <TableCell className="align-middle">
+                        <div className="flex items-center gap-1">
                           {!mapping.isConfirmed && (
-                            <Button size="sm" variant="ghost" onClick={() => handleConfirmMapping(mapping.id)}>
+                            <Button size="sm" variant="ghost" className="h-8 w-8 px-0" onClick={() => handleConfirmMapping(mapping.id)}>
                               <Check className="h-4 w-4 text-green-600" />
                             </Button>
                           )}
-                          <Button size="sm" variant="ghost" onClick={() => handleRejectMapping(mapping.id)}>
+                          <Button size="sm" variant="ghost" className="h-8 w-8 px-0" onClick={() => handleRejectMapping(mapping.id)}>
                             <X className="h-4 w-4 text-red-600" />
                           </Button>
                         </div>
@@ -345,17 +388,17 @@ export function MappingStep({ previewData, mappings, onMappingsChange }: Mapping
             </CollapsibleTrigger>
             <CollapsibleContent>
               <CardContent>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-3">
                   {unmappedColumns.map(col => {
                     const sampleValues = previewData.rows.slice(0, 3).map(r => r[col] || '').join(', ');
                     return (
-                      <div key={col} className="flex items-center gap-2 p-3 border rounded-lg">
+                      <div key={col} className="flex items-center gap-4 p-3 border rounded-lg bg-background/30">
                         <div className="flex-1 min-w-0">
                           <div className="font-mono text-sm truncate">{col}</div>
                           <div className="text-xs text-muted-foreground truncate">{sampleValues || 'No values'}</div>
                         </div>
                         <Select onValueChange={(v) => handleAddManualMapping(col, v)}>
-                          <SelectTrigger className="w-[180px]">
+                          <SelectTrigger className="w-[280px] bg-background/70">
                             <SelectValue placeholder="Map to..." />
                           </SelectTrigger>
                           <SelectContent>

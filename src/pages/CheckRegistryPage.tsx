@@ -17,6 +17,7 @@ import {
   PINT_AE_CODELIST_GOVERNANCE_COUNTS,
   countRuntimeCodelistDomains,
 } from "@/lib/pintAE/codelistGovernanceSummary";
+import { getAffectedDRIdsForRule } from "@/lib/rules/ruleTraceability";
 
 type RegistrySource = "Built-in" | "UAE UC1" | "Custom";
 
@@ -28,16 +29,42 @@ interface RegistryRow {
   source: RegistrySource;
   scope: string;
   ruleType: string;
+  executionLayer?: string;
   ownerTeam?: string;
   mofRuleReference?: string;
   useCase?: string;
   suggestedFix?: string;
   evidenceRequired?: string;
+  authoritativeMappings: string[];
   references: string[];
   enabled: boolean;
   passExample: string;
   failExample: string;
 }
+
+const ruleTypeDisplayLabels: Record<string, string> = {
+  dynamic_codelist: "Dynamic Codelist",
+  fixed_literal: "Fixed Literal",
+  enumeration: "Enumeration",
+  dependency_rule: "Dependency Rule",
+  structural_rule: "Structural Rule",
+};
+
+const executionLayerDisplayLabels: Record<string, string> = {
+  schema: "Schema",
+  codelist: "Codelist",
+  national_rule: "National Rule",
+  dependency_rule: "Dependency",
+  semantic_rule: "Semantic",
+};
+
+const executionLayerGuidance: Record<string, string> = {
+  schema: "Checks baseline field presence, structure, or shape assumptions.",
+  codelist: "Checks a value against an official list of allowed codes.",
+  national_rule: "Checks a UAE-specific fixed or enumerated national rule.",
+  dependency_rule: "Checks whether one field becomes required because another condition is true.",
+  semantic_rule: "Checks whether present values contradict UAE VAT treatment logic.",
+};
 
 const severityClasses: Record<RegistryRow["severity"], string> = {
   Critical: "bg-destructive/10 text-destructive border-destructive/20",
@@ -180,6 +207,15 @@ function getCustomCheckExamples(
   };
 }
 
+function getRuleTypeLabel(ruleType: string): string {
+  return ruleTypeDisplayLabels[ruleType] ?? ruleType.replace(/_/g, " ");
+}
+
+function getExecutionLayerLabel(executionLayer?: string): string | undefined {
+  if (!executionLayer) return undefined;
+  return executionLayerDisplayLabels[executionLayer] ?? executionLayer.replace(/_/g, " ");
+}
+
 function normalizeRows(customChecks: CustomCheckConfig[]): RegistryRow[] {
   const builtInRows: RegistryRow[] = checksRegistry.map((check) => ({
     id: check.id,
@@ -190,6 +226,7 @@ function normalizeRows(customChecks: CustomCheckConfig[]): RegistryRow[] {
     scope: check.category.toUpperCase(),
     ruleType: "Custom",
     ownerTeam: "Internal rules engine",
+    authoritativeMappings: [],
     references: [],
     enabled: true,
     passExample: builtInExamples[check.id]?.pass ?? "Input data satisfies this validation condition.",
@@ -204,11 +241,13 @@ function normalizeRows(customChecks: CustomCheckConfig[]): RegistryRow[] {
     source: "UAE UC1",
     scope: check.scope,
     ruleType: check.rule_type,
+    executionLayer: check.execution_layer,
     ownerTeam: check.owner_team_default,
     mofRuleReference: check.mof_rule_reference,
     useCase: check.use_case,
     suggestedFix: check.suggested_fix,
     evidenceRequired: check.evidence_required,
+    authoritativeMappings: getAffectedDRIdsForRule(check.check_id),
     references: check.pint_reference_terms ?? [],
     enabled: check.is_enabled,
     passExample: check.pass_condition ?? "Invoice data passes the expected condition.",
@@ -226,6 +265,7 @@ function normalizeRows(customChecks: CustomCheckConfig[]): RegistryRow[] {
       scope: check.dataset_scope.toUpperCase(),
       ruleType: `${check.check_type || "VALIDATION"} / ${check.rule_type}`,
       ownerTeam: "Configured via Check Builder",
+      authoritativeMappings: [],
       references: [],
       enabled: check.is_active,
       suggestedFix: "Review this custom rule configuration and update source data accordingly.",
@@ -263,6 +303,7 @@ export default function CheckRegistryPage() {
         row.id.toLowerCase().includes(q) ||
         row.name.toLowerCase().includes(q) ||
         row.description.toLowerCase().includes(q) ||
+        row.authoritativeMappings.some((term) => term.toLowerCase().includes(q)) ||
         row.references.some((term) => term.toLowerCase().includes(q)) ||
         row.passExample.toLowerCase().includes(q) ||
         row.failExample.toLowerCase().includes(q)
@@ -294,7 +335,7 @@ export default function CheckRegistryPage() {
           </div>
           <h1 className="text-2xl font-bold text-foreground">Check & Validation Repository</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Catalog of all active validation checks, rule references, and severity levels.
+            Catalog of active validation checks, authoritative DR coverage mappings, and optional metadata references.
           </p>
           <p className="text-xs text-muted-foreground mt-2">
             Note: technical profile fields (for example IBT-023 / IBT-024) may be resolved by approved system defaults
@@ -452,6 +493,35 @@ export default function CheckRegistryPage() {
           </CardContent>
         </Card>
 
+        <Card className="border shadow-sm mb-6">
+          <CardContent className="p-4 md:p-5">
+            <h2 className="text-sm font-semibold text-foreground">Validation Classes</h2>
+            <p className="text-xs text-muted-foreground mt-1 mb-3">
+              These labels explain how a rule fails. Authoritative DR coverage comes from explicit validation mappings; reference terms stay informational only.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <p className="text-xs font-medium text-foreground">Codelist</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  The value must exist in an approved list, such as ISO4217, GoodsType, or UAE exemption codes.
+                </p>
+              </div>
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <p className="text-xs font-medium text-foreground">Dependency</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Another field becomes required because a VAT treatment or business condition applies.
+                </p>
+              </div>
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <p className="text-xs font-medium text-foreground">Semantic</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Values exist but contradict the intended UAE VAT logic, such as a standard category with zero VAT.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card className="border shadow-sm">
           <CardContent className="p-4 md:p-5">
             <div className="flex flex-col gap-3 md:flex-row md:items-center mb-4">
@@ -459,7 +529,7 @@ export default function CheckRegistryPage() {
                 <Search className="w-4 h-4 absolute left-2.5 top-2.5 text-muted-foreground" />
                 <Input
                   aria-label="Search checks"
-                  placeholder="Search by ID, name, or PINT reference..."
+                  placeholder="Search by ID, name, DR mapping, or reference term..."
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   className="h-9 pl-8 text-sm"
@@ -524,7 +594,7 @@ export default function CheckRegistryPage() {
 
 function CheckCard({ row }: { row: RegistryRow }) {
   return (
-    <Card className="border h-full">
+    <Card className="border h-full" data-testid={`check-card-${row.id}`}>
       <CardContent className="p-4 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -550,7 +620,10 @@ function CheckCard({ row }: { row: RegistryRow }) {
 
         <div className="flex flex-wrap gap-1.5">
           <Badge variant="secondary" className="text-[11px]">Scope: {row.scope}</Badge>
-          <Badge variant="secondary" className="text-[11px]">Type: {row.ruleType}</Badge>
+          <Badge variant="secondary" className="text-[11px]">Class: {getRuleTypeLabel(row.ruleType)}</Badge>
+          {row.executionLayer && (
+            <Badge variant="secondary" className="text-[11px]">Layer: {getExecutionLayerLabel(row.executionLayer)}</Badge>
+          )}
           {row.ownerTeam && (
             <Badge variant="secondary" className="text-[11px]">Owner: {row.ownerTeam}</Badge>
           )}
@@ -561,6 +634,15 @@ function CheckCard({ row }: { row: RegistryRow }) {
             <Badge variant="secondary" className="text-[11px]">{row.useCase}</Badge>
           )}
         </div>
+
+        {row.executionLayer && row.source === "UAE UC1" && (
+          <div className="rounded-md border bg-muted/20 p-2.5">
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Why This Rule Exists</p>
+            <p className="text-xs text-foreground mt-1">
+              {executionLayerGuidance[row.executionLayer] ?? "This rule executes within the mapped UAE validation layer."}
+            </p>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <ExampleBlock title="Pass Example" text={row.passExample} tone="pass" />
@@ -581,13 +663,36 @@ function CheckCard({ row }: { row: RegistryRow }) {
           </div>
         )}
 
+        {row.authoritativeMappings.length > 0 && (
+          <div className="rounded-md border bg-muted/20 p-2.5">
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              Authoritative DR Coverage
+            </p>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {row.authoritativeMappings.map((reference) => (
+                <Badge key={`${row.id}-coverage-${reference}`} variant="outline" className="text-[10px]">
+                  {reference}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+
         {row.references.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {row.references.map((reference) => (
-              <Badge key={`${row.id}-${reference}`} variant="outline" className="text-[10px]">
-                {reference}
-              </Badge>
-            ))}
+          <div className="rounded-md border bg-muted/20 p-2.5">
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              Reference Terms
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Metadata only. These terms do not determine runtime DR coverage.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1">
+              {row.references.map((reference) => (
+                <Badge key={`${row.id}-${reference}`} variant="outline" className="text-[10px]">
+                  {reference}
+                </Badge>
+              ))}
+            </div>
           </div>
         )}
       </CardContent>

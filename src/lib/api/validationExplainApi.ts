@@ -1,7 +1,7 @@
 import { checksRegistry } from '@/lib/checks/checksRegistry';
 import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
 import { fetchActiveTemplates } from '@/lib/api/mappingApi';
-import { PINT_AE_UC1_FIELDS } from '@/types/fieldMapping';
+import { getPintFieldById } from '@/types/fieldMapping';
 import { PINT_AE_CODELISTS } from '@/lib/pintAE/generated/codelists';
 import { supabase } from '@/integrations/supabase/client';
 import { Exception } from '@/types/compliance';
@@ -268,7 +268,7 @@ function getRuleReferences(exception: Exception) {
 
 function findPintFieldMetadata(fieldName?: string): Record<string, unknown> | null {
   if (!fieldName) return null;
-  const field = PINT_AE_UC1_FIELDS.find((item) => item.id === fieldName);
+  const field = getPintFieldById(fieldName);
   if (!field) return null;
 
   let codelistMatch: string | undefined;

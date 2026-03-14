@@ -73,6 +73,9 @@ export interface InvoiceLine {
   // UC1 expansions
   unit_of_measure?: string;
   tax_category_code?: string;
+  exemption_reason_code?: string;
+  exemption_reason_text?: string;
+  goods_service_type?: string;
   item_name?: string;
   line_allowance_amount?: number;
   line_charge_amount?: number;

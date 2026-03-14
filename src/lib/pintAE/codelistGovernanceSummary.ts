@@ -52,7 +52,7 @@ export function countRuntimeCodelistDomains(checks: PintAECheck[]): number {
   return new Set(
     checks
       .filter(
-        (check) => check.rule_type === 'CodeList' && typeof check.parameters?.codelist === 'string'
+        (check) => check.rule_type === 'dynamic_codelist' && typeof check.parameters?.codelist === 'string'
       )
       .map((check) => String(check.parameters?.codelist).trim())
       .filter((codelist) => codelist.length > 0)

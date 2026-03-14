@@ -9,8 +9,11 @@ import { getControlsRegistry, ControlEntry } from '@/lib/registry/controlsRegist
 import { computeTraceabilityMatrix, CoverageStatus, TraceabilityRow } from '@/lib/coverage/conformanceEngine';
 import { DatasetPopulation } from '@/lib/coverage/populationCoverage';
 import { CONFORMANCE_CONFIG } from '@/config/conformance';
-import { PintAEException } from '@/types/pintAE';
+import { ExecutionLayer, FailureClass, PintAEException, RuleType } from '@/types/pintAE';
 import { Buyer, InvoiceHeader, InvoiceLine } from '@/types/compliance';
+import { getValidationDRTargets } from '@/lib/registry/validationToDRMap';
+import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
+import { getFailureClassForRule } from '@/lib/validation/pintAERuleMetadata';
 
 // ── Tab A: Overview ──────────────────────────────────────────────────
 export interface EvidenceOverview {
@@ -53,6 +56,9 @@ export interface RuleExecutionRow {
   rule_id: string;
   rule_name: string;
   severity: string;
+  rule_type: RuleType;
+  execution_layer: ExecutionLayer;
+  failure_class: FailureClass;
   linked_dr_ids: string;
   execution_count: number;
   failure_count: number;
@@ -64,6 +70,9 @@ export interface ExceptionRow {
   exception_id: string;
   dr_id: string;
   rule_id: string;
+  rule_type: RuleType | '';
+  execution_layer: ExecutionLayer | '';
+  failure_class: FailureClass | '';
   record_reference: string;
   severity: string;
   message: string;
@@ -115,11 +124,12 @@ export function buildEvidencePackData(
   const registry = getDRRegistry();
   const rules = getRuleTraceability();
   const controls = getControlsRegistry();
+  const checkMap = new Map(UAE_UC1_CHECK_PACK.map((check) => [check.check_id, check]));
 
   // Build exception counts by DR for the conformance engine
   const exceptionCountsByDR = new Map<string, { pass: number; fail: number }>();
   for (const exc of pintAEExceptions) {
-    const drIds = exc.pint_reference_terms ?? [];
+    const drIds = getValidationDRTargets(exc.check_id).map((target) => target.dr_id);
     for (const drId of drIds) {
       const existing = exceptionCountsByDR.get(drId) ?? { pass: 0, fail: 0 };
       existing.fail++;
@@ -193,6 +203,9 @@ export function buildEvidencePackData(
     rule_id: r.rule_id,
     rule_name: r.rule_name,
     severity: r.severity,
+    rule_type: r.rule_type,
+    execution_layer: r.execution_layer,
+    failure_class: getFailureClassForRule(r.rule_type, r.execution_layer),
     linked_dr_ids: r.affected_dr_ids.join('; '),
     execution_count: ruleExecMap.get(r.rule_id)?.executions ?? 0,
     failure_count: ruleExecMap.get(r.rule_id)?.failures ?? 0,
@@ -200,17 +213,29 @@ export function buildEvidencePackData(
   }));
 
   // ── Tab D ──
-  const exceptions: ExceptionRow[] = pintAEExceptions.map(e => ({
-    exception_id: e.id,
-    dr_id: (e.pint_reference_terms ?? []).join('; '),
-    rule_id: e.check_id,
-    record_reference: e.line_id ?? e.invoice_id ?? e.buyer_id ?? '',
-    severity: e.severity,
-    message: e.message,
-    exception_status: e.case_status,
-    case_id: e.case_id ?? '',
-    case_status: e.case_status,
-  }));
+  const exceptions: ExceptionRow[] = pintAEExceptions.map(e => {
+    const check = checkMap.get(e.check_id);
+    const ruleType = e.rule_type ?? check?.rule_type ?? '';
+    const executionLayer = e.execution_layer ?? check?.execution_layer ?? '';
+    const failureClass =
+      e.failure_class ??
+      (ruleType && executionLayer ? getFailureClassForRule(ruleType, executionLayer) : '');
+
+    return {
+      exception_id: e.id,
+      dr_id: getValidationDRTargets(e.check_id).map((target) => target.dr_id).join('; '),
+      rule_id: e.check_id,
+      rule_type: ruleType,
+      execution_layer: executionLayer,
+      failure_class: failureClass,
+      record_reference: e.line_id ?? e.invoice_id ?? e.buyer_id ?? '',
+      severity: e.severity,
+      message: e.message,
+      exception_status: e.case_status,
+      case_id: e.case_id ?? '',
+      case_status: e.case_status,
+    };
+  });
 
   // ── Tab E ──
   const ruleExcCounts = new Map<string, number>();

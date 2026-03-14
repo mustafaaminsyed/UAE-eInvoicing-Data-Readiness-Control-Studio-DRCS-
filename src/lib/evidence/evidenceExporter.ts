@@ -9,6 +9,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { EvidencePackData } from './evidenceDataBuilder';
 import { runConsistencyChecks, ConsistencyReport } from '@/lib/coverage/consistencyValidator';
+import { buildEvidenceSummary } from './evidenceSummary';
 
 export interface ExportValidationResult {
   valid: boolean;
@@ -35,6 +36,7 @@ function workbookToBuffer(wb: XLSX.WorkBook): Uint8Array {
 
 export async function generateEvidencePackZip(data: EvidencePackData): Promise<Blob> {
   const zip = new JSZip();
+  const summary = buildEvidenceSummary(data);
 
   // 01_scope_summary.xlsx
   const scopeRows = [
@@ -56,6 +58,13 @@ export async function generateEvidencePackZip(data: EvidencePackData): Promise<B
     { field: 'DRs with No Rules', value: data.overview.counts.drsNoRules },
     { field: 'DRs with No Controls', value: data.overview.counts.drsNoControls },
     { field: 'Open Exceptions', value: data.overview.counts.openExceptions },
+    { field: 'Overall Status', value: summary.overallStatus },
+    { field: 'Top Failure Class', value: summary.topFailureClass },
+    { field: 'Execution Count Note', value: summary.executionCountNote },
+    ...summary.mainIssues.map((issue, index) => ({
+      field: `Main Issue ${index + 1}`,
+      value: issue,
+    })),
   ];
   zip.file('01_scope_summary.xlsx', workbookToBuffer(createWorkbook(scopeRows, 'Scope Summary')));
 
@@ -80,6 +89,9 @@ export async function generateEvidencePackZip(data: EvidencePackData): Promise<B
     'Rule ID': r.rule_id,
     'Rule Name': r.rule_name,
     'Severity': r.severity,
+    'Rule Type': r.rule_type,
+    'Execution Layer': r.execution_layer,
+    'Failure Class': r.failure_class,
     'Linked DR IDs': r.linked_dr_ids,
     'Execution Count': r.execution_count,
     'Failure Count': r.failure_count,
@@ -92,6 +104,9 @@ export async function generateEvidencePackZip(data: EvidencePackData): Promise<B
     'Exception ID': e.exception_id,
     'DR ID': e.dr_id,
     'Rule ID': e.rule_id,
+    'Rule Type': e.rule_type,
+    'Execution Layer': e.execution_layer,
+    'Failure Class': e.failure_class,
     'Record Reference': e.record_reference,
     'Severity': e.severity,
     'Message': e.message,
@@ -100,7 +115,7 @@ export async function generateEvidencePackZip(data: EvidencePackData): Promise<B
     'Case Status': e.case_status,
   }));
   zip.file('04_exceptions_and_cases.xlsx', workbookToBuffer(createWorkbook(
-    excRows.length > 0 ? excRows : [{ 'Exception ID': '', 'DR ID': '', 'Rule ID': '', 'Record Reference': '', 'Severity': '', 'Message': 'No exceptions', 'Exception Status': '', 'Case ID': '', 'Case Status': '' }],
+    excRows.length > 0 ? excRows : [{ 'Exception ID': '', 'DR ID': '', 'Rule ID': '', 'Rule Type': '', 'Execution Layer': '', 'Failure Class': '', 'Record Reference': '', 'Severity': '', 'Message': 'No exceptions', 'Exception Status': '', 'Case ID': '', 'Case Status': '' }],
     'Exceptions'
   )));
 
@@ -132,6 +147,7 @@ export async function generateEvidencePackZip(data: EvidencePackData): Promise<B
 export async function generateEvidencePackPdf(data: EvidencePackData): Promise<Blob> {
   const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
   const ov = data.overview;
+  const summary = buildEvidenceSummary(data);
   const pageWidth = doc.internal.pageSize.getWidth();
   const marginX = 40;
   const titleColor: [number, number, number] = [16, 91, 161];
@@ -176,6 +192,34 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
     body: summaryRows,
     theme: 'grid',
     styles: { fontSize: 9, cellPadding: 6 },
+    headStyles: { fillColor: [236, 243, 252], textColor: [24, 40, 72] },
+    margin: { left: marginX, right: marginX },
+  });
+
+  const executiveY = (doc as any).lastAutoTable.finalY + 18;
+  sectionTitle('Executive Summary', executiveY);
+  autoTable(doc, {
+    startY: executiveY + 8,
+    head: [['Metric', 'Value']],
+    body: [
+      ['Overall Status', summary.overallStatus],
+      ['Top Failure Class', summary.topFailureClass],
+      ['Execution Count Note', summary.executionCountNote],
+    ],
+    theme: 'striped',
+    styles: { fontSize: 9, cellPadding: 6 },
+    headStyles: { fillColor: [236, 243, 252], textColor: [24, 40, 72] },
+    margin: { left: marginX, right: marginX },
+  });
+
+  const findingsY = (doc as any).lastAutoTable.finalY + 18;
+  sectionTitle('Main Issues', findingsY);
+  autoTable(doc, {
+    startY: findingsY + 8,
+    head: [['Finding']],
+    body: summary.mainIssues.map((issue) => [issue]),
+    theme: 'grid',
+    styles: { fontSize: 9, cellPadding: 6, overflow: 'linebreak' },
     headStyles: { fillColor: [236, 243, 252], textColor: [24, 40, 72] },
     margin: { left: marginX, right: marginX },
   });
@@ -225,11 +269,13 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
   sectionTitle('Rules and Exceptions', 50);
   autoTable(doc, {
     startY: 62,
-    head: [['Rule ID', 'Rule Name', 'Severity', 'Executions', 'Failures']],
+    head: [['Rule ID', 'Rule Name', 'Severity', 'Type', 'Layer', 'Executions', 'Failures']],
     body: data.ruleExecution.map((r) => [
       r.rule_id,
       r.rule_name,
       r.severity,
+      r.rule_type,
+      r.execution_layer,
       String(r.execution_count),
       String(r.failure_count),
     ]),
@@ -244,11 +290,13 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
   sectionTitle('Top Exceptions (first 100)', afterRulesY);
   autoTable(doc, {
     startY: afterRulesY + 8,
-    head: [['Exception ID', 'DR ID', 'Rule ID', 'Severity', 'Status']],
+    head: [['Exception ID', 'DR ID', 'Rule ID', 'Type', 'Layer', 'Severity', 'Status']],
     body: data.exceptions.slice(0, 100).map((e) => [
       e.exception_id.slice(0, 8),
       e.dr_id,
       e.rule_id,
+      e.rule_type,
+      e.execution_layer,
       e.severity,
       e.exception_status,
     ]),

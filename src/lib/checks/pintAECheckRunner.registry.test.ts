@@ -480,4 +480,280 @@ describe('runPintAECheck executor registry parity', () => {
     expect(runPintAECheck(check, emptyData)).toHaveLength(0);
     expect(runPintAECheck(check, invalidData)).toHaveLength(1);
   });
+
+  it('fails CHK-049 when exempt VAT lines are missing exemption reason details', () => {
+    const check = getCheck('UAE-UC1-CHK-049');
+    const data = buildDataContext(
+      {},
+      {
+        lines: [
+          {
+            line_id: 'L-1',
+            invoice_id: 'INV-1',
+            line_number: 1,
+            quantity: 1,
+            unit_price: 100,
+            line_total_excl_vat: 100,
+            vat_rate: 0,
+            vat_amount: 0,
+            tax_category_code: 'E',
+            exemption_reason_code: '',
+            exemption_reason_text: '',
+          } as InvoiceLine,
+        ],
+      }
+    );
+
+    const exceptions = runPintAECheck(check, data);
+
+    expect(exceptions).toHaveLength(1);
+    expect(exceptions[0].field_name).toBe('exemption_reason_code|exemption_reason_text');
+  });
+
+  it('passes CHK-049 and validates CHK-050 against AE exemption codes', () => {
+    const dependencyCheck = getCheck('UAE-UC1-CHK-049');
+    const codelistCheck = getCheck('UAE-UC1-CHK-050');
+    const validExemptionCode = getCodelistCodes('Aligned-TaxExemptionCodes')[0];
+
+    const validData = buildDataContext(
+      {},
+      {
+        lines: [
+          {
+            line_id: 'L-1',
+            invoice_id: 'INV-1',
+            line_number: 1,
+            quantity: 1,
+            unit_price: 100,
+            line_total_excl_vat: 100,
+            vat_rate: 0,
+            vat_amount: 0,
+            tax_category_code: 'E',
+            exemption_reason_code: validExemptionCode,
+            exemption_reason_text: 'Qualifying exempt supply',
+          } as InvoiceLine,
+        ],
+      }
+    );
+
+    expect(runPintAECheck(dependencyCheck, validData)).toHaveLength(0);
+    expect(runPintAECheck(codelistCheck, validData)).toHaveLength(0);
+
+    const invalidData = buildDataContext(
+      {},
+      {
+        lines: [
+          {
+            line_id: 'L-1',
+            invoice_id: 'INV-1',
+            line_number: 1,
+            quantity: 1,
+            unit_price: 100,
+            line_total_excl_vat: 100,
+            vat_rate: 0,
+            vat_amount: 0,
+            tax_category_code: 'E',
+            exemption_reason_code: 'INVALID',
+            exemption_reason_text: 'Qualifying exempt supply',
+          } as InvoiceLine,
+        ],
+      }
+    );
+
+    const invalidExceptions = runPintAECheck(codelistCheck, invalidData);
+    expect(invalidExceptions).toHaveLength(1);
+    expect(invalidExceptions[0].field_name).toBe('exemption_reason_code');
+  });
+
+  it('fails CHK-051 when reverse-charge VAT lines are missing goods type and validates CHK-052 codelist', () => {
+    const dependencyCheck = getCheck('UAE-UC1-CHK-051');
+    const codelistCheck = getCheck('UAE-UC1-CHK-052');
+    const validGoodsType = getCodelistCodes('GoodsType')[0];
+
+    const missingData = buildDataContext(
+      {},
+      {
+        lines: [
+          {
+            line_id: 'L-1',
+            invoice_id: 'INV-1',
+            line_number: 1,
+            quantity: 1,
+            unit_price: 100,
+            line_total_excl_vat: 100,
+            vat_rate: 0,
+            vat_amount: 0,
+            tax_category_code: 'AE',
+            goods_service_type: '',
+          } as InvoiceLine,
+        ],
+      }
+    );
+
+    expect(runPintAECheck(dependencyCheck, missingData)).toHaveLength(1);
+
+    const validData = buildDataContext(
+      {},
+      {
+        lines: [
+          {
+            line_id: 'L-1',
+            invoice_id: 'INV-1',
+            line_number: 1,
+            quantity: 1,
+            unit_price: 100,
+            line_total_excl_vat: 100,
+            vat_rate: 0,
+            vat_amount: 0,
+            tax_category_code: 'AE',
+            goods_service_type: validGoodsType,
+          } as InvoiceLine,
+        ],
+      }
+    );
+
+    expect(runPintAECheck(dependencyCheck, validData)).toHaveLength(0);
+    expect(runPintAECheck(codelistCheck, validData)).toHaveLength(0);
+
+    const invalidData = buildDataContext(
+      {},
+      {
+        lines: [
+          {
+            line_id: 'L-1',
+            invoice_id: 'INV-1',
+            line_number: 1,
+            quantity: 1,
+            unit_price: 100,
+            line_total_excl_vat: 100,
+            vat_rate: 0,
+            vat_amount: 0,
+            tax_category_code: 'AE',
+            goods_service_type: 'INVALID',
+          } as InvoiceLine,
+        ],
+      }
+    );
+
+    expect(runPintAECheck(codelistCheck, invalidData)).toHaveLength(1);
+  });
+
+  it('fails CHK-053 for VAT category and rate semantic contradictions', () => {
+    const check = getCheck('UAE-UC1-CHK-053');
+
+    const exemptMismatch = buildDataContext(
+      {},
+      {
+        lines: [
+          {
+            line_id: 'L-1',
+            invoice_id: 'INV-1',
+            line_number: 1,
+            quantity: 1,
+            unit_price: 100,
+            line_total_excl_vat: 100,
+            vat_rate: 5,
+            vat_amount: 5,
+            tax_category_code: 'E',
+          },
+        ],
+      }
+    );
+
+    const standardZero = buildDataContext(
+      {},
+      {
+        lines: [
+          {
+            line_id: 'L-1',
+            invoice_id: 'INV-1',
+            line_number: 1,
+            quantity: 1,
+            unit_price: 100,
+            line_total_excl_vat: 100,
+            vat_rate: 0,
+            vat_amount: 0,
+            tax_category_code: 'S',
+          },
+        ],
+      }
+    );
+
+    const reverseChargeMismatch = buildDataContext(
+      {},
+      {
+        lines: [
+          {
+            line_id: 'L-1',
+            invoice_id: 'INV-1',
+            line_number: 1,
+            quantity: 1,
+            unit_price: 100,
+            line_total_excl_vat: 100,
+            vat_rate: 5,
+            vat_amount: 5,
+            tax_category_code: 'AE',
+          },
+        ],
+      }
+    );
+
+    expect(runPintAECheck(check, exemptMismatch)).toHaveLength(2);
+    expect(runPintAECheck(check, standardZero)).toHaveLength(1);
+    expect(runPintAECheck(check, reverseChargeMismatch)).toHaveLength(2);
+  });
+
+  it('fails CHK-054 when header VAT breakdown semantics conflict with line treatment', () => {
+    const check = getCheck('UAE-UC1-CHK-054');
+    const reverseChargeHeaderMismatch = buildDataContext(
+      {
+        tax_category_code: 'S',
+        tax_category_rate: 5,
+        vat_total: 5,
+      },
+      {
+        lines: [
+          {
+            line_id: 'L-1',
+            invoice_id: 'INV-1',
+            line_number: 1,
+            quantity: 1,
+            unit_price: 100,
+            line_total_excl_vat: 100,
+            vat_rate: 0,
+            vat_amount: 0,
+            tax_category_code: 'AE',
+            goods_service_type: getCodelistCodes('GoodsType')[0],
+          } as InvoiceLine,
+        ],
+      }
+    );
+
+    const exemptHeaderMismatch = buildDataContext(
+      {
+        tax_category_code: 'E',
+        tax_category_rate: 5,
+        vat_total: 5,
+      },
+      {
+        lines: [
+          {
+            line_id: 'L-1',
+            invoice_id: 'INV-1',
+            line_number: 1,
+            quantity: 1,
+            unit_price: 100,
+            line_total_excl_vat: 100,
+            vat_rate: 0,
+            vat_amount: 0,
+            tax_category_code: 'E',
+            exemption_reason_code: getCodelistCodes('Aligned-TaxExemptionCodes')[0],
+          } as InvoiceLine,
+        ],
+      }
+    );
+
+    expect(runPintAECheck(check, reverseChargeHeaderMismatch)).toHaveLength(1);
+    expect(runPintAECheck(check, exemptHeaderMismatch)).toHaveLength(2);
+  });
 });

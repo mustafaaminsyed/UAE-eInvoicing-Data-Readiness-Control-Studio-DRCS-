@@ -151,7 +151,8 @@ export const PARSER_KNOWN_COLUMNS: Record<'buyers' | 'headers' | 'lines', Set<st
   lines: new Set([
     'line_id', 'invoice_id', 'line_number', 'description', 'quantity',
     'unit_price', 'line_discount', 'line_total_excl_vat', 'vat_rate', 'vat_amount',
-    'unit_of_measure', 'tax_category_code', 'item_name',
+    'unit_of_measure', 'tax_category_code', 'exemption_reason_code',
+    'exemption_reason_text', 'goods_service_type', 'item_name',
     'line_allowance_amount', 'line_charge_amount',
   ]),
 };

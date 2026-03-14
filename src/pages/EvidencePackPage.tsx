@@ -16,6 +16,7 @@ import { useCompliance } from '@/context/ComplianceContext';
 import { computeAllDatasetPopulations } from '@/lib/coverage/populationCoverage';
 import { buildEvidencePackData, EvidencePackData } from '@/lib/evidence/evidenceDataBuilder';
 import { validateBeforeExport, generateEvidencePackZip, generateEvidencePackPdf, downloadBlob } from '@/lib/evidence/evidenceExporter';
+import { buildEvidenceSummary } from '@/lib/evidence/evidenceSummary';
 import { fetchCheckRuns } from '@/lib/api/checksApi';
 import { fetchExceptionsByRun } from '@/lib/api/pintAEApi';
 import { CheckRun } from '@/types/customChecks';
@@ -23,6 +24,43 @@ import { CONFORMANCE_CONFIG } from '@/config/conformance';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { SeverityBadge } from '@/components/SeverityBadge';
+
+const ruleTypeDisplayLabels: Record<string, string> = {
+  dynamic_codelist: 'Dynamic Codelist',
+  fixed_literal: 'Fixed Literal',
+  enumeration: 'Enumeration',
+  dependency_rule: 'Dependency Rule',
+  structural_rule: 'Structural Rule',
+};
+
+const executionLayerDisplayLabels: Record<string, string> = {
+  schema: 'Schema',
+  codelist: 'Codelist',
+  national_rule: 'National Rule',
+  dependency_rule: 'Dependency',
+  semantic_rule: 'Semantic',
+};
+
+const failureClassDisplayLabels: Record<string, string> = {
+  codelist_failure: 'Codelist Failure',
+  fixed_rule_failure: 'Fixed Rule Failure',
+  enumeration_failure: 'Enumeration Failure',
+  dependency_failure: 'Dependency Failure',
+  semantic_failure: 'Semantic Failure',
+  structural_failure: 'Structural Failure',
+};
+
+function formatRuleTypeLabel(value: string): string {
+  return ruleTypeDisplayLabels[value] ?? value.replace(/_/g, ' ');
+}
+
+function formatExecutionLayerLabel(value: string): string {
+  return executionLayerDisplayLabels[value] ?? value.replace(/_/g, ' ');
+}
+
+function formatFailureClassLabel(value: string): string {
+  return failureClassDisplayLabels[value] ?? value.replace(/_/g, ' ');
+}
 
 export default function EvidencePackPage() {
   const { buyers, headers, lines, pintAEExceptions, isChecksRun, runSummary } = useCompliance();
@@ -37,7 +75,11 @@ export default function EvidencePackPage() {
   const [search, setSearch] = useState('');
   const [drQuickFilter, setDrQuickFilter] = useState<'all' | 'mandatory' | 'gaps' | 'asp'>('all');
   const [ruleQuickFilter, setRuleQuickFilter] = useState<'all' | 'failing' | 'critical' | 'high_impact'>('all');
+  const [ruleLayerFilter, setRuleLayerFilter] = useState<string>('all');
+  const [ruleFailureClassFilter, setRuleFailureClassFilter] = useState<string>('all');
   const [exceptionQuickFilter, setExceptionQuickFilter] = useState<'all' | 'open' | 'critical' | 'with_case'>('all');
+  const [exceptionLayerFilter, setExceptionLayerFilter] = useState<string>('all');
+  const [exceptionFailureClassFilter, setExceptionFailureClassFilter] = useState<string>('all');
   const [controlQuickFilter, setControlQuickFilter] = useState<'all' | 'with_exceptions' | 'automated' | 'manual'>('all');
   const [populationQuickFilter, setPopulationQuickFilter] = useState<'all' | 'fail' | 'na' | 'mandatory_fail'>('all');
 
@@ -96,6 +138,11 @@ export default function EvidencePackPage() {
     );
   }, [isChecksRun, runId, runTimestamp, buyers, headers, lines, selectedRunExceptions, populations]);
 
+  const evidenceSummary = useMemo(
+    () => (evidence ? buildEvidenceSummary(evidence) : null),
+    [evidence]
+  );
+
   const handleExport = useCallback(async () => {
     if (!evidence) return;
     setExporting(true);
@@ -150,11 +197,17 @@ export default function EvidencePackPage() {
   }, [q, evidence, drQuickFilter]);
   const ruleRows = useMemo(() => {
     if (!evidence) return [];
-    const filtered = evidence.ruleExecution.filter((r) =>
+    let filtered = evidence.ruleExecution.filter((r) =>
       r.rule_id.toLowerCase().includes(q) ||
       r.rule_name.toLowerCase().includes(q) ||
       r.linked_dr_ids.toLowerCase().includes(q)
     );
+    if (ruleLayerFilter !== 'all') {
+      filtered = filtered.filter((r) => r.execution_layer === ruleLayerFilter);
+    }
+    if (ruleFailureClassFilter !== 'all') {
+      filtered = filtered.filter((r) => r.failure_class === ruleFailureClassFilter);
+    }
     switch (ruleQuickFilter) {
       case 'failing':
         return filtered.filter((r) => r.failure_count > 0);
@@ -165,15 +218,21 @@ export default function EvidencePackPage() {
       default:
         return filtered;
     }
-  }, [q, evidence, ruleQuickFilter]);
+  }, [q, evidence, ruleQuickFilter, ruleLayerFilter, ruleFailureClassFilter]);
   const exceptionRows = useMemo(() => {
     if (!evidence) return [];
-    const filtered = evidence.exceptions.filter((e) =>
+    let filtered = evidence.exceptions.filter((e) =>
       e.exception_id.toLowerCase().includes(q) ||
       e.dr_id.toLowerCase().includes(q) ||
       e.rule_id.toLowerCase().includes(q) ||
       e.message.toLowerCase().includes(q)
     );
+    if (exceptionLayerFilter !== 'all') {
+      filtered = filtered.filter((e) => e.execution_layer === exceptionLayerFilter);
+    }
+    if (exceptionFailureClassFilter !== 'all') {
+      filtered = filtered.filter((e) => e.failure_class === exceptionFailureClassFilter);
+    }
     switch (exceptionQuickFilter) {
       case 'open':
         return filtered.filter((e) => e.exception_status.toLowerCase() === 'open');
@@ -184,7 +243,7 @@ export default function EvidencePackPage() {
       default:
         return filtered;
     }
-  }, [q, evidence, exceptionQuickFilter]);
+  }, [q, evidence, exceptionQuickFilter, exceptionLayerFilter, exceptionFailureClassFilter]);
   const controlRows = useMemo(() => {
     if (!evidence) return [];
     const filtered = evidence.controlsCoverage.filter((c) =>
@@ -318,21 +377,91 @@ export default function EvidencePackPage() {
               </div>
             )}
             {activeTab === 'rules' && (
-              <div className="mb-4 flex flex-wrap items-center gap-2">
-                <span className="text-xs text-muted-foreground">Rules Quick Filters:</span>
-                <Button size="sm" variant={ruleQuickFilter === 'all' ? 'secondary' : 'outline'} onClick={() => setRuleQuickFilter('all')}>All</Button>
-                <Button size="sm" variant={ruleQuickFilter === 'failing' ? 'secondary' : 'outline'} onClick={() => setRuleQuickFilter('failing')}>Failing</Button>
-                <Button size="sm" variant={ruleQuickFilter === 'critical' ? 'secondary' : 'outline'} onClick={() => setRuleQuickFilter('critical')}>Critical</Button>
-                <Button size="sm" variant={ruleQuickFilter === 'high_impact' ? 'secondary' : 'outline'} onClick={() => setRuleQuickFilter('high_impact')}>High Impact (&gt;=10 fails)</Button>
+              <div className="mb-4 flex flex-wrap items-end gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Rules Quick Filters:</span>
+                  <Button size="sm" variant={ruleQuickFilter === 'all' ? 'secondary' : 'outline'} onClick={() => setRuleQuickFilter('all')}>All</Button>
+                  <Button size="sm" variant={ruleQuickFilter === 'failing' ? 'secondary' : 'outline'} onClick={() => setRuleQuickFilter('failing')}>Failing</Button>
+                  <Button size="sm" variant={ruleQuickFilter === 'critical' ? 'secondary' : 'outline'} onClick={() => setRuleQuickFilter('critical')}>Critical</Button>
+                  <Button size="sm" variant={ruleQuickFilter === 'high_impact' ? 'secondary' : 'outline'} onClick={() => setRuleQuickFilter('high_impact')}>High Impact (&gt;=10 fails)</Button>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Layer</p>
+                  <Select value={ruleLayerFilter} onValueChange={setRuleLayerFilter}>
+                    <SelectTrigger className="w-[160px] h-9">
+                      <SelectValue placeholder="All layers" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All layers</SelectItem>
+                      <SelectItem value="schema">Schema</SelectItem>
+                      <SelectItem value="codelist">Codelist</SelectItem>
+                      <SelectItem value="national_rule">National Rule</SelectItem>
+                      <SelectItem value="dependency_rule">Dependency</SelectItem>
+                      <SelectItem value="semantic_rule">Semantic</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Failure Class</p>
+                  <Select value={ruleFailureClassFilter} onValueChange={setRuleFailureClassFilter}>
+                    <SelectTrigger className="w-[190px] h-9">
+                      <SelectValue placeholder="All failure classes" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All failure classes</SelectItem>
+                      <SelectItem value="codelist_failure">Codelist Failure</SelectItem>
+                      <SelectItem value="fixed_rule_failure">Fixed Rule Failure</SelectItem>
+                      <SelectItem value="enumeration_failure">Enumeration Failure</SelectItem>
+                      <SelectItem value="dependency_failure">Dependency Failure</SelectItem>
+                      <SelectItem value="semantic_failure">Semantic Failure</SelectItem>
+                      <SelectItem value="structural_failure">Structural Failure</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             )}
             {activeTab === 'exceptions' && (
-              <div className="mb-4 flex flex-wrap items-center gap-2">
-                <span className="text-xs text-muted-foreground">Exceptions Quick Filters:</span>
-                <Button size="sm" variant={exceptionQuickFilter === 'all' ? 'secondary' : 'outline'} onClick={() => setExceptionQuickFilter('all')}>All</Button>
-                <Button size="sm" variant={exceptionQuickFilter === 'open' ? 'secondary' : 'outline'} onClick={() => setExceptionQuickFilter('open')}>Open</Button>
-                <Button size="sm" variant={exceptionQuickFilter === 'critical' ? 'secondary' : 'outline'} onClick={() => setExceptionQuickFilter('critical')}>Critical</Button>
-                <Button size="sm" variant={exceptionQuickFilter === 'with_case' ? 'secondary' : 'outline'} onClick={() => setExceptionQuickFilter('with_case')}>Linked to Case</Button>
+              <div className="mb-4 flex flex-wrap items-end gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Exceptions Quick Filters:</span>
+                  <Button size="sm" variant={exceptionQuickFilter === 'all' ? 'secondary' : 'outline'} onClick={() => setExceptionQuickFilter('all')}>All</Button>
+                  <Button size="sm" variant={exceptionQuickFilter === 'open' ? 'secondary' : 'outline'} onClick={() => setExceptionQuickFilter('open')}>Open</Button>
+                  <Button size="sm" variant={exceptionQuickFilter === 'critical' ? 'secondary' : 'outline'} onClick={() => setExceptionQuickFilter('critical')}>Critical</Button>
+                  <Button size="sm" variant={exceptionQuickFilter === 'with_case' ? 'secondary' : 'outline'} onClick={() => setExceptionQuickFilter('with_case')}>Linked to Case</Button>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Layer</p>
+                  <Select value={exceptionLayerFilter} onValueChange={setExceptionLayerFilter}>
+                    <SelectTrigger className="w-[160px] h-9">
+                      <SelectValue placeholder="All layers" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All layers</SelectItem>
+                      <SelectItem value="schema">Schema</SelectItem>
+                      <SelectItem value="codelist">Codelist</SelectItem>
+                      <SelectItem value="national_rule">National Rule</SelectItem>
+                      <SelectItem value="dependency_rule">Dependency</SelectItem>
+                      <SelectItem value="semantic_rule">Semantic</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Failure Class</p>
+                  <Select value={exceptionFailureClassFilter} onValueChange={setExceptionFailureClassFilter}>
+                    <SelectTrigger className="w-[190px] h-9">
+                      <SelectValue placeholder="All failure classes" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All failure classes</SelectItem>
+                      <SelectItem value="codelist_failure">Codelist Failure</SelectItem>
+                      <SelectItem value="fixed_rule_failure">Fixed Rule Failure</SelectItem>
+                      <SelectItem value="enumeration_failure">Enumeration Failure</SelectItem>
+                      <SelectItem value="dependency_failure">Dependency Failure</SelectItem>
+                      <SelectItem value="semantic_failure">Semantic Failure</SelectItem>
+                      <SelectItem value="structural_failure">Structural Failure</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             )}
             {activeTab === 'controls' && (
@@ -382,7 +511,86 @@ export default function EvidencePackPage() {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-foreground">How to read rule evidence</p>
+                <p className="text-xs text-muted-foreground mt-1 max-w-3xl">
+                  Rule classification shows what failed: a code list check, a dependency requirement, or a semantic contradiction. Authoritative DR linkage comes from explicit validation mappings, not metadata reference terms.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline" className="text-xs">Dynamic Codelist</Badge>
+                <Badge variant="outline" className="text-xs">Dependency Rule</Badge>
+                <Badge variant="outline" className="text-xs">Semantic</Badge>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {evidenceSummary && (
+          <Card>
+            <CardContent className="p-4 md:p-5 space-y-4">
+              <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Run Summary</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Use this page for a quick checkpoint. The full audit detail remains in the downloadable PDF or Excel ZIP.
+                  </p>
+                </div>
+                <Badge
+                  variant="outline"
+                  className={cn('text-xs', {
+                    'border-[hsl(var(--success))]/30 text-[hsl(var(--success))]': evidenceSummary.overallTone === 'controlled',
+                    'border-accent/30 text-accent-foreground': evidenceSummary.overallTone === 'attention',
+                    'border-destructive/30 text-destructive': evidenceSummary.overallTone === 'critical',
+                  })}
+                >
+                  {evidenceSummary.overallStatus}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {evidenceSummary.summaryCards.map((card) => (
+                  <div key={card.label} className="rounded-lg border bg-muted/20 p-3">
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{card.label}</p>
+                    <p className="mt-1 text-lg font-semibold text-foreground">{card.value}</p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">{card.helper}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <p className="text-xs font-medium text-foreground">Main issues</p>
+                <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                  {evidenceSummary.mainIssues.map((issue) => (
+                    <li key={issue}>• {issue}</li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <p className="text-xs font-medium text-foreground">Download guidance</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Detailed DR coverage, full rule execution, exception inventories, and control mappings are intended to be consumed from the downloadable evidence files.
+                </p>
+                <p className="mt-1 text-[11px] text-muted-foreground">{evidenceSummary.executionCountNote}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Tabs */}
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm font-semibold text-foreground">Detailed preview</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              The tabs below are an on-screen preview of the evidence package. For handover, audit, or client review, use the downloadable report.
+            </p>
+          </CardContent>
+        </Card>
+
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList className="flex flex-wrap h-auto gap-1">
             <TabsTrigger value="overview" className="gap-1 text-xs"><Layers className="w-3 h-3" /> Overview</TabsTrigger>
@@ -480,7 +688,7 @@ export default function EvidencePackPage() {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Rules Execution</CardTitle>
-                <CardDescription>{ruleRows.length} validation rules (execution counts estimated by scope)</CardDescription>
+                <CardDescription>{ruleRows.length} validation rules with taxonomy and execution-layer classification</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
                 <ScrollArea className="h-[500px]">
@@ -491,6 +699,9 @@ export default function EvidencePackPage() {
                           <TableHead className="text-xs">Rule ID</TableHead>
                           <TableHead className="text-xs">Rule Name</TableHead>
                           <TableHead className="text-xs">Severity</TableHead>
+                          <TableHead className="text-xs">Type</TableHead>
+                          <TableHead className="text-xs">Layer</TableHead>
+                          <TableHead className="text-xs">Failure Class</TableHead>
                           <TableHead className="text-xs">Linked DRs</TableHead>
                           <TableHead className="text-xs text-right">Executions</TableHead>
                           <TableHead className="text-xs text-right">Failures</TableHead>
@@ -508,6 +719,9 @@ export default function EvidencePackPage() {
                               <TableCell className="text-xs font-mono">{r.rule_id}</TableCell>
                               <TableCell className="text-xs max-w-[200px] truncate">{r.rule_name}</TableCell>
                               <TableCell className="text-xs"><SeverityBadge severity={r.severity as any} /></TableCell>
+                              <TableCell className="text-xs">{formatRuleTypeLabel(r.rule_type)}</TableCell>
+                              <TableCell className="text-xs">{formatExecutionLayerLabel(r.execution_layer)}</TableCell>
+                              <TableCell className="text-xs">{formatFailureClassLabel(r.failure_class)}</TableCell>
                               <TableCell className="text-xs font-mono max-w-[200px] truncate">{r.linked_dr_ids}</TableCell>
                               <TableCell className="text-xs text-right">{r.execution_count}</TableCell>
                               <TableCell className="text-xs text-right font-medium">{r.failure_count}</TableCell>
@@ -542,6 +756,9 @@ export default function EvidencePackPage() {
                           <TableHead className="text-xs">Exception ID</TableHead>
                           <TableHead className="text-xs">DR ID</TableHead>
                           <TableHead className="text-xs">Rule ID</TableHead>
+                          <TableHead className="text-xs">Type</TableHead>
+                          <TableHead className="text-xs">Layer</TableHead>
+                          <TableHead className="text-xs">Failure Class</TableHead>
                           <TableHead className="text-xs">Record Ref</TableHead>
                           <TableHead className="text-xs">Severity</TableHead>
                           <TableHead className="text-xs">Status</TableHead>
@@ -551,7 +768,7 @@ export default function EvidencePackPage() {
                       <TableBody>
                         {exceptionRows.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">
+                            <TableCell colSpan={10} className="text-center text-sm text-muted-foreground py-8">
                               No exceptions for this run.
                             </TableCell>
                           </TableRow>
@@ -560,6 +777,9 @@ export default function EvidencePackPage() {
                             <TableCell className="text-xs font-mono truncate max-w-[100px]">{e.exception_id.slice(0, 8)}</TableCell>
                             <TableCell className="text-xs font-mono">{e.dr_id}</TableCell>
                             <TableCell className="text-xs font-mono">{e.rule_id}</TableCell>
+                            <TableCell className="text-xs">{e.rule_type ? formatRuleTypeLabel(e.rule_type) : '-'}</TableCell>
+                            <TableCell className="text-xs">{e.execution_layer ? formatExecutionLayerLabel(e.execution_layer) : '-'}</TableCell>
+                            <TableCell className="text-xs">{e.failure_class ? formatFailureClassLabel(e.failure_class) : '-'}</TableCell>
                             <TableCell className="text-xs font-mono truncate max-w-[100px]">{e.record_reference}</TableCell>
                             <TableCell className="text-xs"><SeverityBadge severity={e.severity as any} /></TableCell>
                             <TableCell className="text-xs">{e.exception_status}</TableCell>
@@ -568,7 +788,7 @@ export default function EvidencePackPage() {
                         ))}
                         {exceptionRows.length > 200 && (
                           <TableRow>
-                            <TableCell colSpan={7} className="text-center text-xs text-muted-foreground py-2">
+                            <TableCell colSpan={10} className="text-center text-xs text-muted-foreground py-2">
                               Showing 200 of {exceptionRows.length} exceptions. Full list available in export.
                             </TableCell>
                           </TableRow>

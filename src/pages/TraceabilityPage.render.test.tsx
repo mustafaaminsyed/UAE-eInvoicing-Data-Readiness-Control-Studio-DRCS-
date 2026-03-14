@@ -68,6 +68,7 @@ describe("TraceabilityPage", () => {
     );
 
     expect(await screen.findByText("DR Coverage & Traceability")).toBeInTheDocument();
+    expect(await screen.findByText("Coverage Basis")).toBeInTheDocument();
     await waitFor(() => {
       expect(
         screen.queryByText(/Upload data on the/i)

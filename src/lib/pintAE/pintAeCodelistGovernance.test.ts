@@ -73,7 +73,7 @@ describe('PINT-AE codelist governance artifact', () => {
         checkIds.forEach((checkId) => {
           const check = checkMap.get(checkId);
           expect(check).toBeDefined();
-          expect(check?.rule_type).toBe('CodeList');
+          expect(check?.rule_type).toBe('dynamic_codelist');
           expect(check?.parameters?.codelist).toBe(row.codelist_name);
         });
         continue;
@@ -83,7 +83,7 @@ describe('PINT-AE codelist governance artifact', () => {
         checkIds.forEach((checkId) => {
           const check = checkMap.get(checkId);
           expect(check).toBeDefined();
-          expect(check?.rule_type).toBe('CodeList');
+          expect(check?.rule_type).toBe('dynamic_codelist');
           expect(check?.parameters?.codelist).toBe(row.codelist_name);
         });
         continue;
@@ -94,6 +94,6 @@ describe('PINT-AE codelist governance artifact', () => {
   });
 
   it('counts unique runtime codelist domains rather than duplicate check rows', () => {
-    expect(countRuntimeCodelistDomains(UAE_UC1_CHECK_PACK)).toBe(7);
+    expect(countRuntimeCodelistDomains(UAE_UC1_CHECK_PACK)).toBe(9);
   });
 });

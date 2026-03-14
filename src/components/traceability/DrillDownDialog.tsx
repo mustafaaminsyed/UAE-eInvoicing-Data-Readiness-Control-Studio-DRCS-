@@ -38,9 +38,8 @@ export function DrillDownDialog({ row, exceptions, open, onOpenChange }: DrillDo
 
   const rules = getRulesForDR(row.dr_id);
   const controls = getControlsForDR(row.dr_id);
-  const drExceptions = exceptions.filter(e =>
-    e.pint_reference_terms?.includes(row.dr_id)
-  );
+  const linkedRuleIds = new Set(rules.map((rule) => rule.rule_id));
+  const drExceptions = exceptions.filter((exception) => linkedRuleIds.has(exception.check_id));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

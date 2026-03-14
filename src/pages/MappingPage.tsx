@@ -20,7 +20,6 @@ import {
   MappingWizardStep, 
   MappingTemplate,
   ERP_TYPES,
-  PINT_AE_UC1_FIELDS
 } from '@/types/fieldMapping';
 import { analyzeCoverage } from '@/lib/mapping/coverageAnalyzer';
 import { fetchMappingTemplates, deleteMappingTemplate } from '@/lib/api/mappingApi';
@@ -91,6 +90,27 @@ export default function MappingPage() {
     }
   };
 
+  const handlePreviewDataLoaded = useCallback((data: ERPPreviewData) => {
+    setPreviewData(data);
+    setMappings([]);
+    setConditionalAnswers({});
+    setShowPostSaveCTA(false);
+  }, []);
+
+  const handleResetUpload = useCallback(() => {
+    setPreviewData(null);
+    setMappings([]);
+    setConditionalAnswers({});
+    setShowPostSaveCTA(false);
+  }, []);
+
+  const handleDatasetTypeChange = useCallback((datasetType: ERPPreviewData['datasetType']) => {
+    setPreviewData((current) => (current ? { ...current, datasetType } : current));
+    setMappings([]);
+    setConditionalAnswers({});
+    setShowPostSaveCTA(false);
+  }, []);
+
   // Template list filtering
   const filteredTemplates = templates.filter(t => {
     const matchesSearch = !templateSearch || 
@@ -153,6 +173,10 @@ export default function MappingPage() {
   };
 
   const handleBack = () => {
+    if (currentStepIndex === 0) {
+      handleTabChange('templates');
+      return;
+    }
     const prevIndex = currentStepIndex - 1;
     if (prevIndex >= 0) setCurrentStep(STEPS[prevIndex].id);
   };
@@ -435,14 +459,27 @@ export default function MappingPage() {
 
             {/* Step Content */}
             {currentStep === 'upload' && (
-              <UploadStep previewData={previewData} onDataLoaded={setPreviewData} />
+              <UploadStep
+                previewData={previewData}
+                onDataLoaded={handlePreviewDataLoaded}
+                onReset={handleResetUpload}
+              />
             )}
             {currentStep === 'mapping' && previewData && (
               <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-6">
-                <MappingStep previewData={previewData} mappings={mappings} onMappingsChange={setMappings} />
+                <MappingStep
+                  previewData={previewData}
+                  mappings={mappings}
+                  onMappingsChange={setMappings}
+                  onDatasetTypeChange={handleDatasetTypeChange}
+                />
                 <div className="hidden xl:block">
                   <div className="sticky top-8">
-                    <MappingCoveragePanel mappings={mappings} />
+                    <MappingCoveragePanel
+                      mappings={mappings}
+                      datasetType={previewData.datasetType}
+                      totalSourceColumns={previewData.columns.length}
+                    />
                   </div>
                 </div>
               </div>
@@ -471,7 +508,7 @@ export default function MappingPage() {
                 <CardContent className="py-6">
                   {(() => {
                     const confirmed = mappings.filter(m => m.isConfirmed);
-                    const cov = analyzeCoverage(confirmed);
+                    const cov = analyzeCoverage(confirmed, previewData?.datasetType ?? 'combined');
                     const hasGaps = cov.unmappedMandatory.length > 0;
                     return hasGaps ? (
                       <div className="flex items-center justify-between">
@@ -510,8 +547,9 @@ export default function MappingPage() {
 
             {/* Navigation Buttons */}
             <div className="flex justify-between mt-8">
-              <Button variant="outline" onClick={handleBack} disabled={currentStepIndex === 0}>
-                <ArrowLeft className="h-4 w-4 mr-2" /> Back
+              <Button variant="outline" onClick={handleBack}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                {currentStepIndex === 0 ? 'Back to Templates' : 'Back'}
               </Button>
               {currentStep !== 'save' && (
                 <Button onClick={handleNext} disabled={!canGoNext()}>

@@ -19,6 +19,7 @@ import { ScenarioLensPanel } from '@/components/traceability/ScenarioLensPanel';
 import { exportTraceabilityReport } from '@/lib/coverage/regulatoryExport';
 import { runConsistencyChecks } from '@/lib/coverage/consistencyValidator';
 import { FEATURE_FLAGS } from '@/config/features';
+import { getAffectedDRIdsForRule } from '@/lib/rules/ruleTraceability';
 import {
   BUSINESS_SCENARIO_OPTIONS,
   CONFIDENCE_OPTIONS,
@@ -283,7 +284,7 @@ export default function TraceabilityPage() {
   const exceptionCountsByDR = useMemo(() => {
     const map = new Map<string, { pass: number; fail: number }>();
     for (const exc of pintAEExceptions) {
-      const drIds = exc.pint_reference_terms ?? [];
+      const drIds = Array.from(new Set(getAffectedDRIdsForRule(exc.check_id)));
       for (const drId of drIds) {
         if (!map.has(drId)) map.set(drId, { pass: 0, fail: 0 });
         map.get(drId)!.fail++;
@@ -474,6 +475,25 @@ export default function TraceabilityPage() {
         <div className="mb-6 animate-slide-up">
           <GapsPanel gaps={gaps} specVersion={specVersion} />
         </div>
+
+        <Card className="mb-6 border shadow-sm animate-slide-up">
+          <CardContent className="p-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">Coverage Basis</h2>
+                <p className="text-xs text-muted-foreground mt-1 max-w-3xl">
+                  DR coverage and exception attribution now come from explicit validation-to-DR mappings. Reference terms shown elsewhere are diagnostic context only and do not determine covered status.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <CoverageStatusBadge status="COVERED" />
+                <CoverageStatusBadge status="NO_RULE" />
+                <CoverageStatusBadge status="NO_CONTROL" />
+                <CoverageStatusBadge status="NOT_IN_TEMPLATE" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {FEATURE_FLAGS.scenarioLens && (
           <div className="mb-6 animate-slide-up">
