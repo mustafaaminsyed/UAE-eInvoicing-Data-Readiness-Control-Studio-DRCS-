@@ -10,11 +10,13 @@ It supports:
 - AR and AP dataset ingestion and separation
 - Mapping ERP columns to PINT-AE UC1 fields
 - Standard PINT-AE/UAE check execution
+- Mapping-driven DR coverage and traceability attribution
 - Custom validation checks and AP search checks
 - AI-generated validation explanations per exception (with cached responses)
 - Traceability coverage and conformance gating
 - Exception, case, rejection, and lifecycle views
 - Evidence Pack export for audit/regulatory use
+- Historical run-safe evidence snapshots and runtime-backed execution telemetry
 
 ## End-to-end workflow
 
@@ -42,15 +44,19 @@ Frontend:
 - Tailwind + shadcn-ui components
 - React Router for module navigation
 - TanStack Query for query client wiring
+- Route-level lazy loading for major workspace pages
 
-Core orchestration:
-- `src/context/ComplianceContext.tsx` manages dataset state, run scope, execution, and result aggregation.
+Application state:
+- `src/context/ComplianceContext.tsx` now focuses on data + validation run state
+- `src/context/WorkspaceContext.tsx` owns workspace/session state such as dataset direction and active mapping profile
+- `src/context/UploadLogContext.tsx` owns upload-log lifecycle state
 
 Validation and domain logic:
 - `src/lib/checks/*` for built-in and custom check runners
 - `src/lib/coverage/*` for readiness/traceability coverage
 - `src/lib/evidence/*` for Evidence Pack generation
 - `src/lib/mapping/*` for mapping suggestion and coverage
+- `src/lib/registry/validationToDRMap.ts` for explicit validation-to-DR linkage
 
 Persistence (Supabase):
 - Checks and runs: `pint_ae_checks`, `custom_checks`, `check_runs`, `check_exceptions`, `run_summaries`
@@ -189,6 +195,13 @@ npm run test
 npm run build
 ```
 
+Focused checks used heavily during recent hardening:
+
+```bash
+npm run build
+npm run preview
+```
+
 ## Spec utilities
 
 To regenerate/import PINT-AE resources used by the solution:
@@ -242,6 +255,29 @@ Latest production updates (after the checkpoint above):
   - removal of SLA breach KPI from the executive row
   - explicit PINT-AE DR coverage + MoF mandatory coverage KPI tiles
   - readiness score weighting disclosure (pass-rate, DR coverage, MoF coverage, critical pressure)
+
+Latest platform hardening updates:
+- Evidence Pack is now historical-run safe:
+  - historical evidence uses persisted run snapshots instead of current in-memory populations
+  - historical export is blocked when required snapshot data is unavailable
+- Evidence execution counts are now runtime-backed across the active validation layers:
+  - core runner telemetry
+  - PINT/UAE runner telemetry
+  - org-profile runner telemetry
+- Evidence Pack execution rows now surface multi-layer rule execution rather than only the PINT/UAE subset.
+- Dashboard high-level exception preview now derives from the normalized exception inventory instead of check-result summary counts.
+- Control registry was aligned for executable UAE VAT/runtime rules so governed rules now map to explicit controls.
+- `ComplianceContext` was modularized incrementally:
+  - workspace/session state extracted into `WorkspaceContext`
+  - upload-log state extracted into `UploadLogContext`
+- Landing experience redesigned into a premium DCS-specific hero/header system:
+  - floating landing nav/header bar
+  - restored theme toggle
+  - Dariba-aligned dark-mode palette
+  - simplified executive preview composition
+- Shared app shell and route loading were refined:
+  - floating/sticky workspace sidebar treatment
+  - route-level code splitting for heavier pages and export libraries
 
 Create a new checkpoint tag:
 
