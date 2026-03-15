@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Upload, FileSpreadsheet, AlertCircle, Database, Calendar, Hash, Type, RefreshCw } from 'lucide-react';
+import { Upload, FileSpreadsheet, AlertCircle, Database, Calendar, Hash, Type, RefreshCw, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,11 +9,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ERPPreviewData, DatasetType, DetectedColumn } from '@/types/fieldMapping';
 import { parseCSV } from '@/lib/csvParser';
+import { downloadSampleCSV, getSampleData } from '@/lib/sampleData';
+import { Direction } from '@/types/direction';
 
 interface UploadStepProps {
   onDataLoaded: (data: ERPPreviewData) => void;
   previewData: ERPPreviewData | null;
   onReset?: () => void;
+  direction?: Direction;
 }
 
 const DATASET_TYPES: { value: DatasetType; label: string; description: string }[] = [
@@ -22,6 +25,62 @@ const DATASET_TYPES: { value: DatasetType; label: string; description: string }[
   { value: 'parties', label: 'Party Data', description: 'Seller/buyer party information' },
   { value: 'combined', label: 'Combined Export', description: 'Headers and lines in a single extract' },
 ];
+
+type BuiltInTemplateType = 'buyers' | 'headers' | 'lines';
+
+type BuiltInTemplateOption = {
+  sampleType: BuiltInTemplateType;
+  title: string;
+  description: string;
+  wizardDatasetType: DatasetType;
+};
+
+const BUILT_IN_TEMPLATE_OPTIONS: Record<DatasetType, BuiltInTemplateOption[]> = {
+  header: [
+    {
+      sampleType: 'headers',
+      title: 'Invoice Headers Template',
+      description: 'Canonical header-level CSV for one row per invoice.',
+      wizardDatasetType: 'header',
+    },
+  ],
+  lines: [
+    {
+      sampleType: 'lines',
+      title: 'Invoice Lines Template',
+      description: 'Canonical line-level CSV for one row per invoice line.',
+      wizardDatasetType: 'lines',
+    },
+  ],
+  parties: [
+    {
+      sampleType: 'buyers',
+      title: 'Party Data Template',
+      description: 'Canonical buyer or supplier master data template.',
+      wizardDatasetType: 'parties',
+    },
+  ],
+  combined: [
+    {
+      sampleType: 'buyers',
+      title: 'Party Data Template',
+      description: 'Load the party master template separately before mapping.',
+      wizardDatasetType: 'parties',
+    },
+    {
+      sampleType: 'headers',
+      title: 'Invoice Headers Template',
+      description: 'Load the header template when your export is split by invoice.',
+      wizardDatasetType: 'header',
+    },
+    {
+      sampleType: 'lines',
+      title: 'Invoice Lines Template',
+      description: 'Load the line template when your export is split by invoice line.',
+      wizardDatasetType: 'lines',
+    },
+  ],
+};
 
 function detectColumnType(values: string[]): 'string' | 'number' | 'date' | 'boolean' | 'unknown' {
   const nonEmpty = values.filter(v => v && v.trim() !== '');
@@ -57,7 +116,40 @@ function getTypeIcon(type: string) {
   }
 }
 
-export function UploadStep({ onDataLoaded, previewData, onReset }: UploadStepProps) {
+function buildPreviewData(fileName: string, text: string, datasetType: DatasetType): ERPPreviewData {
+  const rows = parseCSV(text);
+
+  if (rows.length === 0) {
+    throw new Error('File appears to be empty or invalid');
+  }
+
+  const columns = Object.keys(rows[0]);
+  const detectedColumns: DetectedColumn[] = columns.map((col, index) => {
+    const values = rows.slice(0, 100).map((r) => r[col] || '');
+    const nonEmpty = values.filter((v) => v && v.trim() !== '');
+    const uniqueValues = new Set(nonEmpty);
+
+    return {
+      name: col,
+      index,
+      detectedType: detectColumnType(values),
+      sampleValues: values.slice(0, 5),
+      nullCount: values.length - nonEmpty.length,
+      uniqueCount: uniqueValues.size,
+    };
+  });
+
+  return {
+    fileName,
+    columns,
+    detectedColumns,
+    rows: rows.slice(0, 100),
+    totalRows: rows.length,
+    datasetType,
+  };
+}
+
+export function UploadStep({ onDataLoaded, previewData, onReset, direction = 'AR' }: UploadStepProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -70,42 +162,10 @@ export function UploadStep({ onDataLoaded, previewData, onReset }: UploadStepPro
 
     try {
       const text = await file.text();
-      const rows = parseCSV(text);
-      
-      if (rows.length === 0) {
-        setError('File appears to be empty or invalid');
-        return;
-      }
-
-      const columns = Object.keys(rows[0]);
-      
-      // Detect column types and gather stats
-      const detectedColumns: DetectedColumn[] = columns.map((col, index) => {
-        const values = rows.slice(0, 100).map(r => r[col] || '');
-        const nonEmpty = values.filter(v => v && v.trim() !== '');
-        const uniqueValues = new Set(nonEmpty);
-        
-        return {
-          name: col,
-          index,
-          detectedType: detectColumnType(values),
-          sampleValues: values.slice(0, 5),
-          nullCount: values.length - nonEmpty.length,
-          uniqueCount: uniqueValues.size,
-        };
-      });
-      
-      onDataLoaded({
-        fileName: file.name,
-        columns,
-        detectedColumns,
-        rows: rows.slice(0, 100), // Preview first 100 rows
-        totalRows: rows.length,
-        datasetType: selectedDatasetType,
-      });
+      onDataLoaded(buildPreviewData(file.name, text, selectedDatasetType));
     } catch (err) {
       console.error('Error parsing file:', err);
-      setError('Failed to parse file. Please ensure it is a valid CSV.');
+      setError(err instanceof Error ? err.message : 'Failed to parse file. Please ensure it is a valid CSV.');
     } finally {
       setIsLoading(false);
     }
@@ -143,6 +203,29 @@ export function UploadStep({ onDataLoaded, previewData, onReset }: UploadStepPro
     }
   };
 
+  const handleLoadBuiltInTemplate = useCallback((sampleType: BuiltInTemplateType, datasetType: DatasetType) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const sample = getSampleData(sampleType, 'positive', direction);
+      onDataLoaded(buildPreviewData(sample.filename, sample.content, datasetType));
+      setSelectedDatasetType(datasetType);
+    } catch (err) {
+      console.error('Error loading built-in template:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load built-in template.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [direction, onDataLoaded]);
+
+  const handleDownloadBuiltInTemplate = useCallback((sampleType: BuiltInTemplateType) => {
+    const sample = getSampleData(sampleType, 'positive', direction);
+    downloadSampleCSV(sample.filename, sample.content);
+  }, [direction]);
+
+  const builtInTemplates = BUILT_IN_TEMPLATE_OPTIONS[selectedDatasetType];
+
   return (
     <div className="space-y-6">
       {/* Dataset Type Selection */}
@@ -172,6 +255,60 @@ export function UploadStep({ onDataLoaded, previewData, onReset }: UploadStepPro
               </div>
             ))}
           </RadioGroup>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileSpreadsheet className="h-5 w-5" />
+            Built-in Template Files
+          </CardTitle>
+          <CardDescription>
+            Load a canonical DRCS sample template directly into the wizard or download the CSV for offline use.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {builtInTemplates.map((template) => {
+            const sample = getSampleData(template.sampleType, 'positive', direction);
+            return (
+              <div
+                key={`${selectedDatasetType}-${template.sampleType}`}
+                className="flex flex-col gap-3 rounded-lg border border-dashed p-4 md:flex-row md:items-center md:justify-between"
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium">{template.title}</p>
+                    <Badge variant="outline">{sample.filename}</Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{template.description}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => handleDownloadBuiltInTemplate(template.sampleType)}
+                    disabled={isLoading}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Download
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => handleLoadBuiltInTemplate(template.sampleType, template.wizardDatasetType)}
+                    disabled={isLoading}
+                  >
+                    Load {template.title}
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+          {selectedDatasetType === 'combined' && (
+            <p className="text-xs text-muted-foreground">
+              Combined export mode does not ship with a single canonical sample file, so the split party/header/line templates are shown instead.
+            </p>
+          )}
         </CardContent>
       </Card>
 

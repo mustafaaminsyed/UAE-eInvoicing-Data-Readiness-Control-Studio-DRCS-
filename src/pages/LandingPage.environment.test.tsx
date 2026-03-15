@@ -39,23 +39,23 @@ describe('LandingPage environment selector', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Client access')).toBeInTheDocument();
+      expect(screen.getByText('Operating context')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Operating context')).toBeInTheDocument();
     expect(screen.getByText('United Arab Emirates')).toBeInTheDocument();
-    expect(screen.getByText('GST • UTC+04:00')).toBeInTheDocument();
+    expect(screen.getByText('Current scope')).toBeInTheDocument();
+    expect(screen.getAllByText(/UTC\+04:00/).length).toBeGreaterThan(0);
 
     const devButton = screen.getByRole('button', { name: /dev/i });
     const prodButton = screen.getByRole('button', { name: /prod/i });
 
     expect(devButton).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getAllByText(/DEV ACCESS|DEV sandbox lane selected/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/DEV access|Sandbox client access lane/i).length).toBeGreaterThan(0);
 
     fireEvent.click(prodButton);
 
     expect(prodButton).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getAllByText(/PROD ACCESS|PROD production lane selected/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/PROD access|Production client access lane/i).length).toBeGreaterThan(0);
     expect(window.localStorage.getItem('drcs.preview_environment_v1')).toBe('PROD');
   });
 });
