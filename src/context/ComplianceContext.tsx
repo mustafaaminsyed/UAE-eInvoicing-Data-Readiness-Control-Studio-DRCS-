@@ -30,6 +30,7 @@ import { buildEvidenceRunSnapshot } from '@/lib/evidence/evidenceRunSnapshot';
 import { EvidenceRuleExecutionTelemetryRow } from '@/types/evidence';
 import { WorkspaceProvider, useWorkspace } from '@/context/WorkspaceContext';
 import { UploadLogProvider, useUploadLogs } from '@/context/UploadLogContext';
+import { toast } from 'sonner';
 
 interface ComplianceContextType {
   direction: Direction;
@@ -202,89 +203,109 @@ function ComplianceStateProvider({ children }: { children: ReactNode }) {
 
   const runChecks = async (options?: { mappingProfileId?: string; mappingVersion?: number }) => {
     setIsRunning(true);
-    const activeMappingProfile = activeMappingProfileByDirection[direction];
-    const mappingProfileId = options?.mappingProfileId || activeMappingProfile?.id;
-    const activeRuleset = getRulesetForDirection(direction);
+    try {
+      const activeMappingProfile = activeMappingProfileByDirection[direction];
+      const mappingProfileId = options?.mappingProfileId || activeMappingProfile?.id;
+      const activeRuleset = getRulesetForDirection(direction);
 
-    const orchestrationResult = await runChecksOrchestrator({
-      direction,
-      buyers,
-      headers,
-      lines,
-      organizationProfile,
-      uploadSessionId: uploadSessionId || undefined,
-      uploadManifestId: uploadManifestId || undefined,
-      mappingProfileId,
-      rulesetVersion: RULESET_VERSION,
-    });
-
-    const {
-      builtInResults,
-      coreTelemetry,
-      pintAEChecks,
-      pintExceptions,
-      pintTelemetry,
-      orgProfileTelemetry,
-      allExceptions,
-    } = orchestrationResult;
-    setCheckResults(builtInResults.map((result) => ({ ...result, direction, datasetType: direction })));
-    setExceptions(allExceptions);
-    setPintAEExceptions(pintExceptions);
-    setLastPintRuleTelemetry([...coreTelemetry, ...pintTelemetry, ...orgProfileTelemetry]);
-    setIsChecksRun(true);
-    setLastChecksRunAt(new Date().toISOString());
-    setLastChecksRunDatasetType(direction);
-
-    // Calculate and save scores
-    const stats = calculateStats(allExceptions, headers.length);
-    const evidenceSnapshot = buildEvidenceRunSnapshot(buyers, headers, lines);
-    const runId = await saveCheckRun({
-      run_date: new Date().toISOString(),
-      total_invoices: headers.length,
-      total_exceptions: allExceptions.length,
-      critical_count: stats.exceptionsBySeverity.Critical,
-      high_count: stats.exceptionsBySeverity.High,
-      medium_count: stats.exceptionsBySeverity.Medium,
-      low_count: stats.exceptionsBySeverity.Low,
-      pass_rate: stats.passRate,
-      results_summary: {
-        checkCount: builtInResults.length + pintAEChecks.length,
+      const orchestrationResult = await runChecksOrchestrator({
         direction,
-        ruleset: activeRuleset,
+        buyers,
+        headers,
+        lines,
+        organizationProfile,
+        uploadSessionId: uploadSessionId || undefined,
+        uploadManifestId: uploadManifestId || undefined,
+        mappingProfileId,
         rulesetVersion: RULESET_VERSION,
-        uploadSessionId,
-        uploadManifestId,
-        mappingProfileId: mappingProfileId || null,
-        mappingVersion: options?.mappingVersion || activeMappingProfile?.version || null,
-        evidenceSnapshot,
-        evidenceRuleExecutionTelemetry: [...coreTelemetry, ...pintTelemetry, ...orgProfileTelemetry],
-      },
-    });
+      });
 
-    if (runId) {
-      // Save PINT-AE exceptions
-      await saveExceptions(runId, pintExceptions);
-      setExceptions((prev) => prev.map((exception) => ({ ...exception, validationRunId: runId })));
-      
-      // Calculate and save client risk scores
+      const {
+        builtInResults,
+        coreTelemetry,
+        pintAEChecks,
+        pintExceptions,
+        pintTelemetry,
+        orgProfileTelemetry,
+        allExceptions,
+      } = orchestrationResult;
+      const combinedTelemetry = [...coreTelemetry, ...pintTelemetry, ...orgProfileTelemetry];
+      setCheckResults(builtInResults.map((result) => ({ ...result, direction, datasetType: direction })));
+      setExceptions(allExceptions);
+      setPintAEExceptions(pintExceptions);
+      setLastPintRuleTelemetry(combinedTelemetry);
+      setIsChecksRun(true);
+      setLastChecksRunAt(new Date().toISOString());
+      setLastChecksRunDatasetType(direction);
+
+      // Persist run outputs after UI state is updated.
+      const stats = calculateStats(allExceptions, headers.length);
+      const evidenceSnapshot = buildEvidenceRunSnapshot(buyers, headers, lines);
+      const runId = await saveCheckRun({
+        run_date: new Date().toISOString(),
+        total_invoices: headers.length,
+        total_exceptions: allExceptions.length,
+        critical_count: stats.exceptionsBySeverity.Critical,
+        high_count: stats.exceptionsBySeverity.High,
+        medium_count: stats.exceptionsBySeverity.Medium,
+        low_count: stats.exceptionsBySeverity.Low,
+        pass_rate: stats.passRate,
+        results_summary: {
+          checkCount: builtInResults.length + pintAEChecks.length,
+          direction,
+          ruleset: activeRuleset,
+          rulesetVersion: RULESET_VERSION,
+          uploadSessionId,
+          uploadManifestId,
+          mappingProfileId: mappingProfileId || null,
+          mappingVersion: options?.mappingVersion || activeMappingProfile?.version || null,
+          evidenceSnapshot,
+          evidenceRuleExecutionTelemetry: combinedTelemetry,
+        },
+      });
+
+      if (!runId) {
+        toast.info('Checks completed, but run history could not be saved.');
+        return;
+      }
+
       const clientScores = calculateClientScores(pintExceptions, headers);
-      await saveClientRiskScores(runId, clientScores);
-      
-      // Generate and save run summary
       const summary = generateRunSummary(runId, headers.length, pintExceptions, clientScores);
-      await saveRunSummary(summary);
-      setRunSummary(summary);
-      
-      // Calculate entity scores
       const sellerScores = calculateEntityScores(allExceptions, headers, 'seller');
       const invoiceScores = calculateEntityScores(allExceptions, headers, 'invoice');
-      await saveEntityScores([
-        ...sellerScores.map(s => ({ ...s, run_id: runId })),
-        ...invoiceScores.map(s => ({ ...s, run_id: runId })),
-      ]);
-    }
 
-    setIsRunning(false);
+      const [
+        exceptionsSaved,
+        clientScoresSaved,
+        runSummarySaved,
+        entityScoresSaved,
+      ] = await Promise.all([
+        saveExceptions(runId, pintExceptions),
+        saveClientRiskScores(runId, clientScores),
+        saveRunSummary(summary),
+        saveEntityScores([
+          ...sellerScores.map(s => ({ ...s, run_id: runId })),
+          ...invoiceScores.map(s => ({ ...s, run_id: runId })),
+        ]),
+      ]);
+
+      if (exceptionsSaved) {
+        setExceptions((prev) => prev.map((exception) => ({ ...exception, validationRunId: runId })));
+      }
+      if (runSummarySaved) {
+        setRunSummary(summary);
+      }
+
+      if (!exceptionsSaved || !clientScoresSaved || !runSummarySaved || !entityScoresSaved) {
+        toast.info('Checks completed, but some run artifacts could not be saved.');
+      }
+    } catch (error) {
+      console.error('Error running checks:', error);
+      toast.error(error instanceof Error ? `Run checks failed: ${error.message}` : 'Run checks failed.');
+      throw error;
+    } finally {
+      setIsRunning(false);
+    }
   };
 
   const calculateStats = (excs: Exception[], totalInvoices: number): DashboardStats => {

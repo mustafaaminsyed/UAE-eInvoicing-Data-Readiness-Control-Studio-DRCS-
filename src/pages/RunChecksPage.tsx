@@ -414,11 +414,15 @@ export default function RunChecksPage() {
         version: selectedTemplate.version,
       });
     }
-    await runChecks({
-      mappingProfileId: selectedTemplate?.id,
-      mappingVersion: selectedTemplate?.version,
-    });
-    navigate('/dashboard');
+    try {
+      await runChecks({
+        mappingProfileId: selectedTemplate?.id,
+        mappingVersion: selectedTemplate?.version,
+      });
+      navigate('/dashboard');
+    } catch {
+      // The context surfaces the failure toast and restores the running state.
+    }
   };
 
   const handleRefreshChecks = () => {

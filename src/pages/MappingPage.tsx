@@ -463,6 +463,7 @@ export default function MappingPage() {
                 previewData={previewData}
                 onDataLoaded={handlePreviewDataLoaded}
                 onReset={handleResetUpload}
+                direction={direction}
               />
             )}
             {currentStep === 'mapping' && previewData && (

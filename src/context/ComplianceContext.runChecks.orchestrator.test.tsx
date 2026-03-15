@@ -60,10 +60,11 @@ function Harness() {
   return (
     <div>
       <button type="button" onClick={() => context.setData(arData, 'AR')}>set-data</button>
-      <button type="button" onClick={() => context.runChecks()}>run-checks</button>
+      <button type="button" onClick={() => void context.runChecks().catch(() => undefined)}>run-checks</button>
       <span data-testid="exceptions-count">{context.exceptions.length}</span>
       <span data-testid="check-results-count">{context.checkResults.length}</span>
       <span data-testid="pint-count">{context.pintAEExceptions.length}</span>
+      <span data-testid="is-running">{String(context.isRunning)}</span>
     </div>
   );
 }
@@ -266,6 +267,27 @@ describe('ComplianceContext.runChecks delegation', () => {
       expect(screen.getByTestId('exceptions-count').textContent).toBe('1');
       expect(screen.getByTestId('check-results-count').textContent).toBe('1');
       expect(screen.getByTestId('pint-count').textContent).toBe('1');
+      expect(screen.getByTestId('is-running').textContent).toBe('false');
+    });
+  });
+
+  it('restores isRunning when orchestration fails', async () => {
+    const mockedRunChecksOrchestrator = vi.mocked(runChecksOrchestrator);
+
+    mockedRunChecksOrchestrator.mockRejectedValue(new Error('orchestrator failed'));
+
+    render(
+      <ComplianceProvider>
+        <Harness />
+      </ComplianceProvider>
+    );
+
+    fireEvent.click(screen.getByText('set-data'));
+    fireEvent.click(screen.getByText('run-checks'));
+
+    await waitFor(() => {
+      expect(mockedRunChecksOrchestrator).toHaveBeenCalled();
+      expect(screen.getByTestId('is-running').textContent).toBe('false');
     });
   });
 });

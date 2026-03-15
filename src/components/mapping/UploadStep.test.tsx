@@ -41,4 +41,20 @@ describe('UploadStep', () => {
 
     expect(onReset).toHaveBeenCalledTimes(1);
   });
+
+  it('loads a built-in template into the wizard preview', () => {
+    const onDataLoaded = vi.fn();
+
+    render(<UploadStep previewData={null} onDataLoaded={onDataLoaded} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /load invoice headers template/i }));
+
+    expect(onDataLoaded).toHaveBeenCalledTimes(1);
+    expect(onDataLoaded).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fileName: 'invoice_headers_template.csv',
+        datasetType: 'header',
+      })
+    );
+  });
 });
