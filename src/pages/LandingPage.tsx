@@ -29,7 +29,7 @@ import { fetchActiveTemplates } from "@/lib/api/mappingApi";
 import { fetchCases } from "@/lib/api/casesApi";
 import { analyzeCoverage } from "@/lib/mapping/coverageAnalyzer";
 import { cn } from "@/lib/utils";
-import daribaLogo from "@/assets/dariba-logo.png";
+import daribaLogo from "@/assets/New-Dariba-Tech-Logo.png";
 import type { MappingTemplate } from "@/types/fieldMapping";
 import type { Case } from "@/types/cases";
 
@@ -50,6 +50,12 @@ const trustPills = [
   "PINT-AE traceability",
   "Control-grade evidence",
 ];
+
+const activeRegionScope = {
+  label: "UAE",
+  country: "United Arab Emirates",
+  detail: "Current regulatory scope",
+};
 
 const heroMessages = [
   "Validate source data before transmission and expose blocking gaps early.",
@@ -207,44 +213,71 @@ export default function LandingPage() {
     <div className="min-h-screen">
       <div className="container mx-auto max-w-7xl px-4 py-8 md:py-12">
         <div className="sticky top-4 z-40 mb-6">
-          <div className="mx-auto max-w-6xl rounded-[1.65rem] border border-white/80 bg-white/68 px-4 py-4 shadow-[0_20px_45px_-36px_rgba(9,28,42,0.5)] backdrop-blur-xl dark:border-emerald-900/25 dark:bg-[#0f1917]/84 dark:shadow-[0_24px_52px_-36px_rgba(0,0,0,0.78)] md:px-6">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex items-center gap-3">
-                <div className="rounded-2xl border border-white/80 bg-white/85 p-2 shadow-sm dark:border-emerald-900/20 dark:bg-white/[0.04]">
-                  <img src={daribaLogo} alt="Dariba Tech" className="h-9 w-auto" />
+          <div className="mx-auto max-w-6xl rounded-[1.5rem] border border-white/70 bg-white/78 px-4 py-3 shadow-[0_20px_44px_-34px_rgba(9,28,42,0.38)] backdrop-blur-xl dark:border-emerald-900/35 dark:bg-[#10201a]/92 dark:shadow-[0_24px_48px_-34px_rgba(0,0,0,0.82)] md:px-5">
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="rounded-2xl border border-white/65 bg-white/88 p-2 shadow-sm dark:border-emerald-900/25 dark:bg-white/[0.03]">
+                    <img src={daribaLogo} alt="Dariba Tech" className="h-8 w-auto" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate font-display text-lg font-semibold text-slate-950 dark:text-emerald-50">
+                      Controls Studio
+                    </p>
+                    <p className="truncate text-sm text-slate-500 dark:text-emerald-100/65">
+                      UAE eInvoicing Compliance
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-display text-lg font-semibold text-foreground">Controls Studio</p>
-                  <p className="text-sm text-muted-foreground">UAE eInvoicing Compliance</p>
+
+                <div className="flex flex-wrap items-center justify-start gap-2 xl:justify-end">
+                  <div className="flex h-11 items-center gap-3 rounded-full border border-white/70 bg-white/78 px-3.5 shadow-sm dark:border-emerald-900/25 dark:bg-white/[0.03]">
+                    <UaeFlagMark />
+                    <div className="leading-tight">
+                      <p className="text-xs font-semibold text-slate-900 dark:text-emerald-50">
+                        {activeRegionScope.country}
+                      </p>
+                      <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500 dark:text-emerald-100/55">
+                        Current scope
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 rounded-full border border-white/70 bg-white/78 p-1.5 shadow-sm dark:border-emerald-900/25 dark:bg-white/[0.03]">
+                    <EnvironmentAccessToggle value={clientEnvironment} onChange={setClientEnvironment} />
+
+                    <div className="flex h-9 items-center gap-2 rounded-full border border-white/70 bg-white/88 px-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04]">
+                      <Sun className={cn("h-3.5 w-3.5", !isDark ? "text-amber-500" : "text-emerald-100/55")} />
+                      <Switch
+                        checked={isDark}
+                        onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+                        aria-label={isDark ? "Dark mode enabled" : "Light mode enabled"}
+                      />
+                      <Moon className={cn("h-3.5 w-3.5", isDark ? "text-emerald-300" : "text-slate-500")} />
+                    </div>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    className="h-11 rounded-full border-primary/20 bg-primary/6 px-4 text-sm font-semibold text-primary shadow-sm hover:bg-primary/10 dark:border-emerald-700/30 dark:bg-emerald-500/[0.1] dark:text-emerald-300 dark:hover:bg-emerald-500/[0.16]"
+                  >
+                    Compliance Command Center
+                  </Button>
                 </div>
               </div>
 
-              <nav className="flex flex-1 flex-wrap items-center justify-center gap-2 lg:gap-3">
-                {heroNavLinks.map((item) => (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className="rounded-full border border-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/15 hover:bg-white/75 hover:text-foreground dark:hover:border-emerald-800/30 dark:hover:bg-emerald-500/[0.08] dark:hover:text-emerald-50"
-                  >
-                    {item.label}
-                  </Link>
-                ))}
-              </nav>
-
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <span className="rounded-full border border-primary/20 bg-primary/8 px-3 py-1.5 text-xs font-semibold text-primary dark:border-emerald-700/30 dark:bg-emerald-500/[0.08] dark:text-emerald-300">
-                  Compliance Command Center
-                </span>
-                <EnvironmentAccessToggle value={clientEnvironment} onChange={setClientEnvironment} />
-                <div className="flex items-center gap-2 rounded-full border border-white/80 bg-white/80 px-2 py-1 shadow-sm dark:border-emerald-900/25 dark:bg-white/[0.04]">
-                  <Sun className={cn("h-3.5 w-3.5", !isDark ? "text-amber-500" : "text-muted-foreground")} />
-                  <Switch
-                    checked={isDark}
-                    onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
-                    aria-label={isDark ? "Dark mode enabled" : "Light mode enabled"}
-                  />
-                  <Moon className={cn("h-3.5 w-3.5", isDark ? "text-emerald-300" : "text-muted-foreground")} />
-                </div>
+              <div className="border-t border-white/55 pt-3 dark:border-emerald-900/30">
+                <nav className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-1.5">
+                  {heroNavLinks.map((item) => (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      className="inline-flex h-9 items-center rounded-full px-3.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-950/[0.04] hover:text-slate-950 dark:text-emerald-50/80 dark:hover:bg-emerald-500/[0.08] dark:hover:text-emerald-50"
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </nav>
               </div>
             </div>
           </div>
@@ -266,7 +299,17 @@ export default function LandingPage() {
                 Trusted for UAE readiness, traceability, and control evidence
               </div>
 
-              <h1 className="mx-auto mt-6 max-w-4xl font-display text-4xl font-semibold leading-[0.95] tracking-[-0.05em] text-foreground md:text-6xl xl:text-[4.9rem]">
+              <div className="mt-3 flex justify-center">
+                <div className="w-[320px] max-w-[82vw] overflow-hidden md:w-[420px] lg:w-[500px]">
+                  <img
+                    src={daribaLogo}
+                    alt="Dariba Tech"
+                    className="h-auto w-full -mb-[18%] -mt-[6%] opacity-92 drop-shadow-[0_18px_30px_rgba(8,24,19,0.12)] dark:opacity-85 dark:drop-shadow-[0_20px_34px_rgba(0,0,0,0.34)]"
+                  />
+                </div>
+              </div>
+
+              <h1 className="mx-auto mt-1.5 max-w-4xl font-display text-4xl font-semibold leading-[0.95] tracking-[-0.05em] text-foreground md:text-6xl xl:text-[4.9rem]">
                 Turn invoice data into compliance intelligence.
               </h1>
 
@@ -592,6 +635,19 @@ function PreviewMetricCard({
   );
 }
 
+function UaeFlagMark() {
+  return (
+    <div className="flex h-8 w-12 overflow-hidden rounded-md border border-primary/15 shadow-sm dark:border-emerald-700/30">
+      <div className="w-3 bg-[#D71920]" />
+      <div className="flex flex-1 flex-col">
+        <div className="flex-1 bg-[#009A49]" />
+        <div className="flex-1 bg-white dark:bg-slate-100" />
+        <div className="flex-1 bg-black dark:bg-slate-950" />
+      </div>
+    </div>
+  );
+}
+
 function EnvironmentAccessToggle({
   value,
   onChange,
@@ -600,7 +656,7 @@ function EnvironmentAccessToggle({
   onChange: (next: ClientEnvironment) => void;
 }) {
   return (
-    <div className="rounded-full border border-white/80 bg-white/80 p-1.5 shadow-sm dark:border-white/10 dark:bg-white/6">
+    <div className="rounded-full">
       <div className="flex items-center gap-1">
         {environmentOptions.map((option) => {
           const isActive = option.key === value;
@@ -611,10 +667,10 @@ function EnvironmentAccessToggle({
               onClick={() => onChange(option.key)}
               aria-pressed={isActive}
               className={cn(
-                "min-w-[70px] rounded-full px-3 py-1.5 text-center transition-all",
+                "inline-flex h-9 min-w-[74px] items-center justify-center rounded-full px-3 text-center transition-all",
                 isActive
                   ? "bg-primary text-primary-foreground shadow-[0_12px_24px_-18px_hsl(var(--primary))]"
-                  : "text-muted-foreground hover:bg-muted/65 hover:text-foreground"
+                  : "text-slate-500 hover:bg-slate-950/[0.04] hover:text-slate-900 dark:text-emerald-100/55 dark:hover:bg-emerald-500/[0.08] dark:hover:text-emerald-50"
               )}
             >
               <span className="block text-[11px] font-semibold uppercase tracking-[0.16em]">{option.key}</span>
