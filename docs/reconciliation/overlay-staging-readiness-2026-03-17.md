@@ -58,3 +58,18 @@ npm.cmd test -- src/lib/checks/overlayRuntimeEnablement.test.ts src/modules/scen
   - Set `VITE_OVERLAY_APPLICABILITY_MODE=legacy`
   - Redeploy the non-prod environment
   - Rerun the focused suite above to confirm reversion
+
+## Out Of Scope
+
+- broader `transaction_flag` cutover
+- `credit_note_specialized` cutover
+- UI behavior changes
+- traceability rendering changes
+- exception-analysis behavior changes
+
+## Reviewer Risk Note
+
+- default remains `legacy` when the flag is unset
+- scope is limited to `IBR-137-AE`, `IBR-138-AE`, and `IBR-152-AE`
+- only the five approved runtime-difference rows are expected under `scenario_context`
+- no collateral impact outside the overlay family was observed in verification
