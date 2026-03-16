@@ -21,16 +21,20 @@ Default behavior remains `legacy` via `VITE_OVERLAY_APPLICABILITY_MODE`, with ex
 ## Why This Is Safe
 
 - default behavior remains `legacy`
-- runtime scope is limited to:
-  - `IBR-137-AE`
-  - `IBR-138-AE`
-  - `IBR-152-AE`
+- runtime scope is limited to `IBR-137-AE`, `IBR-138-AE`, and `IBR-152-AE`
 - no UI behavior changes
 - no traceability rendering changes
 - no exception-analysis behavior changes
 - rollback remains immediate by setting `VITE_OVERLAY_APPLICABILITY_MODE=legacy`
 
-## Verification
+## Exact Rule Scope
+
+This PR affects only:
+- `IBR-137-AE`
+- `IBR-138-AE`
+- `IBR-152-AE`
+
+## Verification Performed
 
 Default legacy validation:
 
@@ -72,28 +76,32 @@ There are:
 - zero blocked dependencies
 - zero collateral changes outside the overlay family
 
-## Staging Enablement
+## Non-Prod Enablement Checklist
 
-Use the following in non-prod only:
+1. Set the non-prod flag:
 
 ```text
 VITE_OVERLAY_APPLICABILITY_MODE=scenario_context
 ```
 
-Expected outcome:
-- only the five approved runtime-difference rows above may differ
-- no non-overlay runtime behavior changes
-- no blocked dependencies remain for the three overlay rules
+2. Deploy the non-prod environment.
+3. Run the focused overlay validation suite.
+4. Confirm only the five approved runtime-difference rows above differ.
+5. Confirm no non-overlay runtime behavior changes.
+6. Confirm no blocked dependencies remain for the three overlay rules.
 
-## Rollback
+## Rollback Checklist
 
-If non-prod behavior deviates from the approved set:
+1. Set the flag:
 
 ```text
 VITE_OVERLAY_APPLICABILITY_MODE=legacy
 ```
 
-Redeploy and rerun the focused overlay suite. This reverts overlay applicability to the legacy path without changing rule IDs, exception schemas, UI behavior, traceability rendering, or exception-analysis behavior.
+2. Redeploy the non-prod environment.
+3. Rerun the focused overlay validation suite.
+4. Confirm overlay applicability has reverted to the legacy path.
+5. Confirm no unexpected non-prod differences remain.
 
 ## Out Of Scope
 

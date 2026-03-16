@@ -19,7 +19,7 @@ Date: 2026-03-17
 - No collateral impact outside the overlay family was detected.
 - Rollback to `legacy` was executed and verified by rerunning the same focused suite.
 
-## Commands Run
+## Verification Performed
 
 Default legacy validation:
 
@@ -41,23 +41,27 @@ $env:VITE_OVERLAY_APPLICABILITY_MODE='legacy'
 npm.cmd test -- src/lib/checks/overlayRuntimeEnablement.test.ts src/modules/scenarioContext/overlayRuntimeCutover.test.ts src/modules/scenarioContext/overlayAuthoritativeCutoverPacket.test.ts
 ```
 
-## Enablement Note
+## Non-Prod Enablement Checklist
 
-- Flag: `VITE_OVERLAY_APPLICABILITY_MODE=scenario_context`
-- Approved changed rows:
+1. Set `VITE_OVERLAY_APPLICABILITY_MODE=scenario_context`.
+2. Deploy the non-prod environment.
+3. Confirm only the approved changed rows differ:
   - `fixture-tax-disclosed-agent-summary:IBR-137-AE`
   - `exception-disclosed-agent-credit-note:IBR-137-AE`
   - `fixture-tax-disclosed-agent-summary:IBR-138-AE`
   - `fixture-credit-note-summary-flag:IBR-138-AE`
   - `exception-out-of-scope-summary-conflict:IBR-138-AE`
-- Expected outcome:
+4. Confirm the expected outcome:
   - Overlay applicability follows governed `ScenarioContext` flags for disclosed-agent, summary-invoice, and export overlays.
   - No non-overlay runtime behavior changes.
   - No blocked dependencies remain for these overlay rules.
-- Rollback:
-  - Set `VITE_OVERLAY_APPLICABILITY_MODE=legacy`
-  - Redeploy the non-prod environment
-  - Rerun the focused suite above to confirm reversion
+
+## Rollback Checklist
+
+1. Set `VITE_OVERLAY_APPLICABILITY_MODE=legacy`.
+2. Redeploy the non-prod environment.
+3. Rerun the focused suite above.
+4. Confirm overlay applicability has reverted to the legacy path.
 
 ## Out Of Scope
 
