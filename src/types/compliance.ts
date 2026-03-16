@@ -17,6 +17,18 @@ export interface Buyer {
   upload_manifest_id?: string;
 }
 
+export interface InvoicingPeriod {
+  start_date?: string;
+  end_date?: string;
+}
+
+export interface DeliveryInformation {
+  address_line_1?: string;
+  city?: string;
+  country_subdivision?: string;
+  country_code?: string;
+}
+
 export interface InvoiceHeader {
   invoice_id: string;
   invoice_number: string;
@@ -40,6 +52,15 @@ export interface InvoiceHeader {
   seller_legal_reg_id?: string;
   seller_legal_reg_id_type?: string;
   transaction_type_code?: string;
+  principal_id?: string;
+  invoicing_period_start_date?: string;
+  invoicing_period_end_date?: string;
+  invoicing_period?: InvoicingPeriod;
+  deliver_to_address_line_1?: string;
+  deliver_to_city?: string;
+  deliver_to_country_subdivision?: string;
+  deliver_to_country_code?: string;
+  delivery_information?: DeliveryInformation;
   payment_due_date?: string;
   payment_means_code?: string;
   fx_rate?: number;

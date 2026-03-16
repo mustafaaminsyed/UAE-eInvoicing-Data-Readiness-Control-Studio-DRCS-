@@ -49,15 +49,22 @@ Fields derived by the ASP (Corner 2) — such as Specification ID (IBT-024), Bus
 | 14 | `buyer_id` | — | Yes | String | FK → buyers | Join key | ERP |
 | 15 | `currency` | IBT-005 | Yes | Code | ISO 4217 α-3 | Currency | ERP |
 | 16 | `transaction_type_code` | BTUAE-02 | Yes | Code | 8-char binary | Transaction type | ERP |
-| 17 | `payment_due_date` | IBT-009 | Conditional | Date | YYYY-MM-DD | Due date | ERP |
-| 18 | `payment_means_code` | IBT-081 | Conditional | Code | UNTDID 4461 | Payment means | ERP |
-| 19 | `fx_rate` | IBT-007 | Conditional | Number | Decimal (6dp) | FX rate to AED | ERP |
-| 20 | `total_excl_vat` | IBT-109 | Yes | Number | Decimal (2dp) | Total excl. tax | ERP |
-| 21 | `vat_total` | IBT-110 | Yes | Number | Decimal (2dp) | Total tax | ERP |
-| 22 | `total_incl_vat` | IBT-112 | Yes | Number | Decimal (2dp) | Total incl. tax | ERP |
-| 23 | `amount_due` | IBT-115 | Conditional | Number | Decimal (2dp) | Amount due | ERP |
-| 24 | `tax_category_code` | IBT-118 | Yes | Code | S/Z/E/RC | Tax category | ERP |
-| 25 | `tax_category_rate` | IBT-119 | Yes | Number | Percentage | Tax rate | ERP |
+| 17 | `principal_id` | BTAE-14 | Conditional | String | 15-digit TRN when used | Principal ID for disclosed-agent billing | ERP |
+| 18 | `invoicing_period_start_date` | IBG-14 | Conditional | Date | YYYY-MM-DD | Invoicing period start | ERP |
+| 19 | `invoicing_period_end_date` | IBG-14 | Conditional | Date | YYYY-MM-DD | Invoicing period end | ERP |
+| 20 | `deliver_to_address_line_1` | IBG-13 / IBT-075 | Conditional | String | Free text | Deliver-to street line 1 | ERP |
+| 21 | `deliver_to_city` | IBG-13 / IBT-077 | Conditional | String | Free text | Deliver-to city | ERP |
+| 22 | `deliver_to_country_subdivision` | IBG-13 / IBT-079 | Conditional | Code | ISO 3166-2 / local | Deliver-to subdivision | ERP |
+| 23 | `deliver_to_country_code` | IBG-13 / IBT-080 | Conditional | Code | ISO 3166-1 α-2 | Deliver-to country | ERP |
+| 24 | `payment_due_date` | IBT-009 | Conditional | Date | YYYY-MM-DD | Due date | ERP |
+| 25 | `payment_means_code` | IBT-081 | Conditional | Code | UNTDID 4461 | Payment means | ERP |
+| 26 | `fx_rate` | IBT-007 | Conditional | Number | Decimal (6dp) | FX rate to AED | ERP |
+| 27 | `total_excl_vat` | IBT-109 | Yes | Number | Decimal (2dp) | Total excl. tax | ERP |
+| 28 | `vat_total` | IBT-110 | Yes | Number | Decimal (2dp) | Total tax | ERP |
+| 29 | `total_incl_vat` | IBT-112 | Yes | Number | Decimal (2dp) | Total incl. tax | ERP |
+| 30 | `amount_due` | IBT-115 | Conditional | Number | Decimal (2dp) | Amount due | ERP |
+| 31 | `tax_category_code` | IBT-118 | Yes | Code | S/Z/E/RC | Tax category | ERP |
+| 32 | `tax_category_rate` | IBT-119 | Yes | Number | Percentage | Tax rate | ERP |
 
 ---
 
