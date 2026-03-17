@@ -148,6 +148,27 @@ export const VALIDATION_TO_DR_MAP: ValidationDRMapEntry[] = [
       partial('IBT-117', 'vat_total'),
     ],
   },
+  { validation_id: 'IBR-137-AE', dr_targets: [exact('BTAE-14', 'principal_id')] },
+  {
+    validation_id: 'IBR-138-AE',
+    dr_targets: [partial('IBG-14', 'invoicing_period_start_date', 'invoicing_period_end_date')],
+  },
+  {
+    validation_id: 'IBR-152-AE',
+    dr_targets: [
+      partial(
+        'IBG-13',
+        'deliver_to_address_line_1',
+        'deliver_to_city',
+        'deliver_to_country_subdivision',
+        'deliver_to_country_code'
+      ),
+      exact('IBT-075', 'deliver_to_address_line_1'),
+      exact('IBT-077', 'deliver_to_city'),
+      exact('IBT-079', 'deliver_to_country_subdivision'),
+      exact('IBT-080', 'deliver_to_country_code'),
+    ],
+  },
 ];
 
 const validationMap = new Map(VALIDATION_TO_DR_MAP.map((entry) => [entry.validation_id, entry]));

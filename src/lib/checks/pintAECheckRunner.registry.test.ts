@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { Buyer, DataContext, InvoiceHeader, InvoiceLine } from '@/types/compliance';
-import { runPintAECheck } from '@/lib/checks/pintAECheckRunner';
+import { OVERLAY_RUNTIME_CHECKS } from '@/lib/checks/overlayRuntimeChecks';
+import { runPintAECheck, runPintAECheckWithTelemetry } from '@/lib/checks/pintAECheckRunner';
 import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
 import { getCodelistCodes } from '@/lib/pintAE/specCatalog';
+import type { PintAEException } from '@/types/pintAE';
 
 function buildDataContext(
   overrides: Partial<InvoiceHeader>,
@@ -52,6 +54,27 @@ function getCheck(checkId: string) {
   const check = UAE_UC1_CHECK_PACK.find((item) => item.check_id === checkId);
   if (!check) throw new Error(`Missing check fixture: ${checkId}`);
   return check;
+}
+
+function getOverlayCheck(checkId: string) {
+  const check = OVERLAY_RUNTIME_CHECKS.find((item) => item.check_id === checkId);
+  if (!check) throw new Error(`Missing overlay check fixture: ${checkId}`);
+  return check;
+}
+
+function normalizeExceptions(exceptions: PintAEException[]) {
+  return exceptions.map((exception) => ({
+    check_id: exception.check_id,
+    invoice_id: exception.invoice_id ?? null,
+    buyer_id: exception.buyer_id ?? null,
+    line_id: exception.line_id ?? null,
+    field_name: exception.field_name ?? null,
+    observed_value: exception.observed_value ?? null,
+    expected_value_or_rule: exception.expected_value_or_rule ?? null,
+    message: exception.message,
+    severity: exception.severity,
+    scope: exception.scope,
+  }));
 }
 
 describe('runPintAECheck executor registry parity', () => {
@@ -268,6 +291,165 @@ describe('runPintAECheck executor registry parity', () => {
     expect(exceptions).toHaveLength(1);
     expect(exceptions[0].check_id).toBe('UAE-UC1-CHK-037');
     expect(exceptions[0].message).toContain('not allowed');
+  });
+
+  it('keeps default document-family runtime behavior pinned to legacy mode', () => {
+    const check = getCheck('UAE-UC1-CHK-036');
+    const data = buildDataContext(
+      {
+        invoice_type: '388',
+      },
+      {
+        buyers: [
+          {
+            buyer_id: 'B-1',
+            buyer_name: 'Buyer LLC',
+            buyer_trn: '',
+          },
+        ],
+      }
+    );
+
+    const defaultExceptions = runPintAECheck(check, data);
+    const legacyExceptions = runPintAECheckWithTelemetry(check, data, {
+      documentFamilyApplicabilityMode: 'legacy',
+    }).exceptions;
+
+    expect(normalizeExceptions(defaultExceptions)).toEqual(normalizeExceptions(legacyExceptions));
+  });
+
+  it('does not change non-document-family rules when scenario applicability mode is enabled', () => {
+    const check = getCheck('UAE-UC1-CHK-041');
+    const data = buildDataContext({ tax_category_code: 'INVALID' });
+
+    const legacyResult = runPintAECheckWithTelemetry(check, data, {
+      documentFamilyApplicabilityMode: 'legacy',
+    });
+    const scenarioResult = runPintAECheckWithTelemetry(check, data, {
+      documentFamilyApplicabilityMode: 'scenario_context',
+    });
+
+    expect(scenarioResult.telemetry.execution_count).toBe(legacyResult.telemetry.execution_count);
+    expect(scenarioResult.telemetry.failure_count).toBe(legacyResult.telemetry.failure_count);
+    expect(normalizeExceptions(scenarioResult.exceptions)).toEqual(normalizeExceptions(legacyResult.exceptions));
+  });
+
+  it('keeps default vat-treatment runtime behavior pinned to legacy mode', () => {
+    const check = getCheck('UAE-UC1-CHK-049');
+    const data = buildDataContext(
+      {},
+      {
+        lines: [
+          {
+            line_id: 'L-1',
+            invoice_id: 'INV-1',
+            line_number: 1,
+            quantity: 1,
+            unit_price: 100,
+            line_total_excl_vat: 100,
+            vat_rate: 0,
+            vat_amount: 0,
+            tax_category_code: 'E',
+            exemption_reason_code: '',
+            exemption_reason_text: '',
+          } as InvoiceLine,
+        ],
+      }
+    );
+
+    const defaultExceptions = runPintAECheck(check, data);
+    const legacyExceptions = runPintAECheckWithTelemetry(check, data, {
+      vatTreatmentApplicabilityMode: 'legacy',
+    }).exceptions;
+
+    expect(normalizeExceptions(defaultExceptions)).toEqual(normalizeExceptions(legacyExceptions));
+  });
+
+  it('does not change non-vat-treatment rules when vat-treatment scenario mode is enabled', () => {
+    const check = getCheck('UAE-UC1-CHK-036');
+    const data = buildDataContext(
+      {
+        invoice_type: '388',
+      },
+      {
+        buyers: [
+          {
+            buyer_id: 'B-1',
+            buyer_name: 'Buyer LLC',
+            buyer_trn: '',
+          },
+        ],
+      }
+    );
+
+    const legacyResult = runPintAECheckWithTelemetry(check, data, {
+      vatTreatmentApplicabilityMode: 'legacy',
+    });
+    const scenarioResult = runPintAECheckWithTelemetry(check, data, {
+      vatTreatmentApplicabilityMode: 'scenario_context',
+    });
+
+    expect(scenarioResult.telemetry.execution_count).toBe(legacyResult.telemetry.execution_count);
+    expect(scenarioResult.telemetry.failure_count).toBe(legacyResult.telemetry.failure_count);
+    expect(normalizeExceptions(scenarioResult.exceptions)).toEqual(normalizeExceptions(legacyResult.exceptions));
+  });
+
+  it('keeps default overlay runtime behavior pinned to legacy mode', () => {
+    const check = getOverlayCheck('IBR-138-AE');
+    const data = buildDataContext({
+      transaction_type_code: '00010000',
+      invoicing_period_start_date: '',
+      invoicing_period_end_date: '',
+    });
+
+    const defaultExceptions = runPintAECheck(check, data);
+    const legacyExceptions = runPintAECheckWithTelemetry(check, data, {
+      overlayApplicabilityMode: 'legacy',
+    }).exceptions;
+
+    expect(normalizeExceptions(defaultExceptions)).toEqual(normalizeExceptions(legacyExceptions));
+  });
+
+  it('does not change non-overlay rules when overlay scenario mode is enabled', () => {
+    const check = getCheck('UAE-UC1-CHK-041');
+    const data = buildDataContext({ tax_category_code: 'INVALID' });
+
+    const legacyResult = runPintAECheckWithTelemetry(check, data, {
+      overlayApplicabilityMode: 'legacy',
+    });
+    const scenarioResult = runPintAECheckWithTelemetry(check, data, {
+      overlayApplicabilityMode: 'scenario_context',
+    });
+
+    expect(scenarioResult.telemetry.execution_count).toBe(legacyResult.telemetry.execution_count);
+    expect(scenarioResult.telemetry.failure_count).toBe(legacyResult.telemetry.failure_count);
+    expect(normalizeExceptions(scenarioResult.exceptions)).toEqual(normalizeExceptions(legacyResult.exceptions));
+  });
+
+  it('restores overlay runtime behavior when the applicability mode is rolled back to legacy', () => {
+    const check = getOverlayCheck('IBR-138-AE');
+    const data = buildDataContext({
+      transaction_type_code: '00010000',
+      invoicing_period_start_date: '',
+      invoicing_period_end_date: '',
+    });
+
+    const legacyBefore = runPintAECheckWithTelemetry(check, data, {
+      overlayApplicabilityMode: 'legacy',
+    });
+    const scenario = runPintAECheckWithTelemetry(check, data, {
+      overlayApplicabilityMode: 'scenario_context',
+    });
+    const legacyAfter = runPintAECheckWithTelemetry(check, data, {
+      overlayApplicabilityMode: 'legacy',
+    });
+
+    expect(legacyBefore.telemetry.execution_count).toBe(0);
+    expect(legacyBefore.telemetry.failure_count).toBe(0);
+    expect(scenario.telemetry.execution_count).toBe(1);
+    expect(scenario.telemetry.failure_count).toBe(1);
+    expect(normalizeExceptions(legacyAfter.exceptions)).toEqual(normalizeExceptions(legacyBefore.exceptions));
+    expect(legacyAfter.telemetry).toEqual(legacyBefore.telemetry);
   });
 
   it('fails CHK-038/039 when both item name and description are empty', () => {

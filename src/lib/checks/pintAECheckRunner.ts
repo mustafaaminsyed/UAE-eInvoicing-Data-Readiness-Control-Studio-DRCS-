@@ -2,6 +2,8 @@ import { PintAECheck, PintAEException, SLA_HOURS_BY_SEVERITY } from '@/types/pin
 import { DataContext, Severity } from '@/types/compliance';
 import { isCodeInCodelist } from '@/lib/pintAE/specCatalog';
 import { getFailureClassForRule } from '@/lib/validation/pintAERuleMetadata';
+import { buildScenarioContext } from '@/modules/scenarioContext/buildScenarioContext';
+import { classifyInvoice } from '@/modules/scenarioLens/classifyInvoice';
 
 export interface PintAECheckTelemetry {
   rule_id: string;
@@ -15,10 +17,49 @@ export interface PintAECheckRunResult {
   telemetry: PintAECheckTelemetry;
 }
 
+export type PintAEDocumentFamilyApplicabilityMode = 'legacy' | 'scenario_context';
+export type PintAEVatTreatmentApplicabilityMode = 'legacy' | 'scenario_context';
+export type PintAEOverlayApplicabilityMode = 'legacy' | 'scenario_context';
+
+export interface RunPintAECheckOptions {
+  documentFamilyApplicabilityMode?: PintAEDocumentFamilyApplicabilityMode;
+  vatTreatmentApplicabilityMode?: PintAEVatTreatmentApplicabilityMode;
+  overlayApplicabilityMode?: PintAEOverlayApplicabilityMode;
+}
+
 const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 const PROFILE_DEFAULTS_ENABLED = (import.meta.env.VITE_ENABLE_TECHNICAL_PROFILE_DEFAULTS || 'true').toLowerCase() === 'true';
 const DEFAULT_SPEC_ID = (import.meta.env.VITE_DEFAULT_SPEC_ID || 'urn:peppol:pint:billing-1@ae-1').trim();
 const DEFAULT_BUSINESS_PROCESS = (import.meta.env.VITE_DEFAULT_BUSINESS_PROCESS || 'urn:peppol:bis:billing').trim();
+const DOCUMENT_FAMILY_APPLICABILITY_MODE = normalizeDocumentFamilyApplicabilityMode(
+  import.meta.env.VITE_DOCUMENT_FAMILY_APPLICABILITY_MODE
+);
+const VAT_TREATMENT_APPLICABILITY_MODE = normalizeVatTreatmentApplicabilityMode(
+  import.meta.env.VITE_VAT_TREATMENT_APPLICABILITY_MODE
+);
+const OVERLAY_APPLICABILITY_MODE = normalizeOverlayApplicabilityMode(
+  import.meta.env.VITE_OVERLAY_APPLICABILITY_MODE
+);
+const DOCUMENT_FAMILY_CUTOVER_RULE_IDS = new Set([
+  'UAE-UC1-CHK-036',
+  'UAE-UC1-CHK-037',
+  'UAE-UC1-CHK-045',
+  'UAE-UC1-CHK-046',
+]);
+const VAT_TREATMENT_CUTOVER_RULE_IDS = new Set([
+  'UAE-UC1-CHK-049',
+  'UAE-UC1-CHK-050',
+  'UAE-UC1-CHK-051',
+  'UAE-UC1-CHK-052',
+]);
+const OVERLAY_CUTOVER_RULE_IDS = new Set([
+  'IBR-137-AE',
+  'IBR-138-AE',
+  'IBR-152-AE',
+]);
+
+type ScenarioContextCache = Map<string, ReturnType<typeof buildScenarioContext>>;
+type LegacyScenarioClassificationCache = Map<string, ReturnType<typeof classifyInvoice>>;
 
 function getFieldValue(record: any, fieldPath: string): any {
   const parts = fieldPath.split('.');
@@ -94,10 +135,36 @@ function isCreditNoteInvoiceType(value: string): boolean {
 function shouldRunCodelistForDocumentContext(
   record: any,
   data: DataContext,
-  params: Record<string, any>
+  params: Record<string, any>,
+  checkId?: string,
+  documentFamilyApplicabilityMode: PintAEDocumentFamilyApplicabilityMode = 'legacy',
+  scenarioContextCache?: ScenarioContextCache
 ): boolean {
   const context = normalizeToken(params.document_context || 'both');
   if (!context || context === 'BOTH') return true;
+
+  if (
+    checkId &&
+    data &&
+    shouldUseScenarioContextApplicability(checkId, documentFamilyApplicabilityMode)
+  ) {
+    const header = record?.invoice_id ? data.headerMap.get(record.invoice_id) ?? record : record;
+    const scenarioContext = getScenarioContextForHeader(
+      header,
+      data,
+      scenarioContextCache ?? new Map<string, ReturnType<typeof buildScenarioContext>>()
+    );
+
+    if (context === 'CREDIT_NOTE') {
+      return isScenarioCreditNoteVariant(scenarioContext.documentVariant.value);
+    }
+
+    if (context === 'INVOICE') {
+      return !isScenarioCreditNoteVariant(scenarioContext.documentVariant.value);
+    }
+
+    return true;
+  }
 
   const invoiceType = normalizeToken(
     record?.invoice_type ??
@@ -116,8 +183,28 @@ function shouldRunCodelistForDocumentContext(
   return true;
 }
 
-function isCommercialScopeApplicable(header: any, params: Record<string, any>): boolean {
+function isCommercialScopeApplicable(
+  header: any,
+  params: Record<string, any>,
+  checkId?: string,
+  data?: DataContext,
+  documentFamilyApplicabilityMode: PintAEDocumentFamilyApplicabilityMode = 'legacy',
+  scenarioContextCache?: ScenarioContextCache
+): boolean {
   if (normalizeToken(params.apply_when_document_type) !== 'COMMERCIAL') return true;
+
+  if (
+    checkId &&
+    data &&
+    shouldUseScenarioContextApplicability(checkId, documentFamilyApplicabilityMode)
+  ) {
+    const scenarioContext = getScenarioContextForHeader(
+      header,
+      data,
+      scenarioContextCache ?? new Map<string, ReturnType<typeof buildScenarioContext>>()
+    );
+    return scenarioContext.documentClass.value === 'commercial_invoice';
+  }
 
   const explicitDocumentType = [
     header?.document_type,
@@ -135,6 +222,170 @@ function isCommercialScopeApplicable(header: any, params: Record<string, any>): 
   const commercialInvoiceTypes = getStringArray(params.commercial_invoice_types).map(normalizeToken);
   if (commercialInvoiceTypes.length === 0) return false;
   return commercialInvoiceTypes.includes(normalizeToken(header?.invoice_type));
+}
+
+function normalizeDocumentFamilyApplicabilityMode(
+  value: unknown
+): PintAEDocumentFamilyApplicabilityMode {
+  return String(value ?? '').trim().toLowerCase() === 'scenario_context'
+    ? 'scenario_context'
+    : 'legacy';
+}
+
+function normalizeVatTreatmentApplicabilityMode(
+  value: unknown
+): PintAEVatTreatmentApplicabilityMode {
+  return String(value ?? '').trim().toLowerCase() === 'scenario_context'
+    ? 'scenario_context'
+    : 'legacy';
+}
+
+function normalizeOverlayApplicabilityMode(
+  value: unknown
+): PintAEOverlayApplicabilityMode {
+  return String(value ?? '').trim().toLowerCase() === 'scenario_context'
+    ? 'scenario_context'
+    : 'legacy';
+}
+
+function shouldUseScenarioContextApplicability(
+  checkId: string,
+  documentFamilyApplicabilityMode: PintAEDocumentFamilyApplicabilityMode
+): boolean {
+  return (
+    documentFamilyApplicabilityMode === 'scenario_context' &&
+    DOCUMENT_FAMILY_CUTOVER_RULE_IDS.has(checkId)
+  );
+}
+
+function shouldUseScenarioContextVatTreatmentApplicability(
+  checkId: string,
+  vatTreatmentApplicabilityMode: PintAEVatTreatmentApplicabilityMode
+): boolean {
+  return (
+    vatTreatmentApplicabilityMode === 'scenario_context' &&
+    VAT_TREATMENT_CUTOVER_RULE_IDS.has(checkId)
+  );
+}
+
+function shouldUseScenarioContextOverlayApplicability(
+  checkId: string,
+  overlayApplicabilityMode: PintAEOverlayApplicabilityMode
+): boolean {
+  return (
+    overlayApplicabilityMode === 'scenario_context' &&
+    OVERLAY_CUTOVER_RULE_IDS.has(checkId)
+  );
+}
+
+function isScenarioCreditNoteVariant(value: string): boolean {
+  return (
+    value === 'credit_note' ||
+    value === 'commercial_credit_note' ||
+    value === 'self_billing_credit_note'
+  );
+}
+
+function buildScenarioInvoiceInputForHeader(header: any, data: DataContext) {
+  return {
+    header,
+    lines: header?.invoice_id ? data.linesByInvoice.get(header.invoice_id) ?? [] : [],
+    buyer: data.buyerMap.get(header?.buyer_id) ?? null,
+  };
+}
+
+function getScenarioContextForHeader(
+  header: any,
+  data: DataContext,
+  scenarioContextCache: ScenarioContextCache
+): ReturnType<typeof buildScenarioContext> {
+  const cacheKey = String(header?.invoice_id || header?.invoice_number || '__single_header__');
+  const cached = scenarioContextCache.get(cacheKey);
+  if (cached) return cached;
+
+  const scenarioContext = buildScenarioContext(buildScenarioInvoiceInputForHeader(header, data));
+  scenarioContextCache.set(cacheKey, scenarioContext);
+  return scenarioContext;
+}
+
+function getLegacyScenarioClassificationForHeader(
+  header: any,
+  data: DataContext,
+  legacyScenarioClassificationCache: LegacyScenarioClassificationCache
+): ReturnType<typeof classifyInvoice> {
+  const cacheKey = String(header?.invoice_id || header?.invoice_number || '__single_header__');
+  const cached = legacyScenarioClassificationCache.get(cacheKey);
+  if (cached) return cached;
+
+  const classification = classifyInvoice(buildScenarioInvoiceInputForHeader(header, data));
+  legacyScenarioClassificationCache.set(cacheKey, classification);
+  return classification;
+}
+
+function isVatTreatmentApplicableForRecord(
+  checkId: string,
+  record: any,
+  data: DataContext,
+  vatTreatmentApplicabilityMode: PintAEVatTreatmentApplicabilityMode,
+  scenarioContextCache: ScenarioContextCache
+): boolean {
+  if (!shouldUseScenarioContextVatTreatmentApplicability(checkId, vatTreatmentApplicabilityMode)) {
+    return true;
+  }
+
+  const header = record?.invoice_id ? data.headerMap.get(record.invoice_id) ?? record : record;
+  const scenarioContext = getScenarioContextForHeader(header, data, scenarioContextCache);
+
+  if (checkId === 'UAE-UC1-CHK-049' || checkId === 'UAE-UC1-CHK-050') {
+    return scenarioContext.vatTreatments.value.includes('exempt');
+  }
+
+  if (checkId === 'UAE-UC1-CHK-051' || checkId === 'UAE-UC1-CHK-052') {
+    return scenarioContext.vatTreatments.value.includes('reverse_charge');
+  }
+
+  return true;
+}
+
+function isOverlayApplicableForHeader(
+  checkId: string,
+  header: any,
+  data: DataContext,
+  overlayApplicabilityMode: PintAEOverlayApplicabilityMode,
+  scenarioContextCache: ScenarioContextCache,
+  legacyScenarioClassificationCache: LegacyScenarioClassificationCache
+): boolean {
+  if (shouldUseScenarioContextOverlayApplicability(checkId, overlayApplicabilityMode)) {
+    const scenarioContext = getScenarioContextForHeader(header, data, scenarioContextCache);
+
+    if (checkId === 'IBR-137-AE') {
+      return scenarioContext.transactionFlags.value.includes('disclosed_agent_billing');
+    }
+    if (checkId === 'IBR-138-AE') {
+      return scenarioContext.transactionFlags.value.includes('summary_invoice');
+    }
+    if (checkId === 'IBR-152-AE') {
+      return scenarioContext.transactionFlags.value.includes('exports');
+    }
+    return false;
+  }
+
+  const classification = getLegacyScenarioClassificationForHeader(
+    header,
+    data,
+    legacyScenarioClassificationCache
+  );
+
+  if (checkId === 'IBR-137-AE') {
+    return classification.businessScenarios.includes('Disclosed agent');
+  }
+  if (checkId === 'IBR-138-AE') {
+    return classification.businessScenarios.includes('Summary invoice');
+  }
+  if (checkId === 'IBR-152-AE') {
+    return classification.vatTreatments.includes('Export');
+  }
+  return false;
 }
 
 function pickFirstNonEmptyField(
@@ -196,6 +447,7 @@ function conditionMatches(record: any, condition: DependencyCondition): boolean 
 function runConditionalFieldRequirement(
   check: PintAECheck,
   data: DataContext,
+  recordApplicabilityPredicate: ((record: any) => boolean) | undefined,
   createException: (opts: {
     invoiceId?: string;
     invoiceNumber?: string;
@@ -222,6 +474,9 @@ function runConditionalFieldRequirement(
   let executionCount = 0;
 
   dataset.forEach((record: any) => {
+    if (recordApplicabilityPredicate && !recordApplicabilityPredicate(record)) {
+      return;
+    }
     if (!recordMatchesConditions(record, conditions)) {
       return;
     }
@@ -253,11 +508,20 @@ function runConditionalFieldRequirement(
   return { exceptions, executionCount };
 }
 
-export function runPintAECheckWithTelemetry(check: PintAECheck, data: DataContext): PintAECheckRunResult {
+export function runPintAECheckWithTelemetry(
+  check: PintAECheck,
+  data: DataContext,
+  options: RunPintAECheckOptions = {}
+): PintAECheckRunResult {
   const exceptions: PintAEException[] = [];
   const params = check.parameters || {};
   const timestamp = new Date().toISOString();
   let executionCount = 0;
+  const documentFamilyApplicabilityMode = options.documentFamilyApplicabilityMode ?? DOCUMENT_FAMILY_APPLICABILITY_MODE;
+  const vatTreatmentApplicabilityMode = options.vatTreatmentApplicabilityMode ?? VAT_TREATMENT_APPLICABILITY_MODE;
+  const overlayApplicabilityMode = options.overlayApplicabilityMode ?? OVERLAY_APPLICABILITY_MODE;
+  const scenarioContextCache: ScenarioContextCache = new Map();
+  const legacyScenarioClassificationCache: LegacyScenarioClassificationCache = new Map();
 
   const createException = (opts: {
     invoiceId?: string;
@@ -952,7 +1216,16 @@ export function runPintAECheckWithTelemetry(check: PintAECheck, data: DataContex
     // Commercial buyer legal registration identifier presence
     case 'UAE-UC1-CHK-036':
       data.headers.forEach(header => {
-        if (!isCommercialScopeApplicable(header, params)) return;
+        if (
+          !isCommercialScopeApplicable(
+            header,
+            params,
+            check.check_id,
+            data,
+            documentFamilyApplicabilityMode,
+            scenarioContextCache
+          )
+        ) return;
         executionCount++;
         const buyer = data.buyerMap.get(header.buyer_id);
         const identifierFields = getStringArray(params.buyer_identifier_fields);
@@ -977,7 +1250,16 @@ export function runPintAECheckWithTelemetry(check: PintAECheck, data: DataContex
     // Commercial buyer legal registration identifier type policy
     case 'UAE-UC1-CHK-037':
       data.headers.forEach(header => {
-        if (!isCommercialScopeApplicable(header, params)) return;
+        if (
+          !isCommercialScopeApplicable(
+            header,
+            params,
+            check.check_id,
+            data,
+            documentFamilyApplicabilityMode,
+            scenarioContextCache
+          )
+        ) return;
         executionCount++;
         const buyer = data.buyerMap.get(header.buyer_id);
 
@@ -1348,6 +1630,111 @@ export function runPintAECheckWithTelemetry(check: PintAECheck, data: DataContex
       break;
     }
 
+    case 'IBR-137-AE':
+      data.headers.forEach((header) => {
+        if (
+          !isOverlayApplicableForHeader(
+            check.check_id,
+            header,
+            data,
+            overlayApplicabilityMode,
+            scenarioContextCache,
+            legacyScenarioClassificationCache
+          )
+        ) return;
+        executionCount++;
+        if (isEmpty(header.principal_id)) {
+          exceptions.push(createException({
+            invoiceId: header.invoice_id,
+            invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn,
+            buyerId: header.buyer_id,
+            fieldName: 'principal_id',
+            observedValue: '(empty)',
+            expectedValue: 'Principal ID is required for disclosed-agent billing',
+            message: `Invoice ${header.invoice_number || header.invoice_id}: Principal ID is required when the disclosed-agent billing transaction flag applies`,
+          }));
+        }
+      });
+      break;
+
+    case 'IBR-138-AE':
+      data.headers.forEach((header) => {
+        if (
+          !isOverlayApplicableForHeader(
+            check.check_id,
+            header,
+            data,
+            overlayApplicabilityMode,
+            scenarioContextCache,
+            legacyScenarioClassificationCache
+          )
+        ) return;
+        executionCount++;
+        if (isEmpty(header.invoicing_period_start_date) && isEmpty(header.invoicing_period_end_date)) {
+          exceptions.push(createException({
+            invoiceId: header.invoice_id,
+            invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn,
+            buyerId: header.buyer_id,
+            fieldName: 'invoicing_period_start_date|invoicing_period_end_date',
+            observedValue: '(empty)',
+            expectedValue: 'At least one invoicing period boundary is required',
+            message: `Invoice ${header.invoice_number || header.invoice_id}: Invoicing period is required when the summary-invoice transaction flag applies`,
+          }));
+        }
+      });
+      break;
+
+    case 'IBR-152-AE':
+      data.headers.forEach((header) => {
+        if (
+          !isOverlayApplicableForHeader(
+            check.check_id,
+            header,
+            data,
+            overlayApplicabilityMode,
+            scenarioContextCache,
+            legacyScenarioClassificationCache
+          )
+        ) return;
+        executionCount++;
+
+        const missingFields: string[] = [];
+        if (isEmpty(header.deliver_to_address_line_1)) missingFields.push('deliver_to_address_line_1');
+        if (isEmpty(header.deliver_to_city)) missingFields.push('deliver_to_city');
+        if (isEmpty(header.deliver_to_country_subdivision)) missingFields.push('deliver_to_country_subdivision');
+        if (isEmpty(header.deliver_to_country_code)) missingFields.push('deliver_to_country_code');
+
+        if (missingFields.length > 0) {
+          exceptions.push(createException({
+            invoiceId: header.invoice_id,
+            invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn,
+            buyerId: header.buyer_id,
+            fieldName: missingFields.join('|'),
+            observedValue: '(empty)',
+            expectedValue: 'Delivery information is required for export overlays',
+            message: `Invoice ${header.invoice_number || header.invoice_id}: Delivery information fields are required when the export transaction flag applies`,
+          }));
+          return;
+        }
+
+        if (normalizeToken(header.deliver_to_country_code) === 'AE') {
+          exceptions.push(createException({
+            invoiceId: header.invoice_id,
+            invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn,
+            buyerId: header.buyer_id,
+            fieldName: 'deliver_to_country_code',
+            observedValue: String(header.deliver_to_country_code),
+            expectedValue: 'Deliver-to country code must not be AE for export overlays',
+            message: `Invoice ${header.invoice_number || header.invoice_id}: Deliver-to country code must not be AE when the export transaction flag applies`,
+          }));
+        }
+      });
+      break;
+
     // Default: Generic presence check for other checks
     default:
       if (check.rule_type === 'dynamic_codelist' && params.field && params.codelist) {
@@ -1355,7 +1742,25 @@ export function runPintAECheckWithTelemetry(check: PintAECheck, data: DataContex
         const dataset = getDatasetForField(field, check.scope, data);
         const conditions = Array.isArray(params.when) ? (params.when as DependencyCondition[]) : [];
         dataset.forEach((record: any) => {
-          if (!shouldRunCodelistForDocumentContext(record, data, params)) return;
+          if (
+            !isVatTreatmentApplicableForRecord(
+              check.check_id,
+              record,
+              data,
+              vatTreatmentApplicabilityMode,
+              scenarioContextCache
+            )
+          ) return;
+          if (
+            !shouldRunCodelistForDocumentContext(
+              record,
+              data,
+              params,
+              check.check_id,
+              documentFamilyApplicabilityMode,
+              scenarioContextCache
+            )
+          ) return;
           if (conditions.length > 0 && !recordMatchesConditions(record, conditions)) return;
           executionCount++;
           const value = getFieldValue(record, field);
@@ -1374,7 +1779,19 @@ export function runPintAECheckWithTelemetry(check: PintAECheck, data: DataContex
           }
         });
       } else if (check.rule_type === 'dependency_rule' && Array.isArray(params.when) && Array.isArray(params.require_any_of)) {
-        const dependencyResult = runConditionalFieldRequirement(check, data, createException);
+        const dependencyResult = runConditionalFieldRequirement(
+          check,
+          data,
+          (record: any) =>
+            isVatTreatmentApplicableForRecord(
+              check.check_id,
+              record,
+              data,
+              vatTreatmentApplicabilityMode,
+              scenarioContextCache
+            ),
+          createException
+        );
         executionCount += dependencyResult.executionCount;
         exceptions.push(...dependencyResult.exceptions);
       } else if (check.rule_type === 'structural_rule' && params.field) {

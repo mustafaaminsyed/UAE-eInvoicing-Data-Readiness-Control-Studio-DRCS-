@@ -68,6 +68,32 @@ function num(record: Record<string, string>, ...keys: string[]): number | undefi
   return undefined;
 }
 
+function buildInvoicingPeriod(
+  startDate?: string,
+  endDate?: string
+): InvoiceHeader['invoicing_period'] {
+  if (!startDate && !endDate) return undefined;
+  return {
+    start_date: startDate,
+    end_date: endDate,
+  };
+}
+
+function buildDeliveryInformation(
+  addressLine1?: string,
+  city?: string,
+  countrySubdivision?: string,
+  countryCode?: string
+): InvoiceHeader['delivery_information'] {
+  if (!addressLine1 && !city && !countrySubdivision && !countryCode) return undefined;
+  return {
+    address_line_1: addressLine1,
+    city,
+    country_subdivision: countrySubdivision,
+    country_code: countryCode,
+  };
+}
+
 export async function parseBuyersFile(file: File): Promise<Buyer[]> {
   return parsePartiesFile(file, { direction: 'AR' });
 }
@@ -125,46 +151,94 @@ export async function parseHeadersFile(file: File, options: ParseOptions = {}): 
   const direction = options.direction || 'AR';
   const counterpartyIdKeys = direction === 'AP' ? ['supplier_id', 'vendor_id', 'buyer_id'] : ['buyer_id', 'customer_id', 'party_id'];
 
-  return records.map((record, index) => ({
-    invoice_id: record.invoice_id || '',
-    invoice_number: record.invoice_number || '',
-    issue_date: record.issue_date || '',
-    seller_trn: record.seller_trn || '',
-    buyer_id: getValue(record, counterpartyIdKeys) || '',
-    buyer_trn: str(record, 'buyer_trn'),
-    currency: record.currency || '',
-    direction,
-    invoice_type: str(record, 'invoice_type_code', 'invoice_type'),
-    total_excl_vat: num(record, 'total_excl_vat'),
-    vat_total: num(record, 'vat_total'),
-    total_incl_vat: num(record, 'total_incl_vat'),
-    seller_name: str(record, 'seller_name'),
-    seller_address: str(record, 'seller_address'),
-    seller_city: str(record, 'seller_city'),
-    seller_country: str(record, 'seller_country'),
-    seller_subdivision: str(record, 'seller_subdivision'),
-    seller_electronic_address: str(record, 'seller_electronic_address'),
-    seller_legal_reg_id: str(record, 'seller_legal_reg_id'),
-    seller_legal_reg_id_type: str(record, 'seller_legal_reg_id_type'),
-    transaction_type_code: str(record, 'transaction_type_code'),
-    payment_due_date: str(record, 'payment_due_date', 'due_date'),
-    payment_means_code: str(record, 'payment_means_code'),
-    fx_rate: num(record, 'fx_rate'),
-    amount_due: num(record, 'amount_due'),
-    tax_category_code: str(record, 'tax_category_code'),
-    tax_category_rate: num(record, 'tax_category_rate'),
-    note: str(record, 'note'),
-    supply_date: str(record, 'supply_date'),
-    tax_currency: str(record, 'tax_currency'),
-    document_level_allowance_total: num(record, 'document_level_allowance_total'),
-    document_level_charge_total: num(record, 'document_level_charge_total'),
-    rounding_amount: num(record, 'rounding_amount'),
-    spec_id: str(record, 'spec_id', 'specification_id'),
-    business_process: str(record, 'business_process', 'business_process_type'),
-    source_row_number: index + 2,
-    upload_session_id: options.uploadSessionId,
-    upload_manifest_id: options.uploadManifestId,
-  }));
+  return records.map((record, index) => {
+    const invoicingPeriodStartDate = str(
+      record,
+      'invoicing_period_start_date',
+      'invoice_period_start_date',
+      'period_start_date'
+    );
+    const invoicingPeriodEndDate = str(
+      record,
+      'invoicing_period_end_date',
+      'invoice_period_end_date',
+      'period_end_date'
+    );
+    const deliverToAddressLine1 = str(
+      record,
+      'deliver_to_address_line_1',
+      'deliver_to_address',
+      'delivery_address_line_1'
+    );
+    const deliverToCity = str(record, 'deliver_to_city', 'delivery_city');
+    const deliverToCountrySubdivision = str(
+      record,
+      'deliver_to_country_subdivision',
+      'deliver_to_subdivision',
+      'delivery_country_subdivision'
+    );
+    const deliverToCountryCode = str(
+      record,
+      'deliver_to_country_code',
+      'deliver_to_country',
+      'delivery_country_code'
+    );
+
+    return {
+      invoice_id: record.invoice_id || '',
+      invoice_number: record.invoice_number || '',
+      issue_date: record.issue_date || '',
+      seller_trn: record.seller_trn || '',
+      buyer_id: getValue(record, counterpartyIdKeys) || '',
+      buyer_trn: str(record, 'buyer_trn'),
+      currency: record.currency || '',
+      direction,
+      invoice_type: str(record, 'invoice_type_code', 'invoice_type'),
+      total_excl_vat: num(record, 'total_excl_vat'),
+      vat_total: num(record, 'vat_total'),
+      total_incl_vat: num(record, 'total_incl_vat'),
+      seller_name: str(record, 'seller_name'),
+      seller_address: str(record, 'seller_address'),
+      seller_city: str(record, 'seller_city'),
+      seller_country: str(record, 'seller_country'),
+      seller_subdivision: str(record, 'seller_subdivision'),
+      seller_electronic_address: str(record, 'seller_electronic_address'),
+      seller_legal_reg_id: str(record, 'seller_legal_reg_id'),
+      seller_legal_reg_id_type: str(record, 'seller_legal_reg_id_type'),
+      transaction_type_code: str(record, 'transaction_type_code'),
+      principal_id: str(record, 'principal_id', 'principle_id', 'principal_identifier'),
+      invoicing_period_start_date: invoicingPeriodStartDate,
+      invoicing_period_end_date: invoicingPeriodEndDate,
+      invoicing_period: buildInvoicingPeriod(invoicingPeriodStartDate, invoicingPeriodEndDate),
+      deliver_to_address_line_1: deliverToAddressLine1,
+      deliver_to_city: deliverToCity,
+      deliver_to_country_subdivision: deliverToCountrySubdivision,
+      deliver_to_country_code: deliverToCountryCode,
+      delivery_information: buildDeliveryInformation(
+        deliverToAddressLine1,
+        deliverToCity,
+        deliverToCountrySubdivision,
+        deliverToCountryCode
+      ),
+      payment_due_date: str(record, 'payment_due_date', 'due_date'),
+      payment_means_code: str(record, 'payment_means_code'),
+      fx_rate: num(record, 'fx_rate'),
+      amount_due: num(record, 'amount_due'),
+      tax_category_code: str(record, 'tax_category_code'),
+      tax_category_rate: num(record, 'tax_category_rate'),
+      note: str(record, 'note'),
+      supply_date: str(record, 'supply_date'),
+      tax_currency: str(record, 'tax_currency'),
+      document_level_allowance_total: num(record, 'document_level_allowance_total'),
+      document_level_charge_total: num(record, 'document_level_charge_total'),
+      rounding_amount: num(record, 'rounding_amount'),
+      spec_id: str(record, 'spec_id', 'specification_id'),
+      business_process: str(record, 'business_process', 'business_process_type'),
+      source_row_number: index + 2,
+      upload_session_id: options.uploadSessionId,
+      upload_manifest_id: options.uploadManifestId,
+    };
+  });
 }
 
 export async function parseLinesFile(file: File, options: ParseOptions = {}): Promise<InvoiceLine[]> {

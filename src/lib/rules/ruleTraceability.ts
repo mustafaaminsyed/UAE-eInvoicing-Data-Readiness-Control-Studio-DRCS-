@@ -5,6 +5,7 @@
 
 import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
 import { getValidationDRTargets } from '@/lib/registry/validationToDRMap';
+import { getShadowApplicabilityDefinitions } from '@/modules/scenarioContext/shadowApplicability';
 import { ExecutionLayer, RuleType } from '@/types/pintAE';
 
 export interface RuleTraceEntry {
@@ -20,7 +21,7 @@ export interface RuleTraceEntry {
 }
 
 export function buildRuleTraceability(): RuleTraceEntry[] {
-  return UAE_UC1_CHECK_PACK.map((check) => ({
+  const runtimeEntries = UAE_UC1_CHECK_PACK.map((check) => ({
     rule_id: check.check_id,
     rule_name: check.check_name,
     affected_dr_ids: getValidationDRTargets(check.check_id).map((target) => target.dr_id),
@@ -33,6 +34,24 @@ export function buildRuleTraceability(): RuleTraceEntry[] {
     scope: check.scope,
     applies_when: check.use_case,
   }));
+
+  const overlayBridgeEntries: RuleTraceEntry[] = getShadowApplicabilityDefinitions()
+    .filter((definition) => definition.source === 'shadow_only' && definition.family === 'overlay')
+    .map((definition) => ({
+      rule_id: definition.ruleId,
+      rule_name: definition.title,
+      affected_dr_ids: getValidationDRTargets(definition.ruleId).map((target) => target.dr_id),
+      referenced_dr_ids: getValidationDRTargets(definition.ruleId, { includeReferenceOnly: true }).map(
+        (target) => target.dr_id
+      ),
+      rule_type: 'dependency_rule' as RuleType,
+      execution_layer: 'dependency_rule' as ExecutionLayer,
+      severity: 'Critical',
+      scope: 'Header',
+      applies_when: 'ScenarioContext overlay traceability bridge',
+    }));
+
+  return [...runtimeEntries, ...overlayBridgeEntries];
 }
 
 let _traceMap: RuleTraceEntry[] | null = null;
