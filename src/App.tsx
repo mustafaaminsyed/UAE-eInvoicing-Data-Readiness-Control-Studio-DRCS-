@@ -14,7 +14,8 @@ import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 const UploadPage = lazy(() => import("./pages/UploadPage"));
 const RunChecksPage = lazy(() => import("./pages/RunChecksPage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
-const ExceptionsPage = lazy(() => import("./pages/ExceptionsPage"));
+const DataTwinPage = lazy(() => import("./pages/DataTwinPage"));
+const ExceptionsWorkspacePage = lazy(() => import("./pages/ExceptionsWorkspacePage"));
 const InvoiceDetailPage = lazy(() => import("./pages/InvoiceDetailPage"));
 const CheckBuilderPage = lazy(() => import("./pages/CheckBuilderPage"));
 const CheckRegistryPage = lazy(() => import("./pages/CheckRegistryPage"));
@@ -68,7 +69,8 @@ const App = () => (
                       <Route path="/upload" element={<UploadPage />} />
                       <Route path="/run" element={<RunChecksPage />} />
                       <Route path="/dashboard" element={<DashboardPage />} />
-                      <Route path="/exceptions" element={<ExceptionsPage />} />
+                      <Route path="/data-twin" element={<DataTwinPage />} />
+                      <Route path="/exceptions" element={<ExceptionsWorkspacePage />} />
                       <Route path="/invoice/:invoiceId" element={<InvoiceDetailPage />} />
                       <Route path="/check-builder" element={<CheckBuilderPage />} />
                       <Route path="/check-registry" element={<CheckRegistryPage />} />
