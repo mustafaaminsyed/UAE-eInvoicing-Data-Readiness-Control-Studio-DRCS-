@@ -1,8 +1,16 @@
 import { Buyer, InvoiceHeader, InvoiceLine } from '@/types/compliance';
 import { Direction } from '@/types/direction';
 
+export function normalizeCSVText(text: string): string {
+  return text
+    .replace(/^\uFEFF/, '')
+    .replace(/\r\n?/g, '\n')
+    .trim();
+}
+
 export function parseCSV(text: string): Record<string, string>[] {
-  const lines = text.trim().split('\n');
+  const normalizedText = normalizeCSVText(text);
+  const lines = normalizedText.split('\n');
   if (lines.length < 2) return [];
 
   const headers = parseCSVLine(lines[0]);

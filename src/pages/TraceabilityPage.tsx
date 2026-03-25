@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Search, AlertTriangle, CheckCircle2, XCircle, Shield,
@@ -224,9 +224,17 @@ export default function TraceabilityPage() {
   const [viewMode, setViewMode] = useState<TraceabilityViewMode>('pint');
   const [drillDownRow, setDrillDownRow] = useState<TraceabilityRow | null>(null);
   const [showConsistency, setShowConsistency] = useState(false);
+  const twinInvoice = searchParams.get('invoice')?.trim() || null;
+  const twinField = searchParams.get('field')?.trim() || null;
 
   const consistencyReport = useMemo(() => runConsistencyChecks(), []);
   const scenarioFilters = useMemo(() => readScenarioFilters(searchParams), [searchParams]);
+
+  useEffect(() => {
+    if (twinField) {
+      setSearch(twinField);
+    }
+  }, [twinField]);
 
   const baseScenarioInvoices = useMemo(
     () => buildScenarioLensInvoices(headers, lines, buyers),
@@ -494,6 +502,23 @@ export default function TraceabilityPage() {
             </div>
           </CardContent>
         </Card>
+
+        {(twinInvoice || twinField) && (
+          <Card className="mb-6 border-primary/15 bg-primary/5 shadow-sm animate-slide-up">
+            <CardContent className="p-4">
+              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                <span className="font-semibold text-foreground">Digital Twin context</span>
+                {twinInvoice ? <Badge variant="outline">Invoice: {twinInvoice}</Badge> : null}
+                {twinField ? <Badge variant="outline">Field: {twinField}</Badge> : null}
+                <span>
+                  {twinField
+                    ? 'Search is pre-focused to the selected field for trace review.'
+                    : 'Opened from the selected invoice journey in the Digital Twin.'}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {FEATURE_FLAGS.scenarioLens && (
           <div className="mb-6 animate-slide-up">
