@@ -10,6 +10,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { cn } from '@/lib/utils';
 import { 
   DatasetType,
   FieldMapping, 
@@ -29,6 +30,7 @@ interface MappingStepProps {
   mappings: FieldMapping[];
   onMappingsChange: (mappings: FieldMapping[]) => void;
   onDatasetTypeChange?: (datasetType: DatasetType) => void;
+  focusedField?: string | null;
 }
 
 export function MappingStep({
@@ -36,6 +38,7 @@ export function MappingStep({
   mappings,
   onMappingsChange,
   onDatasetTypeChange,
+  focusedField,
 }: MappingStepProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showOnlyPending, setShowOnlyPending] = useState(false);
@@ -58,6 +61,12 @@ export function MappingStep({
       handleGenerateSuggestions();
     }
   }, [mappings.length, handleGenerateSuggestions]);
+
+  useEffect(() => {
+    if (focusedField) {
+      setSearchTerm(focusedField);
+    }
+  }, [focusedField]);
 
   const handleConfirmMapping = (mappingId: string) => {
     const updated = mappings.map(m => 
@@ -148,7 +157,8 @@ export function MappingStep({
     return mappings.filter(m => {
       const matchesSearch = !searchTerm || 
         m.erpColumn.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.targetField.name.toLowerCase().includes(searchTerm.toLowerCase());
+        m.targetField.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        m.targetField.id.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesPending = !showOnlyPending || !m.isConfirmed;
       return matchesSearch && matchesPending;
     });
@@ -180,6 +190,15 @@ export function MappingStep({
     );
   };
 
+  const isFocusedMapping = (mapping: FieldMapping) => {
+    if (!focusedField) return false;
+    const normalizedFocus = focusedField.toLowerCase();
+    return (
+      mapping.targetField.id.toLowerCase() === normalizedFocus ||
+      mapping.erpColumn.toLowerCase() === normalizedFocus
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Duplicate Error Alert */}
@@ -208,6 +227,15 @@ export function MappingStep({
             >
               Use {getDatasetTypeLabel(recommendedDatasetType)}
             </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {focusedField && (
+        <Alert className="border-primary/20 bg-primary/5">
+          <AlertDescription className="text-sm text-muted-foreground">
+            Focused from Digital Twin on <strong>{focusedField}</strong>. Matching ERP columns and PINT-AE fields are
+            filtered first for quicker review.
           </AlertDescription>
         </Alert>
       )}
@@ -306,7 +334,14 @@ export function MappingStep({
                   </TableRow>
                 ) : (
                   filteredMappings.map((mapping) => (
-                    <TableRow key={mapping.id} className="hover:bg-white/5">
+                    <TableRow
+                      key={mapping.id}
+                      data-focused-match={isFocusedMapping(mapping) ? 'true' : undefined}
+                      className={cn(
+                        'hover:bg-white/5',
+                        isFocusedMapping(mapping) && 'bg-primary/5 ring-1 ring-inset ring-primary/20'
+                      )}
+                    >
                       <TableCell className="align-middle font-mono text-sm">{mapping.erpColumn}</TableCell>
                       <TableCell className="align-middle text-center">
                         <ArrowRight className="h-4 w-4 mx-auto text-muted-foreground" />

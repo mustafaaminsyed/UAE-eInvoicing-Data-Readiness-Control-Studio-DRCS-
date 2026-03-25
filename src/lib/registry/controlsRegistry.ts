@@ -142,6 +142,13 @@ const CONTROLS_DEFINITION: Omit<ControlEntry, 'covered_dr_ids'>[] = [
     description: 'Detects semantic contradictions between VAT category, VAT rate, VAT amounts, and header breakdown behaviour',
     covered_rule_ids: ['UAE-UC1-CHK-053', 'UAE-UC1-CHK-054'],
   },
+  {
+    control_id: 'CTRL-018',
+    control_name: 'Overlay Scenario Dependency Enforcement',
+    control_type: 'preventive',
+    description: 'Requires overlay-specific principal, invoicing-period, and delivery information fields when governed overlay transaction flags apply',
+    covered_rule_ids: ['IBR-137-AE', 'IBR-138-AE', 'IBR-152-AE'],
+  },
 ];
 
 // ── Build registry with derived DR IDs ──────────────────────────────

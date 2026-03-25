@@ -57,7 +57,7 @@ function SeedUploadedData() {
 describe("TraceabilityPage", () => {
   it("renders without crashing after route navigation when loaded data includes numeric buyer fields", async () => {
     render(
-      <MemoryRouter initialEntries={["/traceability"]}>
+      <MemoryRouter initialEntries={["/traceability?invoice=INV001&field=seller_trn"]}>
         <ComplianceProvider>
           <SeedUploadedData />
           <Routes>
@@ -69,6 +69,10 @@ describe("TraceabilityPage", () => {
 
     expect(await screen.findByText("DR Coverage & Traceability")).toBeInTheDocument();
     expect(await screen.findByText("Coverage Basis")).toBeInTheDocument();
+    expect(await screen.findByText("Digital Twin context")).toBeInTheDocument();
+    expect(screen.getByText("Invoice: INV001")).toBeInTheDocument();
+    expect(screen.getByText("Field: seller_trn")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("seller_trn")).toBeInTheDocument();
     await waitFor(() => {
       expect(
         screen.queryByText(/Upload data on the/i)

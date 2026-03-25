@@ -8,9 +8,9 @@ B002,Global Traders FZ-LLC,200000000000003,Unit 7 JAFZA South,AE,Dubai,AE-DU,glo
 B003,Tech Solutions DMCC,300000000000003,Floor 12 Almas Tower JLT,AE,Dubai,AE-DU,tech.solutions@peppol.ae`;
 
 export const headersSample = `invoice_id,invoice_number,issue_date,invoice_type,seller_trn,seller_name,seller_address,seller_city,seller_country,seller_subdivision,seller_electronic_address,seller_legal_reg_id,seller_legal_reg_id_type,buyer_id,currency,transaction_type_code,principal_id,invoicing_period_start_date,invoicing_period_end_date,deliver_to_address_line_1,deliver_to_city,deliver_to_country_subdivision,deliver_to_country_code,payment_due_date,payment_means_code,fx_rate,total_excl_vat,vat_total,total_incl_vat,amount_due,tax_category_code,tax_category_rate
-INV001,UAE-2025-0001,2025-01-15,380,100000000000001,Dariba Tax Technologies LLC,Al Sila Tower ADGM,Abu Dhabi,AE,AE-AZ,dariba@peppol.ae,TL-123456,TL,B001,AED,01000000,,,,,,,2025-02-14,30,1.000000,1000.00,50.00,1050.00,1050.00,S,5.00
-INV002,UAE-2025-0002,2025-01-16,380,100000000000001,Dariba Tax Technologies LLC,Al Sila Tower ADGM,Abu Dhabi,AE,AE-AZ,dariba@peppol.ae,TL-123456,TL,B002,AED,01000000,,,,,,,2025-02-15,30,1.000000,2000.00,100.00,2100.00,2100.00,S,5.00
-INV003,UAE-2025-0003,2025-01-17,380,100000000000001,Dariba Tax Technologies LLC,Al Sila Tower ADGM,Abu Dhabi,AE,AE-AZ,dariba@peppol.ae,TL-123456,TL,B003,AED,01000000,,,,,,,2025-02-16,30,1.000000,500.00,25.00,525.00,525.00,S,5.00`;
+INV001,UAE-2025-0001,2025-01-15,380,100000000000001,Dariba Tax Technologies LLC,Al Sila Tower ADGM,Abu Dhabi,AE,AE-AZ,dariba@peppol.ae,TL-123456,TL,B001,AED,01000000,,,,,,,,2025-02-14,30,1.000000,1000.00,50.00,1050.00,1050.00,S,5.00
+INV002,UAE-2025-0002,2025-01-16,380,100000000000001,Dariba Tax Technologies LLC,Al Sila Tower ADGM,Abu Dhabi,AE,AE-AZ,dariba@peppol.ae,TL-123456,TL,B002,AED,01000000,,,,,,,,2025-02-15,30,1.000000,2000.00,100.00,2100.00,2100.00,S,5.00
+INV003,UAE-2025-0003,2025-01-17,380,100000000000001,Dariba Tax Technologies LLC,Al Sila Tower ADGM,Abu Dhabi,AE,AE-AZ,dariba@peppol.ae,TL-123456,TL,B003,AED,01000000,,,,,,,,2025-02-16,30,1.000000,500.00,25.00,525.00,525.00,S,5.00`;
 
 export const linesSample = `line_id,invoice_id,line_number,description,quantity,unit_of_measure,unit_price,line_discount,line_total_excl_vat,vat_rate,vat_amount,tax_category_code
 L001,INV001,1,Consulting Services - Tax Advisory,10,EA,100.00,0.00,1000.00,5.00,50.00,S
@@ -23,9 +23,9 @@ B002,Global Traders FZ-LLC,INVALIDTRN,Unit 7 JAFZA South,AE,Dubai,AE-DU,global.t
 B003,Tech Solutions DMCC,300000000000003,Floor 12 Almas Tower JLT,AE,Dubai,AE-DU,`;
 
 export const headersNegativeSample = `invoice_id,invoice_number,issue_date,invoice_type,seller_trn,seller_name,seller_address,seller_city,seller_country,seller_subdivision,seller_electronic_address,seller_legal_reg_id,seller_legal_reg_id_type,buyer_id,currency,transaction_type_code,principal_id,invoicing_period_start_date,invoicing_period_end_date,deliver_to_address_line_1,deliver_to_city,deliver_to_country_subdivision,deliver_to_country_code,payment_due_date,payment_means_code,fx_rate,total_excl_vat,vat_total,total_incl_vat,amount_due,tax_category_code,tax_category_rate
-INV001,UAE-2025-0001,2025-01-15,380,100000000000001,Dariba Tax Technologies LLC,Al Sila Tower ADGM,Abu Dhabi,AE,AE-AZ,dariba@peppol.ae,TL-123456,TL,B001,AED,01000000,,,,,,,2025-02-14,30,1.000000,1000.00,50.00,1050.00,1050.00,S,5.00
-INV002,UAE-2025-0002,2025-01-16,380,100000000000001,Dariba Tax Technologies LLC,Al Sila Tower ADGM,Abu Dhabi,AE,AE-XX,dariba@peppol.ae,TL-123456,TL,B002,AED,01000000,,,,,,,,30,1.000000,2000.00,100.00,2100.00,2100.00,S,5.00
-INV003,UAE-2025-0003,2025-01-17,380,100000000000001,Dariba Tax Technologies LLC,Al Sila Tower ADGM,Abu Dhabi,AE,AE-AZ,dariba@peppol.ae,TL-123456,TL,B003,AED,01000000,,,,,,,2025-02-16,30,1.000000,500.00,20.00,525.00,525.00,S,5.00`;
+INV001,UAE-2025-0001,2025-01-15,380,100000000000001,Dariba Tax Technologies LLC,Al Sila Tower ADGM,Abu Dhabi,AE,AE-AZ,dariba@peppol.ae,TL-123456,TL,B001,AED,01000000,,,,,,,,2025-02-14,30,1.000000,1000.00,50.00,1050.00,1050.00,S,5.00
+INV002,UAE-2025-0002,2025-01-16,380,100000000000001,Dariba Tax Technologies LLC,Al Sila Tower ADGM,Abu Dhabi,AE,AE-XX,dariba@peppol.ae,TL-123456,TL,B002,AED,01000000,,,,,,,,,30,1.000000,2000.00,100.00,2100.00,2100.00,S,5.00
+INV003,UAE-2025-0003,2025-01-17,380,100000000000001,Dariba Tax Technologies LLC,Al Sila Tower ADGM,Abu Dhabi,AE,AE-AZ,dariba@peppol.ae,TL-123456,TL,B003,AED,01000000,,,,,,,,2025-02-16,30,1.000000,500.00,20.00,525.00,525.00,S,5.00`;
 
 export const linesNegativeSample = `line_id,invoice_id,line_number,description,quantity,unit_of_measure,unit_price,line_discount,line_total_excl_vat,vat_rate,vat_amount,tax_category_code
 L001,INV001,1,Consulting Services - Tax Advisory,10,EA,100.00,0.00,1000.00,5.00,50.00,S

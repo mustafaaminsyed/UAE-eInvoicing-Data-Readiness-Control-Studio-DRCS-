@@ -3,6 +3,7 @@
 // =============================================================================
 
 import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
+import { OVERLAY_RUNTIME_CHECKS } from '@/lib/checks/overlayRuntimeChecks';
 import { getDRRegistry } from '@/lib/registry/drRegistry';
 import {
   getDRCoverageMaturity,
@@ -34,6 +35,11 @@ export interface ConsistencyCheckOptions {
   checks?: PintAECheck[];
   validationMap?: ValidationDRMapEntry[];
 }
+
+const ACTIVE_EXECUTABLE_CHECKS: PintAECheck[] = [
+  ...UAE_UC1_CHECK_PACK,
+  ...OVERLAY_RUNTIME_CHECKS,
+];
 
 function buildValidationMapIndex(validationMap: ValidationDRMapEntry[]): Map<string, ValidationDRMapEntry> {
   return new Map(validationMap.map((entry) => [entry.validation_id, entry]));
@@ -81,7 +87,7 @@ export function runConsistencyChecks(options: ConsistencyCheckOptions = {}): Con
   const issues: ConsistencyIssue[] = [];
   let passed = 0;
 
-  const checks = options.checks ?? UAE_UC1_CHECK_PACK;
+  const checks = options.checks ?? ACTIVE_EXECUTABLE_CHECKS;
   const validationMap = options.validationMap ?? VALIDATION_TO_DR_MAP;
   const registry = getDRRegistry();
   const controls = getControlsRegistry();

@@ -42,6 +42,9 @@ export default function MappingPage() {
   
   // Tab state
   const activeTab = searchParams.get('tab') || 'templates';
+  const requestedDataset = searchParams.get('dataset');
+  const requestedDirection = requestedDataset === 'AR' || requestedDataset === 'AP' ? requestedDataset : null;
+  const focusedField = searchParams.get('field')?.trim() || null;
   
   // Template list state
   const [templates, setTemplates] = useState<MappingTemplate[]>([]);
@@ -74,6 +77,12 @@ export default function MappingPage() {
   useEffect(() => {
     loadTemplates();
   }, [loadTemplates]);
+
+  useEffect(() => {
+    if (requestedDirection && requestedDirection !== direction) {
+      setDirection(requestedDirection);
+    }
+  }, [direction, requestedDirection, setDirection]);
 
   const handleTabChange = (tab: string) => {
     setSearchParams({ tab });
@@ -424,6 +433,26 @@ export default function MappingPage() {
 
           {/* Create New Tab (Wizard) */}
           <TabsContent value="create">
+            {(requestedDirection || focusedField) && (
+              <Card className="mb-6 border-primary/15 bg-primary/5 rounded-2xl">
+                <CardContent className="flex flex-wrap items-center gap-3 py-4">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-foreground">Digital Twin context</p>
+                    <p className="text-sm text-muted-foreground">
+                      {requestedDirection
+                        ? `Opened for ${requestedDirection === 'AR' ? 'Outbound (AR)' : 'Inbound (AP)'} mapping.`
+                        : 'Opened from a linked workflow context.'}
+                    </p>
+                  </div>
+                  {focusedField ? (
+                    <Badge variant="outline" className="border-border/70 bg-background/80">
+                      Field focus: {focusedField}
+                    </Badge>
+                  ) : null}
+                </CardContent>
+              </Card>
+            )}
+
             {/* Progress Steps */}
             <Card className="mb-8 surface-glass rounded-2xl border border-white/70">
               <CardContent className="py-4">
@@ -473,6 +502,7 @@ export default function MappingPage() {
                   mappings={mappings}
                   onMappingsChange={setMappings}
                   onDatasetTypeChange={handleDatasetTypeChange}
+                  focusedField={focusedField}
                 />
                 <div className="hidden xl:block">
                   <div className="sticky top-8">

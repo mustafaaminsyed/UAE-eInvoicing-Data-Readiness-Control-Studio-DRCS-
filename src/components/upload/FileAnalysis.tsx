@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
+import { normalizeCSVText } from '@/lib/csvParser';
 import { downloadSampleCSV, getSampleData, SampleScenario } from '@/lib/sampleData';
 import { getMandatoryColumnsForDataset } from '@/lib/registry/drRegistry';
 import { Direction } from '@/types/direction';
@@ -24,18 +25,45 @@ const getRequiredColumns = (type: 'buyers' | 'headers' | 'lines', direction: Dir
   if (type === 'headers') {
     const base = getMandatoryColumnsForDataset(type);
     if (direction === 'AP') {
-      return Array.from(new Set(base.filter((column) => column !== 'buyer_id').concat(['supplier_id', 'buyer_trn'])));
+      return Array.from(new Set(base.filter((column) => column !== 'buyer_id').concat(['supplier_id'])));
     }
     return base;
   }
   return getMandatoryColumnsForDataset(type);
 };
 
-const PK_CANDIDATES: Record<string, string> = {
-  buyers: 'buyer_id',
-  headers: 'invoice_id',
-  lines: 'line_id',
-};
+function parseHeaderColumns(line: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let index = 0; index < line.length; index++) {
+    const char = line[index];
+
+    if (char === '"') {
+      if (inQuotes && line[index + 1] === '"') {
+        current += '"';
+        index++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  result.push(current.trim());
+  return result.filter(Boolean);
+}
+
+function getPkCandidate(type: 'buyers' | 'headers' | 'lines', direction: Direction): string {
+  if (type === 'buyers') return direction === 'AP' ? 'supplier_id' : 'buyer_id';
+  if (type === 'headers') return 'invoice_id';
+  return 'line_id';
+}
 
 export interface FileStats {
   fileName: string;
@@ -59,15 +87,20 @@ export function analyzeFile(
   direction: Direction = 'AR',
   rawText?: string
 ): FileStats {
-  const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
+  const normalizedRawText = rawText ? normalizeCSVText(rawText) : '';
+  const headerColumns =
+    normalizedRawText
+      ? parseHeaderColumns(normalizedRawText.split('\n')[0] ?? '')
+      : [];
+  const columns = rows.length > 0 ? Object.keys(rows[0]) : headerColumns;
   const required = getRequiredColumns(type, direction);
   const requiredPresent = required.filter((c) => columns.includes(c));
   const requiredMissing = required.filter((c) => !columns.includes(c));
 
   // Detect delimiter from raw text
   let detectedDelimiter = 'comma';
-  if (rawText) {
-    const firstLine = rawText.split('\n')[0] || '';
+  if (normalizedRawText) {
+    const firstLine = normalizedRawText.split('\n')[0] || '';
     const commas = (firstLine.match(/,/g) || []).length;
     const tabs = (firstLine.match(/\t/g) || []).length;
     const semicolons = (firstLine.match(/;/g) || []).length;
@@ -78,7 +111,7 @@ export function analyzeFile(
     else if (max === pipes && pipes > 0) detectedDelimiter = 'pipe';
   }
 
-  const pkCandidate = PK_CANDIDATES[type];
+  const pkCandidate = getPkCandidate(type, direction);
   let inferredPK: string | null = null;
   if (pkCandidate && columns.includes(pkCandidate)) {
     const values = rows.map((r) => r[pkCandidate]);
