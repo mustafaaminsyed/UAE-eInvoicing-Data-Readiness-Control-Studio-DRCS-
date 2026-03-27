@@ -4,7 +4,7 @@ import { normalizePintAECheck, RawPintAECheck } from '@/lib/validation/pintAERul
 // UAE UC1 Standard Tax Invoice Check Pack
 // 54 checks aligned with PINT-AE / UAE MoF Data Dictionary
 
-const RAW_UAE_UC1_CHECK_PACK: RawPintAECheck[] = [
+export const RAW_UAE_UC1_CHECK_PACK: RawPintAECheck[] = [
   // ============ Header Presence & Format Checks (001-011) ============
   {
     check_id: 'UAE-UC1-CHK-001',

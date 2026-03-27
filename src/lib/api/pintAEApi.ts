@@ -8,11 +8,41 @@ import {
   calculateHealthScore 
 } from '@/types/pintAE';
 import { Severity } from '@/types/compliance';
-import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
+import { RAW_UAE_UC1_CHECK_PACK, UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
 import { getSupabaseEnvStatus, shouldUseLocalDevFallback } from '@/lib/api/supabaseEnv';
 import { getFailureClassForRule } from '@/lib/validation/pintAERuleMetadata';
 
 const UC1_CHECK_LOOKUP = new Map(UAE_UC1_CHECK_PACK.map((check) => [check.check_id, check]));
+const RAW_UC1_CHECK_LOOKUP = new Map(RAW_UAE_UC1_CHECK_PACK.map((check) => [check.check_id, check]));
+
+function mapPintAECheckRow(row: any): PintAECheck {
+  const normalized = UC1_CHECK_LOOKUP.get(row.check_id);
+  return {
+    id: row.id,
+    check_id: row.check_id,
+    check_name: row.check_name,
+    description: row.description || undefined,
+    scope: row.scope as PintAECheck['scope'],
+    rule_type: normalized?.rule_type || ((row as any).rule_type as PintAECheck['rule_type']) || 'structural_rule',
+    execution_layer:
+      normalized?.execution_layer ||
+      ((row as any).execution_layer as PintAECheck['execution_layer']) ||
+      'schema',
+    severity: row.severity as Severity,
+    use_case: row.use_case || undefined,
+    pint_reference_terms: row.pint_reference_terms || [],
+    mof_rule_reference: row.mof_rule_reference || undefined,
+    pass_condition: row.pass_condition || undefined,
+    fail_condition: row.fail_condition || undefined,
+    owner_team_default: row.owner_team_default as PintAECheck['owner_team_default'],
+    suggested_fix: row.suggested_fix || undefined,
+    evidence_required: row.evidence_required || undefined,
+    is_enabled: row.is_enabled,
+    parameters: (row.parameters as Record<string, any>) || {},
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
 
 // ============ PINT-AE Checks CRUD ============
 
@@ -37,33 +67,7 @@ export async function fetchPintAEChecks(): Promise<PintAECheck[]> {
       return [];
     }
 
-    return (data || []).map((row) => {
-      const fallback = UC1_CHECK_LOOKUP.get(row.check_id);
-      return {
-        id: row.id,
-        check_id: row.check_id,
-        check_name: row.check_name,
-        description: row.description || undefined,
-        scope: row.scope as PintAECheck['scope'],
-        rule_type:
-          ((row as any).rule_type as PintAECheck['rule_type']) || fallback?.rule_type || 'structural_rule',
-        execution_layer:
-          ((row as any).execution_layer as PintAECheck['execution_layer']) || fallback?.execution_layer || 'schema',
-        severity: row.severity as Severity,
-        use_case: row.use_case || undefined,
-        pint_reference_terms: row.pint_reference_terms || [],
-        mof_rule_reference: row.mof_rule_reference || undefined,
-        pass_condition: row.pass_condition || undefined,
-        fail_condition: row.fail_condition || undefined,
-        owner_team_default: row.owner_team_default as PintAECheck['owner_team_default'],
-        suggested_fix: row.suggested_fix || undefined,
-        evidence_required: row.evidence_required || undefined,
-        is_enabled: row.is_enabled,
-        parameters: (row.parameters as Record<string, any>) || {},
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-      };
-    });
+    return (data || []).map(mapPintAECheckRow);
   } catch (error) {
     console.error('Error fetching PINT-AE checks:', error);
     return [];
@@ -92,33 +96,7 @@ export async function fetchEnabledPintAEChecks(): Promise<PintAECheck[]> {
       return [];
     }
 
-    return (data || []).map((row) => {
-      const fallback = UC1_CHECK_LOOKUP.get(row.check_id);
-      return {
-        id: row.id,
-        check_id: row.check_id,
-        check_name: row.check_name,
-        description: row.description || undefined,
-        scope: row.scope as PintAECheck['scope'],
-        rule_type:
-          ((row as any).rule_type as PintAECheck['rule_type']) || fallback?.rule_type || 'structural_rule',
-        execution_layer:
-          ((row as any).execution_layer as PintAECheck['execution_layer']) || fallback?.execution_layer || 'schema',
-        severity: row.severity as Severity,
-        use_case: row.use_case || undefined,
-        pint_reference_terms: row.pint_reference_terms || [],
-        mof_rule_reference: row.mof_rule_reference || undefined,
-        pass_condition: row.pass_condition || undefined,
-        fail_condition: row.fail_condition || undefined,
-        owner_team_default: row.owner_team_default as PintAECheck['owner_team_default'],
-        suggested_fix: row.suggested_fix || undefined,
-        evidence_required: row.evidence_required || undefined,
-        is_enabled: row.is_enabled,
-        parameters: (row.parameters as Record<string, any>) || {},
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-      };
-    });
+    return (data || []).map(mapPintAECheckRow);
   } catch (error) {
     console.error('Error fetching enabled PINT-AE checks:', error);
     return [];
@@ -283,12 +261,14 @@ export async function seedUC1CheckPack(forceUpsert = false): Promise<{ success: 
     const existingIds = new Set((existingUC1 || []).map((row) => row.check_id));
 
     // Prepare checks for upsert
-    const checksToUpsert = UAE_UC1_CHECK_PACK.map(check => ({
+    const checksToUpsert = UAE_UC1_CHECK_PACK.map((check) => {
+      const legacy = RAW_UC1_CHECK_LOOKUP.get(check.check_id);
+      return {
       check_id: check.check_id,
       check_name: check.check_name,
       description: check.description,
       scope: check.scope,
-      rule_type: check.rule_type,
+      rule_type: legacy?.rule_type || check.rule_type,
       severity: check.severity,
       use_case: check.use_case,
       pint_reference_terms: check.pint_reference_terms,
@@ -300,7 +280,8 @@ export async function seedUC1CheckPack(forceUpsert = false): Promise<{ success: 
       evidence_required: check.evidence_required,
       is_enabled: check.is_enabled,
       parameters: check.parameters,
-    }));
+      };
+    });
 
     let error: { message: string } | null = null;
     let seededCount = 0;
