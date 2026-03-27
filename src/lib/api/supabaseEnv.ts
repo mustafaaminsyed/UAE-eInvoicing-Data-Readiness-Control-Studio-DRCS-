@@ -17,7 +17,9 @@ function isLikelyPlaceholder(value: string): boolean {
     normalized.includes('your_project_ref') ||
     normalized.includes('your_supabase_anon_key') ||
     normalized.includes('your_supabase_publishable_key') ||
-    normalized.includes('your_')
+    normalized.includes('your_') ||
+    normalized === 'https://test-project.supabase.co' ||
+    normalized === 'test-publishable-key'
   );
 }
 
