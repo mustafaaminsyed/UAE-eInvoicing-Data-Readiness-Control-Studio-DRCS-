@@ -10,6 +10,7 @@ It supports:
 - AR and AP dataset ingestion and separation
 - Mapping ERP columns to PINT-AE UC1 fields
 - Standard PINT-AE/UAE check execution
+- Semantic crosswalk alignment between MoF fields, PINT/BT/BTUAE semantics, DCS canonical fields, and traceability state
 - Mapping-driven DR coverage and traceability attribution
 - Custom validation checks and AP search checks
 - AI-generated validation explanations per exception (with cached responses)
@@ -56,7 +57,14 @@ Validation and domain logic:
 - `src/lib/coverage/*` for readiness/traceability coverage
 - `src/lib/evidence/*` for Evidence Pack generation
 - `src/lib/mapping/*` for mapping suggestion and coverage
+- `src/lib/registry/semanticCrosswalk.ts` for target-state vs current-state semantic alignment across MoF, PINT, and DCS fields
+- `src/lib/registry/semanticCrosswalkBuyerAlias.ts` for read-only document-type-aware buyer semantic interpretation
 - `src/lib/registry/validationToDRMap.ts` for explicit validation-to-DR linkage
+
+Traceability model:
+- Distinguishes direct executable rule coverage from indirect scenario/applicability coverage
+- Keeps target-state semantics separate from current runtime alignment
+- Preserves buyer semantic divergence for tax-invoice vs commercial-XML views as explainability metadata before runtime routing changes
 
 Persistence (Supabase):
 - Checks and runs: `pint_ae_checks`, `custom_checks`, `check_runs`, `check_exceptions`, `run_summaries`
@@ -153,6 +161,11 @@ VITE_ENABLE_LOCAL_DEV_FALLBACK=false
 
 `VITE_ENABLE_LOCAL_DEV_FALLBACK=true` allows Run Checks to use the built-in UC1 check pack when Supabase is not configured (local testing only).
 
+When local fallback is enabled, Run Checks now also degrades safely if Supabase probes fail at fetch time during local review:
+- checks library falls back to the built-in UC1 pack
+- mapping templates degrade to raw-data / no-template mode
+- diagnostics report a hardcoded fallback instead of blocking the page
+
 Server-side environment variables for `validation-explain`:
 
 ```bash
@@ -201,6 +214,26 @@ Focused checks used heavily during recent hardening:
 npm run build
 npm run preview
 ```
+
+Focused patch-scoped tests commonly used for recent controls / traceability work:
+
+```bash
+npm test -- src/pages/TraceabilityPage.render.test.tsx
+npm test -- src/pages/ControlsDashboardPage.allTime.test.tsx src/pages/ControlsDashboardPage.entityRiskMatrix.test.tsx
+npm test -- src/pages/RunChecksPage.localFallback.test.tsx
+```
+
+## Current UX status notes
+
+- Traceability is the primary explainability surface and now includes:
+  - grouped, aligned PINT DR table headers
+  - indirect-rule status where scenario/applicability logic exists without direct field-rule ownership
+  - MoF overlay semantic notes for buyer fields `24` and `25`
+- Controls Dashboard now separates:
+  - top operational KPI panel
+  - diagnostic readiness radar
+  - operational risk snapshot
+- Some lower dashboard analytics remain intentionally heuristic/preview-oriented and are labeled as such until their runtime definitions are formalized.
 
 ## Spec utilities
 
