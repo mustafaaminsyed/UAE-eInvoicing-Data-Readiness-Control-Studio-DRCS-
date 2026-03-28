@@ -86,11 +86,11 @@ describe('pintAEApi legacy schema compatibility', () => {
       }),
     }));
 
-    const { fetchEnabledPintAEChecks } = await import('@/lib/api/pintAEApi');
-    const [check] = await fetchEnabledPintAEChecks();
+  const { fetchEnabledPintAEChecks } = await import('@/lib/api/pintAEApi');
+  const [check] = await fetchEnabledPintAEChecks();
 
-    expect(check.rule_type).toBe('structural_rule');
-    expect(check.execution_layer).toBe('schema');
+  expect(check.rule_type).toBe('structural_rule');
+  expect(check.execution_layer).toBe('schema');
   });
 
   it('falls back to built-in checks and diagnostics when local fallback is enabled and Supabase fetches fail', async () => {

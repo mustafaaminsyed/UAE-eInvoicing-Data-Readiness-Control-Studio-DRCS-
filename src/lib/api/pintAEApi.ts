@@ -18,7 +18,6 @@ const RAW_UC1_CHECK_LOOKUP = new Map(RAW_UAE_UC1_CHECK_PACK.map((check) => [chec
 function canUseFallbackAfterFetchFailure(): boolean {
   return isLocalDevFallbackEnabled();
 }
-
 function mapPintAECheckRow(row: any): PintAECheck {
   const normalized = UC1_CHECK_LOOKUP.get(row.check_id);
   return {
