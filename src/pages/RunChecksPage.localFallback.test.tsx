@@ -8,6 +8,7 @@ import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
 const navigate = vi.fn();
 const runChecks = vi.fn();
 const setActiveMappingProfileForDirection = vi.fn();
+
 const complianceState = {
   direction: 'AR',
   buyers: [{ buyer_id: 'B-1', buyer_name: 'Acme LLC' }],
@@ -31,19 +32,20 @@ const complianceState = {
   activeMappingProfileByDirection: { AR: null, AP: null },
   setActiveMappingProfileForDirection,
 };
+
 const enabledChecks = [
   {
-    check_id: 'UAE-UC1-CHK-004',
-    check_name: 'Invoice type presence',
-    description: 'Checks invoice type field presence.',
+    check_id: 'UAE-UC1-CHK-001',
+    check_name: 'Invoice Number Present',
+    description: 'Built-in fallback check.',
     scope: 'Header',
     rule_type: 'structural_rule',
     execution_layer: 'schema',
-    severity: 'High',
-    pint_reference_terms: ['IBT-003', 'BTUAE-02'],
-    owner_team_default: 'ASP Ops',
+    severity: 'Critical',
+    pint_reference_terms: ['IBT-001'],
+    owner_team_default: 'Client Finance',
     is_enabled: true,
-    parameters: { field: 'invoice_type' },
+    parameters: { field: 'invoice_number' },
   },
 ];
 
@@ -63,14 +65,34 @@ vi.mock('@/lib/api/pintAEApi', () => ({
   fetchEnabledPintAEChecks: vi.fn(async () => enabledChecks),
   getChecksDiagnostics: vi.fn(async () => ({
     totalChecks: UAE_UC1_CHECK_PACK.length,
-    enabledChecks: 1,
+    enabledChecks: enabledChecks.length,
     uc1ChecksPresent: true,
     uc1CheckCount: UAE_UC1_CHECK_PACK.length,
     dataSource: 'hardcoded',
-    configured: false,
-    configurationIssues: ['fallback'],
+    configured: true,
+    configurationIssues: [],
   })),
-  seedUC1CheckPack: vi.fn(async () => ({ success: true, message: 'seeded' })),
+  seedUC1CheckPack: vi.fn(async () => ({ success: true, message: 'Local fallback mode active - using built-in UC1 check pack' })),
+}));
+
+vi.mock('@/lib/api/mappingApi', () => ({
+  fetchActiveTemplates: vi.fn(async () => []),
+}));
+
+vi.mock('@/lib/api/supabaseEnv', () => ({
+  getSupabaseEnvStatus: () => ({ configured: true, issues: [] }),
+  isLocalDevFallbackEnabled: () => true,
+  shouldUseLocalDevFallback: () => false,
+}));
+
+vi.mock('@/integrations/supabase/client', () => ({
+  supabase: {
+    from: vi.fn((table: string) => ({
+      select: vi.fn(async () => ({
+        error: table === 'mapping_templates' ? { message: 'TypeError: Failed to fetch' } : null,
+      })),
+    })),
+  },
 }));
 
 vi.mock('sonner', () => ({
@@ -81,28 +103,12 @@ vi.mock('sonner', () => ({
   },
 }));
 
-vi.mock('@/lib/api/mappingApi', () => ({
-  fetchActiveTemplates: vi.fn(async () => []),
-}));
-
 vi.mock('@/lib/pintAE/specCatalog', () => ({
   getPintAeSpecMetadata: () => ({ schematronRules: 556, codelists: 22 }),
 }));
 
 vi.mock('@/lib/coverage/conformanceEngine', () => ({
   checkRunReadiness: () => ({ canRun: true, reasons: [] }),
-}));
-
-vi.mock('@/lib/api/supabaseEnv', () => ({
-  getSupabaseEnvStatus: () => ({ configured: false, issues: ['missing env'] }),
-  isLocalDevFallbackEnabled: () => true,
-  shouldUseLocalDevFallback: () => true,
-}));
-
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {
-    from: vi.fn(),
-  },
 }));
 
 vi.mock('@/components/run/LastRunContextBanner', () => ({
@@ -124,25 +130,22 @@ vi.mock('@/engine/runners/mof', () => ({
   },
 }));
 
-describe('RunChecksPage reference-term labeling', () => {
-  it('shows authoritative coverage DRs separately from metadata-only reference terms', async () => {
+describe('RunChecksPage local fallback fetch resilience', () => {
+  it('does not surface mapping template fetch failures when local fallback is enabled', async () => {
     render(
       <MemoryRouter>
         <RunChecksPage />
       </MemoryRouter>
     );
 
-    expect(await screen.findByText('Invoice type presence')).toBeInTheDocument();
+    expect(await screen.findByText('Checks Library (1 checks)')).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(screen.getByText('Authoritative coverage')).toBeInTheDocument();
-      expect(screen.getByText('Reference terms')).toBeInTheDocument();
+      expect(screen.queryByText(/Mapping templates unavailable:/i)).not.toBeInTheDocument();
     });
 
-    expect(screen.getByText('(metadata only)')).toBeInTheDocument();
-    expect(screen.getByText('Structural Rule')).toBeInTheDocument();
-    expect(screen.getByText('Schema')).toBeInTheDocument();
-    expect(screen.getAllByText('IBT-003').length).toBeGreaterThan(0);
-    expect(screen.getByText('BTUAE-02')).toBeInTheDocument();
+    expect(screen.getByText(/No active mapping template found\./i)).toBeInTheDocument();
+    expect(screen.getByText('Invoice Number Present')).toBeInTheDocument();
+    expect(screen.getByText('Local Fallback')).toBeInTheDocument();
   });
 });

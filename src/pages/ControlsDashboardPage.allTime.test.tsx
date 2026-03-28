@@ -85,7 +85,7 @@ vi.mock('@/components/StatsCard', () => ({
 }));
 
 vi.mock('recharts', () => {
-  const Stub = ({ children }: { children?: React.ReactNode }) => <div>{children}</div>;
+  const Stub = () => <div />;
   return {
     ResponsiveContainer: Stub,
     LineChart: Stub,
@@ -105,6 +105,7 @@ vi.mock('@/context/ComplianceContext', () => ({
     direction: 'AR',
     exceptions: [],
     headers: [],
+    checkResults: [],
   }),
 }));
 
@@ -130,6 +131,14 @@ describe('ControlsDashboardPage all-time run history', () => {
     await waitFor(() => {
       expect(screen.getByText('Controls Dashboard')).toBeInTheDocument();
       expectStatsCard('Runs Executed', '25', 'All recorded runs');
+      expect(screen.getByText('Control Studio Panel')).toBeInTheDocument();
+      expect(screen.getByText('Readiness Status Score')).toBeInTheDocument();
+      expect(screen.getByText('Trend Indicator')).toBeInTheDocument();
+      expect(screen.getByText('Critical Blockers')).toBeInTheDocument();
+      expect(screen.getByText('Status')).toBeInTheDocument();
+      expect(screen.queryByText('SLA Breach Rate')).not.toBeInTheDocument();
+      expect(screen.queryByText('Average Resolution Time')).not.toBeInTheDocument();
+      expect(screen.queryByText('Client Health Signal')).not.toBeInTheDocument();
     });
   });
 });

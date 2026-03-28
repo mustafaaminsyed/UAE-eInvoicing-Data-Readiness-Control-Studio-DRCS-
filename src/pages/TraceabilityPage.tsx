@@ -642,35 +642,66 @@ export default function TraceabilityPage() {
 
         {/* Table */}
         <div className={cn("bg-card rounded-xl border shadow-sm overflow-hidden animate-slide-up", viewMode !== 'pint' && "hidden")}>
-          <div className="overflow-x-auto border-b bg-card">
+          <div className="max-h-[68vh] overflow-auto">
             <table className={cn('w-full text-sm', tableMinWidthClass)}>
-              <thead>
+              <colgroup>
+                <col style={{ width: '48px' }} />
+                <col style={{ width: '96px' }} />
+                <col style={{ width: '280px' }} />
+                <col style={{ width: '96px' }} />
+                <col style={{ width: '112px' }} />
+                <col style={{ width: '104px' }} />
+                <col style={{ width: '260px' }} />
+                <col style={{ width: '96px' }} />
+                <col style={{ width: '96px' }} />
+                <col style={{ width: '96px' }} />
+                <col style={{ width: '72px' }} />
+                <col style={{ width: '80px' }} />
+                {showScenarioApplicabilityColumn && <col style={{ width: '172px' }} />}
+                <col style={{ width: '120px' }} />
+              </colgroup>
+              <thead className="sticky top-0 z-10">
+                <tr className="border-b bg-muted/25">
+                  <th
+                    colSpan={5}
+                    className="h-9 px-4 text-left align-middle text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+                  >
+                    Requirement
+                  </th>
+                  <th
+                    colSpan={4}
+                    className="h-9 px-4 text-left align-middle text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+                  >
+                    Source Mapping
+                  </th>
+                  <th
+                    colSpan={showScenarioApplicabilityColumn ? 5 : 4}
+                    className="h-9 px-4 text-left align-middle text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+                  >
+                    Coverage & Controls
+                  </th>
+                </tr>
                 <tr className="border-b bg-card">
-                  <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-12">#</th>
-                  <th className="h-12 px-4 text-left align-middle text-xs font-medium text-muted-foreground w-24">DR ID</th>
-                  <th className="h-12 px-4 text-left align-middle text-xs font-medium text-muted-foreground">Business Term</th>
-                  <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-20">Mandatory</th>
-                  <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-24">PINT Delta</th>
-                  <th className="h-12 px-4 text-left align-middle text-xs font-medium text-muted-foreground w-20">Template</th>
-                  <th className="h-12 px-4 text-left align-middle text-xs font-medium text-muted-foreground">Column(s)</th>
-                  <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-20">In Tmpl</th>
-                  <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-20">Ingestible</th>
-                  <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-16">Pop.</th>
-                  <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-16">Rules</th>
-                  <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-16">Controls</th>
+                  <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground whitespace-nowrap">#</th>
+                  <th className="h-12 px-4 text-left align-middle text-xs font-medium text-muted-foreground whitespace-nowrap">DR ID</th>
+                  <th className="h-12 px-4 text-left align-middle text-xs font-medium text-muted-foreground">Requirement</th>
+                  <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground whitespace-nowrap">Mandatory</th>
+                  <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground whitespace-nowrap">PINT Status</th>
+                  <th className="h-12 px-4 text-left align-middle text-xs font-medium text-muted-foreground whitespace-nowrap">Template</th>
+                  <th className="h-12 px-4 text-left align-middle text-xs font-medium text-muted-foreground whitespace-nowrap">Source Field(s)</th>
+                  <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground whitespace-nowrap">In Template</th>
+                  <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground whitespace-nowrap">Ingestible</th>
+                  <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground whitespace-nowrap">Population</th>
+                  <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground whitespace-nowrap">Rules</th>
+                  <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground whitespace-nowrap">Controls</th>
                   {showScenarioApplicabilityColumn && (
-                    <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-28">
+                    <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground">
                       Scenario Applicability
                     </th>
                   )}
-                  <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground w-24">Coverage</th>
+                  <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground whitespace-nowrap">Coverage</th>
                 </tr>
               </thead>
-            </table>
-          </div>
-
-          <div className="max-h-[68vh] overflow-auto">
-            <table className={cn('w-full text-sm', tableMinWidthClass)}>
               <tbody className="[&_tr:last-child]:border-0">
                 {filteredRows.map(row => {
                   const scenarioApplicability = showScenarioApplicabilityColumn
@@ -682,17 +713,17 @@ export default function TraceabilityPage() {
                     className="border-b transition-colors hover:bg-muted/30 cursor-pointer"
                     onClick={() => setDrillDownRow(row)}
                   >
-                    <td className="p-4 text-center align-middle text-xs text-muted-foreground w-12">{rowNumberByDrId.get(row.dr_id) ?? '-'}</td>
-                    <td className="p-4 align-middle font-mono text-xs font-medium text-primary w-24">{row.dr_id}</td>
-                    <td className="p-4 align-middle text-sm">{row.business_term}</td>
-                    <td className="p-4 align-middle text-center w-20">
+                    <td className="p-4 text-center align-middle text-xs text-muted-foreground tabular-nums">{rowNumberByDrId.get(row.dr_id) ?? '-'}</td>
+                    <td className="p-4 align-middle font-mono text-xs font-medium text-primary">{row.dr_id}</td>
+                    <td className="p-4 align-middle text-sm leading-7">{row.business_term}</td>
+                    <td className="p-4 align-middle text-center">
                       {row.mandatory ? (
                         <Badge className="text-xs bg-destructive/10 text-destructive border-destructive/20" variant="outline">Req</Badge>
                       ) : (
                         <Badge variant="outline" className="text-xs text-muted-foreground">Opt</Badge>
                       )}
                     </td>
-                    <td className="p-4 align-middle text-center w-24">
+                    <td className="p-4 align-middle text-center tabular-nums">
                       {row.isNewPintField ? (
                         <button
                           type="button"
@@ -721,7 +752,7 @@ export default function TraceabilityPage() {
                         </button>
                       )}
                     </td>
-                    <td className="p-4 align-middle w-20"><DatasetBadge dataset={row.dataset_file} /></td>
+                    <td className="p-4 align-middle"><DatasetBadge dataset={row.dataset_file} /></td>
                     <td className="p-4 align-middle">
                       {row.internal_columns.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
@@ -735,7 +766,7 @@ export default function TraceabilityPage() {
                         </span>
                       )}
                     </td>
-                    <td className="p-4 align-middle text-center w-20">
+                    <td className="p-4 align-middle text-center">
                       {row.inTemplate ? (
                         <CheckCircle2 className="w-4 h-4 text-[hsl(var(--success))] mx-auto" />
                       ) : (
@@ -755,7 +786,7 @@ export default function TraceabilityPage() {
                         </TooltipProvider>
                       )}
                     </td>
-                    <td className="p-4 align-middle text-center w-20">
+                    <td className="p-4 align-middle text-center">
                       {row.ingestible ? (
                         <CheckCircle2 className="w-4 h-4 text-[hsl(var(--success))] mx-auto" />
                       ) : row.inTemplate ? (
@@ -773,7 +804,7 @@ export default function TraceabilityPage() {
                         <span className="text-xs text-muted-foreground">-</span>
                       )}
                     </td>
-                    <td className="p-4 align-middle text-center w-16">
+                    <td className="p-4 align-middle text-center">
                       {row.populationPct !== null ? (
                         <span className={cn(
                           'text-xs font-medium',
@@ -786,7 +817,7 @@ export default function TraceabilityPage() {
                         <span className="text-xs text-muted-foreground">-</span>
                       )}
                     </td>
-                    <td className="p-4 align-middle text-center w-16">
+                    <td className="p-4 align-middle text-center tabular-nums">
                       {row.ruleIds.length + row.indirectRuleIds.length > 0 ? (
                         <TooltipProvider>
                           <Tooltip>
@@ -802,7 +833,7 @@ export default function TraceabilityPage() {
                         <span className="text-xs text-muted-foreground">0</span>
                       )}
                     </td>
-                    <td className="p-4 align-middle text-center w-16">
+                    <td className="p-4 align-middle text-center tabular-nums">
                       {row.controlIds.length > 0 ? (
                         <TooltipProvider>
                           <Tooltip>
@@ -818,29 +849,33 @@ export default function TraceabilityPage() {
                         <span className="text-xs text-muted-foreground">0</span>
                       )}
                     </td>
-                    {showScenarioApplicabilityColumn && scenarioApplicability && (
-                      <td className="p-4 align-middle text-center w-28">
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger onClick={(e) => e.stopPropagation()}>
-                              <Badge
-                                variant="outline"
-                                className={cn(
-                                  'text-xs',
-                                  getScenarioApplicabilityBadgeClass(scenarioApplicability.status)
-                                )}
-                              >
-                                {scenarioApplicability.status}
-                              </Badge>
-                            </TooltipTrigger>
-                            <TooltipContent className="text-xs max-w-xs">
-                              {scenarioApplicability.notes}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                    {showScenarioApplicabilityColumn && (
+                      <td className="p-4 align-middle text-center">
+                        {scenarioApplicability ? (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger onClick={(e) => e.stopPropagation()}>
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    'text-xs',
+                                    getScenarioApplicabilityBadgeClass(scenarioApplicability.status)
+                                  )}
+                                >
+                                  {scenarioApplicability.status}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent className="text-xs max-w-xs">
+                                {scenarioApplicability.notes}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
                       </td>
                     )}
-                    <td className="p-4 align-middle text-center w-24">
+                    <td className="p-4 align-middle text-center">
                       <CoverageStatusBadge status={row.coverageStatus} />
                     </td>
                   </tr>
