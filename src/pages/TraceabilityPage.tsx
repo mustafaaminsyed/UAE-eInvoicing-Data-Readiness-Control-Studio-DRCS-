@@ -39,6 +39,10 @@ import {
   getMoFCrosswalkDenominatorPolicy,
   getMoFCrosswalkRow,
 } from '@/lib/registry/mofCrosswalkRegistry';
+import {
+  getBuyerSemanticAliasByMoFFieldNumber,
+  type BuyerSemanticAliasInterpretation,
+} from '@/lib/registry/semanticCrosswalkBuyerAlias';
 
 type FilterType = 'all' | 'mandatory' | 'pint-new' | 'pint-legacy' | 'unmapped' | 'not-ingestible' | 'low-population' | 'no-rules' | 'no-controls' | 'covered';
 type TraceabilityViewMode = 'pint' | 'mof';
@@ -66,6 +70,7 @@ type MofOverlayRow = MofFieldEntry & {
   ingestible: boolean;
   ruleCount: number;
   controlCount: number;
+  buyerSemanticAlias: BuyerSemanticAliasInterpretation | null;
 };
 
 const SCENARIO_PARAM_KEYS: Record<keyof ScenarioLensFilters, string> = {
@@ -117,6 +122,7 @@ function readOption<T extends readonly string[]>(
 function CoverageStatusBadge({ status }: { status: CoverageStatus }) {
   const config: Record<CoverageStatus, { label: string; cls: string }> = {
     COVERED: { label: 'Covered', cls: 'bg-[hsl(var(--success))]/10 text-[hsl(var(--success))] border-[hsl(var(--success))]/20' },
+    INDIRECT_RULE: { label: 'Indirect Rule', cls: 'bg-primary/10 text-primary border-primary/20' },
     NO_CONTROL: { label: 'No Control', cls: 'bg-accent/10 text-accent-foreground border-accent/20' },
     NO_RULE: { label: 'No Rule', cls: 'bg-destructive/10 text-destructive border-destructive/20' },
     NOT_IN_TEMPLATE: { label: 'Not in Template', cls: 'bg-muted text-muted-foreground border-muted-foreground/20' },
@@ -367,6 +373,10 @@ export default function TraceabilityPage() {
           }),
           ruleCount: ruleIds.size,
           controlCount: controlIds.size,
+          buyerSemanticAlias:
+            field.fieldNumber === 24 || field.fieldNumber === 25
+              ? getBuyerSemanticAliasByMoFFieldNumber(field.fieldNumber as 24 | 25, field.documentType)
+              : null,
         };
       })
       .sort((a, b) => {
@@ -391,7 +401,7 @@ export default function TraceabilityPage() {
     else if (filter === 'unmapped') result = result.filter(r => !r.inTemplate);
     else if (filter === 'not-ingestible') result = result.filter(r => r.mandatory && r.inTemplate && !r.ingestible);
     else if (filter === 'low-population') result = result.filter(r => r.populationPct !== null && r.populationPct < CONFORMANCE_CONFIG.populationWarningThreshold);
-    else if (filter === 'no-rules') result = result.filter(r => r.ruleIds.length === 0);
+    else if (filter === 'no-rules') result = result.filter(r => r.coverageStatus === 'NO_RULE');
     else if (filter === 'no-controls') result = result.filter(r => r.controlIds.length === 0);
     else if (filter === 'covered') result = result.filter(r => r.coverageStatus === 'COVERED');
 
@@ -440,7 +450,7 @@ export default function TraceabilityPage() {
     { key: 'pint-legacy', label: 'PINT Legacy', count: rows.filter(r => !r.isNewPintField).length },
     { key: 'covered', label: 'Covered', count: rows.filter(r => r.coverageStatus === 'COVERED').length },
     { key: 'unmapped', label: 'Not in Template', count: rows.filter(r => !r.inTemplate).length },
-    { key: 'no-rules', label: 'No Rules', count: rows.filter(r => r.ruleIds.length === 0).length },
+    { key: 'no-rules', label: 'No Rules', count: rows.filter(r => r.coverageStatus === 'NO_RULE').length },
     { key: 'no-controls', label: 'No Controls', count: rows.filter(r => r.controlIds.length === 0).length },
     { key: 'low-population', label: 'Low Pop.', count: rows.filter(r => r.populationPct !== null && r.populationPct < CONFORMANCE_CONFIG.populationWarningThreshold).length },
   ];
@@ -495,6 +505,7 @@ export default function TraceabilityPage() {
               </div>
               <div className="flex flex-wrap gap-2">
                 <CoverageStatusBadge status="COVERED" />
+                <CoverageStatusBadge status="INDIRECT_RULE" />
                 <CoverageStatusBadge status="NO_RULE" />
                 <CoverageStatusBadge status="NO_CONTROL" />
                 <CoverageStatusBadge status="NOT_IN_TEMPLATE" />
@@ -776,14 +787,14 @@ export default function TraceabilityPage() {
                       )}
                     </td>
                     <td className="p-4 align-middle text-center w-16">
-                      {row.ruleIds.length > 0 ? (
+                      {row.ruleIds.length + row.indirectRuleIds.length > 0 ? (
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger>
-                              <Badge variant="secondary" className="text-xs">{row.ruleIds.length}</Badge>
+                              <Badge variant="secondary" className="text-xs">{row.ruleIds.length + row.indirectRuleIds.length}</Badge>
                             </TooltipTrigger>
                             <TooltipContent className="text-xs max-w-xs">
-                              {row.ruleNames.join(', ')}
+                              {[...row.ruleNames, ...row.indirectRuleNames.map((name) => `${name} (indirect)`)].join(', ')}
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
@@ -881,7 +892,23 @@ export default function TraceabilityPage() {
                         </Badge>
                       </td>
                       <td className="p-4 align-middle font-mono text-xs font-medium text-primary w-20">{row.fieldNumber}</td>
-                      <td className="p-4 align-middle text-sm">{row.fieldName}</td>
+                      <td className="p-4 align-middle text-sm">
+                        <div className="space-y-1">
+                          <div>{row.fieldName}</div>
+                          {row.buyerSemanticAlias ? (
+                            <div className="rounded-md border border-primary/15 bg-primary/5 px-2 py-1 text-[11px] text-muted-foreground">
+                              <div>
+                                Semantic: <code className="font-mono text-foreground">{row.buyerSemanticAlias.effectiveSemanticId ?? 'n/a'}</code>
+                                {' '}-&gt; <code className="font-mono text-foreground">{row.buyerSemanticAlias.effectiveCanonicalField}</code>
+                              </div>
+                              <div>
+                                Runtime fallback: {row.buyerSemanticAlias.currentRuntimeFallbackFields.join(', ')}
+                              </div>
+                              <div>Runtime semantic split supported: false</div>
+                            </div>
+                          ) : null}
+                        </div>
+                      </td>
                       <td className="p-4 align-middle text-center text-xs w-20">{row.section}</td>
                       <td className="p-4 align-middle text-center text-xs w-20">{row.cardinality}</td>
                       <td className="p-4 align-middle text-xs w-32">

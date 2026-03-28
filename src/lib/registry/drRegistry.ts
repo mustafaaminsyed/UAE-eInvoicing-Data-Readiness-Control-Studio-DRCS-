@@ -39,7 +39,6 @@ const DR_TO_COLUMN_MAP: Record<string, { dataset: 'buyers' | 'headers' | 'lines'
   'IBT-002': { dataset: 'headers', columns: ['issue_date'] },
   'IBT-003': { dataset: 'headers', columns: ['invoice_type'] },
   'IBT-005': { dataset: 'headers', columns: ['currency'] },
-  'IBT-007': { dataset: 'headers', columns: ['fx_rate'] },
   'IBT-009': { dataset: 'headers', columns: ['payment_due_date'] },
   'IBT-027': { dataset: 'headers', columns: ['seller_name'] },
   'IBT-030': { dataset: 'headers', columns: ['seller_legal_reg_id'] },
