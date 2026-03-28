@@ -4,7 +4,7 @@ import { normalizePintAECheck, RawPintAECheck } from '@/lib/validation/pintAERul
 // UAE UC1 Standard Tax Invoice Check Pack
 // 54 checks aligned with PINT-AE / UAE MoF Data Dictionary
 
-const RAW_UAE_UC1_CHECK_PACK: RawPintAECheck[] = [
+export const RAW_UAE_UC1_CHECK_PACK: RawPintAECheck[] = [
   // ============ Header Presence & Format Checks (001-011) ============
   {
     check_id: 'UAE-UC1-CHK-001',
@@ -274,6 +274,45 @@ const RAW_UAE_UC1_CHECK_PACK: RawPintAECheck[] = [
     parameters: { field: 'seller_electronic_address' },
   },
   {
+    check_id: 'UAE-UC1-CHK-014A',
+    check_name: 'Seller Legal Registration Identifier Present',
+    description: 'Validates seller legal registration identifier (IBT-030) is present',
+    scope: 'Party',
+    rule_type: 'Presence',
+    severity: 'High',
+    use_case: 'UC1 Standard Tax Invoice',
+    pint_reference_terms: ['IBT-030'],
+    mof_rule_reference: 'IBR-150-AE',
+    pass_condition: 'Seller legal registration identifier is present',
+    fail_condition: 'Seller legal registration identifier is missing',
+    owner_team_default: 'Client Finance',
+    suggested_fix: 'Populate seller legal registration identifier from company registration records',
+    evidence_required: 'Trade license or legal registration records',
+    is_enabled: true,
+    parameters: { field: 'seller_legal_reg_id' },
+  },
+  {
+    check_id: 'UAE-UC1-CHK-014B',
+    check_name: 'Seller Legal Registration Identifier Type Present',
+    description: 'Validates seller legal registration identifier type (BTUAE-15) is present when seller legal registration identifier exists',
+    scope: 'Party',
+    rule_type: 'Presence',
+    severity: 'High',
+    use_case: 'UC1 Standard Tax Invoice',
+    pint_reference_terms: ['BTUAE-15'],
+    mof_rule_reference: 'IBR-181-AE',
+    pass_condition: 'Seller legal registration identifier type is present when seller legal registration identifier exists',
+    fail_condition: 'Seller legal registration identifier type is missing when seller legal registration identifier exists',
+    owner_team_default: 'Client Finance',
+    suggested_fix: 'Populate seller legal registration identifier type from company registration records',
+    evidence_required: 'Trade license or legal registration type records',
+    is_enabled: true,
+    parameters: {
+      field: 'seller_legal_reg_id_type',
+      required_when_field_present: 'seller_legal_reg_id',
+    },
+  },
+  {
     check_id: 'UAE-UC1-CHK-015',
     check_name: 'Seller Address Mandatory Fields',
     description: 'Validates seller address has required components (IBT-035 to IBT-040)',
@@ -378,13 +417,13 @@ const RAW_UAE_UC1_CHECK_PACK: RawPintAECheck[] = [
     use_case: 'UC1 Standard Tax Invoice',
     pint_reference_terms: ['IBT-050', 'IBT-052', 'IBT-054', 'IBT-055'],
     mof_rule_reference: 'BR-11',
-    pass_condition: 'Buyer street, city, and country code are present',
+    pass_condition: 'Buyer street, city, country subdivision, and country code are present',
     fail_condition: 'Buyer address is incomplete',
     owner_team_default: 'Buyer-side',
     suggested_fix: 'Complete buyer address fields',
     evidence_required: 'Customer address records',
     is_enabled: true,
-    parameters: { fields: ['buyer_address', 'buyer_country'] },
+    parameters: { fields: ['buyer_address', 'buyer_city', 'buyer_subdivision', 'buyer_country'] },
   },
 
   // ============ Totals & Calculation Checks (021-029) ============

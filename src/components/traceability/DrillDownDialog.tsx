@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { TraceabilityRow, CoverageStatus } from '@/lib/coverage/conformanceEngine';
-import { getRulesForDR, RuleTraceEntry } from '@/lib/rules/ruleTraceability';
+import { getIndirectRulesForDR, getRulesForDR, RuleTraceEntry } from '@/lib/rules/ruleTraceability';
 import { getControlsForDR, ControlEntry } from '@/lib/registry/controlsRegistry';
 import { PintAEException } from '@/types/pintAE';
 
@@ -25,6 +25,7 @@ interface DrillDownDialogProps {
 function CoverageStatusBadge({ status }: { status: CoverageStatus }) {
   const config: Record<CoverageStatus, { label: string; className: string }> = {
     COVERED: { label: 'Covered', className: 'bg-[hsl(var(--success))]/10 text-[hsl(var(--success))] border-[hsl(var(--success))]/20' },
+    INDIRECT_RULE: { label: 'Indirect Rule', className: 'bg-primary/10 text-primary border-primary/20' },
     NO_CONTROL: { label: 'No Control', className: 'bg-accent/10 text-accent-foreground border-accent/20' },
     NO_RULE: { label: 'No Rule', className: 'bg-destructive/10 text-destructive border-destructive/20' },
     NOT_IN_TEMPLATE: { label: 'Not in Template', className: 'bg-muted text-muted-foreground border-muted-foreground/20' },
@@ -37,8 +38,12 @@ export function DrillDownDialog({ row, exceptions, open, onOpenChange }: DrillDo
   if (!row) return null;
 
   const rules = getRulesForDR(row.dr_id);
+  const indirectRules = getIndirectRulesForDR(row.dr_id).filter(
+    (rule) => !rules.some((directRule) => directRule.rule_id === rule.rule_id)
+  );
+  const traceabilityRules = [...rules, ...indirectRules];
   const controls = getControlsForDR(row.dr_id);
-  const linkedRuleIds = new Set(rules.map((rule) => rule.rule_id));
+  const linkedRuleIds = new Set(traceabilityRules.map((rule) => rule.rule_id));
   const drExceptions = exceptions.filter((exception) => linkedRuleIds.has(exception.check_id));
 
   return (
@@ -91,17 +96,22 @@ export function DrillDownDialog({ row, exceptions, open, onOpenChange }: DrillDo
           <div>
             <h4 className="text-sm font-semibold mb-2 flex items-center gap-1">
               <Shield className="w-4 h-4 text-primary" />
-              Linked Rules ({rules.length})
+              Linked Rules ({traceabilityRules.length})
             </h4>
-            {rules.length > 0 ? (
+            {traceabilityRules.length > 0 ? (
               <div className="space-y-2">
-                {rules.map(rule => (
+                {traceabilityRules.map(rule => (
                   <div key={rule.rule_id} className="flex items-center justify-between p-2 bg-muted/50 rounded-lg text-sm">
                     <div>
                       <code className="text-xs text-primary">{rule.rule_id}</code>
                       <p className="text-xs text-foreground">{rule.rule_name}</p>
                     </div>
-                    <Badge variant="outline" className="text-xs">{rule.severity}</Badge>
+                    <div className="flex items-center gap-2">
+                      {indirectRules.some((candidate) => candidate.rule_id === rule.rule_id) ? (
+                        <Badge variant="outline" className="text-xs">Indirect</Badge>
+                      ) : null}
+                      <Badge variant="outline" className="text-xs">{rule.severity}</Badge>
+                    </div>
                   </div>
                 ))}
               </div>
