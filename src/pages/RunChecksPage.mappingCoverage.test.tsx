@@ -143,6 +143,7 @@ vi.mock('@/lib/coverage/conformanceEngine', () => ({
 
 vi.mock('@/lib/api/supabaseEnv', () => ({
   getSupabaseEnvStatus: () => ({ configured: true, issues: [] }),
+  isLocalDevFallbackEnabled: () => false,
   shouldUseLocalDevFallback: () => false,
 }));
 

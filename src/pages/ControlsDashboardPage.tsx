@@ -3,18 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import {
   BarChart3,
   AlertTriangle,
+  CheckCircle2,
   Calendar,
   RefreshCw,
   Award,
   FilterX,
   Shield,
+  ShieldAlert,
   FileCheck,
   Layers3,
   Info,
   Activity,
-  Clock3,
   FolderOpen,
   Hash,
+  TriangleAlert,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,7 +26,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Progress } from '@/components/ui/progress';
 import { StatsCard } from '@/components/StatsCard';
 import ComplianceRadar from '@/components/dashboard/ComplianceRadar';
 import EntityRiskMatrixHeatmap from '@/components/dashboard/EntityRiskMatrixHeatmap';
@@ -75,9 +76,10 @@ function getScoreBgColor(score: number): string {
 }
 
 export default function ControlsDashboardPage() {
+  const NON_BLOCKING_FAILURE_THRESHOLD = 10;
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { activeDatasetType, direction, exceptions, headers } = useCompliance();
+  const { activeDatasetType, direction, exceptions, headers, checkResults } = useCompliance();
   const [checkRuns, setCheckRuns] = useState<CheckRun[]>([]);
   const [clientHealth, setClientHealth] = useState<ClientHealth[]>([]);
   const [topRiskSellers, setTopRiskSellers] = useState<EntityScore[]>([]);
@@ -179,6 +181,20 @@ export default function ControlsDashboardPage() {
   const previousRun = filteredRuns.length > 1 ? filteredRuns[filteredRuns.length - 2] : undefined;
   const passRateTrend = latestRun && previousRun ? latestRun.pass_rate - previousRun.pass_rate : 0;
   const periodRunCount = filteredRuns.length;
+  const scopedRuntimeExceptions = useMemo(
+    () =>
+      exceptions.filter(
+        (exception) => (exception.datasetType || exception.direction || activeDatasetType || direction) === (activeDatasetType || direction)
+      ),
+    [activeDatasetType, direction, exceptions]
+  );
+  const scopedRuntimeCheckResults = useMemo(
+    () =>
+      checkResults.filter(
+        (result) => (((result.datasetType || result.direction || activeDatasetType || direction) === (activeDatasetType || direction)))
+      ),
+    [activeDatasetType, checkResults, direction]
+  );
 
   const periodTotals = useMemo(() => {
     return filteredRuns.reduce(
@@ -207,11 +223,6 @@ export default function ControlsDashboardPage() {
   const criticalDensity = latestRun && latestRun.total_invoices > 0
     ? (latestRun.critical_count / latestRun.total_invoices) * 100
     : null;
-  const avgResolutionHours = useMemo(() => {
-    const values = Object.values(slaMetrics.averageResolutionHours).filter((v) => Number.isFinite(v));
-    if (values.length === 0) return null;
-    return values.reduce((sum, value) => sum + value, 0) / values.length;
-  }, [slaMetrics.averageResolutionHours]);
   const runtimeCodelistDomains = useMemo(
     () => countRuntimeCodelistDomains(UAE_UC1_CHECK_PACK.filter((check) => check.is_enabled)),
     []
@@ -272,26 +283,110 @@ export default function ControlsDashboardPage() {
   const formatPct = (value: number | null, digits = 1) => (value === null ? 'N/A' : `${value.toFixed(digits)}%`);
   const formatHours = (value: number | null) => (value === null ? 'N/A' : `${value.toFixed(1)}h`);
   const formatCount = (value: number) => value.toLocaleString('en-US');
-
-  const readinessScore = useMemo(() => {
-    const normalizedPassRate = latestPassRate ?? 0;
-    const normalizedDrCoverage = drCoverageSummary.percent;
-    const normalizedMoFCoverage = mofMandatoryCoveragePct ?? 0;
-    const normalizedCriticalRisk = criticalDensity === null ? 100 : Math.max(0, 100 - Math.min(criticalDensity * 4, 100));
-    return (
-      normalizedPassRate * 0.4 +
-      normalizedDrCoverage * 0.25 +
-      normalizedMoFCoverage * 0.25 +
-      normalizedCriticalRisk * 0.1
-    );
-  }, [latestPassRate, drCoverageSummary.percent, mofMandatoryCoveragePct, criticalDensity]);
-
-  const readinessBand = useMemo(() => {
-    if (readinessScore >= 90) return { label: 'Controlled', color: 'text-success', hint: 'Strong readiness posture' };
-    if (readinessScore >= 75) return { label: 'Watch', color: 'text-severity-medium', hint: 'Monitor and remediate key gaps' };
-    if (readinessScore >= 60) return { label: 'Exposed', color: 'text-severity-high', hint: 'Material risk is building' };
-    return { label: 'Critical', color: 'text-severity-critical', hint: 'Immediate remediation required' };
-  }, [readinessScore]);
+  const totalInvoicesInScope = headers.length > 0 ? headers.length : latestRun?.total_invoices ?? 0;
+  const liveCriticalBlockerInvoiceIds = new Set(
+    scopedRuntimeExceptions
+      .filter((exception) => exception.severity === 'Critical' && exception.invoiceId)
+      .map((exception) => exception.invoiceId as string)
+  );
+  const liveCriticalBlockers =
+    liveCriticalBlockerInvoiceIds.size > 0
+      ? liveCriticalBlockerInvoiceIds.size
+      : scopedRuntimeExceptions.filter((exception) => exception.severity === 'Critical').length;
+  const criticalBlockers = headers.length > 0 || scopedRuntimeExceptions.length > 0
+    ? liveCriticalBlockers
+    : latestRun?.critical_count ?? 0;
+  const submissionReadyInvoices = Math.max(totalInvoicesInScope - criticalBlockers, 0);
+  const currentReadinessScore = totalInvoicesInScope > 0 ? (submissionReadyInvoices / totalInvoicesInScope) * 100 : 0;
+  const previousRunReadiness = previousRun && previousRun.total_invoices > 0
+    ? ((previousRun.total_invoices - previousRun.critical_count) / previousRun.total_invoices) * 100
+    : null;
+  const readinessTrend = previousRunReadiness === null ? null : currentReadinessScore - previousRunReadiness;
+  const livePassedOutcomes = scopedRuntimeCheckResults.reduce((sum, result) => sum + result.passed, 0);
+  const liveFailedOutcomes = scopedRuntimeCheckResults.reduce((sum, result) => sum + result.failed, 0);
+  const liveNonBlockingFailures = Math.max(
+    liveFailedOutcomes - scopedRuntimeExceptions.filter((exception) => exception.severity === 'Critical').length,
+    0
+  );
+  const passedOutcomes =
+    scopedRuntimeCheckResults.length > 0
+      ? livePassedOutcomes
+      : Math.max((latestRun?.total_invoices ?? 0) - (latestRun?.total_exceptions ?? 0), 0);
+  const failedOutcomes =
+    scopedRuntimeCheckResults.length > 0
+      ? liveNonBlockingFailures
+      : Math.max((latestRun?.total_exceptions ?? 0) - (latestRun?.critical_count ?? 0), 0);
+  const controlStudioStatus = criticalBlockers > 0
+    ? 'AT RISK'
+    : failedOutcomes > NON_BLOCKING_FAILURE_THRESHOLD
+    ? 'DEGRADED'
+    : 'READY';
+  const controlStudioStatusVariant =
+    controlStudioStatus === 'AT RISK' ? 'danger' : controlStudioStatus === 'DEGRADED' ? 'warning' : 'success';
+  const controlStudioMetrics = [
+    {
+      title: 'Readiness Status Score',
+      value: `${currentReadinessScore.toFixed(1)}%`,
+      subtitle:
+        totalInvoicesInScope > 0
+          ? `${submissionReadyInvoices.toLocaleString('en-US')} of ${totalInvoicesInScope.toLocaleString('en-US')} invoices submission-ready`
+          : 'No invoices currently in scope',
+      helpText: 'Share of invoices currently treated as submission-ready based on invoice-level critical blocker presence.',
+      icon: <Shield className="w-5 h-5" />,
+      variant: currentReadinessScore >= 90 ? 'success' : currentReadinessScore >= 75 ? 'warning' : 'danger' as const,
+    },
+    {
+      title: 'Trend Indicator',
+      value: readinessTrend === null ? 'N/A' : `${readinessTrend > 0 ? '+' : ''}${readinessTrend.toFixed(1)} pts`,
+      subtitle: previousRunReadiness === null ? 'No previous run baseline' : 'Movement since previous run',
+      helpText: 'Current readiness score minus the previous recorded run readiness baseline.',
+      icon: <Activity className="w-5 h-5" />,
+      variant: readinessTrend === null ? 'default' : readinessTrend >= 0 ? 'success' : 'warning' as const,
+    },
+    {
+      title: 'Passed',
+      value: formatCount(passedOutcomes),
+      subtitle:
+        scopedRuntimeCheckResults.length > 0
+          ? 'Validation outcomes passing'
+          : 'Latest run pass proxy',
+      helpText: 'Uses current in-memory check outcomes when available; otherwise falls back to the latest recorded run summary.',
+      icon: <CheckCircle2 className="w-5 h-5" />,
+      variant: 'success' as const,
+    },
+    {
+      title: 'Failed',
+      value: formatCount(failedOutcomes),
+      subtitle:
+        scopedRuntimeCheckResults.length > 0
+          ? 'Non-blocking validation outcomes'
+          : 'Latest run non-blocking proxy',
+      helpText: `Non-critical failures only. Status degrades when this exceeds ${NON_BLOCKING_FAILURE_THRESHOLD}.`,
+      icon: <TriangleAlert className="w-5 h-5" />,
+      variant: failedOutcomes > NON_BLOCKING_FAILURE_THRESHOLD ? 'warning' as const : 'default' as const,
+    },
+    {
+      title: 'Critical Blockers',
+      value: formatCount(criticalBlockers),
+      subtitle: 'Invoices that cannot be submitted',
+      helpText: 'Current runtime proxy uses invoice-linked Critical exceptions as submission blockers.',
+      icon: <ShieldAlert className="w-5 h-5" />,
+      variant: criticalBlockers > 0 ? 'danger' as const : 'success' as const,
+    },
+    {
+      title: 'Status',
+      value: controlStudioStatus,
+      subtitle:
+        controlStudioStatus === 'AT RISK'
+          ? 'Critical blockers present'
+          : controlStudioStatus === 'DEGRADED'
+          ? `Non-blocking failures exceed ${NON_BLOCKING_FAILURE_THRESHOLD}`
+          : 'No blocker threshold breached',
+      helpText: 'AT RISK if any critical blockers exist; otherwise DEGRADED when non-blocking failures exceed threshold; else READY.',
+      icon: <FileCheck className="w-5 h-5" />,
+      variant: controlStudioStatusVariant,
+    },
+  ];
 
   const focusRuns = insightMode === 'quality'
     ? filteredRuns.filter((run) => run.pass_rate < 90)
@@ -408,50 +503,31 @@ export default function ControlsDashboardPage() {
           </div>
         </div>
 
-        <div className="mb-8 rounded-2xl border border-white/70 surface-glass p-5 animate-slide-up">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-8 animate-slide-up">
+          <div className="mb-3 flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Compliance readiness band</p>
-              <div className="mt-1 flex items-end gap-2">
-                <p className="text-3xl font-bold text-foreground">{readinessScore.toFixed(1)}%</p>
-                <p className={cn('text-sm font-semibold pb-1', readinessBand.color)}>{readinessBand.label}</p>
-              </div>
-              <p className="text-sm text-muted-foreground">{readinessBand.hint}</p>
+              <h2 className="text-lg font-semibold text-foreground">Control Studio Panel</h2>
+              <p className="text-sm text-muted-foreground">
+                Immediate runtime view of submission readiness, blocker pressure, and validation movement.
+              </p>
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Info className="h-4 w-4" />
-              <span>Thresholds: Critical &lt;60 | Exposed 60-74 | Watch 75-89 | Controlled 90+</span>
+              <span>Operational KPIs first; analytic diagnostics remain below.</span>
             </div>
           </div>
-          <div className="mt-4">
-            <div className="relative h-3 overflow-hidden rounded-full bg-muted">
-              <div className="grid h-full grid-cols-4">
-                <div className="bg-severity-critical/70" />
-                <div className="bg-severity-high/70" />
-                <div className="bg-severity-medium/70" />
-                <div className="bg-success/70" />
-              </div>
-              <span
-                className="pointer-events-none absolute top-[-2px] h-7 w-[2px] rounded bg-white/90 shadow-[0_0_0_1px_rgba(0,0,0,0.18)]"
-                style={{ left: `calc(${Math.min(Math.max(readinessScore, 0), 100)}% - 1px)` }}
-                aria-hidden="true"
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 gap-4">
+            {controlStudioMetrics.map((metric) => (
+              <StatsCard
+                key={metric.title}
+                title={metric.title}
+                value={metric.value}
+                subtitle={metric.subtitle}
+                helpText={metric.helpText}
+                icon={metric.icon}
+                variant={metric.variant}
               />
-            </div>
-            <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] sm:grid-cols-4">
-              <div className="rounded-md border border-severity-critical/40 bg-severity-critical-bg/60 px-2 py-1 text-severity-critical">Critical (&lt;60)</div>
-              <div className="rounded-md border border-severity-high/40 bg-severity-high-bg/60 px-2 py-1 text-severity-high">Exposed (60-74)</div>
-              <div className="rounded-md border border-severity-medium/40 bg-severity-medium-bg/60 px-2 py-1 text-severity-medium">Watch (75-89)</div>
-              <div className="rounded-md border border-success/40 bg-success-bg/60 px-2 py-1 text-success">Controlled (90+)</div>
-            </div>
-            <div className="mt-2">
-              <Progress value={readinessScore} className="h-2" />
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Readiness score combines latest check pass rate, PINT-AE DR coverage, MoF mandatory coverage, and critical exception pressure.
-            </p>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Weighting: pass rate 40% | PINT-AE DR coverage 25% | MoF mandatory coverage 25% | critical pressure 10%.
-            </p>
+            ))}
           </div>
         </div>
 
@@ -596,37 +672,12 @@ export default function ControlsDashboardPage() {
               variant={rejectionAnalytics.repeatRate > 20 ? 'danger' : rejectionAnalytics.repeatRate > 10 ? 'warning' : 'success'}
             />
             <StatsCard
-              title="SLA Breach Rate"
-              value={`${slaMetrics.breachPercentage.toFixed(1)}%`}
-              subtitle={`${formatCount(slaMetrics.breachedCases)} breached of ${formatCount(slaMetrics.totalCases)} total cases`}
-              helpText="Percentage of cases currently breaching SLA commitments."
-              icon={<Clock3 className="w-5 h-5" />}
-              variant={slaMetrics.breachPercentage > 20 ? 'danger' : slaMetrics.breachPercentage > 10 ? 'warning' : 'success'}
-            />
-            <StatsCard
               title="Open Cases"
               value={formatCount(slaMetrics.openCases)}
               subtitle={`${formatCount(slaMetrics.resolvedCases)} resolved cases`}
               helpText="Current remediation workload from open exception cases."
               icon={<FolderOpen className="w-5 h-5" />}
               variant={slaMetrics.openCases > 30 ? 'danger' : slaMetrics.openCases > 10 ? 'warning' : 'success'}
-            />
-            <StatsCard
-              title="Average Resolution Time"
-              value={formatHours(avgResolutionHours)}
-              subtitle="Across severities with resolved cases"
-              helpText="Mean time to resolve cases, averaged across severities where resolved cases exist."
-              icon={<Clock3 className="w-5 h-5" />}
-            />
-            <StatsCard
-              title="Client Health Signal"
-              value={avgHealthScore === null ? 'N/A' : avgHealthScore.toFixed(0)}
-              subtitle={avgHealthScore === null ? 'No client score data yet' : `Latest portfolio average health score`}
-              helpText="Average client health score from the latest health records."
-              onClick={() => setInsightMode('quality')}
-              isActive={insightMode === 'quality'}
-              icon={<Award className="w-5 h-5" />}
-              variant={avgHealthScore === null ? 'default' : avgHealthScore >= 80 ? 'success' : avgHealthScore >= 60 ? 'warning' : 'danger'}
             />
             <StatsCard
               title="Latest Critical Pressure"

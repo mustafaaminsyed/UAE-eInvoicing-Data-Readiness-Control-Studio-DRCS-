@@ -20,7 +20,7 @@ import { checkRunReadiness } from '@/lib/coverage/conformanceEngine';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
-import { getSupabaseEnvStatus, shouldUseLocalDevFallback } from '@/lib/api/supabaseEnv';
+import { getSupabaseEnvStatus, isLocalDevFallbackEnabled, shouldUseLocalDevFallback } from '@/lib/api/supabaseEnv';
 import { supabase } from '@/integrations/supabase/client';
 import { LastRunContextBanner } from '@/components/run/LastRunContextBanner';
 import { FEATURE_FLAGS } from '@/config/features';
@@ -99,6 +99,7 @@ export default function RunChecksPage() {
   const supabaseEnvStatus = useMemo(() => getSupabaseEnvStatus(), []);
   const isSupabaseConfigured = supabaseEnvStatus.configured;
   const isLocalFallbackMode = useMemo(() => shouldUseLocalDevFallback(), []);
+  const isLocalFallbackEnabled = useMemo(() => isLocalDevFallbackEnabled(), []);
 
   // Mapping template state
   const [mappingTemplates, setMappingTemplates] = useState<MappingTemplate[]>([]);
@@ -213,27 +214,46 @@ export default function RunChecksPage() {
       setIsLoadingTemplates(false);
       return;
     }
-    const { error: mappingProbeError } = await supabase
-      .from('mapping_templates')
-      .select('id', { count: 'exact', head: true });
-    if (mappingProbeError) {
-      const message = formatSetupError(mappingProbeError.message, 'mapping_templates');
-      setMappingTemplatesError(message);
+    try {
+      const { error: mappingProbeError } = await supabase
+        .from('mapping_templates')
+        .select('id', { count: 'exact', head: true });
+      if (mappingProbeError) {
+        if (isLocalFallbackEnabled) {
+          setMappingTemplates([]);
+          setSelectedTemplateId('none');
+          setIsLoadingTemplates(false);
+          return;
+        }
+        const message = formatSetupError(mappingProbeError.message, 'mapping_templates');
+        setMappingTemplatesError(message);
+        setMappingTemplates([]);
+        setSelectedTemplateId('none');
+        setIsLoadingTemplates(false);
+        return;
+      }
+      const templates = await fetchActiveTemplates(direction);
+      setMappingTemplates(templates);
+      const activeProfile = activeMappingProfileByDirection[direction];
+      if (activeProfile?.id && templates.some((template) => template.id === activeProfile.id)) {
+        setSelectedTemplateId(activeProfile.id);
+      } else {
+        setSelectedTemplateId('none');
+      }
+      setIsLoadingTemplates(false);
+    } catch (error) {
+      if (isLocalFallbackEnabled) {
+        setMappingTemplates([]);
+        setSelectedTemplateId('none');
+        setIsLoadingTemplates(false);
+        return;
+      }
+      setMappingTemplatesError(error instanceof Error ? error.message : String(error));
       setMappingTemplates([]);
       setSelectedTemplateId('none');
       setIsLoadingTemplates(false);
-      return;
     }
-    const templates = await fetchActiveTemplates(direction);
-    setMappingTemplates(templates);
-    const activeProfile = activeMappingProfileByDirection[direction];
-    if (activeProfile?.id && templates.some((template) => template.id === activeProfile.id)) {
-      setSelectedTemplateId(activeProfile.id);
-    } else {
-      setSelectedTemplateId('none');
-    }
-    setIsLoadingTemplates(false);
-  }, [activeMappingProfileByDirection, direction, isSupabaseConfigured]);
+  }, [activeMappingProfileByDirection, direction, isLocalFallbackEnabled, isSupabaseConfigured]);
 
   const handleSeedUC1 = async (force = false) => {
     if (!isSupabaseConfigured && !isLocalFallbackMode) {

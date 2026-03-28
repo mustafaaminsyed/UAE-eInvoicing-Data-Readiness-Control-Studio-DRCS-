@@ -4,20 +4,22 @@
 // =============================================================================
 
 import { getDRRegistry, DRRegistryEntry, isDRIngestible } from '@/lib/registry/drRegistry';
-import { getRulesForDR, getRuleTraceability } from '@/lib/rules/ruleTraceability';
+import { getIndirectRulesForDR, getRulesForDR, getRuleTraceability } from '@/lib/rules/ruleTraceability';
 import { getControlsForDR } from '@/lib/registry/controlsRegistry';
 import { DatasetPopulation, getColumnPopulationPct } from '@/lib/coverage/populationCoverage';
 import { CONFORMANCE_CONFIG } from '@/config/conformance';
 
 // Part G: Coverage Classification
-export type CoverageStatus = 'NOT_IN_TEMPLATE' | 'NO_RULE' | 'NO_CONTROL' | 'COVERED';
+export type CoverageStatus = 'NOT_IN_TEMPLATE' | 'NO_RULE' | 'INDIRECT_RULE' | 'NO_CONTROL' | 'COVERED';
 
 export function computeCoverageStatus(
   inTemplate: boolean,
   ruleCount: number,
+  indirectRuleCount: number,
   controlCount: number,
 ): CoverageStatus {
   if (!inTemplate) return 'NOT_IN_TEMPLATE';
+  if (ruleCount === 0 && indirectRuleCount > 0) return 'INDIRECT_RULE';
   if (ruleCount === 0) return 'NO_RULE';
   if (controlCount === 0) return 'NO_CONTROL';
   return 'COVERED';
@@ -36,6 +38,8 @@ export interface TraceabilityRow {
   populationPct: number | null;
   ruleIds: string[];
   ruleNames: string[];
+  indirectRuleIds: string[];
+  indirectRuleNames: string[];
   controlIds: string[];
   controlNames: string[];
   coverageStatus: CoverageStatus;
@@ -81,6 +85,9 @@ export function computeTraceabilityMatrix(
 
   const rows: TraceabilityRow[] = registry.map(entry => {
     const rules = getRulesForDR(entry.dr_id);
+    const indirectRules = getIndirectRulesForDR(entry.dr_id).filter(
+      (rule) => !rules.some((directRule) => directRule.rule_id === rule.rule_id)
+    );
     const controls = getControlsForDR(entry.dr_id);
     const inTemplate = entry.internal_column_names.length > 0;
     const ingestible = isDRIngestible(entry);
@@ -109,7 +116,7 @@ export function computeTraceabilityMatrix(
     }
 
     // Coverage status (Part G)
-    const coverageStatus = computeCoverageStatus(inTemplate, rules.length, controls.length);
+    const coverageStatus = computeCoverageStatus(inTemplate, rules.length, indirectRules.length, controls.length);
 
     // Gap counting
     if (entry.mandatory_for_default_use_case) {
@@ -119,7 +126,7 @@ export function computeTraceabilityMatrix(
         mandatoryLowPopulation++;
       }
     }
-    if (rules.length === 0) drsWithNoRules++;
+    if (rules.length === 0 && indirectRules.length === 0) drsWithNoRules++;
     if (controls.length === 0) drsWithNoControls++;
     if (coverageStatus === 'COVERED') drsCovered++;
 
@@ -136,6 +143,8 @@ export function computeTraceabilityMatrix(
       populationPct,
       ruleIds: rules.map(r => r.rule_id),
       ruleNames: rules.map(r => r.rule_name),
+      indirectRuleIds: indirectRules.map(r => r.rule_id),
+      indirectRuleNames: indirectRules.map(r => r.rule_name),
       controlIds: controls.map(c => c.control_id),
       controlNames: controls.map(c => c.control_name),
       coverageStatus,

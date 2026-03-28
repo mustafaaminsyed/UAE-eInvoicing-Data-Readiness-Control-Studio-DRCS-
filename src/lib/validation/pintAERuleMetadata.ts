@@ -47,6 +47,8 @@ const RULE_METADATA_BY_CHECK_ID: Record<string, RuleMetadata> = {
   'UAE-UC1-CHK-012': { rule_type: 'structural_rule', execution_layer: 'schema' },
   'UAE-UC1-CHK-013': { rule_type: 'structural_rule', execution_layer: 'schema' },
   'UAE-UC1-CHK-014': { rule_type: 'structural_rule', execution_layer: 'schema' },
+  'UAE-UC1-CHK-014A': { rule_type: 'structural_rule', execution_layer: 'schema' },
+  'UAE-UC1-CHK-014B': { rule_type: 'structural_rule', execution_layer: 'schema' },
   'UAE-UC1-CHK-015': { rule_type: 'structural_rule', execution_layer: 'schema' },
   'UAE-UC1-CHK-016': { rule_type: 'enumeration', execution_layer: 'national_rule' },
   'UAE-UC1-CHK-017': { rule_type: 'structural_rule', execution_layer: 'schema' },

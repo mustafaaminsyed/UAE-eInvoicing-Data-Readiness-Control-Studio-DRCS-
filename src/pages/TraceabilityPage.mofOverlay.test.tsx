@@ -79,6 +79,11 @@ describe('TraceabilityPage MoF overlay', () => {
     // Collision IDs remain split by document type semantics.
     expect(screen.getByText('Buyer tax identifier')).toBeInTheDocument();
     expect(screen.getByText('Buyer legal registration identifier')).toBeInTheDocument();
+    expect(screen.getAllByText('IBT-048').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('IBT-047').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('IBT-048-1').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('BTAE-16').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Runtime semantic split supported: false').length).toBe(4);
     expect(screen.getByText('VAT line amount in AED')).toBeInTheDocument();
     expect(screen.getAllByText('Item name').length).toBeGreaterThan(0);
     expect(screen.getByText('Invoice line amount in AED')).toBeInTheDocument();

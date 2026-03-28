@@ -133,7 +133,7 @@ vi.mock('@/components/StatsCard', () => ({
 }));
 
 vi.mock('recharts', () => {
-  const Stub = ({ children }: { children?: React.ReactNode }) => <div>{children}</div>;
+  const Stub = () => <div />;
   return {
     ResponsiveContainer: Stub,
     LineChart: Stub,
@@ -153,6 +153,7 @@ vi.mock('@/context/ComplianceContext', () => ({
     direction: 'AR',
     exceptions: [],
     headers: [],
+    checkResults: [],
   }),
 }));
 

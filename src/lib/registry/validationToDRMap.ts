@@ -44,6 +44,8 @@ export const VALIDATION_TO_DR_MAP: ValidationDRMapEntry[] = [
       referenceOnly('IBT-034-1', 'seller_electronic_address'),
     ],
   },
+  { validation_id: 'UAE-UC1-CHK-014A', dr_targets: [exact('IBT-030', 'seller_legal_reg_id')] },
+  { validation_id: 'UAE-UC1-CHK-014B', dr_targets: [exact('BTUAE-15', 'seller_legal_reg_id_type')] },
   {
     validation_id: 'UAE-UC1-CHK-015',
     dr_targets: [
@@ -66,6 +68,8 @@ export const VALIDATION_TO_DR_MAP: ValidationDRMapEntry[] = [
     validation_id: 'UAE-UC1-CHK-020',
     dr_targets: [
       exact('IBT-050', 'buyer_address'),
+      exact('IBT-052', 'buyer_city'),
+      exact('IBT-054', 'buyer_subdivision'),
       exact('IBT-055', 'buyer_country'),
     ],
   },
@@ -116,7 +120,7 @@ export const VALIDATION_TO_DR_MAP: ValidationDRMapEntry[] = [
     ],
   },
   { validation_id: 'UAE-UC1-CHK-036', dr_targets: [partial('IBT-048', 'buyer_legal_reg_id', 'buyer_trn')] },
-  { validation_id: 'UAE-UC1-CHK-037', dr_targets: [referenceOnly('BTUAE-15', 'buyer_legal_reg_id_type', 'buyer_reg_id_type')] },
+  { validation_id: 'UAE-UC1-CHK-037', dr_targets: [] },
   { validation_id: 'UAE-UC1-CHK-038', dr_targets: [exact('IBT-154', 'item_name'), partial('IBT-153', 'description')] },
   { validation_id: 'UAE-UC1-CHK-039', dr_targets: [exact('IBT-153', 'description'), partial('IBT-154', 'item_name')] },
   { validation_id: 'UAE-UC1-CHK-040', dr_targets: [partial('IBT-149', 'price_base_quantity', 'line_base_quantity', 'item_price_base_quantity'), partial('IBT-129', 'quantity'), partial('IBT-146', 'unit_price')] },

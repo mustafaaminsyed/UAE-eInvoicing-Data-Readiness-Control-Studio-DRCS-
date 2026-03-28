@@ -54,6 +54,22 @@ export function buildRuleTraceability(): RuleTraceEntry[] {
   return [...runtimeEntries, ...overlayBridgeEntries];
 }
 
+export function getIndirectRuleTraceability(): RuleTraceEntry[] {
+  return getShadowApplicabilityDefinitions()
+    .filter((definition) => definition.source === 'shadow_only')
+    .map((definition) => ({
+      rule_id: definition.ruleId,
+      rule_name: definition.title,
+      affected_dr_ids: definition.linkedDrIds,
+      referenced_dr_ids: definition.linkedDrIds,
+      rule_type: 'dependency_rule' as RuleType,
+      execution_layer: 'dependency_rule' as ExecutionLayer,
+      severity: 'Critical',
+      scope: 'Header',
+      applies_when: 'ScenarioContext shadow applicability traceability',
+    }));
+}
+
 let _traceMap: RuleTraceEntry[] | null = null;
 
 export function getRuleTraceability(): RuleTraceEntry[] {
@@ -75,6 +91,10 @@ export function getReferencedDRIdsForRule(ruleId: string): string[] {
 
 export function getRulesForDR(drId: string): RuleTraceEntry[] {
   return getRuleTraceability().filter((rule) => rule.affected_dr_ids.includes(drId));
+}
+
+export function getIndirectRulesForDR(drId: string): RuleTraceEntry[] {
+  return getIndirectRuleTraceability().filter((rule) => rule.affected_dr_ids.includes(drId));
 }
 
 export function getDRsWithRules(): Set<string> {

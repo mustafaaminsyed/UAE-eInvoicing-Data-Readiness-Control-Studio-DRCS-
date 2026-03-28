@@ -9,12 +9,15 @@ import {
 } from '@/types/pintAE';
 import { Severity } from '@/types/compliance';
 import { RAW_UAE_UC1_CHECK_PACK, UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
-import { getSupabaseEnvStatus, shouldUseLocalDevFallback } from '@/lib/api/supabaseEnv';
+import { getSupabaseEnvStatus, isLocalDevFallbackEnabled, shouldUseLocalDevFallback } from '@/lib/api/supabaseEnv';
 import { getFailureClassForRule } from '@/lib/validation/pintAERuleMetadata';
 
 const UC1_CHECK_LOOKUP = new Map(UAE_UC1_CHECK_PACK.map((check) => [check.check_id, check]));
 const RAW_UC1_CHECK_LOOKUP = new Map(RAW_UAE_UC1_CHECK_PACK.map((check) => [check.check_id, check]));
 
+function canUseFallbackAfterFetchFailure(): boolean {
+  return isLocalDevFallbackEnabled();
+}
 function mapPintAECheckRow(row: any): PintAECheck {
   const normalized = UC1_CHECK_LOOKUP.get(row.check_id);
   return {
@@ -64,12 +67,18 @@ export async function fetchPintAEChecks(): Promise<PintAECheck[]> {
 
     if (error) {
       console.error('Error fetching PINT-AE checks:', error);
+      if (canUseFallbackAfterFetchFailure()) {
+        return UAE_UC1_CHECK_PACK;
+      }
       return [];
     }
 
     return (data || []).map(mapPintAECheckRow);
   } catch (error) {
     console.error('Error fetching PINT-AE checks:', error);
+    if (canUseFallbackAfterFetchFailure()) {
+      return UAE_UC1_CHECK_PACK;
+    }
     return [];
   }
 }
@@ -93,12 +102,18 @@ export async function fetchEnabledPintAEChecks(): Promise<PintAECheck[]> {
 
     if (error) {
       console.error('Error fetching enabled PINT-AE checks:', error);
+      if (canUseFallbackAfterFetchFailure()) {
+        return UAE_UC1_CHECK_PACK.filter((check) => check.is_enabled);
+      }
       return [];
     }
 
     return (data || []).map(mapPintAECheckRow);
   } catch (error) {
     console.error('Error fetching enabled PINT-AE checks:', error);
+    if (canUseFallbackAfterFetchFailure()) {
+      return UAE_UC1_CHECK_PACK.filter((check) => check.is_enabled);
+    }
     return [];
   }
 }
@@ -192,6 +207,19 @@ export async function getChecksDiagnostics(): Promise<ChecksDiagnostics> {
       .select('check_id, is_enabled');
 
     if (error) {
+      if (canUseFallbackAfterFetchFailure()) {
+        const enabled = UAE_UC1_CHECK_PACK.filter((check) => check.is_enabled).length;
+        return {
+          totalChecks: UAE_UC1_CHECK_PACK.length,
+          enabledChecks: enabled,
+          uc1ChecksPresent: UAE_UC1_CHECK_PACK.length > 0,
+          uc1CheckCount: UAE_UC1_CHECK_PACK.length,
+          dataSource: 'hardcoded',
+          configured: true,
+          configurationIssues: [],
+          fetchError: undefined,
+        };
+      }
       return {
         totalChecks: 0,
         enabledChecks: 0,
@@ -218,6 +246,19 @@ export async function getChecksDiagnostics(): Promise<ChecksDiagnostics> {
       configurationIssues: [],
     };
   } catch (error) {
+    if (canUseFallbackAfterFetchFailure()) {
+      const enabled = UAE_UC1_CHECK_PACK.filter((check) => check.is_enabled).length;
+      return {
+        totalChecks: UAE_UC1_CHECK_PACK.length,
+        enabledChecks: enabled,
+        uc1ChecksPresent: UAE_UC1_CHECK_PACK.length > 0,
+        uc1CheckCount: UAE_UC1_CHECK_PACK.length,
+        dataSource: 'hardcoded',
+        configured: true,
+        configurationIssues: [],
+        fetchError: undefined,
+      };
+    }
     return {
       totalChecks: 0,
       enabledChecks: 0,

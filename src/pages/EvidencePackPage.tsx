@@ -979,6 +979,7 @@ export default function EvidencePackPage() {
 function CoverageStatusBadge({ status }: { status: string }) {
   const config: Record<string, { className: string; label: string }> = {
     COVERED: { className: 'border-[hsl(var(--success))]/30 text-[hsl(var(--success))]', label: 'Covered' },
+    INDIRECT_RULE: { className: 'border-primary/30 text-primary', label: 'Indirect Rule' },
     NO_CONTROL: { className: 'border-accent/30 text-accent-foreground', label: 'No Control' },
     NO_RULE: { className: 'border-destructive/30 text-destructive', label: 'No Rule' },
     NOT_IN_TEMPLATE: { className: 'border-muted text-muted-foreground', label: 'Not in Template' },

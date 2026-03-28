@@ -835,6 +835,52 @@ export function runPintAECheckWithTelemetry(
       });
       break;
 
+    // Seller legal registration identifier present
+    case 'UAE-UC1-CHK-014A':
+      data.headers.forEach(header => {
+        executionCount++;
+        const field = resolveFieldAlias(params.field || 'seller_legal_reg_id');
+        const value = getFieldValue(header, field);
+        if (isEmpty(value)) {
+          exceptions.push(createException({
+            invoiceId: header.invoice_id,
+            invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn,
+            buyerId: header.buyer_id,
+            fieldName: field,
+            observedValue: '(empty)',
+            expectedValue: 'Required value',
+            message: `Invoice ${header.invoice_number}: Missing seller legal registration identifier`,
+          }));
+        }
+      });
+      break;
+
+    // Seller legal registration identifier type present when seller legal registration identifier exists
+    case 'UAE-UC1-CHK-014B':
+      data.headers.forEach(header => {
+        executionCount++;
+        const field = resolveFieldAlias(params.field || 'seller_legal_reg_id_type');
+        const dependencyField = resolveFieldAlias(params.required_when_field_present || 'seller_legal_reg_id');
+        const dependencyValue = getFieldValue(header, dependencyField);
+        if (isEmpty(dependencyValue)) return;
+
+        const value = getFieldValue(header, field);
+        if (isEmpty(value)) {
+          exceptions.push(createException({
+            invoiceId: header.invoice_id,
+            invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn,
+            buyerId: header.buyer_id,
+            fieldName: field,
+            observedValue: '(empty)',
+            expectedValue: 'Required value',
+            message: `Invoice ${header.invoice_number}: Missing seller legal registration identifier type`,
+          }));
+        }
+      });
+      break;
+
     // Seller address mandatory fields
     case 'UAE-UC1-CHK-015':
       data.headers.forEach(header => {
@@ -917,7 +963,9 @@ export function runPintAECheckWithTelemetry(
     case 'UAE-UC1-CHK-020':
       data.buyers.forEach(buyer => {
         executionCount++;
-        const fields: string[] = Array.isArray(params.fields) ? params.fields : ['buyer_address', 'buyer_country'];
+        const fields: string[] = Array.isArray(params.fields)
+          ? params.fields
+          : ['buyer_address', 'buyer_city', 'buyer_subdivision', 'buyer_country'];
         fields.map(resolveFieldAlias).forEach((field) => {
           const value = getFieldValue(buyer, field);
           if (isEmpty(value)) {
