@@ -16,9 +16,99 @@ export interface ExportValidationResult {
   report: ConsistencyReport;
 }
 
+export interface EntityEvidencePackExport {
+  entityKey: string;
+  entityLabel: string;
+  evidence: EvidencePackData;
+}
+
 /** Part 7: Validate consistency before export */
-export function validateBeforeExport(): ExportValidationResult {
-  const report = runConsistencyChecks();
+function buildPackSpecificConsistencyReport(data: EvidencePackData): ConsistencyReport {
+  const issues: ConsistencyReport['issues'] = [];
+  let passed = 0;
+
+  if (!data.overview.assessmentRunId || !data.overview.executionTimestamp) {
+    issues.push({
+      level: 'error',
+      category: 'Evidence Pack Integrity',
+      message: 'Evidence pack is missing required run provenance metadata.',
+      affected_ids: [data.overview.assessmentRunId || 'missing-run-id'],
+    });
+  } else {
+    passed++;
+  }
+
+  if (data.overview.counts.totalDRs !== data.drCoverage.length) {
+    issues.push({
+      level: 'error',
+      category: 'Evidence Pack Integrity',
+      message: 'Overview DR totals do not match the exported DR coverage rows.',
+      affected_ids: ['overview.totalDRs', 'drCoverage'],
+    });
+  } else {
+    passed++;
+  }
+
+  if (
+    data.overview.counts.mandatoryDRs !==
+    data.drCoverage.filter((row) => row.mandatory).length
+  ) {
+    issues.push({
+      level: 'error',
+      category: 'Evidence Pack Integrity',
+      message: 'Overview mandatory DR totals do not match the exported DR coverage rows.',
+      affected_ids: ['overview.mandatoryDRs', 'drCoverage'],
+    });
+  } else {
+    passed++;
+  }
+
+  if (
+    data.overview.counts.openExceptions !==
+    data.exceptions.filter((row) => row.case_status.toLowerCase() === 'open').length
+  ) {
+    issues.push({
+      level: 'error',
+      category: 'Evidence Pack Integrity',
+      message: 'Overview open exception totals do not match the exported exception records.',
+      affected_ids: ['overview.openExceptions', 'exceptions'],
+    });
+  } else {
+    passed++;
+  }
+
+  if (data.traceabilityRows.length !== data.drCoverage.length) {
+    issues.push({
+      level: 'error',
+      category: 'Evidence Pack Integrity',
+      message: 'Traceability export rows do not align to the DR coverage matrix.',
+      affected_ids: ['traceabilityRows', 'drCoverage'],
+    });
+  } else {
+    passed++;
+  }
+
+  if (data.ruleExecution.length === 0) {
+    issues.push({
+      level: 'warning',
+      category: 'Evidence Pack Completeness',
+      message: 'Evidence pack contains no rule execution rows.',
+      affected_ids: ['ruleExecution'],
+    });
+  } else {
+    passed++;
+  }
+
+  return {
+    issues,
+    passed,
+    failed: issues.length,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+export function validateBeforeExport(data?: EvidencePackData): ExportValidationResult {
+  const report = data ? buildPackSpecificConsistencyReport(data) : runConsistencyChecks();
   const hasErrors = report.issues.some(i => i.level === 'error');
   return { valid: !hasErrors, report };
 }
@@ -34,8 +124,15 @@ function workbookToBuffer(wb: XLSX.WorkBook): Uint8Array {
   return XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as Uint8Array;
 }
 
-export async function generateEvidencePackZip(data: EvidencePackData): Promise<Blob> {
-  const zip = new JSZip();
+function sanitizeZipSegment(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '') || 'entity';
+}
+
+function appendEvidencePackFiles(zip: JSZip, data: EvidencePackData, prefix = ''): void {
   const summary = buildEvidenceSummary(data);
 
   // 01_scope_summary.xlsx
@@ -45,10 +142,33 @@ export async function generateEvidencePackZip(data: EvidencePackData): Promise<B
       value: data.overview.assessmentRunId,
     },
     { field: 'Execution Timestamp', value: data.overview.executionTimestamp },
+    {
+      field: 'Evidence Source Mode',
+      value:
+        data.overview.sourceMode === 'persisted_snapshot'
+          ? 'Persisted snapshot'
+          : 'Current in-memory run',
+    },
     { field: 'Scope', value: data.overview.scope },
     { field: 'PINT-AE Version', value: data.overview.specVersion },
     { field: 'UAE DR Version', value: data.overview.drVersion },
     { field: 'Dataset / Client', value: data.overview.datasetName },
+    {
+      field: 'Entity Scope',
+      value:
+        data.overview.entityScopeStatus === 'single_entity'
+          ? 'Single entity'
+          : data.overview.entityScopeStatus === 'multi_entity'
+            ? 'Multi-entity'
+            : 'Unknown',
+    },
+    { field: 'Legal Entity Count', value: data.overview.legalEntityCount },
+    {
+      field: 'Legal Entities',
+      value: data.overview.legalEntityLabels.length > 0
+        ? data.overview.legalEntityLabels.join('; ')
+        : 'Unknown',
+    },
     { field: 'Total Invoices', value: data.overview.counts.totalInvoices },
     { field: 'Total Buyers', value: data.overview.counts.totalBuyers },
     { field: 'Total Lines', value: data.overview.counts.totalLines },
@@ -66,7 +186,7 @@ export async function generateEvidencePackZip(data: EvidencePackData): Promise<B
       value: issue,
     })),
   ];
-  zip.file('01_scope_summary.xlsx', workbookToBuffer(createWorkbook(scopeRows, 'Scope Summary')));
+  zip.file(`${prefix}01_scope_summary.xlsx`, workbookToBuffer(createWorkbook(scopeRows, 'Scope Summary')));
 
   // 02_dr_coverage.xlsx
   const drRows = data.drCoverage.map(r => ({
@@ -82,7 +202,7 @@ export async function generateEvidencePackZip(data: EvidencePackData): Promise<B
     'Population %': r.population_percentage !== null ? Number(r.population_percentage.toFixed(1)) : '',
     'Coverage Status': r.coverage_status,
   }));
-  zip.file('02_dr_coverage.xlsx', workbookToBuffer(createWorkbook(drRows, 'DR Coverage')));
+  zip.file(`${prefix}02_dr_coverage.xlsx`, workbookToBuffer(createWorkbook(drRows, 'DR Coverage')));
 
   // 03_rule_execution.xlsx
   const ruleRows = data.ruleExecution.map(r => ({
@@ -97,7 +217,7 @@ export async function generateEvidencePackZip(data: EvidencePackData): Promise<B
     'Failure Count': r.failure_count,
     'Execution Count Source': r.execution_source,
   }));
-  zip.file('03_rule_execution.xlsx', workbookToBuffer(createWorkbook(ruleRows, 'Rule Execution')));
+  zip.file(`${prefix}03_rule_execution.xlsx`, workbookToBuffer(createWorkbook(ruleRows, 'Rule Execution')));
 
   // 04_exceptions_and_cases.xlsx
   const excRows = data.exceptions.map(e => ({
@@ -114,7 +234,7 @@ export async function generateEvidencePackZip(data: EvidencePackData): Promise<B
     'Case ID': e.case_id,
     'Case Status': e.case_status,
   }));
-  zip.file('04_exceptions_and_cases.xlsx', workbookToBuffer(createWorkbook(
+  zip.file(`${prefix}04_exceptions_and_cases.xlsx`, workbookToBuffer(createWorkbook(
     excRows.length > 0 ? excRows : [{ 'Exception ID': '', 'DR ID': '', 'Rule ID': '', 'Rule Type': '', 'Execution Layer': '', 'Failure Class': '', 'Record Reference': '', 'Severity': '', 'Message': 'No exceptions', 'Exception Status': '', 'Case ID': '', 'Case Status': '' }],
     'Exceptions'
   )));
@@ -128,7 +248,7 @@ export async function generateEvidencePackZip(data: EvidencePackData): Promise<B
     'Covered DR IDs': c.covered_dr_ids,
     'Linked Exceptions': c.linked_exception_count,
   }));
-  zip.file('05_controls_mapping.xlsx', workbookToBuffer(createWorkbook(ctrlRows, 'Controls')));
+  zip.file(`${prefix}05_controls_mapping.xlsx`, workbookToBuffer(createWorkbook(ctrlRows, 'Controls')));
 
   // 06_population_quality.xlsx
   const popRows = data.populationQuality.map(p => ({
@@ -139,7 +259,70 @@ export async function generateEvidencePackZip(data: EvidencePackData): Promise<B
     'Threshold': p.threshold,
     'Pass/Fail': p.pass_fail,
   }));
-  zip.file('06_population_quality.xlsx', workbookToBuffer(createWorkbook(popRows, 'Population Quality')));
+  zip.file(`${prefix}06_population_quality.xlsx`, workbookToBuffer(createWorkbook(popRows, 'Population Quality')));
+
+  // 07_traceability_matrix.xlsx
+  const traceabilityRows = data.traceabilityRows.map((row) => ({
+    'DR ID': row.dr_id,
+    'Business Term': row.business_term,
+    Mandatory: row.mandatory ? 'Yes' : 'No',
+    'VAT Law Status': row.vatLawStatus,
+    'New PINT Field': row.isNewPintField ? 'Yes' : 'No',
+    Template: row.dataset_file ?? '',
+    'Internal Columns': row.internal_columns.join('; '),
+    'In Template': row.inTemplate ? 'Yes' : 'No',
+    Ingestible: row.ingestible ? 'Yes' : 'No',
+    'Population %': row.populationPct !== null ? Number(row.populationPct.toFixed(1)) : '',
+    'Direct Rule IDs': row.ruleIds.join('; '),
+    'Direct Rule Names': row.ruleNames.join('; '),
+    'Indirect Rule IDs': row.indirectRuleIds.join('; '),
+    'Indirect Rule Names': row.indirectRuleNames.join('; '),
+    'Control IDs': row.controlIds.join('; '),
+    'Control Names': row.controlNames.join('; '),
+    'Coverage Status': row.coverageStatus,
+    'Last Run Pass Rate %': row.lastRunPassRate !== null ? Number(row.lastRunPassRate.toFixed(1)) : '',
+    Category: row.category,
+    'Data Responsibility': row.dataResponsibility,
+    'System Default Allowed': row.systemDefaultAllowed ? 'Yes' : 'No',
+    'Exception Count': row.exceptionCount,
+  }));
+  zip.file(
+    `${prefix}07_traceability_matrix.xlsx`,
+    workbookToBuffer(createWorkbook(traceabilityRows, 'Traceability Matrix'))
+  );
+}
+
+export async function generateEvidencePackZip(data: EvidencePackData): Promise<Blob> {
+  const zip = new JSZip();
+  appendEvidencePackFiles(zip, data);
+
+  return zip.generateAsync({ type: 'blob' });
+}
+
+export async function generateEvidencePackZipByEntity(
+  packs: EntityEvidencePackExport[]
+): Promise<Blob> {
+  const zip = new JSZip();
+
+  const manifestRows = packs.map((pack) => ({
+    'Entity Key': pack.entityKey,
+    'Entity Label': pack.entityLabel,
+    'Assessment Run ID': pack.evidence.overview.assessmentRunId,
+    'Invoices': pack.evidence.overview.counts.totalInvoices,
+    'Buyers': pack.evidence.overview.counts.totalBuyers,
+    'Lines': pack.evidence.overview.counts.totalLines,
+    'Open Exceptions': pack.evidence.overview.counts.openExceptions,
+    'Covered DRs': pack.evidence.overview.counts.coveredDRs,
+  }));
+  zip.file(
+    '00_export_scope_manifest.xlsx',
+    workbookToBuffer(createWorkbook(manifestRows, 'Export Scope'))
+  );
+
+  packs.forEach((pack, index) => {
+    const folderName = `${String(index + 1).padStart(2, '0')}_${sanitizeZipSegment(pack.entityLabel || pack.entityKey)}/`;
+    appendEvidencePackFiles(zip, pack.evidence, folderName);
+  });
 
   return zip.generateAsync({ type: 'blob' });
 }
@@ -180,8 +363,11 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
   const summaryRows = [
     ['Run ID', ov.assessmentRunId],
     ['Execution Time', new Date(ov.executionTimestamp).toLocaleString()],
+    ['Evidence Source', ov.sourceMode === 'persisted_snapshot' ? 'Persisted snapshot' : 'Current in-memory run'],
     ['Scope', ov.scope],
     ['Dataset', ov.datasetName || '-'],
+    ['Entity Scope', ov.entityScopeStatus === 'single_entity' ? 'Single entity' : ov.entityScopeStatus === 'multi_entity' ? 'Multi-entity' : 'Unknown'],
+    ['Legal Entities', ov.legalEntityCount > 0 ? String(ov.legalEntityCount) : 'Unknown'],
     ['Invoices', String(ov.counts.totalInvoices)],
     ['Buyers', String(ov.counts.totalBuyers)],
     ['Lines', String(ov.counts.totalLines)],

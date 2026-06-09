@@ -57,13 +57,13 @@
     --chart-4: 25 95% 53%;
     --chart-5: 0 84% 60%;
 
-    --sidebar-background: 148 29% 13%;
-    --sidebar-foreground: 210 40% 98%;
+    --sidebar-background: 210 38% 98%;
+    --sidebar-foreground: 221 36% 16%;
     --sidebar-primary: 142 50% 42%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 150 18% 19%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 150 18% 19%;
+    --sidebar-accent: 210 25% 95%;
+    --sidebar-accent-foreground: 221 36% 16%;
+    --sidebar-border: 215 27% 88%;
     --sidebar-ring: 142 50% 42%;
   }
 
@@ -109,6 +109,15 @@
     /* Success */
     --success: 142 66% 54%;
     --success-bg: 142 34% 16%;
+
+    --sidebar-background: 220 22% 11%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 142 46% 46%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 18% 15%;
+    --sidebar-accent-foreground: 210 40% 96%;
+    --sidebar-border: 220 18% 18%;
+    --sidebar-ring: 142 46% 46%;
   }
 }
 
@@ -121,17 +130,17 @@
     @apply bg-background text-foreground font-sans antialiased;
     font-family: "Manrope", sans-serif;
     background-image:
-      radial-gradient(circle at 12% 0%, rgba(37, 121, 73, 0.08), transparent 36%),
-      radial-gradient(circle at 100% 18%, rgba(11, 124, 173, 0.06), transparent 34%),
-      linear-gradient(180deg, rgba(250, 252, 251, 0.98), rgba(245, 248, 250, 0.98));
+      radial-gradient(circle at 12% 0%, rgba(37, 121, 73, 0.035), transparent 34%),
+      radial-gradient(circle at 100% 18%, rgba(11, 124, 173, 0.045), transparent 32%),
+      linear-gradient(180deg, rgba(252, 253, 255, 0.99), rgba(246, 249, 252, 0.99));
     background-attachment: fixed;
   }
 
   .dark body {
     background-image:
-      radial-gradient(circle at 12% 0%, rgba(55, 170, 109, 0.16), transparent 36%),
-      radial-gradient(circle at 100% 18%, rgba(28, 96, 74, 0.11), transparent 34%),
-      linear-gradient(180deg, rgba(13, 21, 19, 0.98), rgba(10, 16, 15, 0.99));
+      radial-gradient(circle at 12% 0%, rgba(55, 170, 109, 0.1), transparent 34%),
+      radial-gradient(circle at 100% 18%, rgba(28, 96, 74, 0.08), transparent 32%),
+      linear-gradient(180deg, rgba(13, 20, 24, 0.98), rgba(10, 15, 18, 0.99));
   }
 }
 
@@ -141,10 +150,10 @@
   }
 
   .surface-glass {
-    background: hsl(var(--card) / 0.96);
+    background: hsl(var(--card) / 0.94);
     border: 1px solid hsl(var(--border) / 0.95) !important;
-    box-shadow: 0 16px 34px -24px rgba(16, 39, 28, 0.34);
-    backdrop-filter: blur(2px);
+    box-shadow: 0 14px 28px -24px rgba(15, 23, 42, 0.26);
+    backdrop-filter: blur(3px);
   }
 
   .grid-veil {
@@ -156,14 +165,14 @@
 
   .app-gradient-wash {
     background-image:
-      radial-gradient(circle at 12% 0%, rgba(55, 170, 109, 0.12), transparent 36%),
-      radial-gradient(circle at 100% 18%, rgba(37, 141, 185, 0.1), transparent 34%);
+      radial-gradient(circle at 12% 0%, rgba(55, 170, 109, 0.05), transparent 34%),
+      radial-gradient(circle at 100% 18%, rgba(37, 141, 185, 0.06), transparent 32%);
   }
 
   .dark .app-gradient-wash {
     background-image:
-      radial-gradient(circle at 12% 0%, rgba(55, 170, 109, 0.14), transparent 36%),
-      radial-gradient(circle at 100% 18%, rgba(28, 96, 74, 0.1), transparent 34%);
+      radial-gradient(circle at 12% 0%, rgba(55, 170, 109, 0.09), transparent 34%),
+      radial-gradient(circle at 100% 18%, rgba(28, 96, 74, 0.07), transparent 32%);
   }
 
   .app-grid-veil {
@@ -171,14 +180,14 @@
       linear-gradient(to right, rgba(84, 110, 145, 0.045) 1px, transparent 1px),
       linear-gradient(to bottom, rgba(84, 110, 145, 0.045) 1px, transparent 1px);
     background-size: 34px 34px;
-    opacity: 0.48;
+    opacity: 0.28;
   }
 
   .dark .app-grid-veil {
     background-image:
       linear-gradient(to right, rgba(62, 108, 88, 0.08) 1px, transparent 1px),
       linear-gradient(to bottom, rgba(62, 108, 88, 0.08) 1px, transparent 1px);
-    opacity: 0.2;
+    opacity: 0.12;
   }
 
   .app-topbar {

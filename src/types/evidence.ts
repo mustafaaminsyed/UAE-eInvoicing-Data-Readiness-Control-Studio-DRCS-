@@ -14,6 +14,9 @@ export interface EvidenceRunSnapshot {
   version: 1;
   captured_at: string;
   dataset_name: string;
+  entity_scope_status?: 'single_entity' | 'multi_entity' | 'unknown';
+  legal_entity_count?: number;
+  legal_entity_labels?: string[];
   counts: {
     totalInvoices: number;
     totalBuyers: number;

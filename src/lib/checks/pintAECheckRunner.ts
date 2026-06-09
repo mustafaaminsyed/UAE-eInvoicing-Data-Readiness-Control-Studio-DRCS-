@@ -1783,6 +1783,81 @@ export function runPintAECheckWithTelemetry(
       });
       break;
 
+    case 'UAE-UC1-CHK-055':
+      data.headers.forEach((header) => {
+        executionCount++;
+        const invoiceTypeField = resolveFieldAlias(params.invoice_type_field || 'invoice_type');
+        const reasonCodeField = resolveFieldAlias(params.reason_code_field || 'credit_note_reason_code');
+        const invoiceType = String(getFieldValue(header, invoiceTypeField) || '');
+        const reasonCode = getFieldValue(header, reasonCodeField);
+
+        if (isCreditNoteInvoiceType(invoiceType) && isEmpty(reasonCode)) {
+          exceptions.push(createException({
+            invoiceId: header.invoice_id,
+            invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn,
+            buyerId: header.buyer_id,
+            fieldName: reasonCodeField,
+            observedValue: '(empty)',
+            expectedValue: 'Required for credit note invoices',
+            message: `Invoice ${header.invoice_number}: Credit note reason code is required when invoice type is ${invoiceType}`,
+          }));
+        }
+      });
+      break;
+
+    case 'UAE-UC1-CHK-056':
+      data.headers.forEach((header) => {
+        executionCount++;
+        const invoiceTypeField = resolveFieldAlias(params.invoice_type_field || 'invoice_type');
+        const reasonCodeField = resolveFieldAlias(params.reason_code_field || 'credit_note_reason_code');
+        const precedingReferenceField = resolveFieldAlias(params.preceding_reference_field || 'preceding_invoice_reference');
+        const waivedReasonCodes = getStringArray(params.waived_reason_codes).map(normalizeToken);
+        const invoiceType = String(getFieldValue(header, invoiceTypeField) || '');
+        const reasonCode = String(getFieldValue(header, reasonCodeField) || '');
+        const precedingReference = getFieldValue(header, precedingReferenceField);
+
+        if (!isCreditNoteInvoiceType(invoiceType)) return;
+        if (!isEmpty(reasonCode) && waivedReasonCodes.includes(normalizeToken(reasonCode))) return;
+
+        if (isEmpty(precedingReference)) {
+          exceptions.push(createException({
+            invoiceId: header.invoice_id,
+            invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn,
+            buyerId: header.buyer_id,
+            fieldName: precedingReferenceField,
+            observedValue: '(empty)',
+            expectedValue: 'Required for credit notes unless reason code is waived',
+            message: `Invoice ${header.invoice_number}: Preceding invoice reference is required for credit notes unless credit note reason code is VD`,
+          }));
+        }
+      });
+      break;
+
+    case 'UAE-UC1-CHK-057':
+      if (params.field && params.pattern) {
+        const regex = new RegExp(params.pattern);
+        data.headers.forEach((header) => {
+          executionCount++;
+          const field = resolveFieldAlias(params.field);
+          const value = getFieldValue(header, field);
+          if (!isEmpty(value) && !regex.test(String(value))) {
+            exceptions.push(createException({
+              invoiceId: header.invoice_id,
+              invoiceNumber: header.invoice_number,
+              sellerTrn: header.seller_trn,
+              buyerId: header.buyer_id,
+              fieldName: field,
+              observedValue: String(value),
+              expectedValue: `Match pattern: ${params.pattern}`,
+              message: `Invoice ${header.invoice_number}: Field "${field}" format invalid. Expected pattern: ${params.pattern}`,
+            }));
+          }
+        });
+      }
+      break;
+
     // Default: Generic presence check for other checks
     default:
       if (check.rule_type === 'dynamic_codelist' && params.field && params.codelist) {

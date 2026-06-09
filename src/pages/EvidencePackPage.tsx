@@ -14,8 +14,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { useCompliance } from '@/context/ComplianceContext';
 import { computeAllDatasetPopulations } from '@/lib/coverage/populationCoverage';
-import { buildEvidencePackData, EvidencePackData } from '@/lib/evidence/evidenceDataBuilder';
-import { validateBeforeExport, generateEvidencePackZip, generateEvidencePackPdf, downloadBlob } from '@/lib/evidence/evidenceExporter';
+import {
+  buildEvidencePackData,
+  EvidencePackData,
+  resolveEvidenceEntityIdentity,
+} from '@/lib/evidence/evidenceDataBuilder';
+import {
+  validateBeforeExport,
+  generateEvidencePackZip,
+  generateEvidencePackZipByEntity,
+  generateEvidencePackPdf,
+  downloadBlob,
+} from '@/lib/evidence/evidenceExporter';
 import { buildEvidenceSummary } from '@/lib/evidence/evidenceSummary';
 import { getEvidenceRuleExecutionTelemetry, getEvidenceRunSnapshot } from '@/lib/evidence/evidenceRunSnapshot';
 import { fetchCheckRuns } from '@/lib/api/checksApi';
@@ -73,6 +83,7 @@ export default function EvidencePackPage() {
   const [selectedRunDate, setSelectedRunDate] = useState<string | null>(null);
   const [selectedRunExceptions, setSelectedRunExceptions] = useState(pintAEExceptions);
   const [exportFormat, setExportFormat] = useState<'excel' | 'pdf'>('excel');
+  const [exportScope, setExportScope] = useState<'consolidated' | 'per_entity'>('consolidated');
   const [search, setSearch] = useState('');
   const [drQuickFilter, setDrQuickFilter] = useState<'all' | 'mandatory' | 'gaps' | 'asp'>('all');
   const [ruleQuickFilter, setRuleQuickFilter] = useState<'all' | 'failing' | 'critical' | 'high_impact'>('all');
@@ -168,9 +179,14 @@ export default function EvidencePackPage() {
             totalInvoices: selectedRunSnapshot.counts.totalInvoices,
             totalBuyers: selectedRunSnapshot.counts.totalBuyers,
             totalLines: selectedRunSnapshot.counts.totalLines,
+            sourceMode: canUseHistoricalSnapshot ? 'persisted_snapshot' : 'current_in_memory_run',
+            entityScopeStatus: selectedRunSnapshot.entity_scope_status,
+            legalEntityCount: selectedRunSnapshot.legal_entity_count,
+            legalEntityLabels: selectedRunSnapshot.legal_entity_labels,
             executionTelemetry: canUseHistoricalSnapshot ? selectedRunTelemetry : lastPintRuleTelemetry,
           }
         : {
+            sourceMode: canUseHistoricalSnapshot ? 'persisted_snapshot' : 'current_in_memory_run',
             executionTelemetry: lastPintRuleTelemetry,
           }
     );
@@ -194,29 +210,146 @@ export default function EvidencePackPage() {
     [evidence]
   );
 
+  const entityScopedPacks = useMemo(() => {
+    if (!isCurrentContextRun || headers.length === 0) return [];
+
+    const groups = new Map<
+      string,
+      {
+        entityLabel: string;
+        headers: typeof headers;
+      }
+    >();
+
+    headers.forEach((header) => {
+      const identity = resolveEvidenceEntityIdentity(header);
+      if (!identity) return;
+      const existing = groups.get(identity.key);
+      if (existing) {
+        existing.headers.push(header);
+        return;
+      }
+      groups.set(identity.key, { entityLabel: identity.label, headers: [header] });
+    });
+
+    if (groups.size <= 1) return [];
+
+    return Array.from(groups.entries()).map(([entityKey, group]) => {
+      const invoiceIds = new Set(group.headers.map((header) => header.invoice_id));
+      const buyerIds = new Set(group.headers.map((header) => header.buyer_id));
+      const entityBuyers = buyers.filter((buyer) => buyerIds.has(buyer.buyer_id));
+      const entityLines = lines.filter((line) => invoiceIds.has(line.invoice_id));
+      const entityExceptions = selectedRunExceptions.filter((exception) =>
+        (exception.seller_trn && exception.seller_trn === entityKey) ||
+        (exception.invoice_id && invoiceIds.has(exception.invoice_id)) ||
+        (exception.buyer_id && buyerIds.has(exception.buyer_id))
+      );
+
+      const toRawRows = (rows: Record<string, unknown>[]) =>
+        rows.map((item) => {
+          const row: Record<string, string> = {};
+          for (const [key, value] of Object.entries(item)) {
+            row[key] = value != null ? String(value) : '';
+          }
+          return row;
+        });
+
+      const entityPopulations = computeAllDatasetPopulations({
+        buyers: toRawRows(entityBuyers as unknown as Record<string, unknown>[]),
+        headers: toRawRows(group.headers as unknown as Record<string, unknown>[]),
+        lines: toRawRows(entityLines as unknown as Record<string, unknown>[]),
+      });
+
+      return {
+        entityKey,
+        entityLabel: group.entityLabel,
+        evidence: buildEvidencePackData(
+          `${runId}-${entityKey}`,
+          runTimestamp,
+          entityBuyers,
+          group.headers,
+          entityLines,
+          entityExceptions,
+          entityPopulations,
+          {
+            datasetName: group.entityLabel,
+            sourceMode: 'current_in_memory_run',
+            entityScopeStatus: 'single_entity',
+            legalEntityCount: 1,
+            legalEntityLabels: [group.entityLabel],
+          }
+        ),
+      };
+    });
+  }, [buyers, headers, isCurrentContextRun, lines, runId, runTimestamp, selectedRunExceptions]);
+
+  const canExportPerEntity =
+    exportFormat === 'excel' &&
+    isCurrentContextRun &&
+    ovSafeEntityScopeStatus(evidence) === 'multi_entity' &&
+    entityScopedPacks.length > 1;
+
+  useEffect(() => {
+    if (!canExportPerEntity && exportScope !== 'consolidated') {
+      setExportScope('consolidated');
+    }
+  }, [canExportPerEntity, exportScope]);
+
   const handleExport = useCallback(async () => {
     if (!evidence) return;
     setExporting(true);
     try {
-      const validation = validateBeforeExport();
-      if (!validation.valid) {
-        const errorMsgs = validation.report.issues
-          .filter(i => i.level === 'error')
-          .map(i => i.message)
-          .join('; ');
-        toast({
-          title: 'Export Blocked',
-          description: `Consistency errors found: ${errorMsgs}`,
-          variant: 'destructive',
-        });
-        setExporting(false);
-        return;
-      }
       if (exportFormat === 'pdf') {
+        const validation = validateBeforeExport(evidence);
+        if (!validation.valid) {
+          const errorMsgs = validation.report.issues
+            .filter(i => i.level === 'error')
+            .map(i => i.message)
+            .join('; ');
+          toast({
+            title: 'Export Blocked',
+            description: `Consistency errors found: ${errorMsgs}`,
+            variant: 'destructive',
+          });
+          setExporting(false);
+          return;
+        }
         const blob = await generateEvidencePackPdf(evidence);
         downloadBlob(blob, `Evidence_Pack_${runId}.pdf`);
         toast({ title: 'Evidence Pack Downloaded', description: 'PDF report generated successfully.' });
+      } else if (exportScope === 'per_entity' && canExportPerEntity) {
+        const invalidPacks = entityScopedPacks.filter((pack) => !validateBeforeExport(pack.evidence).valid);
+        if (invalidPacks.length > 0) {
+          toast({
+            title: 'Export Blocked',
+            description: 'One or more entity-scoped packs failed integrity validation.',
+            variant: 'destructive',
+          });
+          setExporting(false);
+          return;
+        }
+
+        const blob = await generateEvidencePackZipByEntity(entityScopedPacks);
+        downloadBlob(blob, `Evidence_Pack_${runId}_per_entity.zip`);
+        toast({
+          title: 'Evidence Pack Downloaded',
+          description: 'Per-legal-entity Excel ZIP generated successfully.',
+        });
       } else {
+        const validation = validateBeforeExport(evidence);
+        if (!validation.valid) {
+          const errorMsgs = validation.report.issues
+            .filter(i => i.level === 'error')
+            .map(i => i.message)
+            .join('; ');
+          toast({
+            title: 'Export Blocked',
+            description: `Consistency errors found: ${errorMsgs}`,
+            variant: 'destructive',
+          });
+          setExporting(false);
+          return;
+        }
         const blob = await generateEvidencePackZip(evidence);
         downloadBlob(blob, `Evidence_Pack_${runId}.zip`);
         toast({ title: 'Evidence Pack Downloaded', description: 'Excel ZIP generated successfully.' });
@@ -225,7 +358,7 @@ export default function EvidencePackPage() {
       toast({ title: 'Export Failed', description: String(err), variant: 'destructive' });
     }
     setExporting(false);
-  }, [evidence, runId, toast, exportFormat]);
+  }, [canExportPerEntity, entityScopedPacks, evidence, exportFormat, exportScope, runId, toast]);
 
   const q = search.trim().toLowerCase();
   const drCoverageRows = useMemo(() => {
@@ -387,6 +520,19 @@ export default function EvidencePackPage() {
                 <SelectItem value="pdf">PDF Report</SelectItem>
               </SelectContent>
             </Select>
+            {exportFormat === 'excel' ? (
+              <Select value={exportScope} onValueChange={(v) => setExportScope(v as 'consolidated' | 'per_entity')}>
+                <SelectTrigger className="w-[190px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="consolidated">Consolidated pack</SelectItem>
+                  {canExportPerEntity ? (
+                    <SelectItem value="per_entity">Per legal entity</SelectItem>
+                  ) : null}
+                </SelectContent>
+              </Select>
+            ) : null}
             <Button onClick={handleExport} disabled={exporting} className="gap-2">
               {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
               Generate {exportFormat === 'pdf' ? 'PDF Report' : 'Evidence Pack'}
@@ -404,8 +550,51 @@ export default function EvidencePackPage() {
             <p className="text-xs text-muted-foreground mt-1">
               Historical runs no longer fall back to current loaded data for population and supporting evidence context.
             </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="text-xs">
+                Source: {ov.sourceMode === 'persisted_snapshot' ? 'Persisted snapshot' : 'Current in-memory run'}
+              </Badge>
+              <Badge variant="outline" className="text-xs">
+                Entity scope:{' '}
+                {ov.entityScopeStatus === 'single_entity'
+                  ? 'Single entity'
+                  : ov.entityScopeStatus === 'multi_entity'
+                    ? 'Multi-entity'
+                    : 'Unknown'}
+              </Badge>
+              {ov.legalEntityCount > 0 ? (
+                <Badge variant="outline" className="text-xs">
+                  Legal entities: {ov.legalEntityCount}
+                </Badge>
+              ) : null}
+              {ov.legalEntityLabels.length > 0 ? (
+                <Badge variant="secondary" className="text-xs">
+                  {ov.legalEntityLabels.join(' | ')}
+                </Badge>
+              ) : null}
+            </div>
           </CardContent>
         </Card>
+
+        {exportFormat === 'excel' && canExportPerEntity ? (
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-sm font-medium text-foreground">Export Scope</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Current mode: {exportScope === 'per_entity' ? 'per-legal-entity pack' : 'consolidated pack'}. Entity attribution is complete enough for the current in-memory dataset, so Excel export can be split by legal entity.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (ov.entityScopeStatus === 'multi_entity' || ov.entityScopeStatus === 'unknown') && (
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-sm font-medium text-foreground">Export Scope</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Current mode: consolidated pack. Per-legal-entity export will be enabled only after entity attribution is complete for the selected evidence context.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Run Selector / Info Bar */}
         <Card>
@@ -437,7 +626,9 @@ export default function EvidencePackPage() {
               <div className="flex items-end">
                 {!isCurrentContextRun && (
                   <Badge variant="outline" className="text-xs">
-                    Selected run uses archived exceptions with current loaded dataset snapshot
+                    {canUseHistoricalSnapshot
+                      ? 'Selected run uses persisted evidence snapshot and archived exception context'
+                      : 'Selected run has archived exceptions but no persisted evidence snapshot'}
                   </Badge>
                 )}
               </div>
@@ -974,6 +1165,10 @@ export default function EvidencePackPage() {
       </div>
     </div>
   );
+}
+
+function ovSafeEntityScopeStatus(evidence: EvidencePackData | null): EvidencePackData['overview']['entityScopeStatus'] {
+  return evidence?.overview.entityScopeStatus ?? 'unknown';
 }
 
 function CoverageStatusBadge({ status }: { status: string }) {

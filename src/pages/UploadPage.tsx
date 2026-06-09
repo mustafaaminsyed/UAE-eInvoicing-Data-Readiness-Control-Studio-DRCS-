@@ -69,6 +69,10 @@ export default function UploadPage() {
     (s) => s && s.requiredMissing.length > 0
   );
   const canProceed = allFilesSelected && !hasStructuralErrors;
+  const hasCreditNoteHeaders = (parsedRows.headers ?? []).some((row) => {
+    const invoiceType = (row.invoice_type_code || row.invoice_type || '').trim().toUpperCase();
+    return invoiceType.startsWith('381') || invoiceType.includes('CREDIT');
+  });
 
   // Determine current step
   let currentStep: StepKey = 'upload';
@@ -87,13 +91,13 @@ export default function UploadPage() {
     try {
       const text = await file.text();
       const rows = parseCSV(text);
-      const analysis = analyzeFile(rows, file, type, text);
+      const analysis = analyzeFile(rows, file, type, datasetType, text);
       setStats((prev) => ({ ...prev, [type]: analysis }));
       setParsedRows((prev) => ({ ...prev, [type]: rows }));
     } catch {
       toast({ title: 'Error reading file', description: 'Could not parse the CSV file.', variant: 'destructive' });
     }
-  }, [toast]);
+  }, [datasetType, toast]);
 
   // Relational integrity checks
   useEffect(() => {
@@ -127,12 +131,12 @@ export default function UploadPage() {
 
   const handleLoadData = async () => {
     if (!canProceed) return;
-    setIsLoading(true);
-    try {
-      const [buyers, headers, lines] = await Promise.all([
-        parseBuyersFile(files.buyers!),
-        parseHeadersFile(files.headers!),
-        parseLinesFile(files.lines!),
+      setIsLoading(true);
+      try {
+        const [buyers, headers, lines] = await Promise.all([
+        parseBuyersFile(files.buyers!, { direction: datasetType }),
+        parseHeadersFile(files.headers!, { direction: datasetType }),
+        parseLinesFile(files.lines!, { direction: datasetType }),
       ]);
       setData({ buyers, headers, lines }, datasetType);
 
@@ -287,6 +291,35 @@ export default function UploadPage() {
             </div>
           </div>
 
+          <div className="surface-glass rounded-2xl border border-white/70 shadow-sm p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <p className="text-sm font-semibold text-foreground">Supported Document Scenarios</p>
+              <Badge variant="outline" className="text-[10px] uppercase tracking-wide">UC1</Badge>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl border bg-background/70 p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <Badge variant="secondary">380</Badge>
+                  <span className="text-sm font-medium text-foreground">Standard Invoice</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Baseline supported in current readiness, structural, and validation checks.
+                </p>
+              </div>
+              <div className="rounded-xl border bg-background/70 p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <Badge variant="secondary">381</Badge>
+                  <span className="text-sm font-medium text-foreground">Credit Note</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Supported with additional header fields: <code className="font-mono">credit_note_reason_code</code>,
+                  <code className="ml-1 font-mono">preceding_invoice_reference</code>, and optional
+                  <code className="ml-1 font-mono">preceding_invoice_issue_date</code>.
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* File Cards */}
           <div className="surface-glass rounded-2xl border border-white/70 shadow-sm p-6">
             <div className="mb-4 rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
@@ -297,27 +330,50 @@ export default function UploadPage() {
             <div className="grid gap-6">
               {/* Buyers */}
               {stats.buyers ? (
-                <FileSummaryCard stats={stats.buyers} type="buyers" onRemove={() => handleFileSelect('buyers', null)} />
+                <FileSummaryCard stats={stats.buyers} type="buyers" direction={datasetType} onRemove={() => handleFileSelect('buyers', null)} />
               ) : (
-                <FileDropZone label="Buyers File" description="buyer_id, buyer_name, buyer_trn, buyer_address, buyer_country" sampleType="buyers" sampleScenario={sampleScenario} onFileSelect={(f) => handleFileSelect('buyers', f)} />
+                <FileDropZone label="Buyers File" description="buyer_id, buyer_name, buyer_trn, buyer_address, buyer_country" sampleType="buyers" sampleScenario={sampleScenario} direction={datasetType} onFileSelect={(f) => handleFileSelect('buyers', f)} />
               )}
 
               <div className="border-t" />
 
               {/* Headers */}
               {stats.headers ? (
-                <FileSummaryCard stats={stats.headers} type="headers" onRemove={() => handleFileSelect('headers', null)} />
+                <FileSummaryCard stats={stats.headers} type="headers" direction={datasetType} onRemove={() => handleFileSelect('headers', null)} />
               ) : (
-                <FileDropZone label="Invoice Headers File" description="invoice_id, invoice_number, issue_date, seller_trn, buyer_id, currency, ... (technical fields like business_process/spec_id can be system-derived)" sampleType="headers" sampleScenario={sampleScenario} onFileSelect={(f) => handleFileSelect('headers', f)} />
+                <FileDropZone label="Invoice Headers File" description="invoice_id, invoice_number, issue_date, invoice_type, seller_trn, buyer_id, currency, ... Credit notes (381) require additional credit note fields." sampleType="headers" sampleScenario={sampleScenario} direction={datasetType} onFileSelect={(f) => handleFileSelect('headers', f)} />
               )}
+
+              <div className="rounded-xl border bg-muted/20 px-4 py-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-xs font-semibold text-foreground">Credit Note Requirements</p>
+                  {hasCreditNoteHeaders && (
+                    <Badge variant="outline" className="text-[10px]">Credit note rows detected</Badge>
+                  )}
+                </div>
+                <div className="space-y-1 text-xs text-muted-foreground">
+                  <p>
+                    Scenario-specific validation is driven by <code className="font-mono">invoice_type</code>.
+                  </p>
+                  <p>
+                    When <code className="font-mono">invoice_type = 381</code>, provide <code className="font-mono">credit_note_reason_code</code>.
+                  </p>
+                  <p>
+                    Unless the reason code is <code className="font-mono">VD</code>, also provide <code className="font-mono">preceding_invoice_reference</code>.
+                  </p>
+                  <p>
+                    <code className="font-mono">preceding_invoice_issue_date</code> is optional but should be in <code className="font-mono">YYYY-MM-DD</code> format when supplied.
+                  </p>
+                </div>
+              </div>
 
               <div className="border-t" />
 
               {/* Lines */}
               {stats.lines ? (
-                <FileSummaryCard stats={stats.lines} type="lines" onRemove={() => handleFileSelect('lines', null)} />
+                <FileSummaryCard stats={stats.lines} type="lines" direction={datasetType} onRemove={() => handleFileSelect('lines', null)} />
               ) : (
-                <FileDropZone label="Invoice Lines File" description="line_id, invoice_id, line_number, quantity, unit_price, vat_rate, ..." sampleType="lines" sampleScenario={sampleScenario} onFileSelect={(f) => handleFileSelect('lines', f)} />
+                <FileDropZone label="Invoice Lines File" description="line_id, invoice_id, line_number, quantity, unit_price, vat_rate, ..." sampleType="lines" sampleScenario={sampleScenario} direction={datasetType} onFileSelect={(f) => handleFileSelect('lines', f)} />
               )}
             </div>
           </div>

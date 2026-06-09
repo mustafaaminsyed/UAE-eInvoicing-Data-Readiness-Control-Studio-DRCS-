@@ -52,8 +52,8 @@ vi.mock('@/pages/DataTwinPage', () => ({
   default: () => <div>Data Twin Mock</div>,
 }));
 
-vi.mock('@/pages/ExceptionsWorkspacePage', () => ({
-  default: () => <div>Exceptions Workspace Mock</div>,
+vi.mock('@/pages/ExceptionsPage', () => ({
+  default: () => <div>Exceptions Mock</div>,
 }));
 
 vi.mock('@/pages/InvoiceDetailPage', () => ({
@@ -125,7 +125,7 @@ describe('App route wiring', () => {
 
     render(<App />);
 
-    expect(await screen.findByText('Exceptions Workspace Mock')).toBeInTheDocument();
+    expect(await screen.findByText('Exceptions Mock')).toBeInTheDocument();
     expect(screen.queryByText('Not Found Mock')).not.toBeInTheDocument();
   });
 });

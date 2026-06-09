@@ -36,7 +36,7 @@ describe('overlay runtime cutover report', () => {
     OVERLAY_RUNTIME_RULE_IDS.forEach((ruleId) => {
       expect(runtimeRuleIds.has(ruleId)).toBe(false);
     });
-    expect(UAE_UC1_CHECK_PACK).toHaveLength(54);
+    expect(UAE_UC1_CHECK_PACK).toHaveLength(59);
   });
 
   it('publishes rollback metadata for the overlay applicability switch', () => {

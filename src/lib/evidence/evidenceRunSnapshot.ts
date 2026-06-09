@@ -7,6 +7,38 @@ import {
   EvidenceRunSnapshot,
 } from '@/types/evidence';
 
+function deriveSnapshotEntityScope(headers: InvoiceHeader[]): Pick<
+  EvidenceRunSnapshot,
+  'entity_scope_status' | 'legal_entity_count' | 'legal_entity_labels'
+> {
+  const entityMap = new Map<string, string>();
+
+  for (const header of headers) {
+    const entityKey = header.seller_trn || header.seller_legal_reg_id || header.seller_name;
+    if (!entityKey) continue;
+
+    const entityLabel =
+      header.seller_name ||
+      header.seller_trn ||
+      header.seller_legal_reg_id ||
+      entityKey;
+
+    if (!entityMap.has(entityKey)) {
+      entityMap.set(entityKey, entityLabel);
+    }
+  }
+
+  const legalEntityLabels = Array.from(entityMap.values()).slice(0, 5);
+  const legalEntityCount = entityMap.size;
+
+  return {
+    entity_scope_status:
+      legalEntityCount === 0 ? 'unknown' : legalEntityCount === 1 ? 'single_entity' : 'multi_entity',
+    legal_entity_count: legalEntityCount,
+    legal_entity_labels: legalEntityLabels,
+  };
+}
+
 function toRawRows(rows: Record<string, unknown>[]): Record<string, string>[] {
   return rows.map((item) => {
     const row: Record<string, string> = {};
@@ -26,6 +58,7 @@ export function buildEvidenceRunSnapshot(
     version: 1,
     captured_at: new Date().toISOString(),
     dataset_name: headers[0]?.seller_name ?? headers[0]?.seller_trn ?? 'Unknown',
+    ...deriveSnapshotEntityScope(headers),
     counts: {
       totalInvoices: headers.length,
       totalBuyers: buyers.length,
@@ -49,6 +82,12 @@ function isEvidenceRunSnapshot(value: unknown): value is EvidenceRunSnapshot {
     typeof candidate.counts.totalInvoices === 'number' &&
     typeof candidate.counts.totalBuyers === 'number' &&
     typeof candidate.counts.totalLines === 'number' &&
+    (candidate.entity_scope_status === undefined ||
+      candidate.entity_scope_status === 'single_entity' ||
+      candidate.entity_scope_status === 'multi_entity' ||
+      candidate.entity_scope_status === 'unknown') &&
+    (candidate.legal_entity_count === undefined || typeof candidate.legal_entity_count === 'number') &&
+    (candidate.legal_entity_labels === undefined || Array.isArray(candidate.legal_entity_labels)) &&
     Array.isArray(candidate.populations)
   );
 }

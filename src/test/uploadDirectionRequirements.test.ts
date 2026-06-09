@@ -35,5 +35,34 @@ describe('upload structural requirements by direction', () => {
 
     expect(analysis.requiredMissing).not.toContain('supplier_id');
   });
+
+  it('infers supplier_id as the primary key candidate for AP party files', () => {
+    const rows = [
+      {
+        supplier_id: 'SUP-1',
+        supplier_name: 'Vendor One',
+        supplier_trn: '100000000000003',
+      },
+    ];
+    const file = new File(['test'], 'suppliers.csv', { type: 'text/csv' });
+    const analysis = analyzeFile(rows, file, 'buyers', 'AP');
+
+    expect(analysis.inferredPK).toBe('supplier_id');
+    expect(analysis.requiredMissing).not.toContain('supplier_id');
+  });
+
+  it('keeps header columns visible when no valid data rows are parsed', () => {
+    const file = new File(['test'], 'headers.csv', { type: 'text/csv' });
+    const analysis = analyzeFile(
+      [],
+      file,
+      'headers',
+      'AR',
+      'invoice_id,invoice_number,issue_date\n'
+    );
+
+    expect(analysis.columnCount).toBe(3);
+    expect(analysis.columns).toEqual(['invoice_id', 'invoice_number', 'issue_date']);
+  });
 });
 

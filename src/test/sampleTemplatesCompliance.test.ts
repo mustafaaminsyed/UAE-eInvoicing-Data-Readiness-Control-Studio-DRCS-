@@ -47,6 +47,9 @@ async function loadSamples() {
     invoice_number: r.invoice_number,
     issue_date: r.issue_date,
     invoice_type: r.invoice_type,
+    credit_note_reason_code: r.credit_note_reason_code,
+    preceding_invoice_reference: r.preceding_invoice_reference,
+    preceding_invoice_issue_date: r.preceding_invoice_issue_date,
     seller_trn: r.seller_trn,
     seller_name: r.seller_name,
     seller_address: r.seller_address,
@@ -93,6 +96,7 @@ describe('Downloadable sample templates', () => {
     const parsed = await loadSamples();
     const context = buildContext(parsed);
 
+    expect(parsed.headers.some((header) => header.invoice_type === '381')).toBe(true);
     const builtInExceptions = runAllChecks(context).flatMap((r) => r.exceptions);
     const pintExceptions = runAllPintAEChecks(UAE_UC1_CHECK_PACK, context);
 

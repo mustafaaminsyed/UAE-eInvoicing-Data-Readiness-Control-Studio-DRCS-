@@ -23,6 +23,18 @@ export interface EvidencePackBuildOverrides {
   totalBuyers?: number;
   totalLines?: number;
   executionTelemetry?: EvidenceRuleExecutionTelemetryRow[];
+  sourceMode?: EvidenceSourceMode;
+  entityScopeStatus?: EvidenceEntityScopeStatus;
+  legalEntityCount?: number;
+  legalEntityLabels?: string[];
+}
+
+export type EvidenceSourceMode = 'current_in_memory_run' | 'persisted_snapshot';
+export type EvidenceEntityScopeStatus = 'single_entity' | 'multi_entity' | 'unknown';
+
+export interface EvidenceEntityIdentity {
+  key: string;
+  label: string;
 }
 
 // ── Tab A: Overview ──────────────────────────────────────────────────
@@ -33,6 +45,10 @@ export interface EvidenceOverview {
   specVersion: string;
   drVersion: string;
   datasetName: string;
+  sourceMode: EvidenceSourceMode;
+  entityScopeStatus: EvidenceEntityScopeStatus;
+  legalEntityCount: number;
+  legalEntityLabels: string[];
   counts: {
     totalInvoices: number;
     totalBuyers: number;
@@ -73,6 +89,77 @@ export interface RuleExecutionRow {
   execution_count: number;
   failure_count: number;
   execution_source: 'estimated' | 'runtime';
+}
+
+function deriveEntityScope(
+  headers: InvoiceHeader[],
+  exceptions: PintAEException[],
+  overrides: Pick<EvidencePackBuildOverrides, 'entityScopeStatus' | 'legalEntityCount' | 'legalEntityLabels'>
+): {
+  entityScopeStatus: EvidenceEntityScopeStatus;
+  legalEntityCount: number;
+  legalEntityLabels: string[];
+} {
+  if (
+    overrides.entityScopeStatus &&
+    typeof overrides.legalEntityCount === 'number' &&
+    Array.isArray(overrides.legalEntityLabels)
+  ) {
+    return {
+      entityScopeStatus: overrides.entityScopeStatus,
+      legalEntityCount: overrides.legalEntityCount,
+      legalEntityLabels: overrides.legalEntityLabels,
+    };
+  }
+
+  const entityMap = new Map<string, string>();
+
+  for (const header of headers) {
+    const identity = resolveEvidenceEntityIdentity(header);
+    if (!identity) continue;
+
+    if (!entityMap.has(identity.key)) {
+      entityMap.set(identity.key, identity.label);
+    }
+  }
+
+  if (entityMap.size === 0) {
+    for (const exception of exceptions) {
+      if (!exception.seller_trn) continue;
+      if (!entityMap.has(exception.seller_trn)) {
+        entityMap.set(exception.seller_trn, exception.seller_trn);
+      }
+    }
+  }
+
+  const legalEntityLabels = Array.from(entityMap.values()).slice(0, 5);
+  const legalEntityCount = entityMap.size;
+
+  if (legalEntityCount === 0) {
+    return {
+      entityScopeStatus: 'unknown',
+      legalEntityCount: 0,
+      legalEntityLabels: [],
+    };
+  }
+
+  return {
+    entityScopeStatus: legalEntityCount === 1 ? 'single_entity' : 'multi_entity',
+    legalEntityCount,
+    legalEntityLabels,
+  };
+}
+
+export function resolveEvidenceEntityIdentity(
+  header: Pick<InvoiceHeader, 'seller_trn' | 'seller_legal_reg_id' | 'seller_name'>
+): EvidenceEntityIdentity | null {
+  const entityKey = header.seller_trn || header.seller_legal_reg_id || header.seller_name;
+  if (!entityKey) return null;
+
+  return {
+    key: entityKey,
+    label: header.seller_name || header.seller_trn || header.seller_legal_reg_id || entityKey,
+  };
 }
 
 // ── Tab D: Exceptions & Cases ────────────────────────────────────────
@@ -195,6 +282,8 @@ export function buildEvidencePackData(
   const supplementalRuleCatalog = buildSupplementalRuleCatalog();
   const datasetName =
     overrides.datasetName ?? (headers.length > 0 ? (headers[0].seller_name ?? headers[0].seller_trn) : 'Unknown');
+  const entityScope = deriveEntityScope(headers, pintAEExceptions, overrides);
+  const sourceMode = overrides.sourceMode ?? 'current_in_memory_run';
 
   // Build exception counts by DR for the conformance engine
   const exceptionCountsByDR = new Map<string, { pass: number; fail: number }>();
@@ -217,6 +306,10 @@ export function buildEvidencePackData(
     specVersion: 'PINT-AE 2025-Q2',
     drVersion: 'UAE DR v1.0.1',
     datasetName,
+    sourceMode,
+    entityScopeStatus: entityScope.entityScopeStatus,
+    legalEntityCount: entityScope.legalEntityCount,
+    legalEntityLabels: entityScope.legalEntityLabels,
     counts: {
       totalInvoices,
       totalBuyers,

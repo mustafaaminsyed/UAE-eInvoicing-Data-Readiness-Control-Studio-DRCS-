@@ -65,6 +65,9 @@ Fields derived by the ASP (Corner 2) — such as Specification ID (IBT-024), Bus
 | 30 | `amount_due` | IBT-115 | Conditional | Number | Decimal (2dp) | Amount due | ERP |
 | 31 | `tax_category_code` | IBT-118 | Yes | Code | S/Z/E/RC | Tax category | ERP |
 | 32 | `tax_category_rate` | IBT-119 | Yes | Number | Percentage | Tax rate | ERP |
+| 33 | `credit_note_reason_code` | BTAE-03 | Conditional | Code | Credit note reason code | Required when `invoice_type = 381` | ERP |
+| 34 | `preceding_invoice_reference` | IBT-025 | Conditional | String | Original invoice identifier | Required for credit notes unless `credit_note_reason_code = VD` | ERP |
+| 35 | `preceding_invoice_issue_date` | IBT-026 | Optional | Date | YYYY-MM-DD | Original invoice issue date, if available | ERP |
 
 ---
 

@@ -31,13 +31,7 @@ describe('document-family authoritative cutover packet', () => {
         coverageMaturity: 'runtime_enforced',
       }),
     ]);
-    expect(coverageByRule.get('UAE-UC1-CHK-037')).toEqual([
-      expect.objectContaining({
-        dr_id: 'BTUAE-15',
-        mapping_type: 'reference_only',
-        coverageMaturity: 'reference_only',
-      }),
-    ]);
+    expect(coverageByRule.get('UAE-UC1-CHK-037')).toEqual([]);
     expect(coverageByRule.get('UAE-UC1-CHK-045')).toEqual([
       expect.objectContaining({
         dr_id: 'IBT-003',

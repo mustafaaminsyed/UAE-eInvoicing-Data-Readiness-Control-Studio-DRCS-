@@ -1,0 +1,11 @@
+Measure	Count	Coverage	Notes
+Total imported PINT-AE schematron rules	556	100.0%	Full generated schematron inventory in the repo
+UBL / XML-preprocessed rules	302		Technical UBL/XML-oriented rules excluded from jurisdiction-only coverage view
+Jurisdiction-aligned rules	254	100.0%	Remaining PINT-AE jurisdiction/business-aligned rule entries
+Jurisdiction-aligned rules covered by DCS	106	41.7%	Semantic-reference overlap with existing DCS checks
+Jurisdiction-aligned rules not covered by DCS	148	58.3%	Remaining jurisdiction-aligned rule entries not currently overlapped by DCS checks
+
+Measure	Count	Coverage	Notes
+Unique jurisdiction-aligned rule IDs	127	100.0%	Unique rule concepts after removing invoice/credit note duplication
+Unique jurisdiction-aligned rule IDs covered by DCS	53	41.7%	Semantic-reference overlap with existing DCS checks
+Unique jurisdiction-aligned rule IDs not covered by DCS	74	58.3%	Unique jurisdiction-aligned rule concepts not currently overlapped by DCS checks

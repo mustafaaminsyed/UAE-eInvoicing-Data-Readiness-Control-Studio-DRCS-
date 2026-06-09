@@ -26,10 +26,6 @@ describe("cutover readiness", () => {
           drId: "BTAE-01",
           blockerType: "missing_registry",
         }),
-        expect.objectContaining({
-          drId: "BTAE-03",
-          blockerType: "missing_registry",
-        }),
       ])
     );
     expect(blockedTargets.some((target) => target.drId === 'BTAE-14')).toBe(false);
@@ -53,7 +49,7 @@ describe("cutover readiness", () => {
   it("keeps authoritative runtime behavior unchanged in this readiness pass", () => {
     const report = buildCutoverReadinessReport();
 
-    expect(UAE_UC1_CHECK_PACK).toHaveLength(54);
+    expect(UAE_UC1_CHECK_PACK).toHaveLength(59);
     expect(report.cutoverGates.map((gate) => gate.gateId)).toEqual(
       expect.arrayContaining([
         "gate-shadow-regression",

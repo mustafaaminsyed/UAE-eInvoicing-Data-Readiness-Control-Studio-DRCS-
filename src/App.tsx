@@ -14,8 +14,10 @@ import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 const UploadPage = lazy(() => import("./pages/UploadPage"));
 const RunChecksPage = lazy(() => import("./pages/RunChecksPage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const SubmissionsPage = lazy(() => import("./pages/SubmissionsPage"));
 const DataTwinPage = lazy(() => import("./pages/DataTwinPage"));
-const ExceptionsWorkspacePage = lazy(() => import("./pages/ExceptionsWorkspacePage"));
+const ValidationPage = lazy(() => import("./pages/ValidationPage"));
+const ExceptionsPage = lazy(() => import("./pages/ExceptionsPage"));
 const InvoiceDetailPage = lazy(() => import("./pages/InvoiceDetailPage"));
 const CheckBuilderPage = lazy(() => import("./pages/CheckBuilderPage"));
 const CheckRegistryPage = lazy(() => import("./pages/CheckRegistryPage"));
@@ -25,9 +27,10 @@ const ControlsDashboardPage = lazy(() => import("./pages/ControlsDashboardPage")
 const CasesPage = lazy(() => import("./pages/CasesPage"));
 const RejectionsPage = lazy(() => import("./pages/RejectionsPage"));
 const MappingPage = lazy(() => import("./pages/MappingPage"));
-const EvidencePage = lazy(() => import("./pages/EvidencePage"));
+const EvidenceWorkspacePage = lazy(() => import("./pages/EvidenceWorkspacePage"));
 const EvidencePackPage = lazy(() => import("./pages/EvidencePackPage"));
 const TraceabilityPage = lazy(() => import("./pages/TraceabilityPage"));
+const WorkflowSectionPage = lazy(() => import("./pages/WorkflowSectionPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -66,22 +69,25 @@ const App = () => (
                   <Routes>
                     <Route path="/" element={<LandingPage />} />
                     <Route element={<WorkspaceShell />}>
+                      <Route path="/dashboard" element={<DashboardPage />} />
+                      <Route path="/submissions" element={<SubmissionsPage />} />
+                      <Route path="/data-twin" element={<DataTwinPage />} />
+                      <Route path="/validation" element={<ValidationPage />} />
+                      <Route path="/exceptions" element={<ExceptionsPage />} />
+                      <Route path="/evidence" element={<EvidenceWorkspacePage />} />
+                      <Route path="/analytics" element={<WorkflowSectionPage sectionPath="/analytics" />} />
+                      <Route path="/settings" element={<WorkflowSectionPage sectionPath="/settings" />} />
                       <Route path="/upload" element={<UploadPage />} />
                       <Route path="/run" element={<RunChecksPage />} />
-                      <Route path="/dashboard" element={<DashboardPage />} />
-                      <Route path="/data-twin" element={<DataTwinPage />} />
-                      <Route path="/exceptions" element={<ExceptionsWorkspacePage />} />
                       <Route path="/invoice/:invoiceId" element={<InvoiceDetailPage />} />
                       <Route path="/check-builder" element={<CheckBuilderPage />} />
                       <Route path="/check-registry" element={<CheckRegistryPage />} />
                       <Route path="/upload-audit" element={<UploadAuditPage />} />
                       <Route path="/ap-explorer" element={<APInvoiceExplorerPage />} />
                       <Route path="/controls" element={<ControlsDashboardPage />} />
-                      <Route path="/settings" element={<ControlsDashboardPage />} />
                       <Route path="/cases" element={<CasesPage />} />
                       <Route path="/rejections" element={<RejectionsPage />} />
                       <Route path="/mapping" element={<MappingPage />} />
-                      <Route path="/evidence" element={<EvidencePage />} />
                       <Route path="/evidence-pack" element={<EvidencePackPage />} />
                       <Route path="/traceability" element={<TraceabilityPage />} />
                     </Route>
