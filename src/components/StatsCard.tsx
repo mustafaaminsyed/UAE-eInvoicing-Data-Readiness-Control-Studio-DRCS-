@@ -8,6 +8,7 @@ interface StatsCardProps {
   value: string | number;
   subtitle?: string;
   helpText?: string;
+  helpContent?: ReactNode;
   onClick?: () => void;
   isActive?: boolean;
   icon?: ReactNode;
@@ -38,6 +39,7 @@ export function StatsCard({
   value, 
   subtitle, 
   helpText,
+  helpContent,
   onClick,
   isActive = false,
   icon, 
@@ -45,6 +47,7 @@ export function StatsCard({
   className 
 }: StatsCardProps) {
   const interactive = Boolean(onClick);
+  const resolvedHelpContent = helpContent ?? helpText;
 
   return (
     <div
@@ -69,7 +72,7 @@ export function StatsCard({
         <div className="space-y-1">
           <p className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
             <span>{title}</span>
-            {helpText && (
+            {resolvedHelpContent && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
@@ -80,8 +83,8 @@ export function StatsCard({
                     <CircleHelp className="w-3.5 h-3.5" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent className="max-w-[260px] text-xs leading-relaxed">
-                  {helpText}
+                <TooltipContent className="max-w-[320px] text-xs leading-relaxed">
+                  {resolvedHelpContent}
                 </TooltipContent>
               </Tooltip>
             )}

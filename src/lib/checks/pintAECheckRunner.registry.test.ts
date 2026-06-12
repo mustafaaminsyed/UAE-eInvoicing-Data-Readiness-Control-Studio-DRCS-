@@ -600,6 +600,43 @@ describe('runPintAECheck executor registry parity', () => {
     expect(runPintAECheck(check, invalidData)).toHaveLength(1);
   });
 
+  it('validates CHK-055 credit note reason code presence only for credit notes', () => {
+    const check = getCheck('UAE-UC1-CHK-055');
+
+    expect(runPintAECheck(check, buildDataContext({ invoice_type: '380' }))).toHaveLength(0);
+    expect(runPintAECheck(check, buildDataContext({ invoice_type: '381', credit_note_reason_code: 'ADJ' }))).toHaveLength(0);
+
+    const missingReason = runPintAECheck(check, buildDataContext({ invoice_type: '381', credit_note_reason_code: '' }));
+    expect(missingReason).toHaveLength(1);
+    expect(missingReason[0].field_name).toBe('credit_note_reason_code');
+  });
+
+  it('validates CHK-056 preceding invoice reference requirement with VD waiver', () => {
+    const check = getCheck('UAE-UC1-CHK-056');
+
+    expect(runPintAECheck(check, buildDataContext({ invoice_type: '380' }))).toHaveLength(0);
+    expect(runPintAECheck(check, buildDataContext({ invoice_type: '381', credit_note_reason_code: 'VD', preceding_invoice_reference: '' }))).toHaveLength(0);
+    expect(runPintAECheck(check, buildDataContext({ invoice_type: '381', credit_note_reason_code: 'ADJ', preceding_invoice_reference: 'INV-0001' }))).toHaveLength(0);
+
+    const missingReference = runPintAECheck(
+      check,
+      buildDataContext({ invoice_type: '381', credit_note_reason_code: 'ADJ', preceding_invoice_reference: '' })
+    );
+    expect(missingReference).toHaveLength(1);
+    expect(missingReference[0].field_name).toBe('preceding_invoice_reference');
+  });
+
+  it('validates CHK-057 preceding invoice issue date format when present', () => {
+    const check = getCheck('UAE-UC1-CHK-057');
+
+    expect(runPintAECheck(check, buildDataContext({ preceding_invoice_issue_date: '' }))).toHaveLength(0);
+    expect(runPintAECheck(check, buildDataContext({ preceding_invoice_issue_date: '2026-05-31' }))).toHaveLength(0);
+
+    const invalidDate = runPintAECheck(check, buildDataContext({ preceding_invoice_issue_date: '31/05/2026' }));
+    expect(invalidDate).toHaveLength(1);
+    expect(invalidDate[0].field_name).toBe('preceding_invoice_issue_date');
+  });
+
   it('validates CHK-048 for UNECERec20 and skips empty values', () => {
     const check = getCheck('UAE-UC1-CHK-048');
     const validCode = getCodelistCodes('UNECERec20')[0];

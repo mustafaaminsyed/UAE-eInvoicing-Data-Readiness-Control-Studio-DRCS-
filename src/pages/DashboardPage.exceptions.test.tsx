@@ -158,8 +158,10 @@ vi.mock('@/components/SeverityBadge', () => ({
   SeverityBadge: ({ severity }: { severity: string }) => <span>{severity}</span>,
 }));
 
-vi.mock('@/components/dashboard/PipelineProgress', () => ({
-  PipelineProgress: () => <div>Pipeline</div>,
+vi.mock('@/components/ui/tooltip', () => ({
+  Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  TooltipTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  TooltipContent: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
 vi.mock('@/context/ComplianceContext', () => ({
@@ -171,24 +173,32 @@ describe('DashboardPage executive surface', () => {
     resetMockComplianceState();
   });
 
-  it('renders KPI cards, stage progression, and recurring issues from compliance signals', () => {
+  it('renders the redesigned KPI sections and exception breakdown from compliance signals', () => {
     render(
       <MemoryRouter>
         <DashboardPage />
       </MemoryRouter>
     );
 
-    expect(screen.getByText('Total Invoices')).toBeInTheDocument();
-    expect(screen.getByText('Readiness Score')).toBeInTheDocument();
-    expect(screen.getAllByText('Passed').length).toBeGreaterThan(0);
-    expect(screen.getByText('Failed')).toBeInTheDocument();
-    expect(screen.getByText('Critical Issues')).toBeInTheDocument();
+    expect(screen.getByText('Executive compliance view')).toBeInTheDocument();
+    expect(screen.getByText('Source-data quality and integrity')).toBeInTheDocument();
+    expect(screen.getByText('Coverage against UAE and PINT-AE obligations')).toBeInTheDocument();
+    expect(screen.getByText('Exception breakdown and remediation focus')).toBeInTheDocument();
 
-    expect(screen.getByText('Stage progression')).toBeInTheDocument();
-    expect(screen.getByText('Pipeline')).toBeInTheDocument();
-    expect(screen.getByText('Control posture by stage')).toBeInTheDocument();
-    expect(screen.getByText('Top recurring issues')).toBeInTheDocument();
-    expect(screen.getByText('Derived preview signal across the core readiness themes in the current dashboard scope.')).toBeInTheDocument();
+    expect(screen.getByText('Go-Live Readiness')).toBeInTheDocument();
+    expect(screen.getByText('Portfolio Scope')).toBeInTheDocument();
+    expect(screen.getByText('Mandatory data')).toBeInTheDocument();
+    expect(screen.getByText('Compliance Readiness')).toBeInTheDocument();
+    expect(screen.getByText('Invoice Success Rate')).toBeInTheDocument();
+    expect(screen.getByText('PINT-AE Conformance')).toBeInTheDocument();
+    expect(screen.getByText('Critical Blocking Issues')).toBeInTheDocument();
+    expect(screen.getByText('Mandatory Field Completeness')).toBeInTheDocument();
+    expect(screen.getByText('Conditional Field Completeness')).toBeInTheDocument();
+    expect(screen.getByText('Currency Mismatches')).toBeInTheDocument();
+    expect(screen.getByText('IBT Mandatory Fields')).toBeInTheDocument();
+    expect(screen.getByText('Credit-Note Scenarios')).toBeInTheDocument();
+    expect(screen.getByText('Top blocking issues')).toBeInTheDocument();
+    expect(screen.getByText('Operational interpretation')).toBeInTheDocument();
 
     expect(screen.getByText('Seller Name Present')).toBeInTheDocument();
     expect(screen.getByText('Buyer TRN Pattern Valid')).toBeInTheDocument();
@@ -218,13 +228,12 @@ describe('DashboardPage executive surface', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getAllByText('0').length).toBeGreaterThan(0);
-    expect(screen.getByText('—')).toBeInTheDocument();
-    expect(screen.getByText('Awaiting live dataset scope')).toBeInTheDocument();
-    expect(screen.getByText('Awaiting live validation signals')).toBeInTheDocument();
+    expect(screen.getByText('No validated invoice portfolio is in scope yet')).toBeInTheDocument();
+    expect(screen.getByText('Data quality KPIs appear after dataset intake')).toBeInTheDocument();
+    expect(screen.getByText('UAE coverage widgets are waiting for validated documents')).toBeInTheDocument();
   });
 
-  it('does not fall back to preview recurring issues when live signals exist but no exceptions are present', () => {
+  it('does not fall back to preview exception clusters when live signals exist but no exceptions are present', () => {
     Object.assign(mockComplianceState, {
       isChecksRun: true,
       isDataLoaded: true,
@@ -256,7 +265,7 @@ describe('DashboardPage executive surface', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText('No recurring issues are currently surfaced in this live portfolio scope.')).toBeInTheDocument();
+    expect(screen.getByText('No open exception clusters are currently surfaced for this live portfolio view.')).toBeInTheDocument();
     expect(screen.queryByText('Seller name completeness')).not.toBeInTheDocument();
   });
 });

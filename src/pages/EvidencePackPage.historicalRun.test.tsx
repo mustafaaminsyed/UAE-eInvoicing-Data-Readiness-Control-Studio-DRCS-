@@ -76,6 +76,7 @@ vi.mock('@/lib/api/pintAEApi', () => ({
       execution_layer: 'schema',
       failure_class: 'structural_failure',
       pint_reference_terms: ['IBT-001'],
+      seller_trn: '123456789012345',
       invoice_id: 'INV-1',
       invoice_number: 'INV-001',
       message: 'Invoice number missing',
@@ -98,6 +99,13 @@ describe('EvidencePackPage historical runs', () => {
     });
 
     expect(screen.getByText('Historical Seller')).toBeInTheDocument();
+    expect(
+      screen.getByText(/persisted evidence snapshot and archived exception context/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Source: Persisted snapshot/i)).toBeInTheDocument();
+    expect(screen.getByText(/Entity scope: Single entity/i)).toBeInTheDocument();
+    expect(screen.getByText(/Legal entities: 1/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Current mode: consolidated pack/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Run compliance checks first/i)).not.toBeInTheDocument();
   });
 });

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Save, FileText, Building, Hash, Tag, Settings, Play, AlertCircle, Check, X, Trash2, Plus, Shield, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,7 @@ import {
   DOCUMENT_TYPES,
   normalizeFieldMappings,
 } from '@/types/fieldMapping';
-import { saveMappingTemplate } from '@/lib/api/mappingApi';
+import { saveMappingTemplate, updateMappingTemplate } from '@/lib/api/mappingApi';
 import { applyTransformations } from '@/lib/mapping/transformationEngine';
 import { analyzeCoverage } from '@/lib/mapping/coverageAnalyzer';
 import { useToast } from '@/hooks/use-toast';
@@ -33,7 +33,10 @@ interface SaveStepProps {
   previewData: ERPPreviewData | null;
   direction: Direction;
   onMappingsChange: (mappings: FieldMapping[]) => void;
-  onTemplateSaved: (templateId: string, name?: string, isActive?: boolean) => void;
+  initialTemplate?: Partial<MappingTemplate> | null;
+  editingTemplateId?: string | null;
+  saveMode?: 'create' | 'duplicate' | 'edit';
+  onTemplateSaved: (templateId: string, name?: string, isActive?: boolean, version?: number) => void;
 }
 
 const TRANSFORMATION_TYPES: { value: TransformationType; label: string; description: string }[] = [
@@ -46,7 +49,16 @@ const TRANSFORMATION_TYPES: { value: TransformationType; label: string; descript
   { value: 'lookup', label: 'Lookup Table', description: 'Map values using a lookup' },
 ];
 
-export function SaveStep({ mappings, previewData, direction, onMappingsChange, onTemplateSaved }: SaveStepProps) {
+export function SaveStep({
+  mappings,
+  previewData,
+  direction,
+  onMappingsChange,
+  initialTemplate,
+  editingTemplateId,
+  saveMode = 'create',
+  onTemplateSaved,
+}: SaveStepProps) {
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
@@ -66,6 +78,21 @@ export function SaveStep({ mappings, previewData, direction, onMappingsChange, o
     effectiveDate: '',
     notes: '',
   });
+
+  useEffect(() => {
+    setFormData({
+      templateName: initialTemplate?.templateName || '',
+      description: initialTemplate?.description || '',
+      clientName: initialTemplate?.clientName || '',
+      tenantId: initialTemplate?.tenantId || '',
+      legalEntity: initialTemplate?.legalEntity || '',
+      sellerTrn: initialTemplate?.sellerTrn || '',
+      erpType: initialTemplate?.erpType || '',
+      documentType: initialTemplate?.documentType || 'UC1 Standard Tax Invoice',
+      effectiveDate: initialTemplate?.effectiveDate || '',
+      notes: initialTemplate?.notes || '',
+    });
+  }, [initialTemplate]);
 
   const confirmedMappings = useMemo(
     () => normalizeFieldMappings(mappings.filter((mapping) => mapping.isConfirmed)),
@@ -216,7 +243,7 @@ export function SaveStep({ mappings, previewData, direction, onMappingsChange, o
       sellerTrn: formData.sellerTrn || undefined,
       erpType: formData.erpType || undefined,
       documentType: formData.documentType,
-      version: 1,
+      version: saveMode === 'edit' ? (initialTemplate?.version || 1) : 1,
       isActive: activate,
       mappings: confirmedMappings,
       effectiveDate: formData.effectiveDate || undefined,
@@ -224,22 +251,45 @@ export function SaveStep({ mappings, previewData, direction, onMappingsChange, o
       direction,
     };
 
-    const templateId = await saveMappingTemplate(template, direction);
+    try {
+      if (saveMode === 'edit' && editingTemplateId) {
+        const updated = await updateMappingTemplate(editingTemplateId, {
+          ...template,
+          id: editingTemplateId,
+        });
 
-    setIsSaving(false);
+        if (updated) {
+          toast({
+            title: activate ? 'Template updated & activated' : 'Template updated',
+            description: `Mapping template "${formData.templateName}" has been updated successfully.`,
+          });
+          onTemplateSaved(editingTemplateId, formData.templateName, activate, template.version);
+        } else {
+          toast({
+            title: 'Update failed',
+            description: 'Failed to update the mapping template. Please try again.',
+            variant: 'destructive',
+          });
+        }
+      } else {
+        const templateId = await saveMappingTemplate(template, direction);
 
-    if (templateId) {
-      toast({
-        title: activate ? 'Template approved & activated' : 'Draft saved',
-        description: `Mapping template "${formData.templateName}" has been ${activate ? 'activated' : 'saved as draft'}.`,
-      });
-      onTemplateSaved(templateId, formData.templateName, activate);
-    } else {
-      toast({
-        title: 'Save failed',
-        description: 'Failed to save the mapping template. Please try again.',
-        variant: 'destructive',
-      });
+        if (templateId) {
+          toast({
+            title: activate ? 'Template approved & activated' : 'Draft saved',
+            description: `Mapping template "${formData.templateName}" has been ${activate ? 'activated' : 'saved as draft'}.`,
+          });
+          onTemplateSaved(templateId, formData.templateName, activate, template.version);
+        } else {
+          toast({
+            title: 'Save failed',
+            description: 'Failed to save the mapping template. Please try again.',
+            variant: 'destructive',
+          });
+        }
+      }
+    } finally {
+      setIsSaving(false);
     }
   };
 

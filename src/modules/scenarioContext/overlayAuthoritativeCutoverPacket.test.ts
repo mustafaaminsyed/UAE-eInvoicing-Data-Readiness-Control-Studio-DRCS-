@@ -54,7 +54,7 @@ describe('overlay authoritative cutover packet', () => {
     OVERLAY_CUTOVER_RULE_IDS.forEach((ruleId) => {
       expect(runtimeRuleIds.has(ruleId)).toBe(false);
     });
-    expect(UAE_UC1_CHECK_PACK).toHaveLength(54);
+    expect(UAE_UC1_CHECK_PACK).toHaveLength(59);
     expect(packet.traceabilityImpactNotes.join(' ')).toContain('No traceability behavior changes');
     expect(packet.exceptionAnalysisImpactNotes.join(' ')).toContain('No exception-analysis behavior changes');
   });

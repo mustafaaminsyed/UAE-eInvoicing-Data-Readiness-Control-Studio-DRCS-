@@ -89,6 +89,9 @@ const RULE_METADATA_BY_CHECK_ID: Record<string, RuleMetadata> = {
   'UAE-UC1-CHK-052': { rule_type: 'dynamic_codelist', execution_layer: 'codelist' },
   'UAE-UC1-CHK-053': { rule_type: 'structural_rule', execution_layer: 'semantic_rule' },
   'UAE-UC1-CHK-054': { rule_type: 'structural_rule', execution_layer: 'semantic_rule' },
+  'UAE-UC1-CHK-055': { rule_type: 'structural_rule', execution_layer: 'schema' },
+  'UAE-UC1-CHK-056': { rule_type: 'structural_rule', execution_layer: 'schema' },
+  'UAE-UC1-CHK-057': { rule_type: 'structural_rule', execution_layer: 'schema' },
 };
 
 export function getRuleMetadataForCheck(checkId: string): RuleMetadata | undefined {

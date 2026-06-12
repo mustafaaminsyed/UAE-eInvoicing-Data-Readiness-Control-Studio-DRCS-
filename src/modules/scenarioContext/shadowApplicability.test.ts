@@ -13,7 +13,7 @@ describe("shadow rule applicability", () => {
     const runtimeRuleIds = new Set(UAE_UC1_CHECK_PACK.map((check) => check.check_id));
     const shadowOnlyRules = getShadowApplicabilityDefinitions().filter((definition) => definition.source === "shadow_only");
 
-    expect(UAE_UC1_CHECK_PACK).toHaveLength(54);
+    expect(UAE_UC1_CHECK_PACK).toHaveLength(59);
     shadowOnlyRules.forEach((definition) => {
       expect(runtimeRuleIds.has(definition.ruleId)).toBe(false);
     });

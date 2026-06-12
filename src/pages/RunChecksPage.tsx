@@ -28,6 +28,7 @@ import { PARSER_KNOWN_COLUMNS } from '@/lib/registry/drRegistry';
 import { defaultMoFReadinessRunner } from '@/engine/runners/mof';
 import { getAffectedDRIdsForRule } from '@/lib/rules/ruleTraceability';
 import { analyzeCoverage } from '@/lib/mapping/coverageAnalyzer';
+import { formatElapsedTime, yieldToBrowser } from '@/lib/processingFeedback';
 
 type ConnectionTestStatus = 'idle' | 'running' | 'passed' | 'failed';
 
@@ -106,6 +107,8 @@ export default function RunChecksPage() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('none');
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
   const [mappingTemplatesError, setMappingTemplatesError] = useState<string | null>(null);
+  const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
+  const [runElapsedSeconds, setRunElapsedSeconds] = useState(0);
   const expectedUC1Count = UAE_UC1_CHECK_PACK.length;
 
   const formatSetupError = (errorMessage: string, tableName: string) => {
@@ -323,6 +326,8 @@ export default function RunChecksPage() {
   const mandatoryCoverage = selectedTemplate ? Math.round(mappingCoverage.mandatoryCoverage) : 100;
   const unmappedMandatory = selectedTemplate ? mappingCoverage.unmappedMandatory : [];
   const hasCoverageWarning = selectedTemplate && mandatoryCoverage < 100;
+  const isRunProcessing = isRunning || runStartedAt !== null;
+  const runElapsedLabel = formatElapsedTime(runElapsedSeconds);
   const mappingSatisfied = !noMappingProfile || canRunWithoutMapping;
   const readiness = checkRunReadiness(mappingSatisfied, mandatoryCoverage, null);
 
@@ -419,6 +424,24 @@ export default function RunChecksPage() {
     ? !readiness.canRun
     : (!isSupabaseConfigured || hasSetupBlockers || !readiness.canRun || hasMoFPreGateBlockers);
 
+  useEffect(() => {
+    if (!isRunProcessing || runStartedAt === null) {
+      setRunElapsedSeconds(0);
+      return;
+    }
+
+    const updateElapsed = () => {
+      setRunElapsedSeconds(Math.floor((Date.now() - runStartedAt) / 1000));
+    };
+
+    updateElapsed();
+    const intervalId = window.setInterval(updateElapsed, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [isRunProcessing, runStartedAt]);
+
   if (!isDataLoaded) return null;
 
   const handleRunChecks = async () => {
@@ -434,6 +457,11 @@ export default function RunChecksPage() {
         version: selectedTemplate.version,
       });
     }
+    setRunStartedAt(Date.now());
+    setRunElapsedSeconds(0);
+
+    await yieldToBrowser();
+
     try {
       await runChecks({
         mappingProfileId: selectedTemplate?.id,
@@ -442,6 +470,9 @@ export default function RunChecksPage() {
       navigate('/dashboard');
     } catch {
       // The context surfaces the failure toast and restores the running state.
+    } finally {
+      setRunStartedAt(null);
+      setRunElapsedSeconds(0);
     }
   };
 
@@ -937,6 +968,17 @@ export default function RunChecksPage() {
           </Alert>
         )}
 
+        {isRunProcessing && (
+          <Alert className="mb-8 border-primary/20 bg-primary/5" role="status" aria-live="polite">
+            <RefreshCw className="h-4 w-4 animate-spin text-primary" />
+            <AlertTitle className="text-primary">Validation run in progress</AlertTitle>
+            <AlertDescription className="text-primary/80">
+              Processing {headers.length.toLocaleString()} invoices across {pintAEChecks.length.toLocaleString()} active checks.
+              Elapsed time: <strong>{runElapsedLabel}</strong>. Larger datasets may keep the browser busy while core rules execute.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Action Buttons */}
         <div className="flex items-center justify-center gap-4">
           {isChecksRun ? (
@@ -969,7 +1011,7 @@ export default function RunChecksPage() {
               {isRunning ? (
                 <>
                   <RefreshCw className="w-5 h-5 animate-spin" />
-                  Running Checks...
+                  Running Checks... {runElapsedLabel}
                 </>
               ) : (
                 <>

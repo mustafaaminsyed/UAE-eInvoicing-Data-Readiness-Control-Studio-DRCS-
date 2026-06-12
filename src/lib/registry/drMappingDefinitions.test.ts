@@ -11,8 +11,8 @@ describe('DR mapping definitions', () => {
     expect(field?.ibtReference).toBe('BTUAE-002');
   });
 
-  it('does not link seller BTUAE-15 through the buyer-side CHK-037 mapping', () => {
-    expect(getValidationIdsForDR('BTUAE-15')).toEqual([]);
-    expect(getValidationIdsForDR('BTUAE-15', { includeReferenceOnly: true })).toEqual([]);
+  it('links seller BTUAE-15 only through the seller-side legal registration type rule', () => {
+    expect(getValidationIdsForDR('BTUAE-15')).toEqual(['UAE-UC1-CHK-014B']);
+    expect(getValidationIdsForDR('BTUAE-15', { includeReferenceOnly: true })).toEqual(['UAE-UC1-CHK-014B']);
   });
 });

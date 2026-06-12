@@ -17,6 +17,9 @@ describe('evidenceRunSnapshot', () => {
 
     expect(snapshot.version).toBe(1);
     expect(snapshot.dataset_name).toBe('Seller One');
+    expect(snapshot.entity_scope_status).toBe('single_entity');
+    expect(snapshot.legal_entity_count).toBe(1);
+    expect(snapshot.legal_entity_labels).toEqual(['Seller One']);
     expect(snapshot.counts).toEqual({
       totalInvoices: 1,
       totalBuyers: 1,
@@ -41,6 +44,9 @@ describe('evidenceRunSnapshot', () => {
           version: 1,
           captured_at: new Date().toISOString(),
           dataset_name: 'Historical Seller',
+          entity_scope_status: 'single_entity',
+          legal_entity_count: 1,
+          legal_entity_labels: ['Historical Seller'],
           counts: { totalInvoices: 10, totalBuyers: 4, totalLines: 25 },
           populations: [],
         },
@@ -49,6 +55,9 @@ describe('evidenceRunSnapshot', () => {
 
     expect(getEvidenceRunSnapshot(run)).toMatchObject({
       dataset_name: 'Historical Seller',
+      entity_scope_status: 'single_entity',
+      legal_entity_count: 1,
+      legal_entity_labels: ['Historical Seller'],
       counts: { totalInvoices: 10, totalBuyers: 4, totalLines: 25 },
     });
   });

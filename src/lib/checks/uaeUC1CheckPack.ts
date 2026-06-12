@@ -2,7 +2,7 @@ import { PintAECheck } from '@/types/pintAE';
 import { normalizePintAECheck, RawPintAECheck } from '@/lib/validation/pintAERuleMetadata';
 
 // UAE UC1 Standard Tax Invoice Check Pack
-// 54 checks aligned with PINT-AE / UAE MoF Data Dictionary
+// 57 checks aligned with PINT-AE / UAE MoF Data Dictionary
 
 export const RAW_UAE_UC1_CHECK_PACK: RawPintAECheck[] = [
   // ============ Header Presence & Format Checks (001-011) ============
@@ -1090,6 +1090,71 @@ export const RAW_UAE_UC1_CHECK_PACK: RawPintAECheck[] = [
       reverse_charge_categories: ['AE', 'RC', 'REVERSE_CHARGE'],
       zero_rate_categories: ['E', 'EXEMPT', 'EXEMPT_FROM_VAT', 'Z', 'ZERO_RATED', 'ZERO_RATED_SUPPLY'],
       tolerance: 0.01,
+    },
+  },
+  {
+    check_id: 'UAE-UC1-CHK-055',
+    check_name: 'Credit Note Reason Code Presence',
+    description: 'Validates credit note reason code (BTAE-03) is present when invoice type indicates a credit note',
+    scope: 'Header',
+    rule_type: 'Presence',
+    severity: 'High',
+    use_case: 'UC1 Standard Tax Invoice',
+    pint_reference_terms: ['IBT-003', 'BTAE-03'],
+    mof_rule_reference: 'IBR-158-AE',
+    pass_condition: 'Credit note reason code is populated for credit note documents',
+    fail_condition: 'Credit note document is missing credit note reason code',
+    owner_team_default: 'Client Finance',
+    suggested_fix: 'Populate credit_note_reason_code for records where invoice_type is a credit note',
+    evidence_required: 'Credit note reason-code mapping and original adjustment reason evidence',
+    is_enabled: true,
+    parameters: {
+      invoice_type_field: 'invoice_type',
+      reason_code_field: 'credit_note_reason_code',
+    },
+  },
+  {
+    check_id: 'UAE-UC1-CHK-056',
+    check_name: 'Credit Note Preceding Invoice Reference Presence',
+    description: 'Validates preceding invoice reference (IBT-025) is present for credit notes unless the reason code is VD',
+    scope: 'Header',
+    rule_type: 'Presence',
+    severity: 'High',
+    use_case: 'UC1 Standard Tax Invoice',
+    pint_reference_terms: ['IBT-003', 'BTAE-03', 'IBT-025'],
+    mof_rule_reference: 'IBR-055-AE',
+    pass_condition: 'Preceding invoice reference is populated for credit notes unless reason code is VD',
+    fail_condition: 'Credit note is missing preceding invoice reference when one is required',
+    owner_team_default: 'Client Finance',
+    suggested_fix: 'Populate preceding_invoice_reference for credit notes unless credit_note_reason_code is VD',
+    evidence_required: 'Credit note to original invoice linkage and adjustment reason evidence',
+    is_enabled: true,
+    parameters: {
+      invoice_type_field: 'invoice_type',
+      reason_code_field: 'credit_note_reason_code',
+      preceding_reference_field: 'preceding_invoice_reference',
+      waived_reason_codes: ['VD'],
+    },
+  },
+  {
+    check_id: 'UAE-UC1-CHK-057',
+    check_name: 'Credit Note Preceding Invoice Issue Date Format',
+    description: 'Validates preceding invoice issue date (IBT-026) is in YYYY-MM-DD format when provided',
+    scope: 'Header',
+    rule_type: 'Format',
+    severity: 'Medium',
+    use_case: 'UC1 Standard Tax Invoice',
+    pint_reference_terms: ['IBT-026'],
+    mof_rule_reference: 'IBT-026-FORMAT',
+    pass_condition: 'Preceding invoice issue date matches YYYY-MM-DD pattern when supplied',
+    fail_condition: 'Preceding invoice issue date does not match required format',
+    owner_team_default: 'Client IT',
+    suggested_fix: 'Convert preceding_invoice_issue_date to YYYY-MM-DD format before submission',
+    evidence_required: 'Original invoice issue-date source and ERP date formatting configuration',
+    is_enabled: true,
+    parameters: {
+      field: 'preceding_invoice_issue_date',
+      pattern: '^\\d{4}-\\d{2}-\\d{2}$',
     },
   },
 ];

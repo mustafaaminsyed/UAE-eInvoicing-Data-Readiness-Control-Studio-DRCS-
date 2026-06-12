@@ -44,7 +44,7 @@ describe('overlay-family authoritative cutover plan', () => {
     OVERLAY_CUTOVER_RULE_IDS.forEach((ruleId) => {
       expect(runtimeRuleIds.has(ruleId)).toBe(false);
     });
-    expect(UAE_UC1_CHECK_PACK).toHaveLength(54);
+    expect(UAE_UC1_CHECK_PACK).toHaveLength(59);
     expect(familyImpact?.counts.blocked_by_ingestion_gap).toBe(0);
     expect(packet.traceabilityImpactNotes.join(' ')).toContain('No traceability behavior changes');
     expect(packet.exceptionAnalysisImpactNotes.join(' ')).toContain('No exception-analysis behavior changes');

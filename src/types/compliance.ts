@@ -39,6 +39,9 @@ export interface InvoiceHeader {
   currency: string;
   direction?: Direction;
   invoice_type?: string;
+  credit_note_reason_code?: string;
+  preceding_invoice_reference?: string;
+  preceding_invoice_issue_date?: string;
   total_excl_vat?: number;
   vat_total?: number;
   total_incl_vat?: number;

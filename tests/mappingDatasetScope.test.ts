@@ -19,8 +19,31 @@ describe('mapping dataset scoping', () => {
 
     const mappedIds = new Set(suggestions.map((suggestion) => suggestion.targetField.id));
     expect(mappedIds.has('invoice_id')).toBe(true);
+    expect(mappedIds.has('credit_note_reason_code')).toBe(true);
+    expect(mappedIds.has('preceding_invoice_reference')).toBe(true);
+    expect(mappedIds.has('preceding_invoice_issue_date')).toBe(true);
     expect(mappedIds.has('buyer_id')).toBe(true);
     expect(mappedIds.has('buyer_name')).toBe(false);
+  });
+
+  it('treats the shipped line and party templates as exact canonical match sets', () => {
+    const lineSample = getSampleData('lines', 'positive', 'AR');
+    const lineRows = parseCSV(lineSample.content);
+    const lineColumns = Object.keys(lineRows[0] ?? {});
+    const lineSuggestions = generateMappingSuggestions(lineColumns, lineRows, 'lines');
+
+    expect(lineSuggestions).toHaveLength(lineColumns.length);
+    expect(lineSuggestions.every((suggestion) => suggestion.confidence === 1)).toBe(true);
+    expect(new Set(lineSuggestions.map((suggestion) => suggestion.targetField.id)).has('line_total_excl_vat')).toBe(true);
+
+    const partySample = getSampleData('buyers', 'positive', 'AR');
+    const partyRows = parseCSV(partySample.content);
+    const partyColumns = Object.keys(partyRows[0] ?? {});
+    const partySuggestions = generateMappingSuggestions(partyColumns, partyRows, 'parties');
+
+    expect(partySuggestions).toHaveLength(partyColumns.length);
+    expect(partySuggestions.every((suggestion) => suggestion.confidence === 1)).toBe(true);
+    expect(new Set(partySuggestions.map((suggestion) => suggestion.targetField.id)).has('buyer_trn')).toBe(true);
   });
 
   it('scopes header coverage to the header dataset instead of the full cross-file model', () => {

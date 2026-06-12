@@ -35,6 +35,12 @@ describe('controlsRegistry UC1 gap-closure linkage', () => {
     expect(getControlsForRule('UAE-UC1-CHK-054').length).toBeGreaterThan(0);
   });
 
+  it('links credit-note conditional checks to explicit controls', () => {
+    expect(getControlsForRule('UAE-UC1-CHK-055').length).toBeGreaterThan(0);
+    expect(getControlsForRule('UAE-UC1-CHK-056').length).toBeGreaterThan(0);
+    expect(getControlsForRule('UAE-UC1-CHK-057').length).toBeGreaterThan(0);
+  });
+
   it('governs every executable UAE rule that has authoritative DR linkage', () => {
     const uncoveredRules = getRuleTraceability()
       .filter((rule) => rule.affected_dr_ids.length > 0)

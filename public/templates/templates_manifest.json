@@ -26,7 +26,7 @@
       "file": "invoice_headers_template.csv",
       "dataset": "Invoice Headers",
       "description": "Invoice header facts",
-      "column_count": 32,
+      "column_count": 35,
       "join_keys": ["invoice_id", "buyer_id"],
       "columns": [
         { "name": "invoice_id", "dr_ids": [], "mandatory": true, "asp_derived": false, "type": "String", "format": "Unique identifier", "description": "Internal join key (system primary key)", "responsibility": "ERP (Corner 1)" },
@@ -60,7 +60,10 @@
         { "name": "total_incl_vat", "dr_ids": ["IBT-112"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Decimal (2dp)", "description": "Total amount with tax", "responsibility": "ERP (Corner 1)" },
         { "name": "amount_due", "dr_ids": ["IBT-115"], "mandatory": false, "asp_derived": false, "type": "Number", "format": "Decimal (2dp)", "description": "Amount due for payment", "responsibility": "ERP (Corner 1)" },
         { "name": "tax_category_code", "dr_ids": ["IBT-118"], "mandatory": true, "asp_derived": false, "type": "Code", "format": "S, Z, E, RC", "description": "Tax category code", "responsibility": "ERP (Corner 1)" },
-        { "name": "tax_category_rate", "dr_ids": ["IBT-119"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Percentage (e.g. 5.00)", "description": "Tax category rate", "responsibility": "ERP (Corner 1)" }
+        { "name": "tax_category_rate", "dr_ids": ["IBT-119"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Percentage (e.g. 5.00)", "description": "Tax category rate", "responsibility": "ERP (Corner 1)" },
+        { "name": "credit_note_reason_code", "dr_ids": ["BTAE-03"], "mandatory": false, "asp_derived": false, "type": "Code", "format": "Credit note reason code", "description": "Required for credit notes (invoice_type = 381)", "responsibility": "ERP (Corner 1)" },
+        { "name": "preceding_invoice_reference", "dr_ids": ["IBT-025"], "mandatory": false, "asp_derived": false, "type": "String", "format": "Original invoice identifier", "description": "Required for credit notes unless credit_note_reason_code = VD", "responsibility": "ERP (Corner 1)" },
+        { "name": "preceding_invoice_issue_date", "dr_ids": ["IBT-026"], "mandatory": false, "asp_derived": false, "type": "Date", "format": "YYYY-MM-DD", "description": "Optional issue date of the original invoice being credited", "responsibility": "ERP (Corner 1)" }
       ]
     },
     {

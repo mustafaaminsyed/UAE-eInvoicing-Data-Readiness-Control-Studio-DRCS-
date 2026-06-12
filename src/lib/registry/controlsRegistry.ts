@@ -47,7 +47,7 @@ const CONTROLS_DEFINITION: Omit<ControlEntry, 'covered_dr_ids'>[] = [
     control_name: 'Seller Identity Verification',
     control_type: 'preventive',
     description: 'Ensures seller name, TRN, electronic address, and address are complete and valid',
-    covered_rule_ids: ['UAE-UC1-CHK-012', 'UAE-UC1-CHK-013', 'UAE-UC1-CHK-014', 'UAE-UC1-CHK-015', 'UAE-UC1-CHK-043'],
+    covered_rule_ids: ['UAE-UC1-CHK-012', 'UAE-UC1-CHK-013', 'UAE-UC1-CHK-014', 'UAE-UC1-CHK-014A', 'UAE-UC1-CHK-014B', 'UAE-UC1-CHK-015', 'UAE-UC1-CHK-043'],
   },
   {
     control_id: 'CTRL-005',
@@ -148,6 +148,13 @@ const CONTROLS_DEFINITION: Omit<ControlEntry, 'covered_dr_ids'>[] = [
     control_type: 'preventive',
     description: 'Requires overlay-specific principal, invoicing-period, and delivery information fields when governed overlay transaction flags apply',
     covered_rule_ids: ['IBR-137-AE', 'IBR-138-AE', 'IBR-152-AE'],
+  },
+  {
+    control_id: 'CTRL-019',
+    control_name: 'Credit Note Reference Integrity',
+    control_type: 'preventive',
+    description: 'Requires credit notes to provide a valid reason code, the original invoice reference when applicable, and a normalized preceding invoice issue date',
+    covered_rule_ids: ['UAE-UC1-CHK-055', 'UAE-UC1-CHK-056', 'UAE-UC1-CHK-057'],
   },
 ];
 

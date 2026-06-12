@@ -13,6 +13,19 @@ vi.mock('@/lib/api/pintAEApi', async () => {
 });
 
 describe('UploadPage interactions', () => {
+  it('renders document scenario guidance', () => {
+    render(
+      <MemoryRouter>
+        <ComplianceProvider>
+          <UploadPage />
+        </ComplianceProvider>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('Supported Document Scenarios')).toBeInTheDocument();
+    expect(screen.getByText('Credit Note Requirements')).toBeInTheDocument();
+  });
+
   it('does not open file picker when switching AR/AP and sample scenario toggles', () => {
     const clickSpy = vi.spyOn(HTMLInputElement.prototype, 'click');
 

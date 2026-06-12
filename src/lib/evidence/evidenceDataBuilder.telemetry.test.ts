@@ -145,4 +145,73 @@ describe('buildEvidencePackData telemetry', () => {
       ])
     );
   });
+
+  it('derives single-entity provenance metadata from current headers', () => {
+    const evidence = buildEvidencePackData(
+      'run-3',
+      '2026-03-14T10:00:00.000Z',
+      [],
+      [
+        {
+          invoice_id: 'INV-1',
+          invoice_number: 'INV-001',
+          issue_date: '2026-03-14',
+          seller_trn: '123456789012345',
+          seller_name: 'Dariba Test LLC',
+          buyer_id: 'B-1',
+          currency: 'AED',
+        },
+      ],
+      [],
+      [],
+      [],
+    );
+
+    expect(evidence.overview).toMatchObject({
+      sourceMode: 'current_in_memory_run',
+      entityScopeStatus: 'single_entity',
+      legalEntityCount: 1,
+      legalEntityLabels: ['Dariba Test LLC'],
+    });
+  });
+
+  it('falls back to archived exception seller TRNs when headers are unavailable', () => {
+    const evidence = buildEvidencePackData(
+      'run-4',
+      '2026-03-14T10:00:00.000Z',
+      [],
+      [],
+      [],
+      [
+        {
+          id: 'exc-2',
+          timestamp: '2026-03-14T10:00:00.000Z',
+          check_id: 'UAE-UC1-CHK-001',
+          check_name: 'Invoice Number Present',
+          severity: 'High',
+          scope: 'Header',
+          rule_type: 'structural_rule',
+          execution_layer: 'schema',
+          pint_reference_terms: ['IBT-001'],
+          seller_trn: '123456789012345',
+          message: 'Invoice number missing',
+          root_cause_category: 'Unclassified',
+          owner_team: 'Client Finance',
+          sla_target_hours: 4,
+          case_status: 'Open',
+        },
+      ],
+      [],
+      {
+        sourceMode: 'persisted_snapshot',
+      }
+    );
+
+    expect(evidence.overview).toMatchObject({
+      sourceMode: 'persisted_snapshot',
+      entityScopeStatus: 'single_entity',
+      legalEntityCount: 1,
+      legalEntityLabels: ['123456789012345'],
+    });
+  });
 });
