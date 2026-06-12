@@ -14,10 +14,12 @@ import { UploadStep } from '@/components/mapping/UploadStep';
 import { MappingStep } from '@/components/mapping/MappingStep';
 import { AnalysisStep } from '@/components/mapping/AnalysisStep';
 import { SaveStep } from '@/components/mapping/SaveStep';
-import { 
-  ERPPreviewData, 
-  FieldMapping, 
-  MappingWizardStep, 
+import {
+  ERPPreviewData,
+  DetectedColumn,
+  FieldMapping,
+  DatasetType as MappingDatasetType,
+  MappingWizardStep,
   MappingTemplate,
   ERP_TYPES,
 } from '@/types/fieldMapping';
@@ -26,6 +28,7 @@ import { fetchMappingTemplates, deleteMappingTemplate } from '@/lib/api/mappingA
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { useWorkspace } from '@/context/WorkspaceContext';
+import { detectLikelyDatasetType } from '@/lib/mapping/datasetFieldCatalog';
 
 const STEPS: { id: MappingWizardStep; label: string }[] = [
   { id: 'upload', label: 'Upload Sample' },
@@ -63,6 +66,8 @@ export default function MappingPage() {
   const [templateStatus, setTemplateStatus] = useState<'draft' | 'active'>('draft');
   const [templateName, setTemplateName] = useState<string>('');
   const [showPostSaveCTA, setShowPostSaveCTA] = useState(false);
+  const [templateSeed, setTemplateSeed] = useState<Partial<MappingTemplate> | null>(null);
+  const [saveMode, setSaveMode] = useState<'create' | 'duplicate' | 'edit'>('create');
 
   const currentStepIndex = STEPS.findIndex(s => s.id === currentStep);
 
@@ -84,6 +89,84 @@ export default function MappingPage() {
     }
   }, [direction, requestedDirection, setDirection]);
 
+  const detectColumnType = useCallback((values: string[]): DetectedColumn['detectedType'] => {
+    const nonEmpty = values.filter((value) => value && value.trim() !== '');
+    if (nonEmpty.length === 0) return 'unknown';
+
+    const datePatterns = [/^\d{4}-\d{2}-\d{2}$/, /^\d{2}\/\d{2}\/\d{4}$/, /^\d{2}-\d{2}-\d{4}$/];
+    if (nonEmpty.filter((value) => datePatterns.some((pattern) => pattern.test(value))).length / nonEmpty.length > 0.8) {
+      return 'date';
+    }
+
+    if (nonEmpty.filter((value) => !Number.isNaN(Number(value.replace(/,/g, '')))).length / nonEmpty.length > 0.8) {
+      return 'number';
+    }
+
+    const booleanValues = ['true', 'false', 'yes', 'no', '1', '0', 'y', 'n'];
+    if (nonEmpty.filter((value) => booleanValues.includes(value.toLowerCase())).length / nonEmpty.length > 0.8) {
+      return 'boolean';
+    }
+
+    return 'string';
+  }, []);
+
+  const inferDatasetTypeFromMappings = useCallback((template: MappingTemplate): MappingDatasetType => {
+    const columns = template.mappings
+      .slice()
+      .sort((left, right) => left.erpColumnIndex - right.erpColumnIndex)
+      .map((mapping) => mapping.erpColumn);
+
+    const detectedByColumns = detectLikelyDatasetType(columns);
+    if (detectedByColumns) return detectedByColumns;
+
+    const categories = new Set(template.mappings.map((mapping) => mapping.targetField.category));
+    if (categories.has('line')) return 'lines';
+    if (categories.has('buyer') && categories.size === 1) return 'parties';
+    return 'header';
+  }, []);
+
+  const buildPreviewDataFromTemplate = useCallback((template: MappingTemplate): ERPPreviewData => {
+    const orderedMappings = template.mappings
+      .slice()
+      .sort((left, right) => left.erpColumnIndex - right.erpColumnIndex);
+    const datasetType = inferDatasetTypeFromMappings(template);
+    const columns = orderedMappings.map((mapping) => mapping.erpColumn);
+    const rowCount = Math.max(
+      orderedMappings.reduce((maxRows, mapping) => Math.max(maxRows, mapping.sampleValues.length), 0),
+      1
+    );
+
+    const rows = Array.from({ length: rowCount }, (_, rowIndex) => {
+      const row: Record<string, string> = {};
+      orderedMappings.forEach((mapping) => {
+        row[mapping.erpColumn] = mapping.sampleValues[rowIndex] || '';
+      });
+      return row;
+    });
+
+    const detectedColumns: DetectedColumn[] = columns.map((column, index) => {
+      const sampleValues = rows.slice(0, 5).map((row) => row[column] || '');
+      const nonEmpty = sampleValues.filter((value) => value && value.trim() !== '');
+      return {
+        name: column,
+        index,
+        detectedType: detectColumnType(sampleValues),
+        sampleValues,
+        nullCount: sampleValues.length - nonEmpty.length,
+        uniqueCount: new Set(nonEmpty).size,
+      };
+    });
+
+    return {
+      fileName: `${(template.templateName || 'mapping-template').replace(/\s+/g, '_').toLowerCase()}.csv`,
+      columns,
+      detectedColumns,
+      rows,
+      totalRows: rowCount,
+      datasetType,
+    };
+  }, [detectColumnType, inferDatasetTypeFromMappings]);
+
   const handleTabChange = (tab: string) => {
     setSearchParams({ tab });
     if (tab === 'create') {
@@ -96,6 +179,8 @@ export default function MappingPage() {
       setTemplateStatus('draft');
       setTemplateName('');
       setShowPostSaveCTA(false);
+      setTemplateSeed(null);
+      setSaveMode('create');
     }
   };
 
@@ -104,6 +189,12 @@ export default function MappingPage() {
     setMappings([]);
     setConditionalAnswers({});
     setShowPostSaveCTA(false);
+    setEditingTemplateId(null);
+    setTemplateSeed(null);
+    setSaveMode('create');
+    setTemplateStatus('draft');
+    setTemplateName('');
+    setLastSavedAt(null);
   }, []);
 
   const handleResetUpload = useCallback(() => {
@@ -111,6 +202,12 @@ export default function MappingPage() {
     setMappings([]);
     setConditionalAnswers({});
     setShowPostSaveCTA(false);
+    setEditingTemplateId(null);
+    setTemplateSeed(null);
+    setSaveMode('create');
+    setTemplateStatus('draft');
+    setTemplateName('');
+    setLastSavedAt(null);
   }, []);
 
   const handleDatasetTypeChange = useCallback((datasetType: ERPPreviewData['datasetType']) => {
@@ -133,8 +230,15 @@ export default function MappingPage() {
 
   // Template actions
   const handleViewTemplate = (template: MappingTemplate) => {
+    setPreviewData(buildPreviewDataFromTemplate(template));
     setEditingTemplateId(template.id || null);
     setMappings(template.mappings);
+    setTemplateSeed(template);
+    setSaveMode('edit');
+    setTemplateName(template.templateName);
+    setTemplateStatus(template.isActive ? 'active' : 'draft');
+    setLastSavedAt(template.updatedAt || null);
+    setShowPostSaveCTA(false);
     if (template.id) {
       setActiveMappingProfileForDirection(direction, {
         id: template.id,
@@ -146,7 +250,21 @@ export default function MappingPage() {
   };
 
   const handleDuplicateTemplate = async (template: MappingTemplate) => {
+    const duplicatedTemplateName = `${template.templateName} Copy`;
+    setPreviewData(buildPreviewDataFromTemplate(template));
     setMappings(template.mappings);
+    setEditingTemplateId(null);
+    setTemplateSeed({
+      ...template,
+      templateName: duplicatedTemplateName,
+      isActive: false,
+      version: 1,
+    });
+    setSaveMode('duplicate');
+    setTemplateName(duplicatedTemplateName);
+    setTemplateStatus('draft');
+    setLastSavedAt(null);
+    setShowPostSaveCTA(false);
     setSearchParams({ tab: 'create' });
     setCurrentStep('save');
     toast({
@@ -190,9 +308,9 @@ export default function MappingPage() {
     if (prevIndex >= 0) setCurrentStep(STEPS[prevIndex].id);
   };
 
-  const handleTemplateSaved = (templateId: string, name?: string, isActive?: boolean) => {
+  const handleTemplateSaved = (templateId: string, name?: string, isActive?: boolean, version: number = 1) => {
     loadTemplates();
-    setActiveMappingProfileForDirection(direction, { id: templateId, version: 1 });
+    setActiveMappingProfileForDirection(direction, { id: templateId, version });
     setLastSavedAt(new Date().toISOString());
     setTemplateStatus(isActive ? 'active' : 'draft');
     if (name) setTemplateName(name);
@@ -525,10 +643,14 @@ export default function MappingPage() {
             )}
             {currentStep === 'save' && (
                   <SaveStep 
+                    key={`save-${saveMode}-${editingTemplateId ?? 'new'}-${templateSeed?.templateName ?? 'blank'}`}
                     mappings={mappings} 
                     previewData={previewData}
                     direction={direction}
                     onMappingsChange={setMappings}
+                    initialTemplate={templateSeed}
+                    editingTemplateId={editingTemplateId}
+                    saveMode={saveMode}
                     onTemplateSaved={handleTemplateSaved} 
                   />
             )}

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { UploadStep } from '@/components/mapping/UploadStep';
@@ -56,5 +56,31 @@ describe('UploadStep', () => {
         datasetType: 'header',
       })
     );
+  });
+
+  it('auto-detects header template uploads when the wizard is still on the default dataset type', async () => {
+    const onDataLoaded = vi.fn();
+    const csv = [
+      'invoice_id,invoice_number,issue_date,invoice_type,currency,buyer_id,total_excl_vat,vat_total,total_incl_vat',
+      'INV001,UAE-2025-0001,2025-01-01,380,AED,BUY001,100,5,105',
+    ].join('\n');
+    const file = new File([csv], 'headers.csv', { type: 'text/csv' });
+    Object.defineProperty(file, 'text', {
+      value: () => Promise.resolve(csv),
+    });
+
+    render(<UploadStep previewData={null} onDataLoaded={onDataLoaded} />);
+
+    const input = document.querySelector('#erp-file-input') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(onDataLoaded).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fileName: 'headers.csv',
+          datasetType: 'header',
+        })
+      );
+    });
   });
 });

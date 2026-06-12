@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Upload, FileSpreadsheet, AlertCircle, Database, Calendar, Hash, Type, RefreshCw, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { ERPPreviewData, DatasetType, DetectedColumn } from '@/types/fieldMappin
 import { parseCSV } from '@/lib/csvParser';
 import { downloadSampleCSV, getSampleData } from '@/lib/sampleData';
 import { Direction } from '@/types/direction';
+import { detectLikelyDatasetType } from '@/lib/mapping/datasetFieldCatalog';
 
 interface UploadStepProps {
   onDataLoaded: (data: ERPPreviewData) => void;
@@ -154,7 +155,14 @@ export function UploadStep({ onDataLoaded, previewData, onReset, direction = 'AR
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDatasetType, setSelectedDatasetType] = useState<DatasetType>('combined');
+  const [hasUserSelectedDatasetType, setHasUserSelectedDatasetType] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (previewData?.datasetType) {
+      setSelectedDatasetType(previewData.datasetType);
+    }
+  }, [previewData?.datasetType]);
 
   const processFile = useCallback(async (file: File) => {
     setIsLoading(true);
@@ -162,14 +170,27 @@ export function UploadStep({ onDataLoaded, previewData, onReset, direction = 'AR
 
     try {
       const text = await file.text();
-      onDataLoaded(buildPreviewData(file.name, text, selectedDatasetType));
+      const rows = parseCSV(text);
+      if (rows.length === 0) {
+        throw new Error('File appears to be empty or invalid');
+      }
+
+      const columns = Object.keys(rows[0]);
+      const detectedDatasetType = detectLikelyDatasetType(columns);
+      const resolvedDatasetType =
+        hasUserSelectedDatasetType
+          ? selectedDatasetType
+          : detectedDatasetType || selectedDatasetType;
+
+      setSelectedDatasetType(resolvedDatasetType);
+      onDataLoaded(buildPreviewData(file.name, text, resolvedDatasetType));
     } catch (err) {
       console.error('Error parsing file:', err);
       setError(err instanceof Error ? err.message : 'Failed to parse file. Please ensure it is a valid CSV.');
     } finally {
       setIsLoading(false);
     }
-  }, [onDataLoaded, selectedDatasetType]);
+  }, [hasUserSelectedDatasetType, onDataLoaded, selectedDatasetType]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -194,6 +215,7 @@ export function UploadStep({ onDataLoaded, previewData, onReset, direction = 'AR
   }, [onReset]);
 
   const handleDatasetTypeChange = (value: DatasetType) => {
+    setHasUserSelectedDatasetType(true);
     setSelectedDatasetType(value);
     if (previewData) {
       onDataLoaded({
@@ -210,6 +232,7 @@ export function UploadStep({ onDataLoaded, previewData, onReset, direction = 'AR
     try {
       const sample = getSampleData(sampleType, 'positive', direction);
       onDataLoaded(buildPreviewData(sample.filename, sample.content, datasetType));
+      setHasUserSelectedDatasetType(false);
       setSelectedDatasetType(datasetType);
     } catch (err) {
       console.error('Error loading built-in template:', err);

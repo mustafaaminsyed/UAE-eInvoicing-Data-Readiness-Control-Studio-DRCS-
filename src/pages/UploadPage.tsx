@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, FileSpreadsheet, AlertCircle, CheckCircle2, Link2, ArrowRightCircle } from 'lucide-react';
+import { ArrowRight, FileSpreadsheet, AlertCircle, CheckCircle2, Link2, ArrowRightCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -12,6 +12,7 @@ import { FileDropZone, FileSummaryCard, analyzeFile, FileStats } from '@/compone
 import { SampleScenario } from '@/lib/sampleData';
 import { addUploadAuditLog } from '@/lib/uploadAudit';
 import { DatasetType } from '@/types/datasets';
+import { formatElapsedTime, yieldToBrowser } from '@/lib/processingFeedback';
 
 type StepKey = 'upload' | 'validation' | 'mapping';
 
@@ -46,6 +47,8 @@ export default function UploadPage() {
     headers: Record<string, string>[] | null;
     lines: Record<string, string>[] | null;
   }>({ buyers: null, headers: null, lines: null });
+  const [loadStartedAt, setLoadStartedAt] = useState<number | null>(null);
+  const [loadElapsedSeconds, setLoadElapsedSeconds] = useState(0);
   const [sampleScenario, setSampleScenario] = useState<SampleScenario>('positive');
   const [datasetType, setDatasetType] = useState<DatasetType>('AR');
 
@@ -55,6 +58,11 @@ export default function UploadPage() {
   const validFileCount = [stats.buyers, stats.headers, stats.lines].filter(
     (s) => s && s.requiredMissing.length === 0
   ).length;
+  const totalSelectedRows =
+    (stats.buyers?.rowCount ?? 0) +
+    (stats.headers?.rowCount ?? 0) +
+    (stats.lines?.rowCount ?? 0);
+  const loadElapsedLabel = formatElapsedTime(loadElapsedSeconds);
 
   // Compute blocking reasons
   const blockingReasons: string[] = [];
@@ -129,11 +137,34 @@ export default function UploadPage() {
     setRelationalChecks(checks);
   }, [parsedRows]);
 
+  useEffect(() => {
+    if (!isLoading || loadStartedAt === null) {
+      setLoadElapsedSeconds(0);
+      return;
+    }
+
+    const updateElapsed = () => {
+      setLoadElapsedSeconds(Math.floor((Date.now() - loadStartedAt) / 1000));
+    };
+
+    updateElapsed();
+    const intervalId = window.setInterval(updateElapsed, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [isLoading, loadStartedAt]);
+
   const handleLoadData = async () => {
     if (!canProceed) return;
-      setIsLoading(true);
-      try {
-        const [buyers, headers, lines] = await Promise.all([
+    setIsLoading(true);
+    setLoadStartedAt(Date.now());
+    setLoadElapsedSeconds(0);
+
+    await yieldToBrowser();
+
+    try {
+      const [buyers, headers, lines] = await Promise.all([
         parseBuyersFile(files.buyers!, { direction: datasetType }),
         parseHeadersFile(files.headers!, { direction: datasetType }),
         parseLinesFile(files.lines!, { direction: datasetType }),
@@ -193,6 +224,8 @@ export default function UploadPage() {
       toast({ title: 'Error loading data', description: 'Please check your CSV files and try again.', variant: 'destructive' });
     } finally {
       setIsLoading(false);
+      setLoadStartedAt(null);
+      setLoadElapsedSeconds(0);
     }
   };
 
@@ -439,6 +472,33 @@ export default function UploadPage() {
             </div>
           )}
 
+          {isLoading && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="rounded-xl border border-primary/20 bg-primary/5 p-4"
+            >
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4 animate-spin text-primary" />
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Processing uploaded datasets</p>
+                    <p className="text-xs text-muted-foreground">
+                      Preparing canonical records and relational integrity checks before validation execution.
+                    </p>
+                  </div>
+                </div>
+                <Badge variant="outline" className="text-xs">
+                  {loadElapsedLabel} elapsed
+                </Badge>
+              </div>
+              <p className="mt-3 text-xs text-muted-foreground">
+                Current payload: <span className="font-medium text-foreground">{totalSelectedRows.toLocaleString()}</span> rows
+                across buyers, invoice headers, and invoice lines.
+              </p>
+            </div>
+          )}
+
           {/* Actions */}
           <div className="flex items-center justify-between">
             <Button variant="outline" onClick={handleClearAll} disabled={!files.buyers && !files.headers && !files.lines}>
@@ -455,7 +515,7 @@ export default function UploadPage() {
                       size="lg"
                       className="gap-2"
                     >
-                      {isLoading ? 'Loading...' : 'Load Data & Continue'}
+                      {isLoading ? `Processing data... ${loadElapsedLabel}` : 'Load Data & Continue'}
                       <ArrowRight className="w-4 h-4" />
                     </Button>
                   </span>

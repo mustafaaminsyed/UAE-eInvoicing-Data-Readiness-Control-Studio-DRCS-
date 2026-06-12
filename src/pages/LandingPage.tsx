@@ -41,7 +41,6 @@ const heroNavLinks = [
   { label: "Upload Audit", path: "/upload-audit" },
   { label: "Mapping", path: "/mapping" },
   { label: "Traceability", path: "/traceability" },
-  { label: "Run Checks", path: "/run" },
   { label: "Check Registry", path: "/check-registry" },
 ];
 
@@ -289,9 +288,6 @@ export default function LandingPage() {
             className="absolute inset-3 rounded-[1.7rem] border border-white/70 bg-white/18 backdrop-blur-[1px] dark:border-emerald-900/20 dark:bg-white/[0.02]"
             aria-hidden="true"
           />
-          <div className="absolute left-[22%] top-0 hidden h-full w-px bg-gradient-to-b from-transparent via-sky-200/70 to-transparent dark:hidden lg:block" />
-          <div className="absolute left-[72%] top-0 hidden h-full w-px bg-gradient-to-b from-transparent via-sky-200/60 to-transparent dark:hidden lg:block" />
-
           <div className="relative z-10">
             <div className="mx-auto mt-8 max-w-4xl text-center">
               <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-white/78 px-4 py-1.5 text-xs font-semibold text-primary shadow-sm dark:border-emerald-700/25 dark:bg-emerald-500/[0.06] dark:text-emerald-300">
