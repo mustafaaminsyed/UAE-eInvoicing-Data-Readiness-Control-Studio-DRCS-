@@ -122,6 +122,13 @@ interface ScoreInput {
   summary: string;
 }
 
+interface DashboardAction {
+  label: string;
+  description: string;
+  route: string;
+  variant: 'default' | 'outline';
+}
+
 const numberFormatter = new Intl.NumberFormat('en-US');
 
 const MANDATORY_HEADER_FIELDS = ['invoice_id', 'invoice_number', 'issue_date', 'invoice_type', 'currency', 'buyer_id'];
@@ -631,6 +638,62 @@ function readinessBand(score: number | null) {
   return { label: 'Blocked', tone: 'danger' as const };
 }
 
+function describeReadiness(score: number | null, criticalIssues: number) {
+  if (score === null) {
+    return 'Readiness will appear after invoice data is loaded and validation outcomes exist for the current scope.';
+  }
+
+  if (criticalIssues > 0) {
+    return 'Critical blockers are still active, so the portfolio should be treated as remediation-first rather than submission-ready.';
+  }
+
+  if (score >= 90) {
+    return 'The current portfolio looks structurally stable and regulator-facing controls are largely in place.';
+  }
+
+  if (score >= 75) {
+    return 'Core controls are forming well, but a limited group of data and rule defects still needs deliberate cleanup.';
+  }
+
+  return 'Readiness remains materially constrained by unresolved data quality, rule conformance, or scenario coverage issues.';
+}
+
+function buildPrimaryAction(snapshot: DashboardSnapshot): DashboardAction {
+  if (!snapshot.hasLiveSignals) {
+    return {
+      label: 'Upload dataset',
+      description: 'Start by loading invoice data so readiness, quality, and UAE coverage can be calculated.',
+      route: '/upload',
+      variant: 'default',
+    };
+  }
+
+  if (snapshot.criticalIssues > 0) {
+    return {
+      label: `Fix ${formatNumber(snapshot.criticalIssues)} critical blocker${snapshot.criticalIssues === 1 ? '' : 's'}`,
+      description: 'Resolve the highest-severity exceptions first, because they are the fastest route to rejection or rework.',
+      route: '/exceptions',
+      variant: 'default',
+    };
+  }
+
+  if (snapshot.conditionalCompleteness < 95 || snapshot.currencyMismatchCount > 0) {
+    return {
+      label: 'Review validation gaps',
+      description: 'Conditional-field and FX-related gaps still need attention before treating the portfolio as fully dependable.',
+      route: '/validation',
+      variant: 'outline',
+    };
+  }
+
+  return {
+    label: 'Open validation',
+    description: 'Inspect the detailed rule outcomes to confirm the current readiness posture and evidence trail.',
+    route: '/validation',
+    variant: 'outline',
+  };
+}
+
 export default function DashboardPage() {
   const navigate = useNavigate();
   const {
@@ -697,6 +760,8 @@ export default function DashboardPage() {
   }, [snapshot]);
 
   const goLiveBand = readinessBand(snapshot.goLiveReadiness);
+  const primaryAction = buildPrimaryAction(snapshot);
+  const readinessNarrative = describeReadiness(snapshot.goLiveReadiness, snapshot.criticalIssues);
 
   const supportExecutiveMetrics: MetricCard[] = [
     {
@@ -930,9 +995,9 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-4 animate-fade-in">
+    <div className="space-y-5 animate-fade-in">
       <section className="surface-glass rounded-[28px] border border-border/70 p-4 shadow-[0_16px_34px_-28px_rgba(15,23,42,0.24)]">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-3">
             <div className="inline-flex rounded-xl border border-border/70 bg-background/80 p-1">
               <Button
@@ -980,6 +1045,13 @@ export default function DashboardPage() {
             </Button>
           </div>
         </div>
+
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <ContextChip label="Document flow" value={activeDatasetType === 'AR' ? 'AR / Outbound' : 'AP / Inbound'} />
+          <ContextChip label="Invoices in scope" value={formatNumber(snapshot.totalInvoices)} />
+          <ContextChip label="Rule outcomes" value={formatNumber(snapshot.executedRuleOutcomes)} />
+          <ContextChip label="Critical blockers" value={formatNumber(snapshot.criticalIssues)} />
+        </div>
       </section>
 
       <DashboardSection
@@ -991,8 +1063,8 @@ export default function DashboardPage() {
           <div className="space-y-4">
             <Card className="overflow-hidden rounded-[24px] border-border/70 bg-card/95 shadow-[0_18px_36px_-28px_rgba(15,23,42,0.24)]">
               <CardContent className="p-6">
-                <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-                  <div className="max-w-3xl space-y-3">
+                <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
+                  <div className="space-y-4">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge
                         variant="outline"
@@ -1028,23 +1100,60 @@ export default function DashboardPage() {
                         {formatPercent(snapshot.goLiveReadiness)}
                       </h3>
                       <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-                        This weighted score shows whether the current data set looks safe enough to continue toward UAE e-invoicing go-live. It balances rule conformance, mandatory data quality, blocker pressure, and scenario readiness rather than relying on a single pass metric.
+                        {readinessNarrative}
                       </p>
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                      {readinessInputs.map((input) => (
+                        <div key={input.label} className="rounded-2xl border border-border/70 bg-background/75 p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-sm font-medium text-foreground">{input.label}</p>
+                            <Badge variant="outline" className="border-border/70 bg-background/80 text-[11px] text-muted-foreground">
+                              {Math.round(input.weight * 100)}%
+                            </Badge>
+                          </div>
+                          <p className="mt-3 text-2xl font-semibold text-foreground">{formatPercent(input.score)}</p>
+                          <p className="mt-1 text-xs leading-5 text-muted-foreground">{input.summary}</p>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
-                  <div className="min-w-[240px] rounded-2xl border border-border/70 bg-background/70 p-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                      Portfolio Scope
-                    </p>
-                    <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Invoices in scope</p>
-                        <p className="text-xl font-semibold text-foreground">{formatNumber(snapshot.totalInvoices)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Validation outcomes</p>
-                        <p className="text-xl font-semibold text-foreground">{formatNumber(snapshot.executedRuleOutcomes)}</p>
+                  <div className="space-y-4">
+                    <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                        Recommended next action
+                      </p>
+                      <p className="mt-3 text-base font-semibold text-foreground">{primaryAction.label}</p>
+                      <p className="mt-1 text-sm leading-6 text-muted-foreground">{primaryAction.description}</p>
+                      <Button
+                        variant={primaryAction.variant}
+                        className="mt-4 w-full rounded-full"
+                        onClick={() => navigate(primaryAction.route)}
+                      >
+                        {primaryAction.label}
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                        Portfolio Scope
+                      </p>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Invoices in scope</p>
+                          <p className="text-xl font-semibold text-foreground">{formatNumber(snapshot.totalInvoices)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Validation outcomes</p>
+                          <p className="text-xl font-semibold text-foreground">{formatNumber(snapshot.executedRuleOutcomes)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Readiness band</p>
+                          <p className="text-xl font-semibold text-foreground">{goLiveBand.label}</p>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1061,21 +1170,6 @@ export default function DashboardPage() {
                           : 'h-2.5 [&>div]:bg-severity-critical'
                     }
                   />
-                </div>
-
-                <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  {readinessInputs.map((input) => (
-                    <div key={input.label} className="rounded-2xl border border-border/70 bg-background/75 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-medium text-foreground">{input.label}</p>
-                        <Badge variant="outline" className="border-border/70 bg-background/80 text-[11px] text-muted-foreground">
-                          {Math.round(input.weight * 100)}%
-                        </Badge>
-                      </div>
-                      <p className="mt-3 text-2xl font-semibold text-foreground">{formatPercent(input.score)}</p>
-                      <p className="mt-1 text-xs leading-5 text-muted-foreground">{input.summary}</p>
-                    </div>
-                  ))}
                 </div>
               </CardContent>
             </Card>
@@ -1219,10 +1313,10 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  {snapshot.exceptionThemes.map((theme) => (
-                    <div
-                      key={theme.title}
+                  <div className="space-y-4">
+                    {snapshot.exceptionThemes.map((theme) => (
+                      <div
+                        key={theme.title}
                       className="rounded-2xl border border-border/70 bg-background/75 p-4 shadow-[0_10px_20px_-18px_rgba(15,23,42,0.18)]"
                     >
                       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{theme.title}</p>
@@ -1270,13 +1364,22 @@ function DashboardSection({
 }) {
   return (
     <section className="surface-glass rounded-[28px] border border-border/70 p-5 shadow-[0_16px_34px_-28px_rgba(15,23,42,0.24)]">
-      <div className="mb-4">
+      <div className="mb-5">
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{eyebrow}</p>
         <h2 className="mt-1 text-xl font-semibold text-foreground">{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p>
       </div>
       {children}
     </section>
+  );
+}
+
+function ContextChip({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-medium text-foreground">{value}</p>
+    </div>
   );
 }
 
@@ -1324,11 +1427,16 @@ function DashboardEmptyState({
 }
 
 function CoverageWidget({ metric }: { metric: CoverageMetric }) {
+  const badgeLabel = metric.tone === 'success' ? 'Healthy' : metric.tone === 'warning' ? 'Watch' : 'Attention';
+
   return (
     <Card className="rounded-[24px] border-border/70 bg-card/94 shadow-[0_14px_28px_-24px_rgba(15,23,42,0.22)]">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <div>
+            <Badge variant="outline" className="mb-3 border-border/70 bg-background/75 text-[11px] text-muted-foreground">
+              {badgeLabel}
+            </Badge>
             <CardTitle className="text-base">{metric.title}</CardTitle>
             <CardDescription className="mt-1">{metric.subtitle}</CardDescription>
           </div>
@@ -1397,7 +1505,7 @@ function MetricTooltip({ title, content }: { title: string; content: ReactNode }
           aria-label={`About ${title}`}
           className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/70 bg-background/70 text-muted-foreground transition-colors hover:text-foreground"
         >
-          <AlertTriangle className="h-3.5 w-3.5" />
+          <CircleAlert className="h-3.5 w-3.5" />
         </button>
       </TooltipTrigger>
       <TooltipContent className="max-w-[340px]">
