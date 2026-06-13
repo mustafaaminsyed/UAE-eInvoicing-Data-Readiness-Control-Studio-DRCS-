@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-const HEADER_UPLOAD = `invoice_id,invoice_number,issue_date,invoice_type,seller_trn,seller_name,seller_address,seller_city,seller_country,seller_subdivision,seller_electronic_address,seller_legal_reg_id,seller_legal_reg_id_type,buyer_id,currency,transaction_type_code,principal_id,invoicing_period_start_date,invoicing_period_end_date,deliver_to_address_line_1,deliver_to_city,deliver_to_country_subdivision,deliver_to_country_code,payment_due_date,payment_means_code,fx_rate,total_excl_vat,vat_total,total_incl_vat,amount_due,tax_category_code,tax_category_rate,credit_note_reason_code,preceding_invoice_reference,preceding_invoice_issue_date
-INV900,UAE-2025-0900,2025-01-15,380,100000000000001,Dariba Tax Technologies LLC,Al Sila Tower ADGM,Abu Dhabi,AE,AE-AZ,dariba@peppol.ae,TL-123456,TL,B001,AED,01000000,,,,,,,,2025-02-14,30,1.000000,1000.00,50.00,1050.00,1050.00,S,5.00,,,`;
+const HEADER_UPLOAD = `invoice_id,invoice_number,issue_date,invoice_type,seller_trn,seller_name,seller_address,seller_city,seller_country,seller_subdivision,seller_electronic_address,seller_legal_reg_id,seller_legal_reg_id_type,buyer_id,currency,transaction_type_code,principal_id,invoicing_period_start_date,invoicing_period_end_date,deliver_to_address_line_1,deliver_to_city,deliver_to_country_subdivision,deliver_to_country_code,payment_due_date,payment_means_code,fx_rate,total_excl_vat,vat_total,total_incl_vat,amount_due,tax_category_code,tax_category_rate,credit_note_reason_code,credit_note_reason_text,preceding_invoice_reference,preceding_invoice_issue_date
+INV900,UAE-2025-0900,2025-01-15,380,100000000000001,Dariba Tax Technologies LLC,Al Sila Tower ADGM,Abu Dhabi,AE,AE-AZ,dariba@peppol.ae,TL-123456,TL,B001,AED,01000000,,,,,,,,2025-02-14,30,1.000000,1000.00,50.00,1050.00,1050.00,S,5.00,,,,`;
 
 test.describe('mapping wizard smoke', () => {
   test.beforeEach(async ({ page }) => {

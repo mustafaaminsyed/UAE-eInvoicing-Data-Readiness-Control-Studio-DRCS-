@@ -48,6 +48,7 @@ async function loadSamples() {
     issue_date: r.issue_date,
     invoice_type: r.invoice_type,
     credit_note_reason_code: r.credit_note_reason_code,
+    credit_note_reason_text: r.credit_note_reason_text,
     preceding_invoice_reference: r.preceding_invoice_reference,
     preceding_invoice_issue_date: r.preceding_invoice_issue_date,
     seller_trn: r.seller_trn,
