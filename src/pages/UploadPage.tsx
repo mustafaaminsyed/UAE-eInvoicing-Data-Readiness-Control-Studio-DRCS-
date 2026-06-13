@@ -346,7 +346,8 @@ export default function UploadPage() {
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Supported with additional header fields: <code className="font-mono">credit_note_reason_code</code>,
-                  <code className="ml-1 font-mono">preceding_invoice_reference</code>, and optional
+                  <code className="ml-1 font-mono">credit_note_reason_text</code>,
+                  <code className="ml-1 font-mono">preceding_invoice_reference</code>, and
                   <code className="ml-1 font-mono">preceding_invoice_issue_date</code>.
                 </p>
               </div>
@@ -389,13 +390,16 @@ export default function UploadPage() {
                     Scenario-specific validation is driven by <code className="font-mono">invoice_type</code>.
                   </p>
                   <p>
-                    When <code className="font-mono">invoice_type = 381</code>, provide <code className="font-mono">credit_note_reason_code</code>.
+                    When <code className="font-mono">invoice_type = 381</code>, provide <code className="font-mono">credit_note_reason_code</code> and
+                    <code className="ml-1 font-mono">credit_note_reason_text</code>.
                   </p>
                   <p>
-                    Unless the reason code is <code className="font-mono">VD</code>, also provide <code className="font-mono">preceding_invoice_reference</code>.
+                    Unless the reason code is <code className="font-mono">VD</code>, also provide the <code className="font-mono">IBG-03</code> preceding invoice group using
+                    <code className="ml-1 font-mono">preceding_invoice_reference</code> and ideally
+                    <code className="ml-1 font-mono">preceding_invoice_issue_date</code>.
                   </p>
                   <p>
-                    <code className="font-mono">preceding_invoice_issue_date</code> is optional but should be in <code className="font-mono">YYYY-MM-DD</code> format when supplied.
+                    <code className="font-mono">preceding_invoice_issue_date</code> represents the original invoice issue date and should be in <code className="font-mono">YYYY-MM-DD</code> format when supplied.
                   </p>
                 </div>
               </div>

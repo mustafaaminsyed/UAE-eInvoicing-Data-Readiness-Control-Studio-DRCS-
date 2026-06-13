@@ -40,6 +40,7 @@ export interface InvoiceHeader {
   direction?: Direction;
   invoice_type?: string;
   credit_note_reason_code?: string;
+  credit_note_reason_text?: string;
   preceding_invoice_reference?: string;
   preceding_invoice_issue_date?: string;
   total_excl_vat?: number;

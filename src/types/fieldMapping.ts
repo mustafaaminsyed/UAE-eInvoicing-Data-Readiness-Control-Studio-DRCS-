@@ -172,6 +172,7 @@ export const PINT_AE_UC1_FIELDS: PintAEField[] = [
   { id: 'issue_date', name: 'Issue Date', description: 'Invoice issue date', ibtReference: 'IBT-002', category: 'header', isMandatory: true, dataType: 'date', format: 'YYYY-MM-DD' },
   { id: 'invoice_type', name: 'Invoice Type Code', description: 'Invoice type (380=invoice, 381=credit note)', ibtReference: 'IBT-003', category: 'header', isMandatory: true, dataType: 'string', allowedValues: ['380', '381', '383', '384'] },
   { id: 'credit_note_reason_code', name: 'Credit Note Reason Code', description: 'Reason code required for credit note documents', ibtReference: 'BTAE-03', category: 'header', isMandatory: false, dataType: 'string' },
+  { id: 'credit_note_reason_text', name: 'Credit Note Reason Text', description: 'Free-text narrative describing the credit note reason when captured by the source system', ibtReference: 'SYS-CN-REASON-TEXT', category: 'header', isMandatory: false, dataType: 'string' },
   { id: 'currency', name: 'Document Currency', description: 'ISO 4217 currency code', ibtReference: 'IBT-005', category: 'header', isMandatory: true, dataType: 'string', format: '^[A-Z]{3}$' },
   { id: 'tax_currency', name: 'Tax Accounting Currency', description: 'Must be AED for UAE', ibtReference: 'IBT-006', category: 'header', isMandatory: false, dataType: 'string' },
   { id: 'fx_rate', name: 'Exchange Rate', description: 'FX rate to AED (required if non-AED)', ibtReference: 'BTUAE-002', category: 'header', isMandatory: false, dataType: 'number' },

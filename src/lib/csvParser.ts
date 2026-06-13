@@ -203,6 +203,12 @@ export async function parseHeadersFile(file: File, options: ParseOptions = {}): 
       direction,
       invoice_type: str(record, 'invoice_type_code', 'invoice_type'),
       credit_note_reason_code: str(record, 'credit_note_reason_code'),
+      credit_note_reason_text: str(
+        record,
+        'credit_note_reason_text',
+        'credit_note_reason_description',
+        'credit_note_reason_desc'
+      ),
       preceding_invoice_reference: str(record, 'preceding_invoice_reference'),
       preceding_invoice_issue_date: str(record, 'preceding_invoice_issue_date'),
       total_excl_vat: num(record, 'total_excl_vat'),

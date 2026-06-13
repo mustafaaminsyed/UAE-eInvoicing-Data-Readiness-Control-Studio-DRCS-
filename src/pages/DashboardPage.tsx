@@ -211,8 +211,10 @@ function computeConditionalCompleteness(headers: DashboardRecord[], buyers: Dash
 
     if (invoiceType === '381') {
       requirements.push({ present: presentValue(header.credit_note_reason_code), expected: 1 });
+      requirements.push({ present: presentValue(header.credit_note_reason_text), expected: 1 });
       if (creditReason !== 'VD') {
         requirements.push({ present: presentValue(header.preceding_invoice_reference), expected: 1 });
+        requirements.push({ present: presentValue(header.preceding_invoice_issue_date), expected: 1 });
       }
     }
   });
@@ -258,33 +260,50 @@ function computeCurrencyMismatchCount(headers: DashboardRecord[]) {
 function computeCreditNoteCoverage(headers: DashboardRecord[]) {
   const creditNotes = headers.filter((header) => String(header.invoice_type ?? '').trim() === '381');
   if (creditNotes.length === 0) {
-    return { count: 0, coverage: 100, reasonCoverage: 100, referenceCoverage: 100 };
+    return {
+      count: 0,
+      coverage: 100,
+      reasonCoverage: 100,
+      reasonTextCoverage: 100,
+      referenceCoverage: 100,
+      issueDateCoverage: 100,
+    };
   }
 
   let satisfied = 0;
   let reasonPresent = 0;
+  let reasonTextPresent = 0;
   let referenceRequired = 0;
   let referencePresent = 0;
+  let issueDateRequired = 0;
+  let issueDatePresent = 0;
 
   creditNotes.forEach((header) => {
     const reason = String(header.credit_note_reason_code ?? '').trim().toUpperCase();
     const hasReason = reason !== '';
+    const hasReasonText = presentValue(header.credit_note_reason_text);
     const hasReference = presentValue(header.preceding_invoice_reference);
+    const hasIssueDate = presentValue(header.preceding_invoice_issue_date);
 
     if (hasReason) reasonPresent += 1;
+    if (hasReasonText) reasonTextPresent += 1;
     if (reason !== 'VD') {
       referenceRequired += 1;
       if (hasReference) referencePresent += 1;
+      issueDateRequired += 1;
+      if (hasIssueDate) issueDatePresent += 1;
     }
 
-    if (hasReason && (reason === 'VD' || hasReference)) satisfied += 1;
+    if (hasReason && hasReasonText && (reason === 'VD' || (hasReference && hasIssueDate))) satisfied += 1;
   });
 
   return {
     count: creditNotes.length,
     coverage: (satisfied / creditNotes.length) * 100,
     reasonCoverage: (reasonPresent / creditNotes.length) * 100,
+    reasonTextCoverage: (reasonTextPresent / creditNotes.length) * 100,
     referenceCoverage: referenceRequired === 0 ? 100 : (referencePresent / referenceRequired) * 100,
+    issueDateCoverage: issueDateRequired === 0 ? 100 : (issueDatePresent / issueDateRequired) * 100,
   };
 }
 
@@ -472,7 +491,9 @@ function buildDashboardSnapshot(input: {
       creditNoteCoverage: 0,
       creditNoteCount: 0,
       creditNoteReasonCoverage: 0,
+      creditNoteReasonTextCoverage: 0,
       creditNoteReferenceCoverage: 0,
+      creditNoteIssueDateCoverage: 0,
       headerCompleteness: 0,
       buyerCompleteness: 0,
       lineCompleteness: 0,
@@ -495,7 +516,17 @@ function buildDashboardSnapshot(input: {
   const mandatoryCompleteness = average([headerCompleteness, buyerCompleteness, lineCompleteness]);
   const conditionalCompleteness = computeConditionalCompleteness(headerRecords, buyerRecords);
   const nullFieldRate = computeNullFieldRate([
-    { records: headerRecords, fields: [...MANDATORY_HEADER_FIELDS, 'payment_due_date', 'credit_note_reason_code', 'preceding_invoice_reference'] },
+    {
+      records: headerRecords,
+      fields: [
+        ...MANDATORY_HEADER_FIELDS,
+        'payment_due_date',
+        'credit_note_reason_code',
+        'credit_note_reason_text',
+        'preceding_invoice_reference',
+        'preceding_invoice_issue_date',
+      ],
+    },
     { records: buyerRecords, fields: [...MANDATORY_BUYER_FIELDS, 'buyer_trn', 'buyer_city'] },
     { records: lineRecords, fields: [...MANDATORY_LINE_FIELDS, 'vat_rate', 'vat_amount', 'tax_category_code'] },
   ]);
@@ -603,7 +634,9 @@ function buildDashboardSnapshot(input: {
     creditNoteCoverage: creditNote.coverage,
     creditNoteCount: creditNote.count,
     creditNoteReasonCoverage: creditNote.reasonCoverage,
+    creditNoteReasonTextCoverage: creditNote.reasonTextCoverage,
     creditNoteReferenceCoverage: creditNote.referenceCoverage,
+    creditNoteIssueDateCoverage: creditNote.issueDateCoverage,
     headerCompleteness,
     buyerCompleteness,
     lineCompleteness,
@@ -980,15 +1013,17 @@ export default function DashboardPage() {
           ? ['Upload a 381 population to validate scenario readiness explicitly.']
           : [
               `Reason-code completeness ${formatPercent(snapshot.creditNoteReasonCoverage)}`,
+              `Reason-text completeness ${formatPercent(snapshot.creditNoteReasonTextCoverage)}`,
               `Preceding reference completeness ${formatPercent(snapshot.creditNoteReferenceCoverage)}`,
+              `Preceding issue-date completeness ${formatPercent(snapshot.creditNoteIssueDateCoverage)}`,
               `Overall scenario coverage ${formatPercent(snapshot.creditNoteCoverage)}`,
             ],
       helpContent: (
         <MetricHelpContent
           summary="Shows whether credit-note-specific fields needed for UAE/PINT-AE 381 flows are actually present and usable."
-          formula="Credit-note scenarios meeting reason-code and required preceding reference obligations divided by all credit-note invoices."
+          formula="Credit-note scenarios meeting reason-code, reason-text, and required preceding invoice group obligations divided by all credit-note invoices."
           threshold="Do not treat missing credit-note scope as a pass; it only means the scenario has not yet been proven."
-          sourceFields="invoice_type, credit_note_reason_code, and preceding_invoice_reference on invoice headers."
+          sourceFields="invoice_type, credit_note_reason_code, credit_note_reason_text, preceding_invoice_reference, and preceding_invoice_issue_date on invoice headers."
         />
       ),
     },
