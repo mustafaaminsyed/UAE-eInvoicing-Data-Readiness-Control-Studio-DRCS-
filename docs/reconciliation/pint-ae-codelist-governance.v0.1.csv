@@ -1,10 +1,10 @@
 index_no,codelist_name,source_type,document_context,uc1_applicable,runtime_enforceable_now,bound_field,bound_pint_element,bound_mof_field,bound_check_id,reason_if_not_enforceable,target_phase,notes
 1,Aligned-TaxCategoryCodes,packaged_gc,both,yes,yes,headers.tax_category_code|lines.tax_category_code,IBT-118|IBT-151,tax#37|tax#46|commercial#37|commercial#46,UAE-UC1-CHK-041|UAE-UC1-CHK-042,Active,UC1,First-wave runtime codelist enforcement.
-2,Aligned-TaxExemptionCodes,packaged_gc,both,conditional,no,-,-,-,-,Deferred - scenario dependent,UC2,Requires explicit exemption reason source fields in invoice model.
-3,CreditReason,packaged_gc,credit_note,conditional,no,-,-,-,-,Deferred - scenario dependent,UC2,Credit-note reason code not modeled in current UC1 ingestion.
+2,Aligned-TaxExemptionCodes,packaged_gc,both,conditional,conditional,lines.exemption_reason_code,IBT-186,-,UAE-UC1-CHK-050,Active,UC1,Runtime enforced when exempt VAT applies and the exemption reason code is populated.
+3,CreditReason,packaged_gc,credit_note,conditional,conditional,headers.credit_note_reason_code,BTAE-03,-,UAE-UC1-CHK-058,Active,UC1,Credit-note reason code is modeled and can be runtime-enforced when a credit note document is in scope.
 4,eas,packaged_gc,both,conditional,conditional,headers.seller_endpoint_scheme_id|buyers.buyer_endpoint_scheme_id,IBT-034-1|IBT-049-1,tax#12|tax#23|commercial#12|commercial#23,-,Deferred - policy derived,future,Governed but non-runtime until endpoint scheme derivation contract is formalized.
 5,FreqBilling,packaged_gc,invoice,no,no,-,-,-,-,Deferred - not in UC1 scope,UC3,Recurring-billing frequency is outside UC1 baseline.
-6,GoodsType,packaged_gc,both,conditional,no,-,-,-,-,Deferred - scenario dependent,UC3,Requires reverse-charge goods typing fields not present in UC1 templates.
+6,GoodsType,packaged_gc,both,conditional,conditional,lines.goods_service_type,BTAE-09,-,UAE-UC1-CHK-052,Active,UC1,Runtime enforced when reverse-charge VAT treatment applies and goods/service typing is provided.
 7,ICD,packaged_gc,both,no,no,-,-,-,-,Deferred - missing source field,future,Participant scheme ICD inputs are not present in UC1 ingestion model.
 8,ISO3166,packaged_gc,both,yes,yes,headers.seller_country|buyers.buyer_country,IBT-040|IBT-055,tax#20|tax#29|commercial#20|commercial#29,UAE-UC1-CHK-043|UAE-UC1-CHK-044,Active,UC1,First-wave runtime codelist enforcement.
 9,ISO4217,derived_standard,both,yes,yes,headers.currency,IBT-005,tax#4|commercial#4,UAE-UC1-CHK-006,Active,UC1,Governed coded domain included for currency compliance.

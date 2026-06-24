@@ -1157,6 +1157,28 @@ export const RAW_UAE_UC1_CHECK_PACK: RawPintAECheck[] = [
       pattern: '^\\d{4}-\\d{2}-\\d{2}$',
     },
   },
+  {
+    check_id: 'UAE-UC1-CHK-058',
+    check_name: 'Credit Note Reason Code In CreditReason Codelist',
+    description: 'Validates credit note reason code (BTAE-03) against CreditReason when invoice type indicates a credit note',
+    scope: 'Header',
+    rule_type: 'CodeList',
+    severity: 'High',
+    use_case: 'UC1 Standard Tax Invoice',
+    pint_reference_terms: ['IBT-003', 'BTAE-03'],
+    mof_rule_reference: 'IBR-158-AE-CL',
+    pass_condition: 'Credit note reason code exists in CreditReason when document context is credit note',
+    fail_condition: 'Credit note reason code is not in CreditReason for credit note context',
+    owner_team_default: 'Client IT',
+    suggested_fix: 'Use a valid UAE credit note reason code for records where invoice_type is a credit note',
+    evidence_required: 'Credit note reason-code master data and original adjustment reason evidence',
+    is_enabled: true,
+    parameters: {
+      field: 'credit_note_reason_code',
+      codelist: 'CreditReason',
+      document_context: 'credit_note',
+    },
+  },
 ];
 
 export const UAE_UC1_CHECK_PACK: PintAECheck[] = RAW_UAE_UC1_CHECK_PACK.map(normalizePintAECheck);

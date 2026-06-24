@@ -153,8 +153,8 @@ const CONTROLS_DEFINITION: Omit<ControlEntry, 'covered_dr_ids'>[] = [
     control_id: 'CTRL-019',
     control_name: 'Credit Note Reference Integrity',
     control_type: 'preventive',
-    description: 'Requires credit notes to provide a valid reason code, the original invoice reference when applicable, and a normalized preceding invoice issue date',
-    covered_rule_ids: ['UAE-UC1-CHK-055', 'UAE-UC1-CHK-056', 'UAE-UC1-CHK-057'],
+    description: 'Requires credit notes to provide a governed reason code, the original invoice reference when applicable, and a normalized preceding invoice issue date',
+    covered_rule_ids: ['UAE-UC1-CHK-055', 'UAE-UC1-CHK-056', 'UAE-UC1-CHK-057', 'UAE-UC1-CHK-058'],
   },
 ];
 
