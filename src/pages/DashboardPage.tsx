@@ -19,11 +19,15 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { StatsCard } from '@/components/StatsCard';
 import { SeverityBadge } from '@/components/SeverityBadge';
+import { TopBlockerActionList } from '@/components/shared/TopBlockerActionList';
+import { EXECUTIVE_KPI_LABELS } from '@/constants/dashboardLabels';
 import { useCompliance } from '@/context/ComplianceContext';
+import { computeDashboardMetrics } from '@/hooks/useDashboardMetrics';
 import type { Severity } from '@/types/compliance';
 
 type DatasetScope = 'AR' | 'AP';
@@ -57,6 +61,8 @@ interface MetricCard {
   icon: ReactNode;
   variant: 'default' | 'success' | 'warning' | 'danger';
   helpContent: ReactNode;
+  scopeAbsent?: boolean;
+  scopeAbsentTooltip?: string;
 }
 
 interface CoverageMetric {
@@ -87,6 +93,11 @@ interface DashboardSnapshot {
   hasLiveSignals: boolean;
   modeLabel: string;
   totalInvoices: number;
+  submissionReadyCount: number;
+  submissionReadyRate: number;
+  rulePassRate: number;
+  totalRuleOutcomes: number;
+  criticalBlockerOutcomes: number;
   acceptedInvoices: number;
   successRate: number;
   passRate: number;
@@ -95,6 +106,7 @@ interface DashboardSnapshot {
   goLiveReadiness: number | null;
   mandatoryCompleteness: number;
   conditionalCompleteness: number;
+  conditionalFieldDocumentCount: number;
   nullFieldRate: number;
   duplicateInvoiceRatio: number;
   invalidCodelistCount: number;
@@ -120,13 +132,6 @@ interface ScoreInput {
   score: number;
   weight: number;
   summary: string;
-}
-
-interface DashboardAction {
-  label: string;
-  description: string;
-  route: string;
-  variant: 'default' | 'outline';
 }
 
 const numberFormatter = new Intl.NumberFormat('en-US');
@@ -191,14 +196,20 @@ function computeNullFieldRate(groups: Array<{ records: DashboardRecord[]; fields
   return (emptySlots / totalSlots) * 100;
 }
 
-function computeConditionalCompleteness(headers: DashboardRecord[], buyers: DashboardRecord[]) {
+function computeConditionalCoverage(headers: DashboardRecord[], buyers: DashboardRecord[]) {
   const requirements: Array<{ present: boolean; expected: number }> = [];
+  let qualifyingDocumentCount = 0;
 
   headers.forEach((header) => {
     const amountDue = Number(header.amount_due ?? 0);
     const currency = String(header.currency ?? '').trim().toUpperCase();
     const invoiceType = String(header.invoice_type ?? '').trim();
     const creditReason = String(header.credit_note_reason_code ?? '').trim().toUpperCase();
+    const documentTriggersConditionalFields = amountDue > 0 || (currency !== '' && currency !== 'AED') || invoiceType === '381';
+
+    if (documentTriggersConditionalFields) {
+      qualifyingDocumentCount += 1;
+    }
 
     if (amountDue > 0) {
       requirements.push({ present: presentValue(header.payment_due_date), expected: 1 });
@@ -228,8 +239,10 @@ function computeConditionalCompleteness(headers: DashboardRecord[], buyers: Dash
   const totalExpected = requirements.reduce((sum, item) => sum + item.expected, 0);
   const presentExpected = requirements.filter((item) => item.present).length;
 
-  if (totalExpected === 0) return 100;
-  return (presentExpected / totalExpected) * 100;
+  return {
+    completeness: totalExpected === 0 ? 100 : (presentExpected / totalExpected) * 100,
+    qualifyingDocumentCount,
+  };
 }
 
 function computeDuplicateInvoiceRatio(headers: DashboardRecord[]) {
@@ -384,11 +397,13 @@ function buildFallbackSnapshot(dataset: DatasetScope): DashboardSnapshot {
     acceptedInvoices: dataset === 'AR' ? 1186 : 833,
     successRate: dataset === 'AR' ? 92.4 : 86.4,
     passRate: dataset === 'AR' ? 93.1 : 88.2,
+    criticalBlockerOutcomes: dataset === 'AR' ? 21 : 27,
     criticalIssues: dataset === 'AR' ? 7 : 9,
     complianceReadiness: previewReadiness,
     goLiveReadiness: previewReadiness - 3,
     mandatoryCompleteness: 94,
     conditionalCompleteness: 86,
+    conditionalFieldDocumentCount: 37,
     nullFieldRate: 3.8,
     duplicateInvoiceRatio: 0.9,
     invalidCodelistCount: 12,
@@ -474,6 +489,11 @@ function buildDashboardSnapshot(input: {
       hasLiveSignals: false,
       modeLabel: 'No live data loaded',
       totalInvoices: 0,
+      submissionReadyCount: 0,
+      submissionReadyRate: 0,
+      rulePassRate: 0,
+      totalRuleOutcomes: 0,
+      criticalBlockerOutcomes: 0,
       acceptedInvoices: 0,
       successRate: 0,
       passRate: 0,
@@ -482,6 +502,7 @@ function buildDashboardSnapshot(input: {
       goLiveReadiness: null,
       mandatoryCompleteness: 0,
       conditionalCompleteness: 0,
+      conditionalFieldDocumentCount: 0,
       nullFieldRate: 0,
       duplicateInvoiceRatio: 0,
       invalidCodelistCount: 0,
@@ -514,7 +535,8 @@ function buildDashboardSnapshot(input: {
   const buyerCompleteness = buyerRecords.length > 0 ? computeCompleteness(buyerRecords, MANDATORY_BUYER_FIELDS) : 100;
   const lineCompleteness = lineRecords.length > 0 ? computeCompleteness(lineRecords, MANDATORY_LINE_FIELDS) : 100;
   const mandatoryCompleteness = average([headerCompleteness, buyerCompleteness, lineCompleteness]);
-  const conditionalCompleteness = computeConditionalCompleteness(headerRecords, buyerRecords);
+  const conditionalCoverage = computeConditionalCoverage(headerRecords, buyerRecords);
+  const conditionalCompleteness = conditionalCoverage.completeness;
   const nullFieldRate = computeNullFieldRate([
     {
       records: headerRecords,
@@ -534,13 +556,15 @@ function buildDashboardSnapshot(input: {
   const currencyMismatchCount = computeCurrencyMismatchCount(headerRecords);
   const invalidCodelistCount = computeInvalidCodelistCount(scopedExceptions);
   const creditNote = computeCreditNoteCoverage(headerRecords);
-  const executedRuleOutcomes = scopedCheckResults.reduce((sum, result) => sum + result.passed + result.failed, 0);
+  const dashboardMetrics = computeDashboardMetrics({
+    totalInvoicesInScope: totalInvoices,
+    checkResults: scopedCheckResults,
+    exceptions: scopedExceptions,
+  });
   const pintRuleCoverage =
-    executedRuleOutcomes > 0
-      ? (scopedCheckResults.reduce((sum, result) => sum + result.passed, 0) / executedRuleOutcomes) * 100
-      : Math.max(0, stats.passRate || 0);
-  const acceptedInvoices = totalInvoices > 0 ? Math.round((totalInvoices * pintRuleCoverage) / 100) : 0;
-  const successRate = totalInvoices > 0 ? (acceptedInvoices / totalInvoices) * 100 : 0;
+    dashboardMetrics.totalRuleOutcomes > 0 ? dashboardMetrics.rulePassRate : Math.max(0, stats.passRate || 0);
+  const acceptedInvoices = dashboardMetrics.submissionReadyCount;
+  const successRate = dashboardMetrics.submissionReadyRate;
   const criticalIssues =
     stats.exceptionsBySeverity.Critical ||
     scopedExceptions.filter((exception) => exception.severity === 'Critical').length;
@@ -617,6 +641,11 @@ function buildDashboardSnapshot(input: {
     hasLiveSignals: true,
     modeLabel: isChecksRun ? 'Live portfolio snapshot' : 'Live data loaded',
     totalInvoices,
+    submissionReadyCount: dashboardMetrics.submissionReadyCount,
+    submissionReadyRate: dashboardMetrics.submissionReadyRate,
+    rulePassRate: pintRuleCoverage,
+    totalRuleOutcomes: dashboardMetrics.totalRuleOutcomes,
+    criticalBlockerOutcomes: dashboardMetrics.criticalBlockerOutcomes,
     acceptedInvoices,
     successRate,
     passRate: pintRuleCoverage,
@@ -625,6 +654,7 @@ function buildDashboardSnapshot(input: {
     goLiveReadiness,
     mandatoryCompleteness,
     conditionalCompleteness,
+    conditionalFieldDocumentCount: conditionalCoverage.qualifyingDocumentCount,
     nullFieldRate,
     duplicateInvoiceRatio,
     invalidCodelistCount,
@@ -640,7 +670,7 @@ function buildDashboardSnapshot(input: {
     headerCompleteness,
     buyerCompleteness,
     lineCompleteness,
-    executedRuleOutcomes,
+    executedRuleOutcomes: dashboardMetrics.totalRuleOutcomes,
     exceptionsTotal: scopedExceptions.length,
     exceptionsBySeverity: {
       Critical: scopedExceptions.filter((exception) => exception.severity === 'Critical').length,
@@ -689,42 +719,6 @@ function describeReadiness(score: number | null, criticalIssues: number) {
   }
 
   return 'Readiness remains materially constrained by unresolved data quality, rule conformance, or scenario coverage issues.';
-}
-
-function buildPrimaryAction(snapshot: DashboardSnapshot): DashboardAction {
-  if (!snapshot.hasLiveSignals) {
-    return {
-      label: 'Upload dataset',
-      description: 'Start by loading invoice data so readiness, quality, and UAE coverage can be calculated.',
-      route: '/upload',
-      variant: 'default',
-    };
-  }
-
-  if (snapshot.criticalIssues > 0) {
-    return {
-      label: `Fix ${formatNumber(snapshot.criticalIssues)} critical blocker${snapshot.criticalIssues === 1 ? '' : 's'}`,
-      description: 'Resolve the highest-severity exceptions first, because they are the fastest route to rejection or rework.',
-      route: '/exceptions',
-      variant: 'default',
-    };
-  }
-
-  if (snapshot.conditionalCompleteness < 95 || snapshot.currencyMismatchCount > 0) {
-    return {
-      label: 'Review validation gaps',
-      description: 'Conditional-field and FX-related gaps still need attention before treating the portfolio as fully dependable.',
-      route: '/validation',
-      variant: 'outline',
-    };
-  }
-
-  return {
-    label: 'Open validation',
-    description: 'Inspect the detailed rule outcomes to confirm the current readiness posture and evidence trail.',
-    route: '/validation',
-    variant: 'outline',
-  };
 }
 
 export default function DashboardPage() {
@@ -793,8 +787,24 @@ export default function DashboardPage() {
   }, [snapshot]);
 
   const goLiveBand = readinessBand(snapshot.goLiveReadiness);
-  const primaryAction = buildPrimaryAction(snapshot);
   const readinessNarrative = describeReadiness(snapshot.goLiveReadiness, snapshot.criticalIssues);
+  const conditionalFieldScopeAbsent = snapshot.conditionalFieldDocumentCount === 0;
+  const topBlockingActions = useMemo(
+    () =>
+      snapshot.blockingIssues.slice(0, 3).map((issue, index) => ({
+        rank: index + 1,
+        label: issue.label,
+        severity:
+          issue.severity === 'Critical'
+            ? 'critical'
+            : issue.severity === 'High'
+              ? 'high'
+              : 'medium',
+        count: issue.count,
+        ruleId: issue.key,
+      })),
+    [snapshot.blockingIssues]
+  );
 
   const supportExecutiveMetrics: MetricCard[] = [
     {
@@ -816,14 +826,14 @@ export default function DashboardPage() {
       ),
     },
     {
-      title: 'Invoice Success Rate',
+      title: EXECUTIVE_KPI_LABELS.submissionReadyInvoices.title,
       value: `${formatNumber(snapshot.acceptedInvoices)}/${formatNumber(snapshot.totalInvoices)}`,
-      subtitle: `${formatPercent(snapshot.successRate, 1)} accepted/submitted in current scope`,
+      subtitle: EXECUTIVE_KPI_LABELS.submissionReadyInvoices.subtitle,
       icon: <BadgeCheck className="h-5 w-5" />,
       variant: snapshot.successRate >= 90 ? 'success' : snapshot.successRate >= 75 ? 'warning' : 'danger',
       helpContent: (
         <MetricHelpContent
-          summary="Internal validation success ratio for invoices in the active dashboard scope."
+          summary={EXECUTIVE_KPI_LABELS.submissionReadyInvoices.helpSummary}
           formula="Accepted invoice count divided by total invoices in scope."
           threshold="Investigate below 95% for production-readiness discussions."
           sourceFields="Derived from current rule pass outcomes and invoice totals."
@@ -831,17 +841,17 @@ export default function DashboardPage() {
       ),
     },
     {
-      title: 'PINT-AE Conformance',
+      title: EXECUTIVE_KPI_LABELS.rulePassRate.title,
       value: formatPercent(snapshot.pintRuleCoverage),
       subtitle:
         snapshot.executedRuleOutcomes > 0
-          ? `${formatNumber(snapshot.executedRuleOutcomes)} rule outcomes executed`
+          ? `Rule outcomes resulting in pass across ${formatNumber(snapshot.executedRuleOutcomes)} executed checks`
           : 'Awaiting executed validation outcomes',
       icon: <FileCheck2 className="h-5 w-5" />,
       variant: progressTone(snapshot.pintRuleCoverage),
       helpContent: (
         <MetricHelpContent
-          summary="Conformance rate across currently executed PINT-AE rule outcomes in the selected portfolio scope."
+          summary={EXECUTIVE_KPI_LABELS.rulePassRate.helpSummary}
           formula="Passed rule outcomes divided by all executed rule outcomes."
           threshold="Target 98%+ before treating the portfolio as regulator-ready."
           sourceFields="Validation engine results filtered to the active dataset direction."
@@ -887,6 +897,9 @@ export default function DashboardPage() {
       subtitle: 'FX, payment, and credit-note-only dependencies in scope',
       icon: <FileSearch className="h-5 w-5" />,
       variant: progressTone(snapshot.conditionalCompleteness),
+      scopeAbsent: conditionalFieldScopeAbsent,
+      scopeAbsentTooltip:
+        'Conditional fields (FX rates, payment means, credit-note references) are only validated when the relevant document type is present. No qualifying documents are in the current portfolio.',
       helpContent: (
         <MetricHelpContent
           summary="Measures fields that become mandatory only in specific invoice scenarios."
@@ -1155,22 +1168,44 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                        Recommended next action
-                      </p>
-                      <p className="mt-3 text-base font-semibold text-foreground">{primaryAction.label}</p>
-                      <p className="mt-1 text-sm leading-6 text-muted-foreground">{primaryAction.description}</p>
-                      <Button
-                        variant={primaryAction.variant}
-                        className="mt-4 w-full rounded-full"
-                        onClick={() => navigate(primaryAction.route)}
-                      >
-                        {primaryAction.label}
-                        <ArrowRight className="h-4 w-4" />
-                      </Button>
-                    </div>
+	                  <div className="space-y-4">
+	                    <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
+	                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+	                        Recommended next action
+	                      </p>
+	                      {topBlockingActions.length > 0 ? (
+	                        <div className="mt-3 space-y-4">
+	                          <div>
+	                            <p className="text-base font-semibold text-foreground">Fix 3 checks failing on every invoice</p>
+	                            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+	                              These checks fail on the entire active portfolio. Resolving them eliminates the largest share
+	                              of critical outcomes.
+	                            </p>
+	                          </div>
+	                          <TopBlockerActionList
+	                            blockers={topBlockingActions}
+	                            totalCriticalOutcomes={snapshot.criticalBlockerOutcomes}
+	                            onBlockerClick={(ruleId) =>
+	                              navigate(
+	                                `/exceptions?dataset=${encodeURIComponent(activeDatasetType)}&ruleId=${encodeURIComponent(ruleId)}&sort=count_desc`
+	                              )
+	                            }
+	                          />
+	                        </div>
+	                      ) : (
+	                        <div className="mt-3 space-y-3">
+	                          <p className="text-base font-semibold text-foreground">No recurring critical blocker pattern detected</p>
+	                          <p className="text-sm leading-6 text-muted-foreground">
+	                            The current scope does not expose a dominant cluster of blocking checks, so validation detail is
+	                            the best next review surface.
+	                          </p>
+	                          <Button variant="outline" className="w-full rounded-full" onClick={() => navigate('/validation')}>
+	                            Open validation
+	                            <ArrowRight className="h-4 w-4" />
+	                          </Button>
+	                        </div>
+	                      )}
+	                    </div>
 
                     <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
@@ -1219,6 +1254,8 @@ export default function DashboardPage() {
                   icon={metric.icon}
                   variant={metric.variant}
                   helpContent={metric.helpContent}
+                  scopeAbsent={metric.scopeAbsent}
+                  scopeAbsentTooltip={metric.scopeAbsentTooltip}
                   className="rounded-[24px] border-border/70 bg-card/94 shadow-[0_14px_28px_-24px_rgba(15,23,42,0.22)]"
                 />
               ))}
@@ -1289,8 +1326,8 @@ export default function DashboardPage() {
         >
           {snapshot.hasLiveSignals ? (
             <div className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                {(Object.entries(snapshot.exceptionsBySeverity) as Array<[Severity, number]>).map(([severity, count]) => (
+	              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+	                {(Object.entries(snapshot.exceptionsBySeverity) as Array<[Severity, number]>).map(([severity, count]) => (
                   <div
                     key={severity}
                     className="rounded-2xl border border-border/70 bg-background/75 p-4 shadow-[0_10px_20px_-18px_rgba(15,23,42,0.18)]"
@@ -1302,11 +1339,12 @@ export default function DashboardPage() {
                       </div>
                       <SeverityBadge severity={severity} />
                     </div>
-                  </div>
-                ))}
-              </div>
+	                  </div>
+	                ))}
+	              </div>
+	              <SeverityContextNote />
 
-              <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+	              <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
                 <div className="rounded-2xl border border-border/70 bg-background/75 p-4 shadow-[0_10px_20px_-18px_rgba(15,23,42,0.18)]">
                   <div className="flex items-center justify-between gap-3">
                     <div>
@@ -1406,6 +1444,31 @@ function DashboardSection({
       </div>
       {children}
     </section>
+  );
+}
+
+function SeverityContextNote() {
+  return (
+    <Collapsible>
+      <div className="rounded-2xl border border-border/70 bg-background/65 px-4 py-3">
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="text-left text-[12px] text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Why is the severity distribution skewed? ↓
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="pt-3">
+          <p className="text-sm leading-6 text-muted-foreground">
+            Severity reflects PINT-AE mandatory field classification. Checks on buyer TRN, seller TRN, issue date
+            format, and line-item presence are classified Critical because FTA rejection is automatic on these fields.
+            The absence of Low exceptions means no advisory checks are currently failing — structural and identity
+            checks dominate this portfolio.
+          </p>
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
   );
 }
 

@@ -98,13 +98,16 @@ describe('EvidencePackPage historical runs', () => {
       ).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Historical Seller')).toBeInTheDocument();
     expect(
       screen.getByText(/persisted evidence snapshot and archived exception context/i)
     ).toBeInTheDocument();
     expect(screen.getByText(/Source: Persisted snapshot/i)).toBeInTheDocument();
     expect(screen.getByText(/Entity scope: Single entity/i)).toBeInTheDocument();
     expect(screen.getByText(/Legal entities: 1/i)).toBeInTheDocument();
+    expect(screen.getByText(/Executive decision/i)).toBeInTheDocument();
+    expect(screen.getByText(/Exceptions and mitigations/i)).toBeInTheDocument();
+    expect(screen.getByText(/Domain readiness/i)).toBeInTheDocument();
+    expect(screen.getByText(/Appendix detail/i)).toBeInTheDocument();
     expect(screen.queryByText(/Current mode: consolidated pack/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Run compliance checks first/i)).not.toBeInTheDocument();
   });

@@ -62,7 +62,20 @@ describe('ExceptionsPage heatmap drill-down', () => {
 
     expect(screen.getByText(/entity risk drill-down/i)).toBeInTheDocument();
     expect(screen.getByText(/tax logic integrity/i)).toBeInTheDocument();
-    expect(screen.getByText('VAT Calculation Mismatch')).toBeInTheDocument();
+    expect(screen.getAllByText('VAT Calculation Mismatch').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Buyer TRN Invalid Format')).not.toBeInTheDocument();
+  });
+
+  it('applies a ruleId deep-link filter from dashboard blocker actions', () => {
+    render(
+      <MemoryRouter initialEntries={['/exceptions?dataset=AR&ruleId=vat_calc_mismatch&sort=count_desc']}>
+        <Routes>
+          <Route path="/exceptions" element={<ExceptionsPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(screen.getAllByText('VAT Calculation Mismatch').length).toBeGreaterThan(0);
     expect(screen.queryByText('Buyer TRN Invalid Format')).not.toBeInTheDocument();
   });
 });

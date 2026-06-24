@@ -40,7 +40,7 @@ export default function ExceptionsPage() {
 
   const [search, setSearch] = useState('');
   const [severityFilter, setSeverityFilter] = useState<Severity | 'all'>('all');
-  const [checkFilter, setCheckFilter] = useState<string>('all');
+  const [checkFilter, setCheckFilter] = useState<string>(() => searchParams.get('ruleId')?.trim() || 'all');
   const [explainMode, setExplainMode] = useState<ValidationExplainMode>('heuristic_only');
   const [datasetFilter, setDatasetFilter] = useState<DatasetType>(() => {
     const value = searchParams.get('dataset');
@@ -75,6 +75,24 @@ export default function ExceptionsPage() {
     next.set('dataset', datasetFilter);
     setSearchParams(next, { replace: true });
   }, [datasetFilter, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    const requestedRuleId = searchParams.get('ruleId')?.trim() || 'all';
+    if (requestedRuleId === checkFilter) return;
+    setCheckFilter(requestedRuleId);
+  }, [checkFilter, searchParams]);
+
+  useEffect(() => {
+    const currentRuleId = searchParams.get('ruleId')?.trim() || 'all';
+    if (currentRuleId === checkFilter) return;
+    const next = new URLSearchParams(searchParams);
+    if (checkFilter === 'all') {
+      next.delete('ruleId');
+    } else {
+      next.set('ruleId', checkFilter);
+    }
+    setSearchParams(next, { replace: true });
+  }, [checkFilter, searchParams, setSearchParams]);
 
   const filteredExceptions = useMemo(() => {
     return exceptions.filter((exception) => {
@@ -111,6 +129,23 @@ export default function ExceptionsPage() {
     sellerContext,
     severityFilter,
   ]);
+  const visibleExceptions = useMemo(() => {
+    const sortMode = searchParams.get('sort');
+    if (sortMode !== 'count_desc') {
+      return filteredExceptions;
+    }
+
+    const countsByCheck = new Map<string, number>();
+    filteredExceptions.forEach((exception) => {
+      countsByCheck.set(exception.checkId, (countsByCheck.get(exception.checkId) || 0) + 1);
+    });
+
+    return [...filteredExceptions].sort((left, right) => {
+      const countDelta = (countsByCheck.get(right.checkId) || 0) - (countsByCheck.get(left.checkId) || 0);
+      if (countDelta !== 0) return countDelta;
+      return left.checkName.localeCompare(right.checkName);
+    });
+  }, [filteredExceptions, searchParams]);
 
   const clearDrillDownContext = () => {
     const next = new URLSearchParams(searchParams);
@@ -135,7 +170,7 @@ export default function ExceptionsPage() {
         'Expected',
         'Actual',
       ].join(','),
-      ...filteredExceptions.map((exception) =>
+      ...visibleExceptions.map((exception) =>
         [
           exception.datasetType || 'AR',
           `"${exception.checkName}"`,
@@ -165,8 +200,8 @@ export default function ExceptionsPage() {
   };
 
   const selectedException = useMemo(
-    () => filteredExceptions.find((item) => item.id === selectedExceptionId) || null,
-    [filteredExceptions, selectedExceptionId]
+    () => visibleExceptions.find((item) => item.id === selectedExceptionId) || null,
+    [selectedExceptionId, visibleExceptions]
   );
 
   const closeExplanationDialog = () => {
@@ -177,7 +212,7 @@ export default function ExceptionsPage() {
   };
 
   const openExplanationDialog = async (exceptionId: string) => {
-    const exception = filteredExceptions.find((item) => item.id === exceptionId);
+    const exception = visibleExceptions.find((item) => item.id === exceptionId);
     if (!exception) return;
 
     setSelectedExceptionId(exception.id);
@@ -361,14 +396,14 @@ export default function ExceptionsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredExceptions.length === 0 ? (
+                {visibleExceptions.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="p-8 text-center text-muted-foreground">
                       No exceptions match your filters
                     </td>
                   </tr>
                 ) : (
-                  filteredExceptions.map((exception) => (
+                  visibleExceptions.map((exception) => (
                     <tr key={exception.id} className="border-b hover:bg-muted/20 transition-colors">
                       <td className="p-4">
                         <SeverityBadge severity={exception.severity} />

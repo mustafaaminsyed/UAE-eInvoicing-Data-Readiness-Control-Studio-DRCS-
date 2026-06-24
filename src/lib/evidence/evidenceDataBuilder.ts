@@ -167,12 +167,16 @@ export interface ExceptionRow {
   exception_id: string;
   dr_id: string;
   rule_id: string;
+  check_name: string;
   rule_type: RuleType | '';
   execution_layer: ExecutionLayer | '';
   failure_class: FailureClass | '';
   record_reference: string;
   severity: string;
   message: string;
+  suggested_fix?: string;
+  root_cause_category?: string;
+  owner_team?: string;
   exception_status: string;
   case_id: string;
   case_status: string;
@@ -412,12 +416,16 @@ export function buildEvidencePackData(
       exception_id: e.id,
       dr_id: getValidationDRTargets(e.check_id).map((target) => target.dr_id).join('; '),
       rule_id: e.check_id,
+      check_name: e.check_name,
       rule_type: ruleType,
       execution_layer: executionLayer,
       failure_class: failureClass,
       record_reference: e.line_id ?? e.invoice_id ?? e.buyer_id ?? '',
       severity: e.severity,
       message: e.message,
+      suggested_fix: e.suggested_fix,
+      root_cause_category: e.root_cause_category,
+      owner_team: e.owner_team,
       exception_status: e.case_status,
       case_id: e.case_id ?? '',
       case_status: e.case_status,
