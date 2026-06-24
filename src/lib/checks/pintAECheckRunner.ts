@@ -4,6 +4,7 @@ import { isCodeInCodelist } from '@/lib/pintAE/specCatalog';
 import { getFailureClassForRule } from '@/lib/validation/pintAERuleMetadata';
 import { buildScenarioContext } from '@/modules/scenarioContext/buildScenarioContext';
 import { classifyInvoice } from '@/modules/scenarioLens/classifyInvoice';
+import { decodeTransactionTypeCode } from '@/modules/scenarioContext/transactionTypeCode';
 
 export interface PintAECheckTelemetry {
   rule_id: string;
@@ -568,6 +569,7 @@ export function runPintAECheckWithTelemetry(
     case 'UAE-UC1-CHK-002': // Issue Date Present
     case 'UAE-UC1-CHK-004': // Invoice Type Present
     case 'UAE-UC1-CHK-005': // Currency Present
+    case 'UAE-UC1-CHK-059': // Transaction Type Code Present
       data.headers.forEach(header => {
         executionCount++;
         const field = params.field;
@@ -1856,6 +1858,29 @@ export function runPintAECheckWithTelemetry(
           }
         });
       }
+      break;
+
+    case 'UAE-UC1-CHK-060':
+      data.headers.forEach((header) => {
+        executionCount++;
+        const field = resolveFieldAlias(params.field || 'transaction_type_code');
+        const value = getFieldValue(header, field);
+        if (isEmpty(value)) return;
+
+        const decoded = decodeTransactionTypeCode(value);
+        if (!decoded.valid || (decoded.format !== 'binary' && decoded.format !== 'mask')) {
+          exceptions.push(createException({
+            invoiceId: header.invoice_id,
+            invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn,
+            buyerId: header.buyer_id,
+            fieldName: field,
+            observedValue: String(value),
+            expectedValue: '8-character binary or mask-style transaction scenario token',
+            message: `Invoice ${header.invoice_number}: Transaction type code is invalid for UAE scenario routing. ${decoded.issues[0] || 'Value must be decodable.'}`,
+          }));
+        }
+      });
       break;
 
     // Default: Generic presence check for other checks

@@ -11,7 +11,7 @@ index_no,codelist_name,source_type,document_context,uc1_applicable,runtime_enfor
 10,ItemType,packaged_gc,both,no,no,-,-,-,-,Deferred - not in UC1 scope,UC3,Item type codelist requires additional item-identification context.
 11,MimeCode,packaged_gc,both,no,no,-,-,-,-,Deferred - missing source field,future,Attachment MIME metadata is not modeled in UC1 templates.
 12,SEPA,packaged_gc,invoice,conditional,no,-,-,-,-,Deferred - scenario dependent,UC3,SEPA applicability depends on payment scenarios outside current UC1 baseline.
-13,transactiontype,packaged_gc,both,yes,conditional,headers.transaction_type_code,BTUAE-02,tax#5|commercial#5,-,Deferred - policy derived,future,Observed only until policy-to-runtime transform contract is locked.
+13,transactiontype,packaged_gc,both,yes,conditional,headers.transaction_type_code,BTUAE-02,tax#5|commercial#5,UAE-UC1-CHK-060,Active,UC1,Runtime enforced through decoder-backed validation that accepts governed 8-character binary and mask tokens.
 14,UNCL1001-cn,packaged_gc,credit_note,conditional,conditional,headers.invoice_type,IBT-003,tax#3|commercial#3,UAE-UC1-CHK-046,Active,UC1,Scenario-gated runtime enforcement for credit note context.
 15,UNCL1001-inv,packaged_gc,invoice,yes,yes,headers.invoice_type,IBT-003,tax#3|commercial#3,UAE-UC1-CHK-045,Active,UC1,First-wave runtime codelist enforcement for invoice context.
 16,UNCL1153,packaged_gc,both,no,no,-,-,-,-,Deferred - missing source field,future,Invoiced object identifier scheme is not captured in UC1 source model.

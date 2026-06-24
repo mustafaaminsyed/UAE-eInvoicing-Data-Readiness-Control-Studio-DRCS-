@@ -156,6 +156,13 @@ const CONTROLS_DEFINITION: Omit<ControlEntry, 'covered_dr_ids'>[] = [
     description: 'Requires credit notes to provide a governed reason code, the original invoice reference when applicable, and a normalized preceding invoice issue date',
     covered_rule_ids: ['UAE-UC1-CHK-055', 'UAE-UC1-CHK-056', 'UAE-UC1-CHK-057', 'UAE-UC1-CHK-058'],
   },
+  {
+    control_id: 'CTRL-020',
+    control_name: 'Transaction Type Scenario Signaling',
+    control_type: 'preventive',
+    description: 'Requires the UAE transaction type code to be present and decodable before scenario-routing logic and overlay dependencies rely on it',
+    covered_rule_ids: ['UAE-UC1-CHK-059', 'UAE-UC1-CHK-060'],
+  },
 ];
 
 // ── Build registry with derived DR IDs ──────────────────────────────
