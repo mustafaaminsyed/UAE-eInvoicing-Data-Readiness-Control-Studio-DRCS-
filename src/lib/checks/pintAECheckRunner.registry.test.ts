@@ -637,6 +637,26 @@ describe('runPintAECheck executor registry parity', () => {
     expect(invalidDate[0].field_name).toBe('preceding_invoice_issue_date');
   });
 
+  it('validates CHK-058 credit note reason code membership only for populated credit notes', () => {
+    const presenceCheck = getCheck('UAE-UC1-CHK-055');
+    const codelistCheck = getCheck('UAE-UC1-CHK-058');
+    const validReasonCode = getCodelistCodes('CreditReason')[0];
+
+    expect(runPintAECheck(codelistCheck, buildDataContext({ invoice_type: '380', credit_note_reason_code: '' }))).toHaveLength(0);
+    expect(runPintAECheck(codelistCheck, buildDataContext({ invoice_type: '381', credit_note_reason_code: validReasonCode }))).toHaveLength(0);
+
+    const blankReason = buildDataContext({ invoice_type: '381', credit_note_reason_code: '' });
+    expect(runPintAECheck(presenceCheck, blankReason)).toHaveLength(1);
+    expect(runPintAECheck(codelistCheck, blankReason)).toHaveLength(0);
+
+    const invalidReason = runPintAECheck(
+      codelistCheck,
+      buildDataContext({ invoice_type: '381', credit_note_reason_code: 'INVALID' })
+    );
+    expect(invalidReason).toHaveLength(1);
+    expect(invalidReason[0].field_name).toBe('credit_note_reason_code');
+  });
+
   it('validates CHK-048 for UNECERec20 and skips empty values', () => {
     const check = getCheck('UAE-UC1-CHK-048');
     const validCode = getCodelistCodes('UNECERec20')[0];

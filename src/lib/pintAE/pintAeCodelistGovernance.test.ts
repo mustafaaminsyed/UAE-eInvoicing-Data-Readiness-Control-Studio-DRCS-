@@ -94,6 +94,6 @@ describe('PINT-AE codelist governance artifact', () => {
   });
 
   it('counts unique runtime codelist domains rather than duplicate check rows', () => {
-    expect(countRuntimeCodelistDomains(UAE_UC1_CHECK_PACK)).toBe(9);
+    expect(countRuntimeCodelistDomains(UAE_UC1_CHECK_PACK)).toBe(10);
   });
 });

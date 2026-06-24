@@ -11,11 +11,11 @@ export interface CodelistGovernanceRow {
 // Keep this lightweight and explicit so registry KPIs can be rendered without parsing CSV at runtime.
 export const PINT_AE_CODELIST_GOVERNANCE_ROWS: CodelistGovernanceRow[] = [
   { codelistName: 'Aligned-TaxCategoryCodes', runtimeEnforceableNow: 'yes' },
-  { codelistName: 'Aligned-TaxExemptionCodes', runtimeEnforceableNow: 'no' },
-  { codelistName: 'CreditReason', runtimeEnforceableNow: 'no' },
+  { codelistName: 'Aligned-TaxExemptionCodes', runtimeEnforceableNow: 'conditional' },
+  { codelistName: 'CreditReason', runtimeEnforceableNow: 'conditional' },
   { codelistName: 'eas', runtimeEnforceableNow: 'conditional' },
   { codelistName: 'FreqBilling', runtimeEnforceableNow: 'no' },
-  { codelistName: 'GoodsType', runtimeEnforceableNow: 'no' },
+  { codelistName: 'GoodsType', runtimeEnforceableNow: 'conditional' },
   { codelistName: 'ICD', runtimeEnforceableNow: 'no' },
   { codelistName: 'ISO3166', runtimeEnforceableNow: 'yes' },
   { codelistName: 'ISO4217', runtimeEnforceableNow: 'yes' },
