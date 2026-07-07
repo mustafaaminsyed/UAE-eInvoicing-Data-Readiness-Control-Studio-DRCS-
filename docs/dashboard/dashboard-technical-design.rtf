@@ -1,0 +1,737 @@
+{\rtf1\ansi\deff0
+{\fonttbl{\f0 Segoe UI;}{\f1 Arial;}{\f2 Consolas;}}
+\paperw11907\paperh16839\margl1440\margr1440\margt1080\margb1080
+\par\b\f1\fs38 Dashboard Technical Design\b0\fs22\par
+\par
+\par\b\f1\fs30 Purpose\b0\fs22\par
+\par
+This document explains how the DRCS executive dashboard is built, what each visible KPI means, and how developers should implement or extend dashboard metrics safely.\par
+\par
+This dashboard is not a generic BI surface. It is a workflow-oriented readiness cockpit for:\par
+\par
+\tab\bullet\tab UAE eInvoicing readiness\par
+\tab\bullet\tab PINT-AE conformance\par
+\tab\bullet\tab source data quality\par
+\tab\bullet\tab exception prioritisation\par
+\tab\bullet\tab regulator-facing implementation explainability\par
+\par
+Primary implementation sources:\par
+\par
+\tab\bullet\tab `src/pages/DashboardPage.tsx`\par
+\tab\bullet\tab `src/hooks/useDashboardMetrics.ts`\par
+\tab\bullet\tab `src/context/ComplianceContext.tsx`\par
+\tab\bullet\tab `src/constants/dashboardLabels.ts`\par
+\par
+\par\b\f1\fs30 Design Principles\b0\fs22\par
+\par
+\tab\bullet\tab Explainability over visual noise\par
+\tab\bullet\tab Distinguish document-level readiness from rule-level performance\par
+\tab\bullet\tab Prefer deterministic calculations over inferred percentages\par
+\tab\bullet\tab Make scope absence explicit when a KPI is not applicable\par
+\tab\bullet\tab Keep regulator-facing and operational language separate where needed\par
+\par
+\par\b\f1\fs30 Page Architecture\b0\fs22\par
+\par
+The dashboard is currently assembled directly inside `src/pages/DashboardPage.tsx`.\par
+\par
+High-level structure:\par
+\par
+1. Context strip\par
+2. Executive compliance KPIs\par
+3. Data quality KPIs\par
+4. UAE-specific compliance coverage\par
+5. Exception breakdown and remediation focus\par
+\par
+Runtime data flow:\par
+\par
+1. `useCompliance()` supplies:\par
+   - `headers`\par
+   - `buyers`\par
+   - `lines`\par
+   - `checkResults`\par
+   - `exceptions`\par
+   - `getDashboardStats()`\par
+2. `buildDashboardSnapshot()` normalises the active scope into a single `DashboardSnapshot`\par
+3. `computeDashboardMetrics()` provides document-vs-rule metric separation\par
+4. UI cards render from the snapshot\par
+\par
+\par\b\f1\fs30 Source Layers\b0\fs22\par
+\par
+The dashboard combines three source layers:\par
+\par
+\par\b\f1\fs24 1. Raw portfolio data\b0\fs22\par
+\par
+Used for:\par
+\par
+\tab\bullet\tab invoice counts\par
+\tab\bullet\tab completeness metrics\par
+\tab\bullet\tab null-rate quality\par
+\tab\bullet\tab duplicate ratio\par
+\tab\bullet\tab currency mismatch logic\par
+\tab\bullet\tab credit-note scenario coverage\par
+\par
+Primary sources:\par
+\par
+\tab\bullet\tab `headers`\par
+\tab\bullet\tab `buyers`\par
+\tab\bullet\tab `lines`\par
+\par
+\par\b\f1\fs24 2. Validation run outputs\b0\fs22\par
+\par
+Used for:\par
+\par
+\tab\bullet\tab rule outcomes\par
+\tab\bullet\tab rule pass rate\par
+\tab\bullet\tab submission-ready invoice count\par
+\tab\bullet\tab critical blocker outcomes\par
+\tab\bullet\tab blocker document counts\par
+\par
+Primary sources:\par
+\par
+\tab\bullet\tab `checkResults`\par
+\tab\bullet\tab `exceptions`\par
+\par
+\par\b\f1\fs24 3. Context-level summary stats\b0\fs22\par
+\par
+Used as fallback or compatibility support.\par
+\par
+Primary source:\par
+\par
+\tab\bullet\tab `getDashboardStats()` from `ComplianceContext`\par
+\par
+Important limitation:\par
+\par
+\tab\bullet\tab `getDashboardStats().passRate` is legacy-like and document-oriented in `ComplianceContext`\par
+\tab\bullet\tab `computeDashboardMetrics().rulePassRate` is the current rule-outcome-level metric\par
+\tab\bullet\tab developers must not collapse these two layers back into one percentage\par
+\par
+\par\b\f1\fs30 Dashboard Snapshot Contract\b0\fs22\par
+\par
+The page works from a single in-memory object:\par
+\par
+\tab\bullet\tab `DashboardSnapshot`\par
+\par
+Key categories inside the snapshot:\par
+\par
+\tab\bullet\tab scope context\par
+\tab\bullet\tab readiness scores\par
+\tab\bullet\tab executive KPI values\par
+\tab\bullet\tab data quality KPI values\par
+\tab\bullet\tab UAE coverage values\par
+\tab\bullet\tab exception aggregation\par
+\tab\bullet\tab remediation prioritisation\par
+\par
+This snapshot should remain the source of truth for rendering.\par
+\par
+\par\b\f1\fs30 Metric Logic\b0\fs22\par
+\par
+\par\b\f1\fs30 1. Context Strip\b0\fs22\par
+\par
+These values appear in the top strip above the KPI cards.\par
+\par
+\par\b\f1\fs24 Document flow\b0\fs22\par
+\par
+Meaning:\par
+\par
+\tab\bullet\tab current dataset direction in scope\par
+\par
+Value:\par
+\par
+\tab\bullet\tab `AR / Outbound` when `activeDatasetType === 'AR'`\par
+\tab\bullet\tab `AP / Inbound` otherwise\par
+\par
+Source:\par
+\par
+\tab\bullet\tab UI state, not a computed KPI\par
+\par
+\par\b\f1\fs24 Live portfolio snapshot\b0\fs22\par
+\par
+Meaning:\par
+\par
+\tab\bullet\tab indicates checks have been run on the currently loaded portfolio\par
+\par
+Logic:\par
+\par
+\tab\bullet\tab `Live portfolio snapshot` if `isChecksRun === true`\par
+\tab\bullet\tab `Live data loaded` otherwise\par
+\par
+Source field:\par
+\par
+\tab\bullet\tab `snapshot.modeLabel`\par
+\par
+\par\b\f1\fs24 Executive attention required\b0\fs22\par
+\par
+Meaning:\par
+\par
+\tab\bullet\tab headline status badge for the current scope\par
+\par
+Logic:\par
+\par
+1. `Validation running` when `isRunning === true`\par
+2. `Executive attention required` when `snapshot.criticalIssues > 0`\par
+3. `Executive ready` otherwise\par
+\par
+Interpretation:\par
+\par
+\tab\bullet\tab this is a status badge, not a numeric KPI\par
+\par
+\par\b\f1\fs24 Invoices in scope\b0\fs22\par
+\par
+Meaning:\par
+\par
+\tab\bullet\tab number of invoices included in the active dashboard scope\par
+\par
+Formula:\par
+\par
+\tab\bullet\tab `stats.totalInvoices || headerRecords.length`\par
+\par
+Source:\par
+\par
+\tab\bullet\tab `buildDashboardSnapshot()`\par
+\par
+Fallback:\par
+\par
+\tab\bullet\tab falls back to header count if summary stats are absent\par
+\par
+\par\b\f1\fs24 Rule outcomes\b0\fs22\par
+\par
+Meaning:\par
+\par
+\tab\bullet\tab total number of individual rule evaluations executed\par
+\par
+Formula:\par
+\par
+\tab\bullet\tab `sum(checkResult.passed + checkResult.failed)`\par
+\par
+Source:\par
+\par
+\tab\bullet\tab `computeDashboardMetrics().totalRuleOutcomes`\par
+\par
+Important:\par
+\par
+\tab\bullet\tab one invoice generates many rule outcomes\par
+\tab\bullet\tab this is not a document count\par
+\par
+\par\b\f1\fs24 Critical blockers\b0\fs22\par
+\par
+Meaning:\par
+\par
+\tab\bullet\tab count of critical exception outcomes currently represented in the active scope\par
+\par
+Current logic in context strip:\par
+\par
+\tab\bullet\tab `snapshot.criticalIssues`\par
+\par
+Current formula:\par
+\par
+\tab\bullet\tab `stats.exceptionsBySeverity.Critical || scopedCriticalExceptionCount`\par
+\par
+Interpretation warning:\par
+\par
+\tab\bullet\tab this is currently an outcome-oriented critical count, not a distinct document count\par
+\tab\bullet\tab use `criticalBlockerDocumentCount` and `avgCriticalBlockersPerDocument` when explaining operational burden\par
+\par
+\par\b\f1\fs30 2. Executive Compliance KPIs\b0\fs22\par
+\par
+\par\b\f1\fs24 Go-Live Readiness\b0\fs22\par
+\par
+Meaning:\par
+\par
+\tab\bullet\tab blended executive confidence score for controlled production readiness\par
+\par
+Formula:\par
+\par
+\tab\bullet\tab `clampScore(weightedAverage(goLiveInputs))`\par
+\par
+Dimensions and weights:\par
+\par
+\tab\bullet\tab `40%` compliance score\par
+\tab\bullet\tab `15%` null-rate quality\par
+\tab\bullet\tab `10%` duplicate control\par
+\tab\bullet\tab `10%` currency alignment\par
+\tab\bullet\tab `15%` blocker containment\par
+\tab\bullet\tab `10%` credit-note readiness\par
+\par
+Component formulas:\par
+\par
+\tab\bullet\tab compliance score = `complianceReadiness`\par
+\tab\bullet\tab null-rate quality = `max(0, 100 - nullFieldRate * 4)`\par
+\tab\bullet\tab duplicate control = `max(0, 100 - duplicateInvoiceRatio * 18)`\par
+\tab\bullet\tab currency alignment = `max(0, 100 - ((currencyMismatchCount / totalInvoices) * 180))`\par
+\tab\bullet\tab blocker containment = `max(0, 100 - min(criticalIssues, 10) * 12)`\par
+\tab\bullet\tab credit-note readiness = `creditNote.coverage` when credit notes exist, else `100`\par
+\par
+Band logic:\par
+\par
+\tab\bullet\tab `>= 90` Ready\par
+\tab\bullet\tab `75 to 89` Watch\par
+\tab\bullet\tab `< 75` Blocked\par
+\par
+Important:\par
+\par
+\tab\bullet\tab this is a product score, not a regulatory formula\par
+\tab\bullet\tab treat it as a blended decision-support KPI\par
+\par
+\par\b\f1\fs24 Compliance Readiness\b0\fs22\par
+\par
+Meaning:\par
+\par
+\tab\bullet\tab weighted structural and validation readiness baseline\par
+\par
+Formula:\par
+\par
+\tab\bullet\tab `clampScore(weightedAverage(readinessInputs))`\par
+\par
+Dimensions and weights:\par
+\par
+\tab\bullet\tab `35%` mandatory data\par
+\tab\bullet\tab `15%` conditional data\par
+\tab\bullet\tab `30%` rule conformance\par
+\tab\bullet\tab `20%` blocker pressure\par
+\par
+Component formulas:\par
+\par
+\tab\bullet\tab mandatory data = average of header, buyer, and line completeness\par
+\tab\bullet\tab conditional data = conditional completeness percentage\par
+\tab\bullet\tab rule conformance = rule pass rate\par
+\tab\bullet\tab blocker pressure = `max(0, 100 - min(criticalIssues, 10) * 10)`\par
+\par
+Important:\par
+\par
+\tab\bullet\tab this score excludes null-rate, duplication, and FX alignment penalties that are used in Go-Live Readiness\par
+\par
+\par\b\f1\fs24 Submission-ready invoices\b0\fs22\par
+\par
+Meaning:\par
+\par
+\tab\bullet\tab count of invoices that pass every executed rule check in the active scope\par
+\par
+Display:\par
+\par
+\tab\bullet\tab `submissionReadyCount / totalInvoices`\par
+\par
+Formula:\par
+\par
+\tab\bullet\tab `submissionReadyCount = max(totalInvoicesInScope - failedInvoiceIds.size, 0)`\par
+\tab\bullet\tab `submissionReadyRate = submissionReadyCount / totalInvoicesInScope`\par
+\par
+Source:\par
+\par
+\tab\bullet\tab `computeDashboardMetrics()`\par
+\par
+How failed invoices are identified:\par
+\par
+1. use invoice-linked failed exceptions from `checkResults[].exceptions` when available\par
+2. fall back to invoice-linked `exceptions`\par
+\par
+Important:\par
+\par
+\tab\bullet\tab this is the primary document-level go/no-go signal\par
+\tab\bullet\tab do not derive this from rule pass rate\par
+\par
+\par\b\f1\fs24 Rule pass rate\b0\fs22\par
+\par
+Meaning:\par
+\par
+\tab\bullet\tab proportion of executed rule outcomes that passed\par
+\par
+Display:\par
+\par
+\tab\bullet\tab percentage only\par
+\par
+Formula:\par
+\par
+\tab\bullet\tab `passedRuleOutcomes / totalRuleOutcomes`\par
+\par
+Source:\par
+\par
+\tab\bullet\tab `computeDashboardMetrics()`\par
+\par
+Important:\par
+\par
+\tab\bullet\tab this is a rule-engine performance metric\par
+\tab\bullet\tab one failing rule on one invoice can still leave rule pass rate high while making that invoice not submission-ready\par
+\par
+\par\b\f1\fs24 Critical Blocking Issues\b0\fs22\par
+\par
+Meaning:\par
+\par
+\tab\bullet\tab currently rendered as count of critical issues in active scope\par
+\par
+Source:\par
+\par
+\tab\bullet\tab `snapshot.criticalIssues`\par
+\par
+Current formula:\par
+\par
+\tab\bullet\tab `stats.exceptionsBySeverity.Critical || scopedCriticalExceptionCount`\par
+\par
+Important distinction:\par
+\par
+\tab\bullet\tab this card is not yet using `criticalBlockerDocumentCount`\par
+\tab\bullet\tab when evolving the dashboard, developers should decide whether the card should continue to represent:\par
+  - critical outcomes\par
+  - critical exception cases\par
+  - affected documents\par
+\par
+\par\b\f1\fs30 3. Data Quality KPIs\b0\fs22\par
+\par
+\par\b\f1\fs24 Mandatory Field Completeness\b0\fs22\par
+\par
+Meaning:\par
+\par
+\tab\bullet\tab average completeness across core required fields\par
+\par
+Formula:\par
+\par
+\tab\bullet\tab average of:\par
+  - header completeness\par
+  - buyer completeness\par
+  - line completeness\par
+\par
+Completeness formula per group:\par
+\par
+\tab\bullet\tab present mandatory values / total mandatory field slots\par
+\par
+Source field groups:\par
+\par
+\tab\bullet\tab header: `MANDATORY_HEADER_FIELDS`\par
+\tab\bullet\tab buyer: `MANDATORY_BUYER_FIELDS`\par
+\tab\bullet\tab line: `MANDATORY_LINE_FIELDS`\par
+\par
+\par\b\f1\fs24 Conditional Field Completeness\b0\fs22\par
+\par
+Meaning:\par
+\par
+\tab\bullet\tab completeness across scenario-triggered requirements only\par
+\par
+Formula:\par
+\par
+\tab\bullet\tab satisfied conditional requirements / triggered conditional requirements\par
+\par
+Triggered conditions currently include:\par
+\par
+\tab\bullet\tab positive `amount_due` -> `payment_due_date`\par
+\tab\bullet\tab non-AED invoice currency -> `fx_rate` and `tax_currency = AED`\par
+\tab\bullet\tab invoice type `381` -> credit note fields\par
+\tab\bullet\tab buyer name present -> `buyer_trn`\par
+\par
+Scope-absent logic:\par
+\par
+\tab\bullet\tab if `qualifyingDocumentCount === 0`, the card renders `Not in scope`\par
+\par
+Important:\par
+\par
+\tab\bullet\tab zero qualifying documents is not a failure\par
+\par
+\par\b\f1\fs24 Null Field Rate\b0\fs22\par
+\par
+Meaning:\par
+\par
+\tab\bullet\tab percentage of evaluated governed fields that are empty\par
+\par
+Formula:\par
+\par
+\tab\bullet\tab empty governed field slots / total governed field slots evaluated\par
+\par
+Important:\par
+\par
+\tab\bullet\tab lower is better\par
+\par
+\par\b\f1\fs24 Duplicate Invoice Ratio\b0\fs22\par
+\par
+Meaning:\par
+\par
+\tab\bullet\tab duplicate incidence in the invoice header population\par
+\par
+Formula:\par
+\par
+\tab\bullet\tab duplicate invoice records / total header records\par
+\par
+Current duplicate logic:\par
+\par
+\tab\bullet\tab key = `invoice_number` or fallback `invoice_id`\par
+\par
+\par\b\f1\fs24 Invalid Codelist\b0\fs22\par
+\par
+Meaning:\par
+\par
+\tab\bullet\tab count of open exceptions that appear to be codelist-related\par
+\par
+Current logic:\par
+\par
+\tab\bullet\tab text classification over exception name, message, and check id\par
+\par
+Current search terms:\par
+\par
+\tab\bullet\tab `codelist`\par
+\tab\bullet\tab `code`\par
+\tab\bullet\tab `iso3166`\par
+\tab\bullet\tab `uncl`\par
+\tab\bullet\tab `unece`\par
+\tab\bullet\tab `currency`\par
+\tab\bullet\tab `payment means`\par
+\par
+Important:\par
+\par
+\tab\bullet\tab this is heuristic, not registry-driven\par
+\par
+\par\b\f1\fs24 Currency Mismatches\b0\fs22\par
+\par
+Meaning:\par
+\par
+\tab\bullet\tab header-level count of currency / tax-currency / FX inconsistencies\par
+\par
+Logic:\par
+\par
+\tab\bullet\tab for AED invoices:\par
+  - mismatch if `tax_currency` is populated but not `AED`\par
+\tab\bullet\tab for non-AED invoices:\par
+  - mismatch if `tax_currency !== AED`\par
+  - or `fx_rate` missing / non-numeric / non-positive\par
+\par
+\par\b\f1\fs30 4. UAE-Specific Compliance Coverage\b0\fs22\par
+\par
+\par\b\f1\fs24 IBT Mandatory Fields\b0\fs22\par
+\par
+Meaning:\par
+\par
+\tab\bullet\tab coverage of mandatory invoice business-term fields\par
+\par
+Current implementation:\par
+\par
+\tab\bullet\tab mirrors `mandatoryCompleteness`\par
+\par
+Supporting points shown:\par
+\par
+\tab\bullet\tab header completeness\par
+\tab\bullet\tab buyer completeness\par
+\tab\bullet\tab line completeness\par
+\par
+Important:\par
+\par
+\tab\bullet\tab this is a coverage proxy, not a full formal semantic mapping audit\par
+\par
+\par\b\f1\fs24 PINT-AE Rules\b0\fs22\par
+\par
+Meaning:\par
+\par
+\tab\bullet\tab rule execution and rule pass performance for the selected scope\par
+\par
+Current value:\par
+\par
+\tab\bullet\tab same percentage as rule pass rate\par
+\par
+Supporting points:\par
+\par
+\tab\bullet\tab total rule outcomes executed\par
+\tab\bullet\tab current pass rate\par
+\tab\bullet\tab critical issues still blocking\par
+\par
+\par\b\f1\fs24 Credit-Note Scenarios\b0\fs22\par
+\par
+Meaning:\par
+\par
+\tab\bullet\tab readiness of in-scope `381` credit note scenarios\par
+\par
+Coverage logic:\par
+\par
+\tab\bullet\tab if no credit notes are present:\par
+  - `count = 0`\par
+  - coverage defaults to `100`\par
+\tab\bullet\tab if credit notes are present:\par
+  - each credit note must satisfy:\par
+    - reason code\par
+    - reason text\par
+    - preceding reference unless reason code is `VD`\par
+    - preceding issue date unless reason code is `VD`\par
+\par
+Important:\par
+\par
+\tab\bullet\tab when no credit notes are present, this behaves as not-applicable rather than failed\par
+\par
+\par\b\f1\fs30 5. Exception Breakdown and Remediation\b0\fs22\par
+\par
+\par\b\f1\fs24 Severity cards\b0\fs22\par
+\par
+Meaning:\par
+\par
+\tab\bullet\tab counts of open exceptions by severity\par
+\par
+Formula:\par
+\par
+\tab\bullet\tab count scoped exceptions where severity equals:\par
+  - `Critical`\par
+  - `High`\par
+  - `Medium`\par
+  - `Low`\par
+\par
+\par\b\f1\fs24 Top blocking issues\b0\fs22\par
+\par
+Meaning:\par
+\par
+\tab\bullet\tab top recurring exception clusters grouped by check id\par
+\par
+Grouping logic:\par
+\par
+\tab\bullet\tab group by `exception.checkId`\par
+\tab\bullet\tab count occurrences\par
+\tab\bullet\tab keep highest observed severity for the cluster\par
+\tab\bullet\tab sort by count descending\par
+\tab\bullet\tab show top 5 on dashboard\par
+\par
+\par\b\f1\fs24 Recommended next action panel\b0\fs22\par
+\par
+Current logic:\par
+\par
+\tab\bullet\tab derive top 3 blocking checks from `snapshot.blockingIssues`\par
+\tab\bullet\tab pass them into `TopBlockerActionList`\par
+\tab\bullet\tab use `criticalBlockerOutcomes` as total critical denominator\par
+\par
+Navigation:\par
+\par
+\tab\bullet\tab clicking a blocker navigates to:\par
+  - `/exceptions?dataset=<scope>&ruleId=<checkId>&sort=count_desc`\par
+\par
+\par\b\f1\fs24 Severity context note\b0\fs22\par
+\par
+Purpose:\par
+\par
+\tab\bullet\tab explain why critical/high issues can dominate the portfolio\par
+\par
+Implementation:\par
+\par
+\tab\bullet\tab collapsed note using the existing `Collapsible` primitive\par
+\par
+\par\b\f1\fs30 Fallback and Preview Behaviour\b0\fs22\par
+\par
+When no live signals exist:\par
+\par
+\tab\bullet\tab the dashboard renders empty states instead of misleading zeroes\par
+\par
+When preview snapshots are used:\par
+\par
+\tab\bullet\tab `buildFallbackSnapshot()` injects non-live representative values\par
+\par
+Developers must ensure:\par
+\par
+\tab\bullet\tab live-truthful states do not silently fall back to preview values\par
+\tab\bullet\tab scope absence uses neutral presentation\par
+\tab\bullet\tab no KPI should show a failure state purely because a scenario is absent\par
+\par
+\par\b\f1\fs30 Important Distinctions Developers Must Preserve\b0\fs22\par
+\par
+\par\b\f1\fs24 Document count vs rule-outcome count\b0\fs22\par
+\par
+Never collapse these:\par
+\par
+\tab\bullet\tab invoices in scope\par
+\tab\bullet\tab submission-ready invoices\par
+\tab\bullet\tab critical blocker document count\par
+\tab\bullet\tab total rule outcomes\par
+\tab\bullet\tab critical blocker outcomes\par
+\par
+\par\b\f1\fs24 Rule pass rate vs submission-ready rate\b0\fs22\par
+\par
+These must remain distinct:\par
+\par
+\tab\bullet\tab rule pass rate can be high even when many documents are not submission-ready\par
+\tab\bullet\tab submission-ready rate is stricter because every executed rule must pass on a document\par
+\par
+\par\b\f1\fs24 Scope absence vs poor performance\b0\fs22\par
+\par
+Examples:\par
+\par
+\tab\bullet\tab no credit notes in scope\par
+\tab\bullet\tab no FX invoices in scope\par
+\tab\bullet\tab no conditional-field-triggering documents in scope\par
+\par
+These should not render as red failure states.\par
+\par
+\par\b\f1\fs30 Implementation Guidance\b0\fs22\par
+\par
+When adding a new dashboard metric:\par
+\par
+1. add or extend logic in `buildDashboardSnapshot()` or `computeDashboardMetrics()`\par
+2. document:\par
+   - meaning\par
+   - exact formula\par
+   - numerator\par
+   - denominator\par
+   - source fields\par
+   - fallback logic\par
+   - interpretation caveat\par
+3. decide whether it is:\par
+   - live only\par
+   - preview-safe\par
+   - scope-sensitive\par
+4. add unit tests for:\par
+   - normal case\par
+   - empty case\par
+   - divergence case if relevant\par
+   - scope-absent case if relevant\par
+\par
+\par\b\f1\fs30 Testing Guidance\b0\fs22\par
+\par
+Minimum test coverage expectations for dashboard metrics:\par
+\par
+\tab\bullet\tab document-vs-rule divergence\par
+\tab\bullet\tab critical outcome vs critical document count\par
+\tab\bullet\tab conditional completeness scope absence\par
+\tab\bullet\tab URL deep-link filtering from blocker actions\par
+\tab\bullet\tab no-preview fallback contamination when live signals exist\par
+\par
+Recommended future tests:\par
+\par
+\tab\bullet\tab explicit credit-note coverage permutations\par
+\tab\bullet\tab AED vs foreign-currency mismatch scenarios\par
+\tab\bullet\tab duplicate ratio edge cases\par
+\tab\bullet\tab no invoice-linked exception fallback behavior\par
+\par
+\par\b\f1\fs30 Known Gaps and Risks\b0\fs22\par
+\par
+\par\b\f1\fs24 1. `ComplianceContext.getDashboardStats().passRate` is legacy-style\b0\fs22\par
+\par
+Current logic:\par
+\par
+\tab\bullet\tab `(totalInvoices - invoicesWithExceptions) / totalInvoices`\par
+\par
+This is not the same thing as rule pass rate.\par
+\par
+\par\b\f1\fs24 2. `Invalid Codelist` is heuristic\b0\fs22\par
+\par
+Current logic is text-based, not registry-backed.\par
+\par
+\par\b\f1\fs24 3. `Critical Blocking Issues` label may still be interpreted as documents\b0\fs22\par
+\par
+The codebase now computes:\par
+\par
+\tab\bullet\tab `criticalBlockerOutcomes`\par
+\tab\bullet\tab `criticalBlockerDocumentCount`\par
+\tab\bullet\tab `avgCriticalBlockersPerDocument`\par
+\par
+But the executive card itself still surfaces a critical issue count without fully disambiguating the semantic type.\par
+\par
+\par\b\f1\fs24 4. Some readiness scores are product-level composites\b0\fs22\par
+\par
+They are useful decision-support metrics, but they are not legal formulas defined by PINT-AE or the FTA.\par
+\par
+\par\b\f1\fs30 Suggested Future Refactor\b0\fs22\par
+\par
+To make the dashboard easier to maintain, consider extracting:\par
+\par
+\tab\bullet\tab `src/components/dashboard/ExecutiveKPIs.tsx`\par
+\tab\bullet\tab `src/components/dashboard/DataQualityKPIs.tsx`\par
+\tab\bullet\tab `src/components/dashboard/UAECoverageKPIs.tsx`\par
+\tab\bullet\tab `src/components/dashboard/ExceptionsPanel.tsx`\par
+\tab\bullet\tab `src/lib/dashboard/buildDashboardSnapshot.ts`\par
+\tab\bullet\tab `src/lib/dashboard/dashboardMetricDefinitions.ts`\par
+\par
+This would separate:\par
+\par
+\tab\bullet\tab metric definition\par
+\tab\bullet\tab snapshot assembly\par
+\tab\bullet\tab UI composition\par
+\par
+without changing current behavior.\par
+}

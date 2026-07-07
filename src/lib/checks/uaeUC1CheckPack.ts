@@ -2,7 +2,7 @@ import { PintAECheck } from '@/types/pintAE';
 import { normalizePintAECheck, RawPintAECheck } from '@/lib/validation/pintAERuleMetadata';
 
 // UAE UC1 Standard Tax Invoice Check Pack
-// 57 checks aligned with PINT-AE / UAE MoF Data Dictionary
+// 60 checks aligned with PINT-AE / UAE MoF Data Dictionary
 
 export const RAW_UAE_UC1_CHECK_PACK: RawPintAECheck[] = [
   // ============ Header Presence & Format Checks (001-011) ============
@@ -1178,6 +1178,42 @@ export const RAW_UAE_UC1_CHECK_PACK: RawPintAECheck[] = [
       codelist: 'CreditReason',
       document_context: 'credit_note',
     },
+  },
+  {
+    check_id: 'UAE-UC1-CHK-059',
+    check_name: 'Transaction Type Code Present',
+    description: 'Validates transaction type code (BTUAE-02) is present for UAE invoice scenario routing',
+    scope: 'Header',
+    rule_type: 'Presence',
+    severity: 'Critical',
+    use_case: 'UC1 Standard Tax Invoice',
+    pint_reference_terms: ['BTUAE-02'],
+    mof_rule_reference: 'BTUAE-02',
+    pass_condition: 'Transaction type code field is not empty',
+    fail_condition: 'Transaction type code is missing',
+    owner_team_default: 'Client Finance',
+    suggested_fix: 'Populate transaction_type_code using the governed UAE 8-character transaction scenario format',
+    evidence_required: 'ERP scenario-routing configuration and transaction-type master data',
+    is_enabled: true,
+    parameters: { field: 'transaction_type_code' },
+  },
+  {
+    check_id: 'UAE-UC1-CHK-060',
+    check_name: 'Transaction Type Code Valid Format',
+    description: 'Validates transaction type code (BTUAE-02) is a decodable 8-character UAE transaction scenario token',
+    scope: 'Header',
+    rule_type: 'Format',
+    severity: 'High',
+    use_case: 'UC1 Standard Tax Invoice',
+    pint_reference_terms: ['BTUAE-02'],
+    mof_rule_reference: 'BTUAE-02-FORMAT',
+    pass_condition: 'Transaction type code is a valid binary or mask-style 8-character UAE scenario token',
+    fail_condition: 'Transaction type code is not a valid binary or mask-style UAE scenario token',
+    owner_team_default: 'Client IT',
+    suggested_fix: 'Normalize transaction_type_code to an 8-character binary or mask token before validation',
+    evidence_required: 'ERP transaction-type transformation rules and UAE scenario-routing documentation',
+    is_enabled: true,
+    parameters: { field: 'transaction_type_code', validator: 'transaction_type_code_decoder' },
   },
 ];
 

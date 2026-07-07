@@ -140,6 +140,8 @@ export const VALIDATION_TO_DR_MAP: ValidationDRMapEntry[] = [
   { validation_id: 'UAE-UC1-CHK-056', dr_targets: [exact('IBT-025', 'preceding_invoice_reference'), exact('BTAE-03', 'credit_note_reason_code'), exact('IBT-003', 'invoice_type')] },
   { validation_id: 'UAE-UC1-CHK-057', dr_targets: [exact('IBT-026', 'preceding_invoice_issue_date')] },
   { validation_id: 'UAE-UC1-CHK-058', dr_targets: [exact('BTAE-03', 'credit_note_reason_code'), exact('IBT-003', 'invoice_type')] },
+  { validation_id: 'UAE-UC1-CHK-059', dr_targets: [exact('BTUAE-02', 'transaction_type_code')] },
+  { validation_id: 'UAE-UC1-CHK-060', dr_targets: [exact('BTUAE-02', 'transaction_type_code')] },
   {
     validation_id: 'UAE-UC1-CHK-053',
     dr_targets: [

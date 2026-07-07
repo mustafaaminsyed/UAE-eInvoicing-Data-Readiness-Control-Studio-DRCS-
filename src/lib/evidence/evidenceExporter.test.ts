@@ -130,6 +130,13 @@ describe('generateEvidencePackZip', () => {
           (payload instanceof Uint8Array || payload instanceof ArrayBuffer)
       )
     ).toBe(true);
+    expect(
+      fileSpy.mock.calls.some(
+        ([filename, payload]) =>
+          filename === '00_executive_decision.xlsx' &&
+          (payload instanceof Uint8Array || payload instanceof ArrayBuffer)
+      )
+    ).toBe(true);
   });
 
   it('includes source-mode and entity-scope metadata in the manifest workbook', async () => {

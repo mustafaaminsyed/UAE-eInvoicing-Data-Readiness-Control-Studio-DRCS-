@@ -207,6 +207,33 @@ describe('runPintAECheck executor registry parity', () => {
     expect(runPintAECheck(check, selfBilling)).toHaveLength(0);
   });
 
+  it('validates CHK-059 transaction type code presence', () => {
+    const check = getCheck('UAE-UC1-CHK-059');
+
+    expect(runPintAECheck(check, buildDataContext({ transaction_type_code: '00010101' }))).toHaveLength(0);
+
+    const missingCode = runPintAECheck(check, buildDataContext({ transaction_type_code: '' }));
+    expect(missingCode).toHaveLength(1);
+    expect(missingCode[0].field_name).toBe('transaction_type_code');
+  });
+
+  it('validates CHK-060 transaction type code decoder-backed format rules', () => {
+    const check = getCheck('UAE-UC1-CHK-060');
+
+    expect(runPintAECheck(check, buildDataContext({ transaction_type_code: '00010101' }))).toHaveLength(0);
+    expect(runPintAECheck(check, buildDataContext({ transaction_type_code: 'XXXXX1XX' }))).toHaveLength(0);
+    expect(runPintAECheck(check, buildDataContext({ transaction_type_code: '' }))).toHaveLength(0);
+
+    const invalidText = runPintAECheck(check, buildDataContext({ transaction_type_code: 'EXPORT' }));
+    expect(invalidText).toHaveLength(1);
+    expect(invalidText[0].field_name).toBe('transaction_type_code');
+    expect(invalidText[0].message).toContain('8-character');
+
+    const invalidMask = runPintAECheck(check, buildDataContext({ transaction_type_code: 'XXXXXXXX' }));
+    expect(invalidMask).toHaveLength(1);
+    expect(invalidMask[0].field_name).toBe('transaction_type_code');
+  });
+
   it('fails CHK-035 when non-AED invoice has missing FX rate', () => {
     const check = getCheck('UAE-UC1-CHK-035');
     const data = buildDataContext(

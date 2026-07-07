@@ -1,5 +1,5 @@
 // =============================================================================
-// Evidence Pack Exporter — Generates ZIP with 6 XLSX files
+// Evidence Pack Exporter — Generates a streamlined report front matter plus detailed XLSX appendices
 // Part 4 + Part 7 (consistency validation before export)
 // =============================================================================
 
@@ -10,6 +10,7 @@ import autoTable from 'jspdf-autotable';
 import { EvidencePackData } from './evidenceDataBuilder';
 import { runConsistencyChecks, ConsistencyReport } from '@/lib/coverage/consistencyValidator';
 import { buildEvidenceSummary } from './evidenceSummary';
+import { buildStreamlinedEvidenceReport } from './streamlinedEvidenceReport';
 
 export interface ExportValidationResult {
   valid: boolean;
@@ -132,8 +133,75 @@ function sanitizeZipSegment(value: string): string {
     .replace(/^_+|_+$/g, '') || 'entity';
 }
 
+function executiveDecisionRows(data: EvidencePackData) {
+  const report = buildStreamlinedEvidenceReport(data);
+
+  return [
+    { field: 'Readiness Verdict', value: report.verdict },
+    { field: 'Evidence Confidence', value: report.evidenceConfidence },
+    { field: 'Recommended Decision', value: report.recommendedDecision },
+    { field: 'Residual Risk', value: report.residualRisk },
+    { field: 'Summary', value: report.summaryText },
+    ...report.topMetrics.map((metric) => ({
+      field: metric.label,
+      value: `${metric.value} | ${metric.helper}`,
+    })),
+    { field: 'Included Scope', value: report.includedScopeNote },
+    { field: 'Excluded Scope', value: report.excludedScopeNote },
+  ];
+}
+
+function exceptionMitigationRows(data: EvidencePackData) {
+  const report = buildStreamlinedEvidenceReport(data);
+  return report.blockers.map((blocker) => ({
+    Exception: blocker.title,
+    Severity: blocker.severity,
+    Impact: blocker.impact,
+    Mitigation: blocker.mitigation,
+    Owner: blocker.owner,
+    Status: blocker.status,
+    'Residual Risk': blocker.residualRisk,
+    'Decision Impact': blocker.decisionImpact,
+  }));
+}
+
+function domainReadinessRows(data: EvidencePackData) {
+  const report = buildStreamlinedEvidenceReport(data);
+  return report.domainReadiness
+    .filter((domain) => domain.inScope)
+    .map((domain) => ({
+      Domain: domain.domain,
+      Status: domain.status,
+      Confidence: domain.confidence,
+      'Main Exception': domain.mainException,
+      'Mitigation Status': domain.mitigationStatus,
+      'Residual Risk': domain.residualRisk,
+    }));
+}
+
 function appendEvidencePackFiles(zip: JSZip, data: EvidencePackData, prefix = ''): void {
   const summary = buildEvidenceSummary(data);
+
+  zip.file(
+    `${prefix}00_executive_decision.xlsx`,
+    workbookToBuffer(createWorkbook(executiveDecisionRows(data), 'Executive Decision'))
+  );
+  const groupedExceptions = exceptionMitigationRows(data);
+  zip.file(
+    `${prefix}00a_exceptions_and_mitigations.xlsx`,
+    workbookToBuffer(
+      createWorkbook(
+        groupedExceptions.length > 0
+          ? groupedExceptions
+          : [{ Exception: 'No grouped exception themes', Severity: '', Impact: '', Mitigation: '', Owner: '', Status: '', 'Residual Risk': '', 'Decision Impact': '' }],
+        'Exceptions & Mitigations'
+      )
+    )
+  );
+  zip.file(
+    `${prefix}00b_domain_readiness.xlsx`,
+    workbookToBuffer(createWorkbook(domainReadinessRows(data), 'Domain Readiness'))
+  );
 
   // 01_scope_summary.xlsx
   const scopeRows = [
@@ -330,7 +398,7 @@ export async function generateEvidencePackZipByEntity(
 export async function generateEvidencePackPdf(data: EvidencePackData): Promise<Blob> {
   const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
   const ov = data.overview;
-  const summary = buildEvidenceSummary(data);
+  const report = buildStreamlinedEvidenceReport(data);
   const pageWidth = doc.internal.pageSize.getWidth();
   const marginX = 40;
   const titleColor: [number, number, number] = [16, 91, 161];
@@ -356,7 +424,7 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
   doc.setTextColor(...textColor);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);
-  doc.text('Assessment Summary', marginX, 106);
+  doc.text('Executive Decision', marginX, 106);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
@@ -383,14 +451,15 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
   });
 
   const executiveY = (doc as any).lastAutoTable.finalY + 18;
-  sectionTitle('Executive Summary', executiveY);
+  sectionTitle('Decision Summary', executiveY);
   autoTable(doc, {
     startY: executiveY + 8,
     head: [['Metric', 'Value']],
     body: [
-      ['Overall Status', summary.overallStatus],
-      ['Top Failure Class', summary.topFailureClass],
-      ['Execution Count Note', summary.executionCountNote],
+      ['Readiness verdict', report.verdict],
+      ['Evidence confidence', report.evidenceConfidence],
+      ['Recommended decision', report.recommendedDecision],
+      ['Residual risk', report.residualRisk],
     ],
     theme: 'striped',
     styles: { fontSize: 9, cellPadding: 6 },
@@ -399,11 +468,16 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
   });
 
   const findingsY = (doc as any).lastAutoTable.finalY + 18;
-  sectionTitle('Main Issues', findingsY);
+  sectionTitle('Top Blockers', findingsY);
   autoTable(doc, {
     startY: findingsY + 8,
-    head: [['Finding']],
-    body: summary.mainIssues.map((issue) => [issue]),
+    head: [['Exception', 'Severity', 'Mitigation', 'Decision Impact']],
+    body: report.blockers.slice(0, 3).map((blocker) => [
+      blocker.title,
+      blocker.severity,
+      blocker.mitigation,
+      blocker.decisionImpact,
+    ]),
     theme: 'grid',
     styles: { fontSize: 9, cellPadding: 6, overflow: 'linebreak' },
     headStyles: { fillColor: [236, 243, 252], textColor: [24, 40, 72] },
@@ -411,18 +485,11 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
   });
 
   const kpiY = (doc as any).lastAutoTable.finalY + 18;
-  sectionTitle('Coverage KPIs', kpiY);
+  sectionTitle('Headline KPIs', kpiY);
   autoTable(doc, {
     startY: kpiY + 8,
     head: [['Metric', 'Value']],
-    body: [
-      ['Total DRs', String(ov.counts.totalDRs)],
-      ['Mandatory DRs', String(ov.counts.mandatoryDRs)],
-      ['Covered DRs', String(ov.counts.coveredDRs)],
-      ['DRs With No Rules', String(ov.counts.drsNoRules)],
-      ['DRs With No Controls', String(ov.counts.drsNoControls)],
-      ['Open Exceptions', String(ov.counts.openExceptions)],
-    ],
+    body: report.topMetrics.map((metric) => [metric.label, `${metric.value} | ${metric.helper}`]),
     theme: 'striped',
     styles: { fontSize: 9, cellPadding: 6 },
     headStyles: { fillColor: [236, 243, 252], textColor: [24, 40, 72] },
@@ -430,7 +497,66 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
   });
 
   doc.addPage();
-  sectionTitle('DR Coverage Matrix', 50);
+  sectionTitle('Exceptions And Mitigations', 50);
+  autoTable(doc, {
+    startY: 62,
+    head: [['Exception', 'Severity', 'Impact', 'Mitigation', 'Owner', 'Status', 'Residual Risk']],
+    body: report.blockers.map((blocker) => [
+      blocker.title,
+      blocker.severity,
+      blocker.impact,
+      blocker.mitigation,
+      blocker.owner,
+      blocker.status,
+      blocker.residualRisk,
+    ]),
+    theme: 'grid',
+    styles: { fontSize: 8, cellPadding: 4, overflow: 'linebreak' },
+    headStyles: { fillColor: [236, 243, 252], textColor: [24, 40, 72] },
+    margin: { left: marginX, right: marginX },
+    columnStyles: { 2: { cellWidth: 110 }, 3: { cellWidth: 140 } },
+  });
+
+  doc.addPage();
+  sectionTitle('Domain Readiness', 50);
+  autoTable(doc, {
+    startY: 62,
+    head: [['Domain', 'Status', 'Confidence', 'Main Exception', 'Mitigation Status', 'Residual Risk']],
+    body: report.domainReadiness
+      .filter((domain) => domain.inScope)
+      .map((domain) => [
+        domain.domain,
+        domain.status,
+        domain.confidence,
+        domain.mainException,
+        domain.mitigationStatus,
+        domain.residualRisk,
+      ]),
+    theme: 'striped',
+    styles: { fontSize: 8, cellPadding: 4, overflow: 'linebreak' },
+    headStyles: { fillColor: [236, 243, 252], textColor: [24, 40, 72] },
+    margin: { left: marginX, right: marginX },
+    columnStyles: { 3: { cellWidth: 180 }, 4: { cellWidth: 150 } },
+  });
+
+  const notesY = (doc as any).lastAutoTable.finalY + 18;
+  sectionTitle('Scope Boundary', notesY);
+  autoTable(doc, {
+    startY: notesY + 8,
+    head: [['Field', 'Value']],
+    body: [
+      ['Included scope', report.includedScopeNote],
+      ['Excluded scope', report.excludedScopeNote],
+      ['Appendix guidance', report.appendixNote],
+    ],
+    theme: 'grid',
+    styles: { fontSize: 8, cellPadding: 4, overflow: 'linebreak' },
+    headStyles: { fillColor: [236, 243, 252], textColor: [24, 40, 72] },
+    margin: { left: marginX, right: marginX },
+  });
+
+  doc.addPage();
+  sectionTitle('Appendix A: DR Coverage Matrix', 50);
   autoTable(doc, {
     startY: 62,
     head: [['DR ID', 'Term', 'Mandatory', 'Template', 'Rules', 'Controls', 'Pop %', 'Status']],
@@ -452,7 +578,7 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
   });
 
   doc.addPage();
-  sectionTitle('Rules and Exceptions', 50);
+  sectionTitle('Appendix B: Rules and Exceptions', 50);
   autoTable(doc, {
     startY: 62,
     head: [['Rule ID', 'Rule Name', 'Severity', 'Type', 'Layer', 'Executions', 'Failures']],

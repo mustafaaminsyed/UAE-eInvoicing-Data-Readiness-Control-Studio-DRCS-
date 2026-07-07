@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+﻿import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -187,11 +187,11 @@ describe('DashboardPage executive surface', () => {
 
     expect(screen.getByText('Go-Live Readiness')).toBeInTheDocument();
     expect(screen.getByText('Portfolio Scope')).toBeInTheDocument();
-    expect(screen.getByText('Mandatory data')).toBeInTheDocument();
+    expect(screen.getAllByText('Mandatory data').length).toBeGreaterThan(0);
     expect(screen.getByText('Compliance Readiness')).toBeInTheDocument();
-    expect(screen.getByText('Invoice Success Rate')).toBeInTheDocument();
-    expect(screen.getByText('PINT-AE Conformance')).toBeInTheDocument();
-    expect(screen.getByText('Critical Blocking Issues')).toBeInTheDocument();
+    expect(screen.getByText('Submission-ready invoices')).toBeInTheDocument();
+    expect(screen.getByText('Rule pass rate')).toBeInTheDocument();
+    expect(screen.getByText('Critical blocker outcomes')).toBeInTheDocument();
     expect(screen.getByText('Mandatory Field Completeness')).toBeInTheDocument();
     expect(screen.getByText('Conditional Field Completeness')).toBeInTheDocument();
     expect(screen.getByText('Currency Mismatches')).toBeInTheDocument();
@@ -199,9 +199,11 @@ describe('DashboardPage executive surface', () => {
     expect(screen.getByText('Credit-Note Scenarios')).toBeInTheDocument();
     expect(screen.getByText('Top blocking issues')).toBeInTheDocument();
     expect(screen.getByText('Operational interpretation')).toBeInTheDocument();
+    expect(screen.getByText('Prioritise 1 recurring blocker check')).toBeInTheDocument();
+    expect(screen.getByText(/Why is the severity distribution skewed\? ↓/i)).toBeInTheDocument();
 
-    expect(screen.getByText('Seller Name Present')).toBeInTheDocument();
-    expect(screen.getByText('Buyer TRN Pattern Valid')).toBeInTheDocument();
+    expect(screen.getAllByText('Seller Name Present').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Buyer TRN Pattern Valid').length).toBeGreaterThan(0);
   });
 
   it('keeps KPI cards live-truthful when no live signals exist', () => {
@@ -269,3 +271,4 @@ describe('DashboardPage executive surface', () => {
     expect(screen.queryByText('Seller name completeness')).not.toBeInTheDocument();
   });
 });
+

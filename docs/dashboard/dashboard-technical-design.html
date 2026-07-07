@@ -1,0 +1,684 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard Technical Design</title>
+<style>
+body{font-family:Segoe UI,Arial,sans-serif;background:#f5f7fb;color:#172033;line-height:1.6;margin:0;padding:32px;}
+.page{max-width:980px;margin:0 auto;background:#fff;border:1px solid #d9e1ef;border-radius:18px;padding:40px 48px;box-shadow:0 18px 40px rgba(15,23,42,.08);}
+h1,h2,h3{color:#13213a;line-height:1.25;margin-top:1.4em;}
+h1{margin-top:0;font-size:32px;}
+h2{font-size:24px;padding-bottom:6px;border-bottom:1px solid #e6ebf5;}
+h3{font-size:18px;}
+p{margin:12px 0;} ul{margin:8px 0 16px 20px;} li{margin:4px 0;}
+code{font-family:Consolas,monospace;background:#f3f6fb;border:1px solid #dfe7f3;border-radius:6px;padding:1px 6px;font-size:.95em;}
+</style>
+</head>
+<body><main class="page">
+<h1>Dashboard Technical Design</h1>
+<h2>Purpose</h2>
+<p>This document explains how the DRCS executive dashboard is built, what each visible KPI means, and how developers should implement or extend dashboard metrics safely.</p>
+<p>This dashboard is not a generic BI surface. It is a workflow-oriented readiness cockpit for:</p>
+<ul>
+<li>UAE eInvoicing readiness</li>
+<li>PINT-AE conformance</li>
+<li>source data quality</li>
+<li>exception prioritisation</li>
+<li>regulator-facing implementation explainability</li>
+</ul>
+<p>Primary implementation sources:</p>
+<ul>
+<li><code>src/pages/DashboardPage.tsx</code></li>
+<li><code>src/hooks/useDashboardMetrics.ts</code></li>
+<li><code>src/context/ComplianceContext.tsx</code></li>
+<li><code>src/constants/dashboardLabels.ts</code></li>
+</ul>
+<h2>Design Principles</h2>
+<ul>
+<li>Explainability over visual noise</li>
+<li>Distinguish document-level readiness from rule-level performance</li>
+<li>Prefer deterministic calculations over inferred percentages</li>
+<li>Make scope absence explicit when a KPI is not applicable</li>
+<li>Keep regulator-facing and operational language separate where needed</li>
+</ul>
+<h2>Page Architecture</h2>
+<p>The dashboard is currently assembled directly inside <code>src/pages/DashboardPage.tsx</code>.</p>
+<p>High-level structure:</p>
+<p>1. Context strip</p>
+<p>2. Executive compliance KPIs</p>
+<p>3. Data quality KPIs</p>
+<p>4. UAE-specific compliance coverage</p>
+<p>5. Exception breakdown and remediation focus</p>
+<p>Runtime data flow:</p>
+<p>1. <code>useCompliance()</code> supplies:</p>
+<p>   - <code>headers</code></p>
+<p>   - <code>buyers</code></p>
+<p>   - <code>lines</code></p>
+<p>   - <code>checkResults</code></p>
+<p>   - <code>exceptions</code></p>
+<p>   - <code>getDashboardStats()</code></p>
+<p>2. <code>buildDashboardSnapshot()</code> normalises the active scope into a single <code>DashboardSnapshot</code></p>
+<p>3. <code>computeDashboardMetrics()</code> provides document-vs-rule metric separation</p>
+<p>4. UI cards render from the snapshot</p>
+<h2>Source Layers</h2>
+<p>The dashboard combines three source layers:</p>
+<h3>1. Raw portfolio data</h3>
+<p>Used for:</p>
+<ul>
+<li>invoice counts</li>
+<li>completeness metrics</li>
+<li>null-rate quality</li>
+<li>duplicate ratio</li>
+<li>currency mismatch logic</li>
+<li>credit-note scenario coverage</li>
+</ul>
+<p>Primary sources:</p>
+<ul>
+<li><code>headers</code></li>
+<li><code>buyers</code></li>
+<li><code>lines</code></li>
+</ul>
+<h3>2. Validation run outputs</h3>
+<p>Used for:</p>
+<ul>
+<li>rule outcomes</li>
+<li>rule pass rate</li>
+<li>submission-ready invoice count</li>
+<li>critical blocker outcomes</li>
+<li>blocker document counts</li>
+</ul>
+<p>Primary sources:</p>
+<ul>
+<li><code>checkResults</code></li>
+<li><code>exceptions</code></li>
+</ul>
+<h3>3. Context-level summary stats</h3>
+<p>Used as fallback or compatibility support.</p>
+<p>Primary source:</p>
+<ul>
+<li><code>getDashboardStats()</code> from <code>ComplianceContext</code></li>
+</ul>
+<p>Important limitation:</p>
+<ul>
+<li><code>getDashboardStats().passRate</code> is legacy-like and document-oriented in <code>ComplianceContext</code></li>
+<li><code>computeDashboardMetrics().rulePassRate</code> is the current rule-outcome-level metric</li>
+<li>developers must not collapse these two layers back into one percentage</li>
+</ul>
+<h2>Dashboard Snapshot Contract</h2>
+<p>The page works from a single in-memory object:</p>
+<ul>
+<li><code>DashboardSnapshot</code></li>
+</ul>
+<p>Key categories inside the snapshot:</p>
+<ul>
+<li>scope context</li>
+<li>readiness scores</li>
+<li>executive KPI values</li>
+<li>data quality KPI values</li>
+<li>UAE coverage values</li>
+<li>exception aggregation</li>
+<li>remediation prioritisation</li>
+</ul>
+<p>This snapshot should remain the source of truth for rendering.</p>
+<h2>Metric Logic</h2>
+<h2>1. Context Strip</h2>
+<p>These values appear in the top strip above the KPI cards.</p>
+<h3>Document flow</h3>
+<p>Meaning:</p>
+<ul>
+<li>current dataset direction in scope</li>
+</ul>
+<p>Value:</p>
+<ul>
+<li><code>AR / Outbound</code> when <code>activeDatasetType === &#39;AR&#39;</code></li>
+<li><code>AP / Inbound</code> otherwise</li>
+</ul>
+<p>Source:</p>
+<ul>
+<li>UI state, not a computed KPI</li>
+</ul>
+<h3>Live portfolio snapshot</h3>
+<p>Meaning:</p>
+<ul>
+<li>indicates checks have been run on the currently loaded portfolio</li>
+</ul>
+<p>Logic:</p>
+<ul>
+<li><code>Live portfolio snapshot</code> if <code>isChecksRun === true</code></li>
+<li><code>Live data loaded</code> otherwise</li>
+</ul>
+<p>Source field:</p>
+<ul>
+<li><code>snapshot.modeLabel</code></li>
+</ul>
+<h3>Executive attention required</h3>
+<p>Meaning:</p>
+<ul>
+<li>headline status badge for the current scope</li>
+</ul>
+<p>Logic:</p>
+<p>1. <code>Validation running</code> when <code>isRunning === true</code></p>
+<p>2. <code>Executive attention required</code> when <code>snapshot.criticalIssues &gt; 0</code></p>
+<p>3. <code>Executive ready</code> otherwise</p>
+<p>Interpretation:</p>
+<ul>
+<li>this is a status badge, not a numeric KPI</li>
+</ul>
+<h3>Invoices in scope</h3>
+<p>Meaning:</p>
+<ul>
+<li>number of invoices included in the active dashboard scope</li>
+</ul>
+<p>Formula:</p>
+<ul>
+<li><code>stats.totalInvoices || headerRecords.length</code></li>
+</ul>
+<p>Source:</p>
+<ul>
+<li><code>buildDashboardSnapshot()</code></li>
+</ul>
+<p>Fallback:</p>
+<ul>
+<li>falls back to header count if summary stats are absent</li>
+</ul>
+<h3>Rule outcomes</h3>
+<p>Meaning:</p>
+<ul>
+<li>total number of individual rule evaluations executed</li>
+</ul>
+<p>Formula:</p>
+<ul>
+<li><code>sum(checkResult.passed + checkResult.failed)</code></li>
+</ul>
+<p>Source:</p>
+<ul>
+<li><code>computeDashboardMetrics().totalRuleOutcomes</code></li>
+</ul>
+<p>Important:</p>
+<ul>
+<li>one invoice generates many rule outcomes</li>
+<li>this is not a document count</li>
+</ul>
+<h3>Critical blockers</h3>
+<p>Meaning:</p>
+<ul>
+<li>count of critical exception outcomes currently represented in the active scope</li>
+</ul>
+<p>Current logic in context strip:</p>
+<ul>
+<li><code>snapshot.criticalIssues</code></li>
+</ul>
+<p>Current formula:</p>
+<ul>
+<li><code>stats.exceptionsBySeverity.Critical || scopedCriticalExceptionCount</code></li>
+</ul>
+<p>Interpretation warning:</p>
+<ul>
+<li>this is currently an outcome-oriented critical count, not a distinct document count</li>
+<li>use <code>criticalBlockerDocumentCount</code> and <code>avgCriticalBlockersPerDocument</code> when explaining operational burden</li>
+</ul>
+<h2>2. Executive Compliance KPIs</h2>
+<h3>Go-Live Readiness</h3>
+<p>Meaning:</p>
+<ul>
+<li>blended executive confidence score for controlled production readiness</li>
+</ul>
+<p>Formula:</p>
+<ul>
+<li><code>clampScore(weightedAverage(goLiveInputs))</code></li>
+</ul>
+<p>Dimensions and weights:</p>
+<ul>
+<li><code>40%</code> compliance score</li>
+<li><code>15%</code> null-rate quality</li>
+<li><code>10%</code> duplicate control</li>
+<li><code>10%</code> currency alignment</li>
+<li><code>15%</code> blocker containment</li>
+<li><code>10%</code> credit-note readiness</li>
+</ul>
+<p>Component formulas:</p>
+<ul>
+<li>compliance score = <code>complianceReadiness</code></li>
+<li>null-rate quality = <code>max(0, 100 - nullFieldRate * 4)</code></li>
+<li>duplicate control = <code>max(0, 100 - duplicateInvoiceRatio * 18)</code></li>
+<li>currency alignment = <code>max(0, 100 - ((currencyMismatchCount / totalInvoices) * 180))</code></li>
+<li>blocker containment = <code>max(0, 100 - min(criticalIssues, 10) * 12)</code></li>
+<li>credit-note readiness = <code>creditNote.coverage</code> when credit notes exist, else <code>100</code></li>
+</ul>
+<p>Band logic:</p>
+<ul>
+<li><code>&gt;= 90</code> Ready</li>
+<li><code>75 to 89</code> Watch</li>
+<li><code>&lt; 75</code> Blocked</li>
+</ul>
+<p>Important:</p>
+<ul>
+<li>this is a product score, not a regulatory formula</li>
+<li>treat it as a blended decision-support KPI</li>
+</ul>
+<h3>Compliance Readiness</h3>
+<p>Meaning:</p>
+<ul>
+<li>weighted structural and validation readiness baseline</li>
+</ul>
+<p>Formula:</p>
+<ul>
+<li><code>clampScore(weightedAverage(readinessInputs))</code></li>
+</ul>
+<p>Dimensions and weights:</p>
+<ul>
+<li><code>35%</code> mandatory data</li>
+<li><code>15%</code> conditional data</li>
+<li><code>30%</code> rule conformance</li>
+<li><code>20%</code> blocker pressure</li>
+</ul>
+<p>Component formulas:</p>
+<ul>
+<li>mandatory data = average of header, buyer, and line completeness</li>
+<li>conditional data = conditional completeness percentage</li>
+<li>rule conformance = rule pass rate</li>
+<li>blocker pressure = <code>max(0, 100 - min(criticalIssues, 10) * 10)</code></li>
+</ul>
+<p>Important:</p>
+<ul>
+<li>this score excludes null-rate, duplication, and FX alignment penalties that are used in Go-Live Readiness</li>
+</ul>
+<h3>Submission-ready invoices</h3>
+<p>Meaning:</p>
+<ul>
+<li>count of invoices that pass every executed rule check in the active scope</li>
+</ul>
+<p>Display:</p>
+<ul>
+<li><code>submissionReadyCount / totalInvoices</code></li>
+</ul>
+<p>Formula:</p>
+<ul>
+<li><code>submissionReadyCount = max(totalInvoicesInScope - failedInvoiceIds.size, 0)</code></li>
+<li><code>submissionReadyRate = submissionReadyCount / totalInvoicesInScope</code></li>
+</ul>
+<p>Source:</p>
+<ul>
+<li><code>computeDashboardMetrics()</code></li>
+</ul>
+<p>How failed invoices are identified:</p>
+<p>1. use invoice-linked failed exceptions from <code>checkResults[].exceptions</code> when available</p>
+<p>2. fall back to invoice-linked <code>exceptions</code></p>
+<p>Important:</p>
+<ul>
+<li>this is the primary document-level go/no-go signal</li>
+<li>do not derive this from rule pass rate</li>
+</ul>
+<h3>Rule pass rate</h3>
+<p>Meaning:</p>
+<ul>
+<li>proportion of executed rule outcomes that passed</li>
+</ul>
+<p>Display:</p>
+<ul>
+<li>percentage only</li>
+</ul>
+<p>Formula:</p>
+<ul>
+<li><code>passedRuleOutcomes / totalRuleOutcomes</code></li>
+</ul>
+<p>Source:</p>
+<ul>
+<li><code>computeDashboardMetrics()</code></li>
+</ul>
+<p>Important:</p>
+<ul>
+<li>this is a rule-engine performance metric</li>
+<li>one failing rule on one invoice can still leave rule pass rate high while making that invoice not submission-ready</li>
+</ul>
+<h3>Critical Blocking Issues</h3>
+<p>Meaning:</p>
+<ul>
+<li>currently rendered as count of critical issues in active scope</li>
+</ul>
+<p>Source:</p>
+<ul>
+<li><code>snapshot.criticalIssues</code></li>
+</ul>
+<p>Current formula:</p>
+<ul>
+<li><code>stats.exceptionsBySeverity.Critical || scopedCriticalExceptionCount</code></li>
+</ul>
+<p>Important distinction:</p>
+<ul>
+<li>this card is not yet using <code>criticalBlockerDocumentCount</code></li>
+<li>when evolving the dashboard, developers should decide whether the card should continue to represent:</li>
+</ul>
+<p>  - critical outcomes</p>
+<p>  - critical exception cases</p>
+<p>  - affected documents</p>
+<h2>3. Data Quality KPIs</h2>
+<h3>Mandatory Field Completeness</h3>
+<p>Meaning:</p>
+<ul>
+<li>average completeness across core required fields</li>
+</ul>
+<p>Formula:</p>
+<ul>
+<li>average of:</li>
+</ul>
+<p>  - header completeness</p>
+<p>  - buyer completeness</p>
+<p>  - line completeness</p>
+<p>Completeness formula per group:</p>
+<ul>
+<li>present mandatory values / total mandatory field slots</li>
+</ul>
+<p>Source field groups:</p>
+<ul>
+<li>header: <code>MANDATORY_HEADER_FIELDS</code></li>
+<li>buyer: <code>MANDATORY_BUYER_FIELDS</code></li>
+<li>line: <code>MANDATORY_LINE_FIELDS</code></li>
+</ul>
+<h3>Conditional Field Completeness</h3>
+<p>Meaning:</p>
+<ul>
+<li>completeness across scenario-triggered requirements only</li>
+</ul>
+<p>Formula:</p>
+<ul>
+<li>satisfied conditional requirements / triggered conditional requirements</li>
+</ul>
+<p>Triggered conditions currently include:</p>
+<ul>
+<li>positive <code>amount_due</code> -&gt; <code>payment_due_date</code></li>
+<li>non-AED invoice currency -&gt; <code>fx_rate</code> and <code>tax_currency = AED</code></li>
+<li>invoice type <code>381</code> -&gt; credit note fields</li>
+<li>buyer name present -&gt; <code>buyer_trn</code></li>
+</ul>
+<p>Scope-absent logic:</p>
+<ul>
+<li>if <code>qualifyingDocumentCount === 0</code>, the card renders <code>Not in scope</code></li>
+</ul>
+<p>Important:</p>
+<ul>
+<li>zero qualifying documents is not a failure</li>
+</ul>
+<h3>Null Field Rate</h3>
+<p>Meaning:</p>
+<ul>
+<li>percentage of evaluated governed fields that are empty</li>
+</ul>
+<p>Formula:</p>
+<ul>
+<li>empty governed field slots / total governed field slots evaluated</li>
+</ul>
+<p>Important:</p>
+<ul>
+<li>lower is better</li>
+</ul>
+<h3>Duplicate Invoice Ratio</h3>
+<p>Meaning:</p>
+<ul>
+<li>duplicate incidence in the invoice header population</li>
+</ul>
+<p>Formula:</p>
+<ul>
+<li>duplicate invoice records / total header records</li>
+</ul>
+<p>Current duplicate logic:</p>
+<ul>
+<li>key = <code>invoice_number</code> or fallback <code>invoice_id</code></li>
+</ul>
+<h3>Invalid Codelist</h3>
+<p>Meaning:</p>
+<ul>
+<li>count of open exceptions that appear to be codelist-related</li>
+</ul>
+<p>Current logic:</p>
+<ul>
+<li>text classification over exception name, message, and check id</li>
+</ul>
+<p>Current search terms:</p>
+<ul>
+<li><code>codelist</code></li>
+<li><code>code</code></li>
+<li><code>iso3166</code></li>
+<li><code>uncl</code></li>
+<li><code>unece</code></li>
+<li><code>currency</code></li>
+<li><code>payment means</code></li>
+</ul>
+<p>Important:</p>
+<ul>
+<li>this is heuristic, not registry-driven</li>
+</ul>
+<h3>Currency Mismatches</h3>
+<p>Meaning:</p>
+<ul>
+<li>header-level count of currency / tax-currency / FX inconsistencies</li>
+</ul>
+<p>Logic:</p>
+<ul>
+<li>for AED invoices:</li>
+</ul>
+<p>  - mismatch if <code>tax_currency</code> is populated but not <code>AED</code></p>
+<ul>
+<li>for non-AED invoices:</li>
+</ul>
+<p>  - mismatch if <code>tax_currency !== AED</code></p>
+<p>  - or <code>fx_rate</code> missing / non-numeric / non-positive</p>
+<h2>4. UAE-Specific Compliance Coverage</h2>
+<h3>IBT Mandatory Fields</h3>
+<p>Meaning:</p>
+<ul>
+<li>coverage of mandatory invoice business-term fields</li>
+</ul>
+<p>Current implementation:</p>
+<ul>
+<li>mirrors <code>mandatoryCompleteness</code></li>
+</ul>
+<p>Supporting points shown:</p>
+<ul>
+<li>header completeness</li>
+<li>buyer completeness</li>
+<li>line completeness</li>
+</ul>
+<p>Important:</p>
+<ul>
+<li>this is a coverage proxy, not a full formal semantic mapping audit</li>
+</ul>
+<h3>PINT-AE Rules</h3>
+<p>Meaning:</p>
+<ul>
+<li>rule execution and rule pass performance for the selected scope</li>
+</ul>
+<p>Current value:</p>
+<ul>
+<li>same percentage as rule pass rate</li>
+</ul>
+<p>Supporting points:</p>
+<ul>
+<li>total rule outcomes executed</li>
+<li>current pass rate</li>
+<li>critical issues still blocking</li>
+</ul>
+<h3>Credit-Note Scenarios</h3>
+<p>Meaning:</p>
+<ul>
+<li>readiness of in-scope <code>381</code> credit note scenarios</li>
+</ul>
+<p>Coverage logic:</p>
+<ul>
+<li>if no credit notes are present:</li>
+</ul>
+<p>  - <code>count = 0</code></p>
+<p>  - coverage defaults to <code>100</code></p>
+<ul>
+<li>if credit notes are present:</li>
+</ul>
+<p>  - each credit note must satisfy:</p>
+<p>    - reason code</p>
+<p>    - reason text</p>
+<p>    - preceding reference unless reason code is <code>VD</code></p>
+<p>    - preceding issue date unless reason code is <code>VD</code></p>
+<p>Important:</p>
+<ul>
+<li>when no credit notes are present, this behaves as not-applicable rather than failed</li>
+</ul>
+<h2>5. Exception Breakdown and Remediation</h2>
+<h3>Severity cards</h3>
+<p>Meaning:</p>
+<ul>
+<li>counts of open exceptions by severity</li>
+</ul>
+<p>Formula:</p>
+<ul>
+<li>count scoped exceptions where severity equals:</li>
+</ul>
+<p>  - <code>Critical</code></p>
+<p>  - <code>High</code></p>
+<p>  - <code>Medium</code></p>
+<p>  - <code>Low</code></p>
+<h3>Top blocking issues</h3>
+<p>Meaning:</p>
+<ul>
+<li>top recurring exception clusters grouped by check id</li>
+</ul>
+<p>Grouping logic:</p>
+<ul>
+<li>group by <code>exception.checkId</code></li>
+<li>count occurrences</li>
+<li>keep highest observed severity for the cluster</li>
+<li>sort by count descending</li>
+<li>show top 5 on dashboard</li>
+</ul>
+<h3>Recommended next action panel</h3>
+<p>Current logic:</p>
+<ul>
+<li>derive top 3 blocking checks from <code>snapshot.blockingIssues</code></li>
+<li>pass them into <code>TopBlockerActionList</code></li>
+<li>use <code>criticalBlockerOutcomes</code> as total critical denominator</li>
+</ul>
+<p>Navigation:</p>
+<ul>
+<li>clicking a blocker navigates to:</li>
+</ul>
+<p>  - <code>/exceptions?dataset=&lt;scope&gt;&amp;ruleId=&lt;checkId&gt;&amp;sort=count_desc</code></p>
+<h3>Severity context note</h3>
+<p>Purpose:</p>
+<ul>
+<li>explain why critical/high issues can dominate the portfolio</li>
+</ul>
+<p>Implementation:</p>
+<ul>
+<li>collapsed note using the existing <code>Collapsible</code> primitive</li>
+</ul>
+<h2>Fallback and Preview Behaviour</h2>
+<p>When no live signals exist:</p>
+<ul>
+<li>the dashboard renders empty states instead of misleading zeroes</li>
+</ul>
+<p>When preview snapshots are used:</p>
+<ul>
+<li><code>buildFallbackSnapshot()</code> injects non-live representative values</li>
+</ul>
+<p>Developers must ensure:</p>
+<ul>
+<li>live-truthful states do not silently fall back to preview values</li>
+<li>scope absence uses neutral presentation</li>
+<li>no KPI should show a failure state purely because a scenario is absent</li>
+</ul>
+<h2>Important Distinctions Developers Must Preserve</h2>
+<h3>Document count vs rule-outcome count</h3>
+<p>Never collapse these:</p>
+<ul>
+<li>invoices in scope</li>
+<li>submission-ready invoices</li>
+<li>critical blocker document count</li>
+<li>total rule outcomes</li>
+<li>critical blocker outcomes</li>
+</ul>
+<h3>Rule pass rate vs submission-ready rate</h3>
+<p>These must remain distinct:</p>
+<ul>
+<li>rule pass rate can be high even when many documents are not submission-ready</li>
+<li>submission-ready rate is stricter because every executed rule must pass on a document</li>
+</ul>
+<h3>Scope absence vs poor performance</h3>
+<p>Examples:</p>
+<ul>
+<li>no credit notes in scope</li>
+<li>no FX invoices in scope</li>
+<li>no conditional-field-triggering documents in scope</li>
+</ul>
+<p>These should not render as red failure states.</p>
+<h2>Implementation Guidance</h2>
+<p>When adding a new dashboard metric:</p>
+<p>1. add or extend logic in <code>buildDashboardSnapshot()</code> or <code>computeDashboardMetrics()</code></p>
+<p>2. document:</p>
+<p>   - meaning</p>
+<p>   - exact formula</p>
+<p>   - numerator</p>
+<p>   - denominator</p>
+<p>   - source fields</p>
+<p>   - fallback logic</p>
+<p>   - interpretation caveat</p>
+<p>3. decide whether it is:</p>
+<p>   - live only</p>
+<p>   - preview-safe</p>
+<p>   - scope-sensitive</p>
+<p>4. add unit tests for:</p>
+<p>   - normal case</p>
+<p>   - empty case</p>
+<p>   - divergence case if relevant</p>
+<p>   - scope-absent case if relevant</p>
+<h2>Testing Guidance</h2>
+<p>Minimum test coverage expectations for dashboard metrics:</p>
+<ul>
+<li>document-vs-rule divergence</li>
+<li>critical outcome vs critical document count</li>
+<li>conditional completeness scope absence</li>
+<li>URL deep-link filtering from blocker actions</li>
+<li>no-preview fallback contamination when live signals exist</li>
+</ul>
+<p>Recommended future tests:</p>
+<ul>
+<li>explicit credit-note coverage permutations</li>
+<li>AED vs foreign-currency mismatch scenarios</li>
+<li>duplicate ratio edge cases</li>
+<li>no invoice-linked exception fallback behavior</li>
+</ul>
+<h2>Known Gaps and Risks</h2>
+<h3>1. <code>ComplianceContext.getDashboardStats().passRate</code> is legacy-style</h3>
+<p>Current logic:</p>
+<ul>
+<li><code>(totalInvoices - invoicesWithExceptions) / totalInvoices</code></li>
+</ul>
+<p>This is not the same thing as rule pass rate.</p>
+<h3>2. <code>Invalid Codelist</code> is heuristic</h3>
+<p>Current logic is text-based, not registry-backed.</p>
+<h3>3. <code>Critical Blocking Issues</code> label may still be interpreted as documents</h3>
+<p>The codebase now computes:</p>
+<ul>
+<li><code>criticalBlockerOutcomes</code></li>
+<li><code>criticalBlockerDocumentCount</code></li>
+<li><code>avgCriticalBlockersPerDocument</code></li>
+</ul>
+<p>But the executive card itself still surfaces a critical issue count without fully disambiguating the semantic type.</p>
+<h3>4. Some readiness scores are product-level composites</h3>
+<p>They are useful decision-support metrics, but they are not legal formulas defined by PINT-AE or the FTA.</p>
+<h2>Suggested Future Refactor</h2>
+<p>To make the dashboard easier to maintain, consider extracting:</p>
+<ul>
+<li><code>src/components/dashboard/ExecutiveKPIs.tsx</code></li>
+<li><code>src/components/dashboard/DataQualityKPIs.tsx</code></li>
+<li><code>src/components/dashboard/UAECoverageKPIs.tsx</code></li>
+<li><code>src/components/dashboard/ExceptionsPanel.tsx</code></li>
+<li><code>src/lib/dashboard/buildDashboardSnapshot.ts</code></li>
+<li><code>src/lib/dashboard/dashboardMetricDefinitions.ts</code></li>
+</ul>
+<p>This would separate:</p>
+<ul>
+<li>metric definition</li>
+<li>snapshot assembly</li>
+<li>UI composition</li>
+</ul>
+<p>without changing current behavior.</p>
+</main></body></html>

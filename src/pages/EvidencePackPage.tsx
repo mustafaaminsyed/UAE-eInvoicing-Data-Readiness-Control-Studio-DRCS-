@@ -1,7 +1,6 @@
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import {
-  FileDown, Shield, CheckCircle2, AlertTriangle, XCircle,
-  FileSpreadsheet, BarChart3, Scale, Bug, Layers, Database,
+  FileDown, Shield, BarChart3, Scale, Bug, Database,
   Download, Loader2
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -28,6 +27,11 @@ import {
 } from '@/lib/evidence/evidenceExporter';
 import { buildEvidenceSummary } from '@/lib/evidence/evidenceSummary';
 import { getEvidenceRuleExecutionTelemetry, getEvidenceRunSnapshot } from '@/lib/evidence/evidenceRunSnapshot';
+import {
+  buildStreamlinedEvidenceReport,
+  StreamlinedBlocker,
+  StreamlinedDomainReadiness,
+} from '@/lib/evidence/streamlinedEvidenceReport';
 import { fetchCheckRuns } from '@/lib/api/checksApi';
 import { fetchExceptionsByRun } from '@/lib/api/pintAEApi';
 import { CheckRun } from '@/types/customChecks';
@@ -77,7 +81,7 @@ export default function EvidencePackPage() {
   const { buyers, headers, lines, pintAEExceptions, isChecksRun, runSummary, lastPintRuleTelemetry } = useCompliance();
   const { toast } = useToast();
   const [exporting, setExporting] = useState(false);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('exceptions');
   const [runs, setRuns] = useState<CheckRun[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string>('');
   const [selectedRunDate, setSelectedRunDate] = useState<string | null>(null);
@@ -140,6 +144,7 @@ export default function EvidencePackPage() {
   const canUseHistoricalSnapshot = Boolean(isHistoricalRun && selectedRunSnapshot);
   const isHistoricalSnapshotMissing = Boolean(isHistoricalRun && !selectedRunSnapshot);
   const canBuildEvidence = (isChecksRun && isCurrentContextRun) || canUseHistoricalSnapshot;
+  const showLegacyRunSummary = false;
 
   // Build populations from raw data for evidence
   const populations = useMemo(() => {
@@ -205,6 +210,10 @@ export default function EvidencePackPage() {
     lastPintRuleTelemetry,
   ]);
 
+  const streamlinedReport = useMemo(
+    () => (evidence ? buildStreamlinedEvidenceReport(evidence) : null),
+    [evidence]
+  );
   const evidenceSummary = useMemo(
     () => (evidence ? buildEvidenceSummary(evidence) : null),
     [evidence]
@@ -777,25 +786,78 @@ export default function EvidencePackPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-foreground">How to read rule evidence</p>
-                <p className="text-xs text-muted-foreground mt-1 max-w-3xl">
-                  Rule classification shows what failed: a code list check, a dependency requirement, or a semantic contradiction. Authoritative DR linkage comes from explicit validation mappings, not metadata reference terms.
-                </p>
+        {streamlinedReport && (
+          <Card>
+            <CardContent className="p-4 md:p-5 space-y-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Executive decision</p>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-3xl">{streamlinedReport.summaryText}</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline" className={verdictBadgeClassName(streamlinedReport.verdict)}>
+                    {streamlinedReport.verdict}
+                  </Badge>
+                  <Badge variant="outline" className="text-xs">
+                    Evidence confidence: {streamlinedReport.evidenceConfidence}
+                  </Badge>
+                  <Badge variant="secondary" className="text-xs">
+                    Recommended decision: {streamlinedReport.recommendedDecision}
+                  </Badge>
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="outline" className="text-xs">Dynamic Codelist</Badge>
-                <Badge variant="outline" className="text-xs">Dependency Rule</Badge>
-                <Badge variant="outline" className="text-xs">Semantic</Badge>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        {evidenceSummary && (
+              <div className="grid grid-cols-2 xl:grid-cols-6 gap-3">
+                {streamlinedReport.topMetrics.map((metric) => (
+                  <div key={metric.label} className="rounded-lg border bg-muted/20 p-3">
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{metric.label}</p>
+                    <p className={cn('mt-1 text-lg font-semibold', metricToneClassName(metric.tone))}>{metric.value}</p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">{metric.helper}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
+                <div className="rounded-lg border bg-muted/20 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-foreground">Top blockers</p>
+                    <Badge variant="outline" className="text-xs">
+                      Residual risk: {streamlinedReport.residualRisk}
+                    </Badge>
+                  </div>
+                  <div className="mt-3 space-y-3">
+                    {streamlinedReport.blockers.slice(0, 3).map((blocker) => (
+                      <BlockerCallout key={`${blocker.title}-${blocker.severity}`} blocker={blocker} />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border bg-muted/20 p-4 space-y-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Mitigations in place</p>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Keep the main body focused on the actions that reduce onboarding risk. Full detail remains in the appendices below.
+                    </p>
+                  </div>
+                  <ul className="space-y-2 text-xs text-muted-foreground">
+                    {streamlinedReport.mitigationSnapshot.map((mitigation) => (
+                      <li key={mitigation} className="rounded-md border bg-background/80 px-3 py-2">
+                        {mitigation}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="rounded-md border bg-background/80 p-3">
+                    <p className="text-xs font-medium text-foreground">Scope boundary</p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">{streamlinedReport.includedScopeNote}</p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">{streamlinedReport.excludedScopeNote}</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {showLegacyRunSummary && streamlinedReport && (
           <Card>
             <CardContent className="p-4 md:p-5 space-y-4">
               <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
@@ -847,6 +909,98 @@ export default function EvidencePackPage() {
           </Card>
         )}
 
+        {streamlinedReport && (
+          <>
+            <Card>
+              <CardContent className="p-4 md:p-5 space-y-4">
+                <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Exceptions and mitigations</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      This page is intentionally limited to the most material grouped exception themes. Use the appendix tabs below for the full register.
+                    </p>
+                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    Top {Math.min(streamlinedReport.blockers.length, 5)} grouped themes
+                  </Badge>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Exception</TableHead>
+                        <TableHead className="text-xs">Severity</TableHead>
+                        <TableHead className="text-xs">Impact</TableHead>
+                        <TableHead className="text-xs">Mitigation</TableHead>
+                        <TableHead className="text-xs">Owner</TableHead>
+                        <TableHead className="text-xs">Status</TableHead>
+                        <TableHead className="text-xs">Residual Risk</TableHead>
+                        <TableHead className="text-xs">Decision Impact</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {streamlinedReport.blockers.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
+                            No grouped exception themes were recorded for this run.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        streamlinedReport.blockers.map((blocker) => (
+                          <TableRow key={`${blocker.title}-${blocker.severity}`}>
+                            <TableCell className="text-xs font-medium">{blocker.title}</TableCell>
+                            <TableCell className="text-xs"><SeverityBadge severity={blocker.severity as any} /></TableCell>
+                            <TableCell className="max-w-[220px] text-xs text-muted-foreground">{blocker.impact}</TableCell>
+                            <TableCell className="max-w-[220px] text-xs text-muted-foreground">{blocker.mitigation}</TableCell>
+                            <TableCell className="text-xs">{blocker.owner}</TableCell>
+                            <TableCell className="text-xs">{blocker.status}</TableCell>
+                            <TableCell className="text-xs">{blocker.residualRisk}</TableCell>
+                            <TableCell className="text-xs">{blocker.decisionImpact}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4 md:p-5 space-y-4">
+                <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Domain readiness</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Keep this view short. It should tell reviewers whether the risk is isolated or systemic before they move into the technical appendices.
+                    </p>
+                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    {streamlinedReport.appendixNote}
+                  </Badge>
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-3">
+                  {streamlinedReport.domainReadiness
+                    .filter((domain) => domain.inScope)
+                    .map((domain) => (
+                      <DomainReadinessCard key={domain.domain} domain={domain} />
+                    ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-sm font-semibold text-foreground">Appendix detail</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  The tabs below preserve the current DR coverage, rule execution, exception, control, and population evidence as the technical appendix for audit and client handover.
+                </p>
+              </CardContent>
+            </Card>
+          </>
+        )}
+
         {/* Tabs */}
         <Card>
           <CardContent className="p-4">
@@ -859,39 +1013,12 @@ export default function EvidencePackPage() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList className="flex flex-wrap h-auto gap-1">
-            <TabsTrigger value="overview" className="gap-1 text-xs"><Layers className="w-3 h-3" /> Overview</TabsTrigger>
             <TabsTrigger value="dr-coverage" className="gap-1 text-xs"><Shield className="w-3 h-3" /> DR Coverage</TabsTrigger>
             <TabsTrigger value="rules" className="gap-1 text-xs"><Scale className="w-3 h-3" /> Rules</TabsTrigger>
             <TabsTrigger value="exceptions" className="gap-1 text-xs"><Bug className="w-3 h-3" /> Exceptions</TabsTrigger>
             <TabsTrigger value="controls" className="gap-1 text-xs"><BarChart3 className="w-3 h-3" /> Controls</TabsTrigger>
             <TabsTrigger value="population" className="gap-1 text-xs"><Database className="w-3 h-3" /> Population</TabsTrigger>
           </TabsList>
-
-          {/* Tab A: Overview */}
-          <TabsContent value="overview">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { label: 'Total DRs', value: ov.counts.totalDRs, icon: FileSpreadsheet },
-                { label: 'Mandatory DRs', value: ov.counts.mandatoryDRs, icon: Shield },
-                { label: 'Covered DRs', value: ov.counts.coveredDRs, icon: CheckCircle2, color: 'text-[hsl(var(--success))]' },
-                { label: 'No Rules', value: ov.counts.drsNoRules, icon: AlertTriangle, color: ov.counts.drsNoRules > 0 ? 'text-accent-foreground' : undefined },
-                { label: 'No Controls', value: ov.counts.drsNoControls, icon: XCircle, color: ov.counts.drsNoControls > 0 ? 'text-destructive' : undefined },
-                { label: 'Open Exceptions', value: ov.counts.openExceptions, icon: Bug, color: ov.counts.openExceptions > 0 ? 'text-destructive' : undefined },
-                { label: 'Dataset', value: ov.datasetName || '-', icon: Database },
-                { label: 'Scope', value: 'B2B UC1', icon: Layers },
-              ].map(({ label, value, icon: Icon, color }) => (
-                <Card key={label}>
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <Icon className={cn('w-5 h-5', color ?? 'text-muted-foreground')} />
-                    <div>
-                      <p className={cn('text-lg font-bold', color ?? 'text-foreground')}>{value}</p>
-                      <p className="text-xs text-muted-foreground">{label}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
 
           {/* Tab B: DR Coverage */}
           <TabsContent value="dr-coverage">
@@ -1181,4 +1308,77 @@ function CoverageStatusBadge({ status }: { status: string }) {
   };
   const c = config[status] ?? config.NOT_IN_TEMPLATE;
   return <Badge variant="outline" className={cn('text-xs', c.className)}>{c.label}</Badge>;
+}
+
+function verdictBadgeClassName(verdict: string): string {
+  return cn('text-xs', {
+    'border-[hsl(var(--success))]/30 text-[hsl(var(--success))]': verdict === 'Ready',
+    'border-accent/30 text-accent-foreground': verdict === 'Conditionally Ready',
+    'border-destructive/30 text-destructive': verdict === 'Not Ready' || verdict === 'Insufficient Evidence',
+  });
+}
+
+function metricToneClassName(tone: 'good' | 'warning' | 'critical' | 'neutral'): string {
+  switch (tone) {
+    case 'good':
+      return 'text-[hsl(var(--success))]';
+    case 'warning':
+      return 'text-accent-foreground';
+    case 'critical':
+      return 'text-destructive';
+    default:
+      return 'text-foreground';
+  }
+}
+
+function BlockerCallout({ blocker }: { blocker: StreamlinedBlocker }) {
+  return (
+    <div className="rounded-md border bg-background/80 p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-sm font-medium text-foreground">{blocker.title}</p>
+        <SeverityBadge severity={blocker.severity as any} />
+        <Badge variant="outline" className="text-[11px]">
+          {blocker.decisionImpact}
+        </Badge>
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">{blocker.impact}</p>
+      <p className="mt-2 text-xs text-foreground">
+        <span className="font-medium">Mitigation:</span> {blocker.mitigation}
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+        <span>Owner: {blocker.owner}</span>
+        <span>Status: {blocker.status}</span>
+        <span>Residual risk: {blocker.residualRisk}</span>
+      </div>
+    </div>
+  );
+}
+
+function DomainReadinessCard({ domain }: { domain: StreamlinedDomainReadiness }) {
+  return (
+    <div className="rounded-lg border bg-muted/20 p-4 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-medium text-foreground">{domain.domain}</p>
+        <Badge variant="outline" className={verdictBadgeClassName(domain.status)}>
+          {domain.status}
+        </Badge>
+      </div>
+      <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+        <Badge variant="outline" className="text-[11px]">
+          Confidence: {domain.confidence}
+        </Badge>
+        <Badge variant="outline" className="text-[11px]">
+          Residual risk: {domain.residualRisk}
+        </Badge>
+      </div>
+      <div>
+        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Main exception</p>
+        <p className="mt-1 text-xs text-foreground">{domain.mainException}</p>
+      </div>
+      <div>
+        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Mitigation status</p>
+        <p className="mt-1 text-xs text-muted-foreground">{domain.mitigationStatus}</p>
+      </div>
+    </div>
+  );
 }

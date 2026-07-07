@@ -80,6 +80,15 @@ describe('PINT-AE codelist governance artifact', () => {
       }
 
       if (runtime === 'conditional' && checkIds.length > 0) {
+        if (row.codelist_name === 'transactiontype') {
+          checkIds.forEach((checkId) => {
+            const check = checkMap.get(checkId);
+            expect(check).toBeDefined();
+            expect(check?.parameters?.field).toBe('transaction_type_code');
+          });
+          continue;
+        }
+
         checkIds.forEach((checkId) => {
           const check = checkMap.get(checkId);
           expect(check).toBeDefined();
