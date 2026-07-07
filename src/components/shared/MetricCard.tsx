@@ -67,7 +67,7 @@ export function MetricCard({
   const resolvedIcon = scopeAbsent ? <Info className="w-5 h-5" /> : icon;
 
   const iconNode = resolvedIcon ? (
-    <div className={cn('p-3 rounded-lg', scopeAbsent ? scopeAbsentIconStyles : iconStyles[variant])}>
+    <div className={cn('rounded-lg p-3', scopeAbsent ? scopeAbsentIconStyles : iconStyles[variant])}>
       {resolvedIcon}
     </div>
   ) : null;
@@ -119,7 +119,7 @@ export function MetricCard({
     >
       <div className="flex items-start justify-between">
         <div className="space-y-1">
-          <p className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+          <p className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
             <span>{title}</span>
             {resolvedHelpContent && (
               <Tooltip>
@@ -127,9 +127,9 @@ export function MetricCard({
                   <button
                     type="button"
                     aria-label={`About ${title}`}
-                    className="inline-flex items-center justify-center text-muted-foreground/70 hover:text-foreground transition-colors"
+                    className="inline-flex items-center justify-center text-muted-foreground/70 transition-colors hover:text-foreground"
                   >
-                    <CircleHelp className="w-3.5 h-3.5" />
+                    <CircleHelp className="h-3.5 w-3.5" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-[320px] text-xs leading-relaxed">

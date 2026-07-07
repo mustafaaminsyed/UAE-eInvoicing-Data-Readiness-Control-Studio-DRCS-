@@ -8,6 +8,6 @@ export const EXECUTIVE_KPI_LABELS = {
   rulePassRate: {
     title: 'Rule pass rate',
     helpSummary:
-      'The share of individual rule-outcome evaluations that returned pass. One document generates multiple rule outcomes — this metric reflects rule-engine performance, not document-level readiness.',
+      'The share of individual rule-outcome evaluations that returned pass. One document generates multiple rule outcomes - this metric reflects rule-engine performance, not document-level readiness.',
   },
 } as const;

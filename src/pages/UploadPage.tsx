@@ -240,11 +240,11 @@ export default function UploadPage() {
     <div className="min-h-[calc(100vh-4rem)]">
       <div className="container max-w-4xl py-8 md:py-10">
         {/* Step Indicator */}
-        <div className="flex items-center justify-center gap-2 mb-8">
+        <div className="mb-8 flex flex-wrap items-center justify-center gap-2">
           {STEPS.map((step, i) => (
             <div key={step.key} className="flex items-center gap-2">
               <div className={cn(
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-center text-xs font-medium transition-colors',
                 step.key === currentStep
                   ? 'bg-primary text-primary-foreground'
                   : (STEPS.findIndex(s => s.key === currentStep) > i
@@ -298,18 +298,19 @@ export default function UploadPage() {
                 </Button>
               </div>
             </div>
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div>
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="min-w-0">
                 <p className="text-sm font-semibold text-foreground">Sample Testing Mode</p>
                 <p className="text-xs text-muted-foreground">
                   Choose positive samples for baseline pass testing, or negative samples to simulate exceptions.
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 md:justify-end">
                 <Button
                   size="sm"
                   variant={sampleScenario === 'positive' ? 'default' : 'outline'}
                   onClick={() => setSampleScenario('positive')}
+                  className="w-full sm:w-auto"
                 >
                   Positive Samples
                 </Button>
@@ -317,6 +318,7 @@ export default function UploadPage() {
                   size="sm"
                   variant={sampleScenario === 'negative' ? 'default' : 'outline'}
                   onClick={() => setSampleScenario('negative')}
+                  className="w-full sm:w-auto"
                 >
                   Negative Test Samples
                 </Button>
@@ -344,22 +346,29 @@ export default function UploadPage() {
                   <Badge variant="secondary">381</Badge>
                   <span className="text-sm font-medium text-foreground">Credit Note</span>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Supported with additional header fields: <code className="font-mono">credit_note_reason_code</code>,
-                  <code className="ml-1 font-mono">credit_note_reason_text</code>,
-                  <code className="ml-1 font-mono">preceding_invoice_reference</code>, and
-                  <code className="ml-1 font-mono">preceding_invoice_issue_date</code>.
-                </p>
+                <div className="space-y-2 text-xs text-muted-foreground">
+                  <p>Supported with additional header fields:</p>
+                  <div className="flex flex-wrap gap-2">
+                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] break-all">credit_note_reason_code</code>
+                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] break-all">credit_note_reason_text</code>
+                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] break-all">preceding_invoice_reference</code>
+                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] break-all">preceding_invoice_issue_date</code>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
           {/* File Cards */}
           <div className="surface-glass rounded-2xl border border-white/70 shadow-sm p-6">
-            <div className="mb-4 rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-              Upload progress: <span className="font-semibold text-foreground">{validFileCount}/3</span> files structurally valid
-              <span className="mx-1">|</span>
-              <span className="font-medium">{selectedFileCount}/3</span> files selected
+            <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              <span>
+                Upload progress: <span className="font-semibold text-foreground">{validFileCount}/3</span> files structurally valid
+              </span>
+              <span className="hidden text-muted-foreground/60 sm:inline">|</span>
+              <span>
+                <span className="font-medium">{selectedFileCount}/3</span> files selected
+              </span>
             </div>
             <div className="grid gap-6">
               {/* Buyers */}
@@ -379,25 +388,30 @@ export default function UploadPage() {
               )}
 
               <div className="rounded-xl border bg-muted/20 px-4 py-3">
-                <div className="flex items-center gap-2 mb-2">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
                   <p className="text-xs font-semibold text-foreground">Credit Note Requirements</p>
                   {hasCreditNoteHeaders && (
                     <Badge variant="outline" className="text-[10px]">Credit note rows detected</Badge>
                   )}
                 </div>
-                <div className="space-y-1 text-xs text-muted-foreground">
+                <div className="space-y-2 text-xs text-muted-foreground">
                   <p>
                     Scenario-specific validation is driven by <code className="font-mono">invoice_type</code>.
                   </p>
                   <p>
-                    When <code className="font-mono">invoice_type = 381</code>, provide <code className="font-mono">credit_note_reason_code</code> and
-                    <code className="ml-1 font-mono">credit_note_reason_text</code>.
+                    When <code className="font-mono">invoice_type = 381</code>, provide:
                   </p>
+                  <div className="flex flex-wrap gap-2">
+                    <code className="rounded bg-background px-1.5 py-0.5 font-mono text-[11px] break-all">credit_note_reason_code</code>
+                    <code className="rounded bg-background px-1.5 py-0.5 font-mono text-[11px] break-all">credit_note_reason_text</code>
+                  </div>
                   <p>
-                    Unless the reason code is <code className="font-mono">VD</code>, also provide the <code className="font-mono">IBG-03</code> preceding invoice group using
-                    <code className="ml-1 font-mono">preceding_invoice_reference</code> and ideally
-                    <code className="ml-1 font-mono">preceding_invoice_issue_date</code>.
+                    Unless the reason code is <code className="font-mono">VD</code>, also provide the <code className="font-mono">IBG-03</code> preceding invoice group using:
                   </p>
+                  <div className="flex flex-wrap gap-2">
+                    <code className="rounded bg-background px-1.5 py-0.5 font-mono text-[11px] break-all">preceding_invoice_reference</code>
+                    <code className="rounded bg-background px-1.5 py-0.5 font-mono text-[11px] break-all">preceding_invoice_issue_date</code>
+                  </div>
                   <p>
                     <code className="font-mono">preceding_invoice_issue_date</code> represents the original invoice issue date and should be in <code className="font-mono">YYYY-MM-DD</code> format when supplied.
                   </p>
@@ -424,9 +438,9 @@ export default function UploadPage() {
               </div>
               <div className="space-y-2">
                 {relationalChecks.map((check) => (
-                  <div key={check.label} className="flex items-center justify-between text-sm">
-                    <code className="text-xs text-muted-foreground font-mono">{check.label}</code>
-                    <div className="flex items-center gap-2">
+                  <div key={check.label} className="flex flex-col gap-2 text-sm md:flex-row md:items-center md:justify-between">
+                    <code className="break-all text-xs font-mono text-muted-foreground">{check.label}</code>
+                    <div className="flex flex-wrap items-center gap-2 md:justify-end">
                       <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden">
                         <div
                           className={cn(
@@ -467,9 +481,9 @@ export default function UploadPage() {
           )}
 
           {canProceed && blockingReasons.length === 0 && (
-            <div className="flex items-center gap-2 text-sm bg-[hsl(var(--success))]/5 rounded-lg p-4 border border-[hsl(var(--success))]/20">
-              <CheckCircle2 className="w-4 h-4 text-[hsl(var(--success))]" />
-              <span className="text-[hsl(var(--success))] font-medium">
+            <div className="flex items-start gap-2 rounded-lg border border-[hsl(var(--success))]/20 bg-[hsl(var(--success))]/5 p-4 text-sm">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--success))]" />
+              <span className="font-medium text-[hsl(var(--success))]">
                 All files uploaded and validated for {datasetType === 'AR' ? 'AR (Outbound)' : 'AP (Inbound)'}.
                 Ready to proceed.
               </span>
@@ -482,10 +496,10 @@ export default function UploadPage() {
               aria-live="polite"
               className="rounded-xl border border-primary/20 bg-primary/5 p-4"
             >
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <RefreshCw className="w-4 h-4 animate-spin text-primary" />
-                  <div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex items-start gap-2">
+                  <RefreshCw className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-primary" />
+                  <div className="min-w-0">
                     <p className="text-sm font-semibold text-foreground">Processing uploaded datasets</p>
                     <p className="text-xs text-muted-foreground">
                       Preparing canonical records and relational integrity checks before validation execution.
@@ -504,7 +518,7 @@ export default function UploadPage() {
           )}
 
           {/* Actions */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Button variant="outline" onClick={handleClearAll} disabled={!files.buyers && !files.headers && !files.lines}>
               Clear All
             </Button>
@@ -513,12 +527,12 @@ export default function UploadPage() {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span>
-                    <Button
-                      onClick={handleLoadData}
-                      disabled={!canProceed || isLoading}
-                      size="lg"
-                      className="gap-2"
-                    >
+	                    <Button
+	                      onClick={handleLoadData}
+	                      disabled={!canProceed || isLoading}
+	                      size="lg"
+	                      className="w-full gap-2 sm:w-auto"
+	                    >
                       {isLoading ? `Processing data... ${loadElapsedLabel}` : 'Load Data & Continue'}
                       <ArrowRight className="w-4 h-4" />
                     </Button>

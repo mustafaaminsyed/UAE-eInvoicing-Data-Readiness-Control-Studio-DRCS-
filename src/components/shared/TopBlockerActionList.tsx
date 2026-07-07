@@ -7,7 +7,9 @@ export interface TopBlockerActionItem {
   label: string;
   severity: 'critical' | 'high' | 'medium';
   count: number;
+  summaryCount?: number;
   ruleId: string;
+  countLabel?: string;
 }
 
 export interface TopBlockerActionListProps {
@@ -20,6 +22,14 @@ export interface TopBlockerActionListProps {
    * the share covered by the listed blockers.
    */
   totalCriticalOutcomes: number;
+  /**
+   * Summary label for the resolved count sentence in the footer.
+   */
+  summaryUnitLabel?: string;
+  /**
+   * Summary label for the denominator in the footer sentence.
+   */
+  summaryDenominatorLabel?: string;
   /**
    * Called when a user selects a blocker remediation action.
    */
@@ -39,9 +49,11 @@ function formatCount(value: number) {
 export function TopBlockerActionList({
   blockers,
   totalCriticalOutcomes,
+  summaryUnitLabel = 'blocking outcomes',
+  summaryDenominatorLabel = 'total critical blocker outcomes',
   onBlockerClick,
 }: TopBlockerActionListProps) {
-  const resolvedOutcomes = blockers.reduce((sum, blocker) => sum + blocker.count, 0);
+  const resolvedOutcomes = blockers.reduce((sum, blocker) => sum + (blocker.summaryCount ?? blocker.count), 0);
   const percentage =
     totalCriticalOutcomes > 0 ? Math.round((resolvedOutcomes / totalCriticalOutcomes) * 100) : 0;
 
@@ -61,7 +73,9 @@ export function TopBlockerActionList({
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-sm font-semibold text-foreground">{blocker.label}</p>
                   <SeverityBadge severity={severityMap[blocker.severity]} />
-                  <span className="text-sm text-muted-foreground">· {formatCount(blocker.count)} invoices</span>
+                  <span className="text-sm text-muted-foreground">
+                    {`\u00B7 ${formatCount(blocker.count)} ${blocker.countLabel ?? 'invoices'}`}
+                  </span>
                 </div>
               </div>
             </div>
@@ -79,7 +93,7 @@ export function TopBlockerActionList({
 
       <p className="text-sm leading-6 text-muted-foreground">
         Fixing these {formatCount(blockers.length)} checks would resolve approx. {formatCount(resolvedOutcomes)}{' '}
-        blocking outcomes — {percentage}% of total critical exceptions.
+        {summaryUnitLabel} - {percentage}% of {summaryDenominatorLabel}.
       </p>
     </div>
   );

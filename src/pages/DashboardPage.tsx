@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+﻿import { useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -24,6 +24,7 @@ import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { StatsCard } from '@/components/StatsCard';
 import { SeverityBadge } from '@/components/SeverityBadge';
+import { ReadinessMethodologyTooltip } from '@/components/shared/ReadinessMethodologyTooltip';
 import { TopBlockerActionList } from '@/components/shared/TopBlockerActionList';
 import { EXECUTIVE_KPI_LABELS } from '@/constants/dashboardLabels';
 import { useCompliance } from '@/context/ComplianceContext';
@@ -39,6 +40,7 @@ interface DashboardException {
   checkId: string;
   checkName: string;
   severity: Severity;
+  invoiceId?: string;
   datasetType?: string;
   direction?: string;
   message: string;
@@ -79,6 +81,8 @@ interface ExceptionBreakdownItem {
   key: string;
   label: string;
   count: number;
+  affectedInvoices: number;
+  hasInvoiceCoverage: boolean;
   severity: Severity;
   description: string;
 }
@@ -98,6 +102,8 @@ interface DashboardSnapshot {
   rulePassRate: number;
   totalRuleOutcomes: number;
   criticalBlockerOutcomes: number;
+  criticalBlockerDocumentCount: number;
+  avgCriticalBlockersPerDocument: number;
   acceptedInvoices: number;
   successRate: number;
   passRate: number;
@@ -361,7 +367,12 @@ function deriveExceptionThemes(exceptions: DashboardException[]) {
 }
 
 function buildBlockingIssues(exceptions: DashboardException[]) {
-  const grouped = new Map<string, ExceptionBreakdownItem>();
+  const grouped = new Map<
+    string,
+    ExceptionBreakdownItem & {
+      invoiceIds: Set<string>;
+    }
+  >();
   const severityRank: Record<Severity, number> = { Critical: 4, High: 3, Medium: 2, Low: 1 };
 
   exceptions.forEach((exception) => {
@@ -371,13 +382,21 @@ function buildBlockingIssues(exceptions: DashboardException[]) {
         key: exception.checkId,
         label: exception.checkName,
         count: 1,
+        affectedInvoices: exception.invoiceId ? 1 : 0,
+        hasInvoiceCoverage: Boolean(exception.invoiceId),
         severity: exception.severity,
         description: exception.message,
+        invoiceIds: new Set(exception.invoiceId ? [exception.invoiceId] : []),
       });
       return;
     }
 
     existing.count += 1;
+    if (exception.invoiceId) {
+      existing.invoiceIds.add(exception.invoiceId);
+      existing.affectedInvoices = existing.invoiceIds.size;
+      existing.hasInvoiceCoverage = true;
+    }
     if (severityRank[exception.severity] > severityRank[existing.severity]) {
       existing.severity = exception.severity;
     }
@@ -394,6 +413,12 @@ function buildFallbackSnapshot(dataset: DatasetScope): DashboardSnapshot {
     hasLiveSignals: true,
     modeLabel: 'Preview portfolio snapshot',
     totalInvoices: dataset === 'AR' ? 1284 : 964,
+    submissionReadyCount: dataset === 'AR' ? 1186 : 833,
+    submissionReadyRate: dataset === 'AR' ? 92.4 : 86.4,
+    rulePassRate: dataset === 'AR' ? 93.1 : 88.2,
+    totalRuleOutcomes: dataset === 'AR' ? 4380 : 3264,
+    criticalBlockerDocumentCount: dataset === 'AR' ? 7 : 9,
+    avgCriticalBlockersPerDocument: dataset === 'AR' ? 3 : 3,
     acceptedInvoices: dataset === 'AR' ? 1186 : 833,
     successRate: dataset === 'AR' ? 92.4 : 86.4,
     passRate: dataset === 'AR' ? 93.1 : 88.2,
@@ -425,6 +450,8 @@ function buildFallbackSnapshot(dataset: DatasetScope): DashboardSnapshot {
         key: 'UAE-UC1-CHK-012',
         label: 'Seller identity completeness',
         count: 18,
+        affectedInvoices: 18,
+        hasInvoiceCoverage: true,
         severity: 'Critical',
         description: 'Seller registration and naming fields still create the largest readiness drag.',
       },
@@ -432,6 +459,8 @@ function buildFallbackSnapshot(dataset: DatasetScope): DashboardSnapshot {
         key: 'UAE-UC1-CHK-018',
         label: 'Buyer TRN pattern',
         count: 13,
+        affectedInvoices: 13,
+        hasInvoiceCoverage: true,
         severity: 'High',
         description: 'Counterparty TRN formatting remains inconsistent across repeat records.',
       },
@@ -439,6 +468,8 @@ function buildFallbackSnapshot(dataset: DatasetScope): DashboardSnapshot {
         key: 'UAE-UC1-CHK-031',
         label: 'VAT amount reconciliation',
         count: 9,
+        affectedInvoices: 9,
+        hasInvoiceCoverage: true,
         severity: 'High',
         description: 'Totals and tax derivation diverge on manually adjusted documents.',
       },
@@ -494,6 +525,8 @@ function buildDashboardSnapshot(input: {
       rulePassRate: 0,
       totalRuleOutcomes: 0,
       criticalBlockerOutcomes: 0,
+      criticalBlockerDocumentCount: 0,
+      avgCriticalBlockersPerDocument: 0,
       acceptedInvoices: 0,
       successRate: 0,
       passRate: 0,
@@ -646,6 +679,8 @@ function buildDashboardSnapshot(input: {
     rulePassRate: pintRuleCoverage,
     totalRuleOutcomes: dashboardMetrics.totalRuleOutcomes,
     criticalBlockerOutcomes: dashboardMetrics.criticalBlockerOutcomes,
+    criticalBlockerDocumentCount: dashboardMetrics.criticalBlockerDocumentCount,
+    avgCriticalBlockersPerDocument: dashboardMetrics.avgCriticalBlockersPerDocument,
     acceptedInvoices,
     successRate,
     passRate: pintRuleCoverage,
@@ -789,22 +824,40 @@ export default function DashboardPage() {
   const goLiveBand = readinessBand(snapshot.goLiveReadiness);
   const readinessNarrative = describeReadiness(snapshot.goLiveReadiness, snapshot.criticalIssues);
   const conditionalFieldScopeAbsent = snapshot.conditionalFieldDocumentCount === 0;
-  const topBlockingActions = useMemo(
+  const blockerChipCaption =
+    snapshot.criticalBlockerDocumentCount > 0
+      ? `${formatNumber(snapshot.criticalBlockerDocumentCount)} affected invoice${
+          snapshot.criticalBlockerDocumentCount === 1 ? '' : 's'
+        } · ${snapshot.avgCriticalBlockersPerDocument.toFixed(1)} outcomes per affected invoice`
+      : 'No active critical blocker exposure in the selected scope';
+  const criticalBlockingActions = useMemo(
     () =>
-      snapshot.blockingIssues.slice(0, 3).map((issue, index) => ({
-        rank: index + 1,
-        label: issue.label,
-        severity:
-          issue.severity === 'Critical'
-            ? 'critical'
-            : issue.severity === 'High'
-              ? 'high'
-              : 'medium',
-        count: issue.count,
-        ruleId: issue.key,
-      })),
+      snapshot.blockingIssues
+        .filter((issue) => issue.severity === 'Critical')
+        .slice(0, 3)
+        .map((issue, index) => ({
+          rank: index + 1,
+          label: issue.label,
+          severity: 'critical' as const,
+          count: issue.hasInvoiceCoverage ? issue.affectedInvoices : issue.count,
+          summaryCount: issue.count,
+          countLabel: issue.hasInvoiceCoverage ? 'invoices' : 'outcomes',
+          ruleId: issue.key,
+        })),
     [snapshot.blockingIssues]
   );
+  const universalCriticalCoverage =
+    criticalBlockingActions.length > 0 &&
+    snapshot.totalInvoices > 0 &&
+    criticalBlockingActions.every(
+      (issue) => issue.countLabel === 'invoices' && issue.count >= snapshot.totalInvoices
+    );
+  const remediationPanelTitle = universalCriticalCoverage
+    ? `Fix ${criticalBlockingActions.length} check${criticalBlockingActions.length === 1 ? '' : 's'} failing on every invoice`
+    : `Prioritise ${criticalBlockingActions.length} recurring blocker check${criticalBlockingActions.length === 1 ? '' : 's'}`;
+  const remediationPanelSubtitle = universalCriticalCoverage
+    ? 'These checks fail across the full active invoice population. Resolving them removes the largest concentration of critical blocker pressure.'
+    : 'These checks drive the largest share of critical blocker pressure in the current portfolio and are the fastest route to a cleaner readiness signal.';
 
   const supportExecutiveMetrics: MetricCard[] = [
     {
@@ -859,17 +912,20 @@ export default function DashboardPage() {
       ),
     },
     {
-      title: 'Critical Blocking Issues',
-      value: formatNumber(snapshot.criticalIssues),
-      subtitle: 'Immediate remediation required before reliable submission',
+      title: 'Critical blocker outcomes',
+      value: formatNumber(snapshot.criticalBlockerOutcomes),
+      subtitle:
+        snapshot.criticalBlockerDocumentCount > 0
+          ? `${formatNumber(snapshot.criticalBlockerDocumentCount)} invoice${snapshot.criticalBlockerDocumentCount === 1 ? '' : 's'} affected in current scope`
+          : 'No critical blockers currently linked to this scope',
       icon: <ShieldAlert className="h-5 w-5" />,
-      variant: snapshot.criticalIssues > 0 ? 'danger' : 'success',
+      variant: snapshot.criticalBlockerOutcomes > 0 ? 'danger' : 'success',
       helpContent: (
         <MetricHelpContent
-          summary="Critical exceptions that are most likely to stop, delay, or materially weaken a submission."
-          formula="Count of open Critical severity exceptions in the active scope."
+          summary="Critical validation outcomes that are most likely to stop, delay, or materially weaken a submission."
+          formula="Count of Critical failed rule outcomes, plus the distinct invoice population they affect."
           threshold="The target state is zero open critical blockers."
-          sourceFields="Exception queue records linked to validation findings."
+          sourceFields="Validation outcomes and exception queue records linked to the active invoice scope."
         />
       ),
     },
@@ -1094,11 +1150,28 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-          <ContextChip label="Document flow" value={activeDatasetType === 'AR' ? 'AR / Outbound' : 'AP / Inbound'} />
-          <ContextChip label="Invoices in scope" value={formatNumber(snapshot.totalInvoices)} />
-          <ContextChip label="Rule outcomes" value={formatNumber(snapshot.executedRuleOutcomes)} />
-          <ContextChip label="Critical blockers" value={formatNumber(snapshot.criticalIssues)} />
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <ContextChip
+            label="Current scope"
+            value={activeDatasetType === 'AR' ? 'AR / Outbound' : 'AP / Inbound'}
+            caption={snapshot.modeLabel}
+          />
+          <ContextChip
+            label="Invoices in scope"
+            value={formatNumber(snapshot.totalInvoices)}
+            caption="Header population under active dashboard review"
+          />
+          <ContextChip
+            label="Rule outcomes"
+            value={formatNumber(snapshot.executedRuleOutcomes)}
+            caption="Executed validation outcomes in the selected direction"
+          />
+          <ContextChip
+            label="Critical blocker exposure"
+            value={formatNumber(snapshot.criticalBlockerOutcomes)}
+            caption={blockerChipCaption}
+            tone={snapshot.criticalBlockerOutcomes > 0 ? 'danger' : 'success'}
+          />
         </div>
       </section>
 
@@ -1144,9 +1217,11 @@ export default function DashboardPage() {
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                         Go-Live Readiness
                       </p>
-                      <h3 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-                        {formatPercent(snapshot.goLiveReadiness)}
-                      </h3>
+                      <ReadinessMethodologyTooltip type="go-live" dimensions={readinessInputs}>
+                        <h3 className="cursor-help text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                          {formatPercent(snapshot.goLiveReadiness)}
+                        </h3>
+                      </ReadinessMethodologyTooltip>
                       <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
                         {readinessNarrative}
                       </p>
@@ -1168,62 +1243,69 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-	                  <div className="space-y-4">
+		                  <div className="space-y-4">
+		                    <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
+		                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+		                        Recommended next action
+		                      </p>
+		                      {criticalBlockingActions.length > 0 ? (
+		                        <div className="mt-3 space-y-4">
+		                          <div>
+		                            <p className="text-base font-semibold text-foreground">{remediationPanelTitle}</p>
+		                            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+		                              {remediationPanelSubtitle}
+		                            </p>
+		                          </div>
+		                          <TopBlockerActionList
+		                            blockers={criticalBlockingActions}
+		                            totalCriticalOutcomes={snapshot.criticalBlockerOutcomes}
+		                            summaryUnitLabel="critical blocker outcomes"
+		                            summaryDenominatorLabel="total critical blocker outcomes"
+		                            onBlockerClick={(ruleId) =>
+		                              navigate(
+		                                `/exceptions?dataset=${encodeURIComponent(activeDatasetType)}&ruleId=${encodeURIComponent(ruleId)}&sort=count_desc`
+		                              )
+		                            }
+		                          />
+		                        </div>
+		                      ) : (
+		                        <div className="mt-3 space-y-3">
+		                          <p className="text-base font-semibold text-foreground">No recurring critical blocker pattern detected</p>
+		                          <p className="text-sm leading-6 text-muted-foreground">
+		                            The current scope does not expose a dominant cluster of critical blockers, so validation detail is
+		                            the best next review surface.
+		                          </p>
+		                          <Button variant="outline" className="w-full rounded-full" onClick={() => navigate('/validation')}>
+		                            Open validation
+		                            <ArrowRight className="h-4 w-4" />
+		                          </Button>
+		                        </div>
+		                      )}
+		                    </div>
+
 	                    <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
 	                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-	                        Recommended next action
+	                        Portfolio Scope
 	                      </p>
-	                      {topBlockingActions.length > 0 ? (
-	                        <div className="mt-3 space-y-4">
-	                          <div>
-	                            <p className="text-base font-semibold text-foreground">Fix 3 checks failing on every invoice</p>
-	                            <p className="mt-1 text-sm leading-6 text-muted-foreground">
-	                              These checks fail on the entire active portfolio. Resolving them eliminates the largest share
-	                              of critical outcomes.
-	                            </p>
-	                          </div>
-	                          <TopBlockerActionList
-	                            blockers={topBlockingActions}
-	                            totalCriticalOutcomes={snapshot.criticalBlockerOutcomes}
-	                            onBlockerClick={(ruleId) =>
-	                              navigate(
-	                                `/exceptions?dataset=${encodeURIComponent(activeDatasetType)}&ruleId=${encodeURIComponent(ruleId)}&sort=count_desc`
-	                              )
-	                            }
-	                          />
+	                      <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+	                        <div>
+	                          <p className="text-xs text-muted-foreground">Invoices in scope</p>
+	                          <p className="text-xl font-semibold text-foreground">{formatNumber(snapshot.totalInvoices)}</p>
 	                        </div>
-	                      ) : (
-	                        <div className="mt-3 space-y-3">
-	                          <p className="text-base font-semibold text-foreground">No recurring critical blocker pattern detected</p>
-	                          <p className="text-sm leading-6 text-muted-foreground">
-	                            The current scope does not expose a dominant cluster of blocking checks, so validation detail is
-	                            the best next review surface.
+	                        <div>
+	                          <p className="text-xs text-muted-foreground">Validation outcomes</p>
+	                          <p className="text-xl font-semibold text-foreground">{formatNumber(snapshot.executedRuleOutcomes)}</p>
+	                        </div>
+	                        <div>
+	                          <p className="text-xs text-muted-foreground">Critical blocker invoices</p>
+	                          <p className="text-xl font-semibold text-foreground">
+	                            {formatNumber(snapshot.criticalBlockerDocumentCount)}
 	                          </p>
-	                          <Button variant="outline" className="w-full rounded-full" onClick={() => navigate('/validation')}>
-	                            Open validation
-	                            <ArrowRight className="h-4 w-4" />
-	                          </Button>
 	                        </div>
-	                      )}
-	                    </div>
-
-                    <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                        Portfolio Scope
-                      </p>
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                        <div>
-                          <p className="text-xs text-muted-foreground">Invoices in scope</p>
-                          <p className="text-xl font-semibold text-foreground">{formatNumber(snapshot.totalInvoices)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Validation outcomes</p>
-                          <p className="text-xl font-semibold text-foreground">{formatNumber(snapshot.executedRuleOutcomes)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Readiness band</p>
-                          <p className="text-xl font-semibold text-foreground">{goLiveBand.label}</p>
-                        </div>
+	                        <div>
+	                          <p className="text-xs text-muted-foreground">Readiness band</p>
+	                          <p className="text-xl font-semibold text-foreground">{goLiveBand.label}</p>
+	                        </div>
                       </div>
                     </div>
                   </div>
@@ -1372,8 +1454,12 @@ export default function DashboardPage() {
                           <div className="mt-2 flex items-center justify-between gap-3">
                             <p className="text-sm leading-6 text-muted-foreground">{issue.description}</p>
                             <div className="shrink-0 rounded-xl border border-border/70 bg-background px-3 py-2 text-right">
-                              <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Count</p>
-                              <p className="text-lg font-semibold text-foreground">{issue.count}</p>
+                              <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                                {issue.hasInvoiceCoverage ? 'Invoices' : 'Outcomes'}
+                              </p>
+                              <p className="text-lg font-semibold text-foreground">
+                                {issue.hasInvoiceCoverage ? issue.affectedInvoices : issue.count}
+                              </p>
                             </div>
                           </div>
                         </div>
@@ -1463,7 +1549,7 @@ function SeverityContextNote() {
           <p className="text-sm leading-6 text-muted-foreground">
             Severity reflects PINT-AE mandatory field classification. Checks on buyer TRN, seller TRN, issue date
             format, and line-item presence are classified Critical because FTA rejection is automatic on these fields.
-            The absence of Low exceptions means no advisory checks are currently failing — structural and identity
+            The absence of Low exceptions means no advisory checks are currently failing - structural and identity
             checks dominate this portfolio.
           </p>
         </CollapsibleContent>
@@ -1472,11 +1558,30 @@ function SeverityContextNote() {
   );
 }
 
-function ContextChip({ label, value }: { label: string; value: string }) {
+function ContextChip({
+  label,
+  value,
+  caption,
+  tone = 'default',
+}: {
+  label: string;
+  value: string;
+  caption?: string;
+  tone?: 'default' | 'success' | 'danger';
+}) {
   return (
-    <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
+    <div
+      className={
+        tone === 'danger'
+          ? 'rounded-2xl border border-severity-critical/15 bg-severity-critical/5 px-4 py-3'
+          : tone === 'success'
+            ? 'rounded-2xl border border-success/15 bg-success/5 px-4 py-3'
+            : 'rounded-2xl border border-border/70 bg-background/70 px-4 py-3'
+      }
+    >
       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
       <p className="mt-1 text-sm font-medium text-foreground">{value}</p>
+      {caption ? <p className="mt-1 text-xs leading-5 text-muted-foreground">{caption}</p> : null}
     </div>
   );
 }
@@ -1612,3 +1717,5 @@ function MetricTooltip({ title, content }: { title: string; content: ReactNode }
     </Tooltip>
   );
 }
+
+

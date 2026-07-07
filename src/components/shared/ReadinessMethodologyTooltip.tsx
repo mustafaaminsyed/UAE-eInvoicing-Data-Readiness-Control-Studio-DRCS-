@@ -46,9 +46,9 @@ export function ReadinessMethodologyTooltip({
   children,
 }: ReadinessMethodologyTooltipProps) {
   return (
-    <Tooltip>
+      <Tooltip>
       <TooltipTrigger asChild>
-        <span className="inline-flex items-center">{children}</span>
+        <div className="inline-flex items-center">{children}</div>
       </TooltipTrigger>
       <TooltipContent className="max-w-[360px] p-0">
         <div className="space-y-3 p-4">
@@ -57,7 +57,8 @@ export function ReadinessMethodologyTooltip({
               <div className="space-y-1">
                 <p className="text-sm font-semibold text-foreground">Go-Live Readiness methodology</p>
                 <p className="text-xs leading-5 text-muted-foreground">
-                  Weighted readiness dimensions are combined into a single score before critical blocker pressure is applied.
+                  Weighted readiness dimensions are combined into a single score before critical blocker
+                  pressure is applied.
                 </p>
               </div>
               <div className="overflow-hidden rounded-md border border-border/70">
@@ -76,7 +77,9 @@ export function ReadinessMethodologyTooltip({
                         <td className="px-3 py-2 text-foreground">{dimension.label}</td>
                         <td className="px-3 py-2 text-muted-foreground">{formatWeight(dimension.weight)}</td>
                         <td className="px-3 py-2 text-muted-foreground">{formatScore(dimension.score)}</td>
-                        <td className="px-3 py-2 text-foreground">{formatContribution(dimension.weight, dimension.score)}</td>
+                        <td className="px-3 py-2 text-foreground">
+                          {formatContribution(dimension.weight, dimension.score)}
+                        </td>
                       </tr>
                     ))}
                     {dimensions.length === 0 ? (
@@ -90,7 +93,7 @@ export function ReadinessMethodologyTooltip({
                 </table>
               </div>
               <p className="text-xs leading-5 text-muted-foreground">
-                Go-Live Readiness applies a 20% penalty for active critical blockers
+                Go-Live Readiness applies a 20% penalty for active critical blockers.
               </p>
             </>
           ) : (
@@ -98,7 +101,7 @@ export function ReadinessMethodologyTooltip({
               <div className="space-y-1">
                 <p className="text-sm font-semibold text-foreground">Compliance Readiness methodology</p>
                 <p className="text-xs leading-5 text-muted-foreground">
-                  Weighted data quality and rule readiness — excludes the critical blocker penalty
+                  Weighted data quality and rule readiness - excludes the critical blocker penalty.
                 </p>
               </div>
               <div className="space-y-2">
