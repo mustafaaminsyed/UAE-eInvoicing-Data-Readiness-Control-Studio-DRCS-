@@ -14,6 +14,7 @@ import { UploadStep } from '@/components/mapping/UploadStep';
 import { MappingStep } from '@/components/mapping/MappingStep';
 import { AnalysisStep } from '@/components/mapping/AnalysisStep';
 import { SaveStep } from '@/components/mapping/SaveStep';
+import { WorkflowNavigator, buildWorkflowItems } from '@/components/shared/WorkflowNavigator';
 import {
   ERPPreviewData,
   DetectedColumn,
@@ -329,7 +330,7 @@ export default function MappingPage() {
     <div className="min-h-screen">
       <div className="container mx-auto max-w-7xl px-6 py-8 md:py-10">
         {/* Profile Banner */}
-        <div className="mb-6 flex items-center justify-between rounded-2xl border border-white/70 p-4 surface-glass">
+	        <div className="mb-6 flex items-center justify-between rounded-2xl border border-white/70 p-4 surface-glass">
           <div className="flex items-center gap-4">
             <div>
               <h1 className="font-display text-2xl font-semibold">Field Mapping Assistant</h1>
@@ -366,12 +367,20 @@ export default function MappingPage() {
               </div>
             )}
           </div>
-          <Badge variant="outline" className="text-xs font-normal text-muted-foreground">
-            MoF baseline + PINT-AE technical layer
-          </Badge>
-        </div>
+	          <Badge variant="outline" className="text-xs font-normal text-muted-foreground">
+	            MoF baseline + PINT-AE technical layer
+	          </Badge>
+	        </div>
 
-        <Tabs value={activeTab} onValueChange={handleTabChange}>
+          <WorkflowNavigator
+            current="mapping"
+            fallbackPath="/upload"
+            className="mb-6"
+            helperText="Move through the ingestion workflow without losing context as you progress into mapping and validation."
+            items={buildWorkflowItems(['upload', 'mapping', 'run', 'validation', 'dashboard'])}
+          />
+
+	        <Tabs value={activeTab} onValueChange={handleTabChange}>
           <TabsList className="mb-6 surface-glass border border-white/70">
             <TabsTrigger value="templates" className="gap-2">
               <FileText className="h-4 w-4" />

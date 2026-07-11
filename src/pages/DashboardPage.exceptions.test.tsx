@@ -8,6 +8,18 @@ const mockComplianceState = {
   isChecksRun: true,
   isDataLoaded: true,
   isRunning: false,
+  runSummary: {
+    run_id: 'run-1',
+    run_mode: 'diagnostic_mapping',
+    readiness_qualification: 'diagnostic_only',
+    mapping_coverage_percent: 82,
+    total_invoices_tested: 3,
+    total_exceptions: 4,
+    pass_rate_percent: 66.7,
+    exceptions_by_severity: { Critical: 1, High: 3, Medium: 0, Low: 0 },
+    top_10_failing_checks: [],
+    top_10_clients_by_risk: [],
+  },
   activeDatasetType: 'AR',
   setActiveDatasetType: vi.fn(),
   getDashboardStats: () => ({
@@ -71,10 +83,22 @@ const mockComplianceState = {
 
 const resetMockComplianceState = () => {
   Object.assign(mockComplianceState, {
-    isChecksRun: true,
-    isDataLoaded: true,
-    isRunning: false,
-    activeDatasetType: 'AR',
+      isChecksRun: true,
+      isDataLoaded: true,
+      isRunning: false,
+      runSummary: {
+        run_id: 'run-1',
+        run_mode: 'diagnostic_mapping',
+        readiness_qualification: 'diagnostic_only',
+        mapping_coverage_percent: 82,
+        total_invoices_tested: 3,
+        total_exceptions: 4,
+        pass_rate_percent: 66.7,
+        exceptions_by_severity: { Critical: 1, High: 3, Medium: 0, Low: 0 },
+        top_10_failing_checks: [],
+        top_10_clients_by_risk: [],
+      },
+      activeDatasetType: 'AR',
     setActiveDatasetType: vi.fn(),
     getDashboardStats: () => ({
       totalInvoices: 3,
@@ -186,6 +210,8 @@ describe('DashboardPage executive surface', () => {
     expect(screen.getByText('Exception breakdown and remediation focus')).toBeInTheDocument();
 
     expect(screen.getByText('Go-Live Readiness')).toBeInTheDocument();
+    expect(screen.getByText('Diagnostic run')).toBeInTheDocument();
+    expect(screen.getByText('Mapped coverage 82%')).toBeInTheDocument();
     expect(screen.getByText('Portfolio Scope')).toBeInTheDocument();
     expect(screen.getAllByText('Mandatory data').length).toBeGreaterThan(0);
     expect(screen.getByText('Compliance Readiness')).toBeInTheDocument();

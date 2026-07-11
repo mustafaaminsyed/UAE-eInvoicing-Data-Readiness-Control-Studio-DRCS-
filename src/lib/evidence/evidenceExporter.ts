@@ -135,8 +135,30 @@ function sanitizeZipSegment(value: string): string {
 
 function executiveDecisionRows(data: EvidencePackData) {
   const report = buildStreamlinedEvidenceReport(data);
+  const runModeLabel =
+    data.overview.runMode === 'diagnostic_mapping'
+      ? 'Diagnostic mapping run'
+      : data.overview.runMode === 'governed_mapping'
+        ? 'Governed mapping run'
+        : data.overview.runMode === 'raw_template'
+          ? 'Raw template run'
+          : 'Not recorded';
+  const readinessQualificationLabel =
+    data.overview.readinessQualification === 'diagnostic_only'
+      ? 'Diagnostic only'
+      : data.overview.readinessQualification === 'decision_ready'
+        ? 'Decision-ready basis'
+        : 'Not recorded';
 
   return [
+    { field: 'Run classification', value: `${readinessQualificationLabel} | ${runModeLabel}` },
+    {
+      field: 'Mapping coverage context',
+      value:
+        data.overview.mappingCoveragePercent !== null && data.overview.mappingCoveragePercent !== undefined
+          ? `${Math.round(data.overview.mappingCoveragePercent)}%`
+          : 'Not recorded',
+    },
     { field: 'Readiness Verdict', value: report.verdict },
     { field: 'Evidence Confidence', value: report.evidenceConfidence },
     { field: 'Recommended Decision', value: report.recommendedDecision },
@@ -210,6 +232,33 @@ function appendEvidencePackFiles(zip: JSZip, data: EvidencePackData, prefix = ''
       value: data.overview.assessmentRunId,
     },
     { field: 'Execution Timestamp', value: data.overview.executionTimestamp },
+    {
+      field: 'Run Classification',
+      value:
+        data.overview.readinessQualification === 'diagnostic_only'
+          ? 'Diagnostic only'
+          : data.overview.readinessQualification === 'decision_ready'
+            ? 'Decision-ready basis'
+            : 'Not recorded',
+    },
+    {
+      field: 'Run Mode',
+      value:
+        data.overview.runMode === 'diagnostic_mapping'
+          ? 'Diagnostic mapping run'
+          : data.overview.runMode === 'governed_mapping'
+            ? 'Governed mapping run'
+            : data.overview.runMode === 'raw_template'
+              ? 'Raw template run'
+              : 'Not recorded',
+    },
+    {
+      field: 'Mapping Coverage Context',
+      value:
+        data.overview.mappingCoveragePercent !== null && data.overview.mappingCoveragePercent !== undefined
+          ? `${Math.round(data.overview.mappingCoveragePercent)}%`
+          : 'Not recorded',
+    },
     {
       field: 'Evidence Source Mode',
       value:
@@ -376,6 +425,20 @@ export async function generateEvidencePackZipByEntity(
     'Entity Key': pack.entityKey,
     'Entity Label': pack.entityLabel,
     'Assessment Run ID': pack.evidence.overview.assessmentRunId,
+    'Run Classification':
+      pack.evidence.overview.readinessQualification === 'diagnostic_only'
+        ? 'Diagnostic only'
+        : pack.evidence.overview.readinessQualification === 'decision_ready'
+          ? 'Decision-ready basis'
+          : 'Not recorded',
+    'Run Mode':
+      pack.evidence.overview.runMode === 'diagnostic_mapping'
+        ? 'Diagnostic mapping run'
+        : pack.evidence.overview.runMode === 'governed_mapping'
+          ? 'Governed mapping run'
+          : pack.evidence.overview.runMode === 'raw_template'
+            ? 'Raw template run'
+            : 'Not recorded',
     'Invoices': pack.evidence.overview.counts.totalInvoices,
     'Buyers': pack.evidence.overview.counts.totalBuyers,
     'Lines': pack.evidence.overview.counts.totalLines,
@@ -410,6 +473,20 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
     doc.setTextColor(...titleColor);
     doc.text(title, marginX, y);
   };
+  const runModeLabel =
+    ov.runMode === 'diagnostic_mapping'
+      ? 'Diagnostic mapping run'
+      : ov.runMode === 'governed_mapping'
+        ? 'Governed mapping run'
+        : ov.runMode === 'raw_template'
+          ? 'Raw template run'
+          : 'Not recorded';
+  const readinessQualificationLabel =
+    ov.readinessQualification === 'diagnostic_only'
+      ? 'Diagnostic only'
+      : ov.readinessQualification === 'decision_ready'
+        ? 'Decision-ready basis'
+        : 'Not recorded';
 
   doc.setFillColor(...titleColor);
   doc.rect(0, 0, pageWidth, 78, 'F');
@@ -420,6 +497,8 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
   doc.text(`${ov.specVersion} | ${ov.drVersion}`, marginX, 56);
+  doc.setFontSize(9);
+  doc.text(`${readinessQualificationLabel} | ${runModeLabel}`, marginX, 70);
 
   doc.setTextColor(...textColor);
   doc.setFont('helvetica', 'bold');
@@ -431,6 +510,9 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
   const summaryRows = [
     ['Run ID', ov.assessmentRunId],
     ['Execution Time', new Date(ov.executionTimestamp).toLocaleString()],
+    ['Run classification', readinessQualificationLabel],
+    ['Run mode', runModeLabel],
+    ['Mapping coverage context', ov.mappingCoveragePercent !== null && ov.mappingCoveragePercent !== undefined ? `${Math.round(ov.mappingCoveragePercent)}%` : 'Not recorded'],
     ['Evidence Source', ov.sourceMode === 'persisted_snapshot' ? 'Persisted snapshot' : 'Current in-memory run'],
     ['Scope', ov.scope],
     ['Dataset', ov.datasetName || '-'],

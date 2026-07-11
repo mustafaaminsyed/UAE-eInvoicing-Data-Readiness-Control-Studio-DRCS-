@@ -37,6 +37,9 @@ export interface CheckRunResultsSummary {
   direction?: string;
   ruleset?: string;
   rulesetVersion?: string;
+  runMode?: 'raw_template' | 'governed_mapping' | 'diagnostic_mapping';
+  readinessQualification?: 'decision_ready' | 'diagnostic_only';
+  mappingCoveragePercent?: number | null;
   uploadSessionId?: string | null;
   uploadManifestId?: string | null;
   mappingProfileId?: string | null;

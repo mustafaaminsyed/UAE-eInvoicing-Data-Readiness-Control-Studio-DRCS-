@@ -32,6 +32,9 @@ vi.mock('@/lib/api/checksApi', () => ({
       low_count: 0,
       pass_rate: 90,
       results_summary: {
+        run_mode: 'diagnostic_mapping',
+        readiness_qualification: 'diagnostic_only',
+        mapping_coverage_percent: 82,
         evidenceSnapshot: {
           version: 1,
           captured_at: '2026-03-14T10:00:00.000Z',
@@ -102,6 +105,9 @@ describe('EvidencePackPage historical runs', () => {
       screen.getByText(/persisted evidence snapshot and archived exception context/i)
     ).toBeInTheDocument();
     expect(screen.getByText(/Source: Persisted snapshot/i)).toBeInTheDocument();
+    expect(screen.getByText(/Diagnostic only/i)).toBeInTheDocument();
+    expect(screen.getByText(/Diagnostic mapping run/i)).toBeInTheDocument();
+    expect(screen.getByText(/Mapping coverage 82%/i)).toBeInTheDocument();
     expect(screen.getByText(/Entity scope: Single entity/i)).toBeInTheDocument();
     expect(screen.getByText(/Legal entities: 1/i)).toBeInTheDocument();
     expect(screen.getByText(/Executive decision/i)).toBeInTheDocument();

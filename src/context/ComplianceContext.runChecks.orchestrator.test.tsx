@@ -229,6 +229,9 @@ describe('ComplianceContext.runChecks delegation', () => {
     expect(saveCheckRunPayload.total_exceptions).toBe(1);
     expect(saveCheckRunPayload.results_summary.checkCount).toBe(2);
     expect(saveCheckRunPayload.results_summary.rulesetVersion).toBe('v1.0.0');
+    expect(saveCheckRunPayload.results_summary.runMode).toBe('raw_template');
+    expect(saveCheckRunPayload.results_summary.readinessQualification).toBe('decision_ready');
+    expect(saveCheckRunPayload.results_summary.mappingCoveragePercent).toBeNull();
     expect(saveCheckRunPayload.results_summary.evidenceSnapshot).toMatchObject({
       version: 1,
       counts: {
@@ -261,6 +264,17 @@ describe('ComplianceContext.runChecks delegation', () => {
     expect(mockedSaveExceptions).toHaveBeenCalledTimes(1);
     expect(mockedSaveClientRiskScores).toHaveBeenCalledTimes(1);
     expect(mockedSaveRunSummary).toHaveBeenCalledTimes(1);
+    expect(mockedGenerateRunSummary).toHaveBeenCalledWith(
+      'run-1',
+      1,
+      expect.any(Array),
+      [],
+      {
+        runMode: 'raw_template',
+        readinessQualification: 'decision_ready',
+        mappingCoveragePercent: null,
+      },
+    );
     expect(mockedSaveEntityScores).toHaveBeenCalledTimes(1);
 
     await waitFor(() => {

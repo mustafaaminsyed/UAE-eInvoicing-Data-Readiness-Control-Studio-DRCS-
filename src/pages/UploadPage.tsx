@@ -8,6 +8,8 @@ import { useCompliance } from '@/context/ComplianceContext';
 import { parseBuyersFile, parseHeadersFile, parseLinesFile, parseCSV } from '@/lib/csvParser';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { WorkflowNavigator, buildWorkflowItems } from '@/components/shared/WorkflowNavigator';
+import { WorkflowPageHeader } from '@/components/shared/WorkflowPageHeader';
 import { FileDropZone, FileSummaryCard, analyzeFile, FileStats } from '@/components/upload/FileAnalysis';
 import { SampleScenario } from '@/lib/sampleData';
 import { addUploadAuditLog } from '@/lib/uploadAudit';
@@ -259,16 +261,22 @@ export default function UploadPage() {
           ))}
         </div>
 
-        {/* Header */}
-        <div className="text-center mb-8 animate-fade-in">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-primary/10 rounded-2xl mb-3">
-            <FileSpreadsheet className="w-7 h-7 text-primary" />
-          </div>
-          <h1 className="text-2xl font-bold text-foreground mb-1">Upload Your Invoice Data</h1>
-          <p className="text-muted-foreground text-sm max-w-xl mx-auto">
-            Upload your invoice datasets to begin readiness and structural validation.
-          </p>
-        </div>
+        <WorkflowPageHeader
+          title="Upload Your Invoice Data"
+          description="Upload your invoice datasets to begin readiness and structural validation."
+          icon={<FileSpreadsheet className="h-7 w-7" />}
+          align="center"
+          className="mb-6 animate-fade-in"
+          descriptionClassName="max-w-xl"
+        />
+
+        <WorkflowNavigator
+          current="upload"
+          fallbackPath="/"
+          className="mb-5 animate-fade-in"
+          helperText="Move through the ingestion workflow without losing context as you progress into mapping and validation."
+          items={buildWorkflowItems(['upload', 'mapping', 'run', 'validation', 'dashboard'])}
+        />
 
         <div className="space-y-6 animate-slide-up">
           <div className="surface-glass rounded-2xl border border-white/70 shadow-sm p-4">

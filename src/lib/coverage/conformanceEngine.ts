@@ -182,12 +182,22 @@ export interface ReadinessResult {
   reasons: { message: string; link: string; linkLabel: string }[];
 }
 
+export interface ReadinessOptions {
+  /**
+   * Allow a governed diagnostic run when at least some mandatory DRs are mapped.
+   * Structural absence still blocks execution.
+   */
+  allowPartialMapping?: boolean;
+}
+
 export function checkRunReadiness(
   hasMappingProfile: boolean,
   mandatoryMappingCoverage: number,
   mandatoryPopulationPct: number | null,
+  options: ReadinessOptions = {},
 ): ReadinessResult {
   const reasons: { message: string; link: string; linkLabel: string }[] = [];
+  const allowPartialMapping = options.allowPartialMapping === true;
 
   if (!hasMappingProfile) {
     reasons.push({
@@ -197,7 +207,10 @@ export function checkRunReadiness(
     });
   }
 
-  if (mandatoryMappingCoverage < CONFORMANCE_CONFIG.mandatoryMappingCoverageThreshold) {
+  if (
+    mandatoryMappingCoverage < CONFORMANCE_CONFIG.mandatoryMappingCoverageThreshold &&
+    (!allowPartialMapping || mandatoryMappingCoverage <= 0)
+  ) {
     reasons.push({
       message: `Mandatory DR mapping coverage is ${mandatoryMappingCoverage.toFixed(0)}% (required: ${CONFORMANCE_CONFIG.mandatoryMappingCoverageThreshold}%).`,
       link: '/mapping',

@@ -46,6 +46,9 @@ export type RootCauseCategory =
   | 'Business Rule Violation'
   | 'Buyer Data Issue';
 
+export type ValidationRunMode = 'raw_template' | 'governed_mapping' | 'diagnostic_mapping';
+export type ReadinessQualification = 'decision_ready' | 'diagnostic_only';
+
 // PINT-AE Check Definition
 export interface PintAECheck {
   id?: string;
@@ -106,6 +109,9 @@ export interface PintAEException {
 export interface RunSummary {
   id?: string;
   run_id: string;
+  run_mode?: ValidationRunMode;
+  readiness_qualification?: ReadinessQualification;
+  mapping_coverage_percent?: number | null;
   total_invoices_tested: number;
   total_exceptions: number;
   pass_rate_percent: number;

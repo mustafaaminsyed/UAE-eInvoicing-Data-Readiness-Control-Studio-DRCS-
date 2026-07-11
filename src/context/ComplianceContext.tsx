@@ -9,7 +9,7 @@ import {
   DashboardStats,
   Severity
 } from '@/types/compliance';
-import { PintAEException, RunSummary } from '@/types/pintAE';
+import { PintAEException, ReadinessQualification, RunSummary, ValidationRunMode } from '@/types/pintAE';
 import { saveCheckRun, saveEntityScores } from '@/lib/api/checksApi';
 import { calculateScore } from '@/types/customChecks';
 import { DEFAULT_DIRECTION, Direction, OrganizationProfile } from '@/types/direction';
@@ -61,7 +61,13 @@ interface ComplianceContextType {
   setData: (data: ParsedData, options?: DatasetType | { direction?: Direction; uploadSessionId?: string; uploadManifestId?: string }) => void;
   getDataForDataset: (datasetType: DatasetType) => ParsedData;
   hasDatasetLoaded: (datasetType: DatasetType) => boolean;
-  runChecks: (options?: { mappingProfileId?: string; mappingVersion?: number }) => Promise<void>;
+  runChecks: (options?: {
+    mappingProfileId?: string;
+    mappingVersion?: number;
+    runMode?: ValidationRunMode;
+    readinessQualification?: ReadinessQualification;
+    mappingCoveragePercent?: number | null;
+  }) => Promise<void>;
   clearData: () => void;
   addUploadLogEntry: (entry: NewUploadLogEntry) => void;
   deleteUploadLogEntry: (id: string) => void;
@@ -201,11 +207,20 @@ function ComplianceStateProvider({ children }: { children: ReactNode }) {
     setLastChecksRunDatasetType(null);
   };
 
-  const runChecks = async (options?: { mappingProfileId?: string; mappingVersion?: number }) => {
+  const runChecks = async (options?: {
+    mappingProfileId?: string;
+    mappingVersion?: number;
+    runMode?: ValidationRunMode;
+    readinessQualification?: ReadinessQualification;
+    mappingCoveragePercent?: number | null;
+  }) => {
     setIsRunning(true);
     try {
       const activeMappingProfile = activeMappingProfileByDirection[direction];
       const mappingProfileId = options?.mappingProfileId || activeMappingProfile?.id;
+      const runMode = options?.runMode || (mappingProfileId ? 'governed_mapping' : 'raw_template');
+      const readinessQualification =
+        options?.readinessQualification || (runMode === 'diagnostic_mapping' ? 'diagnostic_only' : 'decision_ready');
       const activeRuleset = getRulesetForDirection(direction);
 
       const orchestrationResult = await runChecksOrchestrator({
@@ -255,6 +270,9 @@ function ComplianceStateProvider({ children }: { children: ReactNode }) {
           direction,
           ruleset: activeRuleset,
           rulesetVersion: RULESET_VERSION,
+          runMode,
+          readinessQualification,
+          mappingCoveragePercent: options?.mappingCoveragePercent ?? null,
           uploadSessionId,
           uploadManifestId,
           mappingProfileId: mappingProfileId || null,
@@ -270,7 +288,11 @@ function ComplianceStateProvider({ children }: { children: ReactNode }) {
       }
 
       const clientScores = calculateClientScores(pintExceptions, headers);
-      const summary = generateRunSummary(runId, headers.length, pintExceptions, clientScores);
+      const summary = generateRunSummary(runId, headers.length, pintExceptions, clientScores, {
+        runMode,
+        readinessQualification,
+        mappingCoveragePercent: options?.mappingCoveragePercent ?? null,
+      });
       const sellerScores = calculateEntityScores(allExceptions, headers, 'seller');
       const invoiceScores = calculateEntityScores(allExceptions, headers, 'invoice');
 

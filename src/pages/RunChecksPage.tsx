@@ -23,6 +23,8 @@ import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
 import { getSupabaseEnvStatus, isLocalDevFallbackEnabled, shouldUseLocalDevFallback } from '@/lib/api/supabaseEnv';
 import { supabase } from '@/integrations/supabase/client';
 import { LastRunContextBanner } from '@/components/run/LastRunContextBanner';
+import { WorkflowNavigator, buildWorkflowItems } from '@/components/shared/WorkflowNavigator';
+import { WorkflowPageHeader } from '@/components/shared/WorkflowPageHeader';
 import { FEATURE_FLAGS } from '@/config/features';
 import { PARSER_KNOWN_COLUMNS } from '@/lib/registry/drRegistry';
 import { defaultMoFReadinessRunner } from '@/engine/runners/mof';
@@ -240,6 +242,8 @@ export default function RunChecksPage() {
       const activeProfile = activeMappingProfileByDirection[direction];
       if (activeProfile?.id && templates.some((template) => template.id === activeProfile.id)) {
         setSelectedTemplateId(activeProfile.id);
+      } else if (templates.length > 0) {
+        setSelectedTemplateId(templates[0].id ?? 'none');
       } else {
         setSelectedTemplateId('none');
       }
@@ -293,8 +297,8 @@ export default function RunChecksPage() {
   const checksInfraError = diagnostics?.fetchError
     ? formatSetupError(diagnostics.fetchError, 'pint_ae_checks')
     : null;
-  const noMappingProfile =
-    isSupabaseConfigured && !isLoadingTemplates && !mappingTemplatesError && mappingTemplates.length === 0;
+  const hasSavedMappingProfiles =
+    isSupabaseConfigured && !isLoadingTemplates && !mappingTemplatesError && mappingTemplates.length > 0;
 
   // Raw template mode: allow check execution without a saved mapping profile
   // when uploaded data already has the minimum canonical shape required for UC1 checks.
@@ -323,13 +327,17 @@ export default function RunChecksPage() {
     () => analyzeCoverage(normalizedTemplateMappings.filter((mapping) => mapping.isConfirmed)),
     [normalizedTemplateMappings]
   );
+  const hasSelectedMappingProfile = Boolean(selectedTemplate?.id);
   const mandatoryCoverage = selectedTemplate ? Math.round(mappingCoverage.mandatoryCoverage) : 100;
   const unmappedMandatory = selectedTemplate ? mappingCoverage.unmappedMandatory : [];
   const hasCoverageWarning = selectedTemplate && mandatoryCoverage < 100;
+  const diagnosticRunEnabled = hasSelectedMappingProfile && mandatoryCoverage > 0 && mandatoryCoverage < 100;
   const isRunProcessing = isRunning || runStartedAt !== null;
   const runElapsedLabel = formatElapsedTime(runElapsedSeconds);
-  const mappingSatisfied = !noMappingProfile || canRunWithoutMapping;
-  const readiness = checkRunReadiness(mappingSatisfied, mandatoryCoverage, null);
+  const mappingSatisfied = hasSelectedMappingProfile || canRunWithoutMapping;
+  const readiness = checkRunReadiness(mappingSatisfied, mandatoryCoverage, null, {
+    allowPartialMapping: diagnosticRunEnabled,
+  });
 
   const mappedCanonicalColumnsByDataset = useMemo(() => {
     const asSet = {
@@ -466,6 +474,13 @@ export default function RunChecksPage() {
       await runChecks({
         mappingProfileId: selectedTemplate?.id,
         mappingVersion: selectedTemplate?.version,
+        runMode: diagnosticRunEnabled
+          ? 'diagnostic_mapping'
+          : selectedTemplate?.id
+            ? 'governed_mapping'
+            : 'raw_template',
+        readinessQualification: diagnosticRunEnabled ? 'diagnostic_only' : 'decision_ready',
+        mappingCoveragePercent: selectedTemplate ? mandatoryCoverage : null,
       });
       navigate('/dashboard');
     } catch {
@@ -565,22 +580,29 @@ export default function RunChecksPage() {
   return (
     <div className="min-h-[calc(100vh-4rem)]">
       <div className="container max-w-5xl py-8 md:py-10">
-        <div className="text-center mb-10 animate-fade-in">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-2xl mb-4">
-            <Play className="w-8 h-8 text-primary" />
-          </div>
-          <h1 className="font-display text-3xl font-semibold text-foreground mb-2">
-            Run Compliance Checks
-          </h1>
-          <p className="text-muted-foreground max-w-xl mx-auto">
-            Execute layered UAE eInvoicing controls across your uploaded data: MoF mandatory baseline readiness and
-            PINT-AE technical conformance checks. This will validate {headers.length} invoices across{' '}
-            {isLoadingChecks ? '...' : pintAEChecks.length} checks.
-          </p>
-          <div className="mt-3 flex justify-center">
-            <Badge variant="outline">Direction: {direction}</Badge>
-          </div>
-        </div>
+        <WorkflowPageHeader
+          title="Run Compliance Checks"
+          description={
+            <>
+              Execute layered UAE eInvoicing controls across your uploaded data: MoF mandatory baseline readiness and
+              PINT-AE technical conformance checks. This will validate {headers.length} invoices across{' '}
+              {isLoadingChecks ? '...' : pintAEChecks.length} checks.
+            </>
+          }
+          icon={<Play className="h-8 w-8" />}
+          align="center"
+          className="mb-8 animate-fade-in"
+          descriptionClassName="max-w-xl"
+          meta={<Badge variant="outline">Direction: {direction}</Badge>}
+        />
+
+        <WorkflowNavigator
+          current="run"
+          fallbackPath="/mapping"
+          className="mb-5 animate-fade-in"
+          helperText="Move through the ingestion workflow without losing context as you progress into mapping and validation."
+          items={buildWorkflowItems(['mapping', 'run', 'validation', 'dashboard', 'exceptions'])}
+        />
 
         <LastRunContextBanner
           lastChecksRunAt={lastChecksRunAt}
@@ -646,7 +668,7 @@ export default function RunChecksPage() {
                   </SelectContent>
                 </Select>
 
-                {mappingTemplates.length === 0 && !isLoadingTemplates && (
+                {!hasSelectedMappingProfile && !isLoadingTemplates && (
                   <p className="text-sm text-muted-foreground mt-2">
                     {isLocalFallbackMode ? (
                       'Local fallback mode: mapping templates from Supabase are unavailable. Checks can still run with raw uploaded data.'
@@ -654,6 +676,8 @@ export default function RunChecksPage() {
                       `Mapping templates unavailable: ${mappingTemplatesError}`
                     ) : canRunWithoutMapping ? (
                       'No active mapping template found. Raw template mode is enabled because uploaded columns already match required canonical structure.'
+                    ) : hasSavedMappingProfiles ? (
+                      'Select an active mapping template to run checks against non-canonical source files.'
                     ) : (
                       <>
                         No active {direction} mapping templates found.{' '}
@@ -689,11 +713,12 @@ export default function RunChecksPage() {
 
             {/* Coverage Warning */}
             {hasCoverageWarning && (
-              <Alert variant="destructive" className="mt-4 bg-yellow-500/10 border-yellow-500/30 text-yellow-700">
+              <Alert className="mt-4 border-amber-500/30 bg-amber-500/10 text-amber-700">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Coverage Gap</AlertTitle>
                 <AlertDescription>
-                  {unmappedMandatory.length} mandatory UC1 field(s) are not mapped:{' '}
+                  {unmappedMandatory.length} mandatory UC1 field(s) are not mapped. DRCS will allow a diagnostic run,
+                  but these gaps can still produce failures or incomplete readiness evidence:{' '}
                   <span className="font-medium">
                     {unmappedMandatory.slice(0, 5).map(f => f.name).join(', ')}
                     {unmappedMandatory.length > 5 && ` +${unmappedMandatory.length - 5} more`}
@@ -901,23 +926,32 @@ export default function RunChecksPage() {
         </div>
 
         {/* Mapping Prerequisite Warning */}
-        {noMappingProfile && !canRunWithoutMapping && (
+        {!hasSelectedMappingProfile && !canRunWithoutMapping && (
           <Alert className="mb-8 bg-amber-500/10 border-amber-500/30">
             <AlertTriangle className="h-4 w-4 text-amber-600" />
-            <AlertTitle className="text-amber-700">Mapping required before running checks</AlertTitle>
+            <AlertTitle className="text-amber-700">
+              {hasSavedMappingProfiles ? 'Select a mapping template before running checks' : 'Mapping required before running checks'}
+            </AlertTitle>
             <AlertDescription className="text-amber-600">
-              No active mapping profile found. Create and save a mapping template if your source columns do not match
-              DRCS canonical template fields.
+              {hasSavedMappingProfiles
+                ? 'This dataset does not meet the raw canonical fallback, so DRCS needs an active mapping template selected before checks can run.'
+                : 'No active mapping profile found. Create and save a mapping template if your source columns do not match DRCS canonical template fields.'}
               <div className="mt-3">
-                <Button size="sm" onClick={() => navigate('/mapping?tab=create')}>
-                  Go to Mapping Studio
-                </Button>
+                {hasSavedMappingProfiles ? (
+                  <Button size="sm" variant="outline" onClick={() => navigate('/mapping')}>
+                    Open Mapping Studio
+                  </Button>
+                ) : (
+                  <Button size="sm" onClick={() => navigate('/mapping?tab=create')}>
+                    Go to Mapping Studio
+                  </Button>
+                )}
               </div>
             </AlertDescription>
           </Alert>
         )}
 
-        {noMappingProfile && canRunWithoutMapping && (
+        {!hasSelectedMappingProfile && canRunWithoutMapping && (
           <Alert className="mb-8 border-emerald-500/20 bg-emerald-500/5">
             <AlertCircle className="h-4 w-4 text-emerald-600" />
             <AlertTitle className="text-emerald-700">Running in raw template mode</AlertTitle>
@@ -964,6 +998,17 @@ export default function RunChecksPage() {
                   View full traceability matrix {'->'}
                 </Link>
               </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {diagnosticRunEnabled && (
+          <Alert className="mb-8 border-amber-500/30 bg-amber-500/10">
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <AlertTitle className="text-amber-700">Diagnostic run mode is enabled</AlertTitle>
+            <AlertDescription className="text-amber-700/90">
+              A governed mapping profile is selected, but some mandatory fields are still unmapped. Checks can run for
+              diagnostics, however readiness should be treated as incomplete until mapping coverage is closed.
             </AlertDescription>
           </Alert>
         )}

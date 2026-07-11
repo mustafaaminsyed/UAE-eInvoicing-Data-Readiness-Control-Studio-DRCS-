@@ -19,6 +19,8 @@ import {
   TriangleAlert,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { WorkflowNavigator, buildWorkflowItems } from '@/components/shared/WorkflowNavigator';
+import { WorkflowPageHeader } from '@/components/shared/WorkflowPageHeader';
 import {
   Select,
   SelectContent,
@@ -474,34 +476,39 @@ export default function ControlsDashboardPage() {
   return (
     <div className="min-h-[calc(100vh-4rem)]">
       <div className="container max-w-7xl py-8 md:py-10">
-        <div className="flex items-center justify-between mb-8 animate-fade-in">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <BarChart3 className="w-6 h-6 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Controls Dashboard</h1>
-              <p className="text-muted-foreground">Readiness scoring, conformance coverage, and operational risk intelligence</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Select value={timeRange} onValueChange={(v) => setTimeRange(v as '7d' | '30d' | 'all')}>
-              <SelectTrigger className="w-32">
-                <Calendar className="w-4 h-4 mr-2" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7d">Last 7 days</SelectItem>
-                <SelectItem value="30d">Last 30 days</SelectItem>
-                <SelectItem value="all">All time</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline" onClick={() => loadData(true)} className="gap-2" disabled={isRefreshing}>
-              <RefreshCw className={cn('w-4 h-4', isRefreshing && 'animate-spin')} />
-              Refresh
-            </Button>
-          </div>
-        </div>
+        <WorkflowPageHeader
+          title="Controls Dashboard"
+          description="Readiness scoring, conformance coverage, and operational risk intelligence"
+          icon={<BarChart3 className="h-6 w-6" />}
+          className="mb-8 animate-fade-in"
+          actions={
+            <>
+              <Select value={timeRange} onValueChange={(v) => setTimeRange(v as '7d' | '30d' | 'all')}>
+                <SelectTrigger className="w-32">
+                  <Calendar className="mr-2 h-4 w-4" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7d">Last 7 days</SelectItem>
+                  <SelectItem value="30d">Last 30 days</SelectItem>
+                  <SelectItem value="all">All time</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="outline" onClick={() => loadData(true)} className="gap-2 rounded-full" disabled={isRefreshing}>
+                <RefreshCw className={cn('w-4 h-4', isRefreshing && 'animate-spin')} />
+                Refresh
+              </Button>
+            </>
+          }
+        />
+
+        <WorkflowNavigator
+          current="controls"
+          fallbackPath="/exceptions"
+          className="mb-6 animate-fade-in"
+          helperText="Move between readiness, remediation, controls, traceability, and evidence views without losing workflow context."
+          items={buildWorkflowItems(['dashboard', 'exceptions', 'controls', 'traceability', 'evidence'])}
+        />
 
         <div className="mb-8 animate-slide-up">
           <div className="mb-3 flex items-center justify-between gap-3">

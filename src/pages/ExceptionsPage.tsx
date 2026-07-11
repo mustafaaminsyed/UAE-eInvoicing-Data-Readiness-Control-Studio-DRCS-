@@ -26,6 +26,8 @@ import {
 import { ValidationExplainMode, ValidationExplanation } from '@/types/validationExplain';
 import { ExplanationPackPanel } from '@/components/explanations/ExplanationPackPanel';
 import { LastRunContextBanner } from '@/components/run/LastRunContextBanner';
+import { WorkflowNavigator, buildWorkflowItems } from '@/components/shared/WorkflowNavigator';
+import { WorkflowPageHeader } from '@/components/shared/WorkflowPageHeader';
 import {
   COMPLIANCE_RADAR_DIMENSIONS,
   getComplianceRadarDimensionDefinition,
@@ -275,18 +277,25 @@ export default function ExceptionsPage() {
   return (
     <div className="min-h-[calc(100vh-4rem)]">
       <div className="container max-w-7xl py-8 md:py-10">
-        <div className="flex items-center justify-between mb-8 animate-fade-in">
-          <div>
-            <h1 className="font-display text-3xl font-semibold text-foreground">Exceptions</h1>
-            <p className="text-muted-foreground mt-1">
-              {filteredExceptions.length} of {exceptions.length} exceptions shown
-            </p>
-          </div>
-          <Button onClick={handleExport} variant="outline" className="gap-2">
-            <Download className="w-4 h-4" />
-            Export CSV
-          </Button>
-        </div>
+        <WorkflowPageHeader
+          title="Exceptions"
+          description={`${filteredExceptions.length} of ${exceptions.length} exceptions shown`}
+          className="mb-8 animate-fade-in"
+          actions={
+            <Button onClick={handleExport} variant="outline" className="gap-2 rounded-full">
+              <Download className="w-4 h-4" />
+              Export CSV
+            </Button>
+          }
+        />
+
+        <WorkflowNavigator
+          current="exceptions"
+          fallbackPath="/dashboard"
+          className="mb-6 animate-fade-in"
+          helperText="Move between readiness, remediation, controls, traceability, and evidence views without losing workflow context."
+          items={buildWorkflowItems(['dashboard', 'exceptions', 'controls', 'traceability', 'evidence'])}
+        />
 
         <LastRunContextBanner
           lastChecksRunAt={lastChecksRunAt}
