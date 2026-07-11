@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { StatsCard } from '@/components/StatsCard';
 import { SeverityBadge } from '@/components/SeverityBadge';
+import { WorkflowNavigator, buildWorkflowItems } from '@/components/shared/WorkflowNavigator';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -218,6 +219,13 @@ export default function ValidationPage() {
 
   return (
     <div className="space-y-4 animate-fade-in">
+      <WorkflowNavigator
+        current="validation"
+        fallbackPath="/run"
+        helperText="Move through the ingestion workflow without losing context as you progress into mapping and validation."
+        items={buildWorkflowItems(['mapping', 'run', 'validation', 'dashboard', 'exceptions'])}
+      />
+
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatsCard
           title="Total Rules Evaluated"

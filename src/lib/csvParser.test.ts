@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { analyzeFile } from '@/components/upload/FileAnalysis';
-import { parseCSV, parseHeadersFile } from '@/lib/csvParser';
+import { parseCSV, parseHeadersFile, parseLinesFile } from '@/lib/csvParser';
 import { headersNegativeSample } from '@/lib/sampleData';
 
 describe('negative headers template upload path', () => {
@@ -46,5 +46,20 @@ describe('negative headers template upload path', () => {
     const [header] = await parseHeadersFile(file);
 
     expect(header.credit_note_reason_text).toBe('Commercial adjustment narrative');
+  });
+
+  it('prefers line_allowance_amount and backfills the legacy line_discount helper when parsing lines', async () => {
+    const csv = [
+      'line_id,invoice_id,line_number,description,quantity,unit_price,line_total_excl_vat,vat_rate,vat_amount,line_allowance_amount',
+      'L-001,INV-001,1,Advisory service,2,100,190,5,9.5,10',
+    ].join('\n');
+
+    const file = {
+      text: async () => csv,
+    } as File;
+    const [line] = await parseLinesFile(file);
+
+    expect(line.line_allowance_amount).toBe(10);
+    expect(line.line_discount).toBe(10);
   });
 });

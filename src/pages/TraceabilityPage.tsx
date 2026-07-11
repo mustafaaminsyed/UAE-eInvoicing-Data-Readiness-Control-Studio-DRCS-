@@ -16,6 +16,8 @@ import { computeAllDatasetPopulations } from '@/lib/coverage/populationCoverage'
 import { CONFORMANCE_CONFIG } from '@/config/conformance';
 import { DrillDownDialog } from '@/components/traceability/DrillDownDialog';
 import { ScenarioLensPanel } from '@/components/traceability/ScenarioLensPanel';
+import { WorkflowNavigator, buildWorkflowItems } from '@/components/shared/WorkflowNavigator';
+import { WorkflowPageHeader } from '@/components/shared/WorkflowPageHeader';
 import { exportTraceabilityReport } from '@/lib/coverage/regulatoryExport';
 import { runConsistencyChecks } from '@/lib/coverage/consistencyValidator';
 import { FEATURE_FLAGS } from '@/config/features';
@@ -478,16 +480,21 @@ export default function TraceabilityPage() {
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-background">
       <div className="container py-8 max-w-7xl">
-        {/* Header */}
-        <div className="text-center mb-8 animate-fade-in">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-primary/10 rounded-2xl mb-3">
-            <Shield className="w-7 h-7 text-primary" />
-          </div>
-          <h1 className="text-2xl font-bold text-foreground mb-1">DR Coverage & Traceability</h1>
-          <p className="text-muted-foreground text-sm max-w-2xl mx-auto">
-            Full regulatory traceability: UAE DR {'->'} templates {'->'} validation rules {'->'} controls {'->'} exceptions
-          </p>
-        </div>
+        <WorkflowPageHeader
+          title="DR Coverage & Traceability"
+          description="Full regulatory traceability: UAE DR -> templates -> validation rules -> controls -> exceptions"
+          icon={<Shield className="h-7 w-7" />}
+          align="center"
+          className="mb-6 animate-fade-in"
+        />
+
+        <WorkflowNavigator
+          current="traceability"
+          fallbackPath="/dashboard"
+          className="mb-5 animate-fade-in"
+          helperText="Move between readiness, remediation, controls, traceability, and evidence views without losing workflow context."
+          items={buildWorkflowItems(['dashboard', 'exceptions', 'controls', 'traceability', 'evidence'])}
+        />
 
         {/* Gaps Panel */}
         <div className="mb-6 animate-slide-up">

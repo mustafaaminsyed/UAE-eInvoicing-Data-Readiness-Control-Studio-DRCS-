@@ -59,6 +59,10 @@ const OVERLAY_CUTOVER_RULE_IDS = new Set([
   'IBR-152-AE',
 ]);
 
+function resolveLineAllowanceAmount(line: DataContext['lines'][number]): number {
+  return line.line_allowance_amount ?? line.line_discount ?? 0;
+}
+
 type ScenarioContextCache = Map<string, ReturnType<typeof buildScenarioContext>>;
 type LegacyScenarioClassificationCache = Map<string, ReturnType<typeof classifyInvoice>>;
 
@@ -1145,8 +1149,8 @@ export function runPintAECheckWithTelemetry(
       data.lines.forEach(line => {
         executionCount++;
         const header = data.headerMap.get(line.invoice_id);
-        const discount = line.line_discount || 0;
-        const expected = (line.quantity * line.unit_price) - discount;
+        const allowance = resolveLineAllowanceAmount(line);
+        const expected = (line.quantity * line.unit_price) - allowance;
         const diff = Math.abs(line.line_total_excl_vat - expected);
         const tolerance = params.tolerance || 0.01;
         if (diff > tolerance) {
@@ -1158,8 +1162,8 @@ export function runPintAECheckWithTelemetry(
             lineId: line.line_id,
             fieldName: 'line_total_excl_vat',
             observedValue: String(line.line_total_excl_vat),
-            expectedValue: `(${line.quantity} x ${line.unit_price}) - ${discount} = ${expected.toFixed(2)}`,
-            message: `Invoice ${header?.invoice_number}, Line ${line.line_number}: Net amount (${line.line_total_excl_vat}) != (Qty x Price) - Discount (${expected.toFixed(2)})`,
+            expectedValue: `(${line.quantity} x ${line.unit_price}) - ${allowance} = ${expected.toFixed(2)}`,
+            message: `Invoice ${header?.invoice_number}, Line ${line.line_number}: Net amount (${line.line_total_excl_vat}) != (Qty x Price) - Allowance/Discount (${expected.toFixed(2)})`,
           }));
         }
       });

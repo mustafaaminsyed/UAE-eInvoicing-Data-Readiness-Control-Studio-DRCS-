@@ -4,6 +4,8 @@ import {
   PintAEException, 
   RunSummary, 
   ClientRiskScore,
+  ValidationRunMode,
+  ReadinessQualification,
   calculateRiskScore,
   calculateHealthScore 
 } from '@/types/pintAE';
@@ -664,7 +666,12 @@ export function generateRunSummary(
   runId: string,
   totalInvoices: number,
   exceptions: PintAEException[],
-  clientScores: Omit<ClientRiskScore, 'id' | 'run_id'>[]
+  clientScores: Omit<ClientRiskScore, 'id' | 'run_id'>[],
+  options?: {
+    runMode?: ValidationRunMode;
+    readinessQualification?: ReadinessQualification;
+    mappingCoveragePercent?: number | null;
+  },
 ): Omit<RunSummary, 'id'> {
   // Count by severity
   const severityCounts: Record<Severity, number> = { Critical: 0, High: 0, Medium: 0, Low: 0 };
@@ -701,6 +708,9 @@ export function generateRunSummary(
 
   return {
     run_id: runId,
+    run_mode: options?.runMode,
+    readiness_qualification: options?.readinessQualification,
+    mapping_coverage_percent: options?.mappingCoveragePercent ?? null,
     total_invoices_tested: totalInvoices,
     total_exceptions: exceptions.length,
     pass_rate_percent: Math.round(passRate * 100) / 100,

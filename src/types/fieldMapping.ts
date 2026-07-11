@@ -222,7 +222,7 @@ export const PINT_AE_UC1_FIELDS: PintAEField[] = [
   { id: 'quantity', name: 'Quantity', description: 'Invoiced quantity', ibtReference: 'IBT-129', category: 'line', isMandatory: true, dataType: 'number' },
   { id: 'unit_of_measure', name: 'Unit of Measure', description: 'UNECE Rec 20 unit code', ibtReference: 'IBT-130', category: 'line', isMandatory: false, dataType: 'string' },
   { id: 'unit_price', name: 'Unit Price', description: 'Item net price', ibtReference: 'IBT-146', category: 'line', isMandatory: true, dataType: 'number' },
-  { id: 'line_discount', name: 'Line Discount', description: 'Line-level discount amount before VAT', ibtReference: 'SYS-LINE-DISCOUNT', category: 'line', isMandatory: false, dataType: 'number' },
+  { id: 'line_discount', name: 'Line Discount (Legacy)', description: 'Backward-compatible DRCS helper field for line discounts; use line_allowance_amount where possible', ibtReference: 'SYS-LINE-DISCOUNT', category: 'line', isMandatory: false, dataType: 'number' },
   { id: 'line_total_excl_vat', name: 'Line Net Amount', description: 'Line total excl VAT', ibtReference: 'IBT-131', category: 'line', isMandatory: true, dataType: 'number' },
   { id: 'description', name: 'Item Description', description: 'Item name/description', ibtReference: 'IBT-153', category: 'line', isMandatory: true, dataType: 'string' },
   { id: 'item_name', name: 'Item Name', description: 'Item name used when separate from description', ibtReference: 'IBT-154', category: 'line', isMandatory: false, dataType: 'string' },
@@ -233,7 +233,7 @@ export const PINT_AE_UC1_FIELDS: PintAEField[] = [
   { id: 'exemption_reason_code', name: 'Exemption Reason Code', description: 'Exemption code required for exempt VAT scenarios', ibtReference: 'IBT-151', category: 'line', isMandatory: false, dataType: 'string' },
   { id: 'exemption_reason_text', name: 'Exemption Reason Text', description: 'Exemption reason text for exempt VAT scenarios', ibtReference: 'IBT-151', category: 'line', isMandatory: false, dataType: 'string' },
   { id: 'goods_service_type', name: 'Goods / Service Type', description: 'Goods or service type required for reverse-charge VAT scenarios', ibtReference: 'IBT-151', category: 'line', isMandatory: false, dataType: 'string' },
-  { id: 'line_allowance_amount', name: 'Line Allowance Amount', description: 'Line-level allowance amount', ibtReference: 'SYS-LINE-ALLOWANCE', category: 'line', isMandatory: false, dataType: 'number' },
+  { id: 'line_allowance_amount', name: 'Line Allowance Amount', description: 'Preferred standards-aligned line allowance amount for pricing and discount logic', ibtReference: 'SYS-LINE-ALLOWANCE', category: 'line', isMandatory: false, dataType: 'number' },
   { id: 'line_charge_amount', name: 'Line Charge Amount', description: 'Line-level charge amount', ibtReference: 'SYS-LINE-CHARGE', category: 'line', isMandatory: false, dataType: 'number' },
   
   // Totals Fields

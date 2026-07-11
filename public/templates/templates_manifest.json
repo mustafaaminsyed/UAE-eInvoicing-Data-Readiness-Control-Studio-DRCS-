@@ -26,7 +26,7 @@
       "file": "invoice_headers_template.csv",
       "dataset": "Invoice Headers",
       "description": "Invoice header facts",
-      "column_count": 35,
+      "column_count": 36,
       "join_keys": ["invoice_id", "buyer_id"],
       "columns": [
         { "name": "invoice_id", "dr_ids": [], "mandatory": true, "asp_derived": false, "type": "String", "format": "Unique identifier", "description": "Internal join key (system primary key)", "responsibility": "ERP (Corner 1)" },
@@ -62,6 +62,7 @@
         { "name": "tax_category_code", "dr_ids": ["IBT-118"], "mandatory": true, "asp_derived": false, "type": "Code", "format": "S, Z, E, RC", "description": "Tax category code", "responsibility": "ERP (Corner 1)" },
         { "name": "tax_category_rate", "dr_ids": ["IBT-119"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Percentage (e.g. 5.00)", "description": "Tax category rate", "responsibility": "ERP (Corner 1)" },
         { "name": "credit_note_reason_code", "dr_ids": ["BTAE-03"], "mandatory": false, "asp_derived": false, "type": "Code", "format": "Credit note reason code", "description": "Required for credit notes (invoice_type = 381)", "responsibility": "ERP (Corner 1)" },
+        { "name": "credit_note_reason_text", "dr_ids": ["SYS-CN-REASON-TEXT"], "mandatory": false, "asp_derived": false, "type": "String", "format": "Free text", "description": "Narrative reason text for credit notes when captured by the source system", "responsibility": "ERP (Corner 1)" },
         { "name": "preceding_invoice_reference", "dr_ids": ["IBT-025"], "mandatory": false, "asp_derived": false, "type": "String", "format": "Original invoice identifier", "description": "Required for credit notes unless credit_note_reason_code = VD", "responsibility": "ERP (Corner 1)" },
         { "name": "preceding_invoice_issue_date", "dr_ids": ["IBT-026"], "mandatory": false, "asp_derived": false, "type": "Date", "format": "YYYY-MM-DD", "description": "Optional issue date of the original invoice being credited", "responsibility": "ERP (Corner 1)" }
       ]
@@ -70,21 +71,27 @@
       "file": "invoice_lines_template.csv",
       "dataset": "Invoice Lines",
       "description": "Invoice line item facts",
-      "column_count": 12,
+      "column_count": 18,
       "join_keys": ["line_id", "invoice_id"],
       "columns": [
         { "name": "line_id", "dr_ids": ["IBT-126"], "mandatory": true, "asp_derived": false, "type": "String", "format": "Unique sequential identifier", "description": "Line identifier", "responsibility": "ERP (Corner 1)" },
         { "name": "invoice_id", "dr_ids": [], "mandatory": true, "asp_derived": false, "type": "String", "format": "FK → headers.invoice_id", "description": "Foreign key to invoice headers", "responsibility": "ERP (Corner 1)" },
         { "name": "line_number", "dr_ids": ["IBT-126"], "mandatory": true, "asp_derived": false, "type": "Integer", "format": "Sequential number", "description": "Line sequence number within invoice", "responsibility": "ERP (Corner 1)" },
-        { "name": "description", "dr_ids": ["IBT-153"], "mandatory": true, "asp_derived": false, "type": "String", "format": "Free text", "description": "Item name / description", "responsibility": "ERP (Corner 1)" },
+        { "name": "description", "dr_ids": ["IBT-153"], "mandatory": true, "asp_derived": false, "type": "String", "format": "Free text", "description": "Item description", "responsibility": "ERP (Corner 1)" },
+        { "name": "item_name", "dr_ids": ["IBT-154"], "mandatory": false, "asp_derived": false, "type": "String", "format": "Free text", "description": "Item name when captured separately from description", "responsibility": "ERP (Corner 1)" },
         { "name": "quantity", "dr_ids": ["IBT-129"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Decimal", "description": "Invoiced quantity", "responsibility": "ERP (Corner 1)" },
         { "name": "unit_of_measure", "dr_ids": ["IBT-130"], "mandatory": true, "asp_derived": false, "type": "Code", "format": "UN/ECE Rec 20 (EA, KGM, MTR…)", "description": "Unit of measure code", "responsibility": "ERP (Corner 1)" },
         { "name": "unit_price", "dr_ids": ["IBT-146"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Decimal", "description": "Item net price", "responsibility": "ERP (Corner 1)" },
-        { "name": "line_discount", "dr_ids": [], "mandatory": false, "asp_derived": false, "type": "Number", "format": "Decimal (2dp)", "description": "Line-level allowance/discount amount", "responsibility": "ERP (Corner 1)" },
+        { "name": "line_discount", "dr_ids": [], "mandatory": false, "asp_derived": false, "type": "Number", "format": "Decimal (2dp)", "description": "Simplified line discount input used by current DRCS line-math checks", "responsibility": "ERP (Corner 1)" },
         { "name": "line_total_excl_vat", "dr_ids": ["IBT-131"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Decimal (2dp)", "description": "Line net amount", "responsibility": "ERP (Corner 1)" },
         { "name": "vat_rate", "dr_ids": ["IBT-152"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Percentage (e.g. 5.00)", "description": "VAT rate", "responsibility": "ERP (Corner 1)" },
         { "name": "vat_amount", "dr_ids": ["BTUAE-08"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Decimal (2dp)", "description": "VAT line amount", "responsibility": "ERP (Corner 1)" },
-        { "name": "tax_category_code", "dr_ids": ["IBT-151"], "mandatory": true, "asp_derived": false, "type": "Code", "format": "S, Z, E, RC", "description": "Item tax category code", "responsibility": "ERP (Corner 1)" }
+        { "name": "tax_category_code", "dr_ids": ["IBT-151"], "mandatory": true, "asp_derived": false, "type": "Code", "format": "S, Z, E, RC", "description": "Item tax category code", "responsibility": "ERP (Corner 1)" },
+        { "name": "exemption_reason_code", "dr_ids": ["IBT-151"], "mandatory": false, "asp_derived": false, "type": "Code", "format": "UAE exemption reason code", "description": "Reason code used when the item tax category is exempt or zero-rated", "responsibility": "ERP (Corner 1)" },
+        { "name": "exemption_reason_text", "dr_ids": ["IBT-151"], "mandatory": false, "asp_derived": false, "type": "String", "format": "Free text", "description": "Narrative exemption reason text when captured by the source system", "responsibility": "ERP (Corner 1)" },
+        { "name": "goods_service_type", "dr_ids": ["IBT-151"], "mandatory": false, "asp_derived": false, "type": "Code", "format": "Goods or services indicator", "description": "Reverse-charge goods or services classification when applicable", "responsibility": "ERP (Corner 1)" },
+        { "name": "line_allowance_amount", "dr_ids": ["IBT-136"], "mandatory": false, "asp_derived": false, "type": "Number", "format": "Decimal (2dp)", "description": "Standards-aligned invoice line allowance amount", "responsibility": "ERP (Corner 1)" },
+        { "name": "line_charge_amount", "dr_ids": ["IBT-141"], "mandatory": false, "asp_derived": false, "type": "Number", "format": "Decimal (2dp)", "description": "Standards-aligned invoice line charge amount", "responsibility": "ERP (Corner 1)" }
       ]
     }
   ],

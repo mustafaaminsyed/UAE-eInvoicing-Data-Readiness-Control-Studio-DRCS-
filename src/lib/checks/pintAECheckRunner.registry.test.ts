@@ -684,6 +684,30 @@ describe('runPintAECheck executor registry parity', () => {
     expect(invalidReason[0].field_name).toBe('credit_note_reason_code');
   });
 
+  it('validates CHK-034 using standards-aligned line allowance when legacy discount is absent', () => {
+    const check = getCheck('UAE-UC1-CHK-034');
+    const validData = buildDataContext(
+      {},
+      {
+        lines: [
+          {
+            line_id: 'L-1',
+            invoice_id: 'INV-1',
+            line_number: 1,
+            quantity: 2,
+            unit_price: 100,
+            line_total_excl_vat: 190,
+            line_allowance_amount: 10,
+            vat_rate: 5,
+            vat_amount: 9.5,
+          } as InvoiceLine,
+        ],
+      }
+    );
+
+    expect(runPintAECheck(check, validData)).toHaveLength(0);
+  });
+
   it('validates CHK-048 for UNECERec20 and skips empty values', () => {
     const check = getCheck('UAE-UC1-CHK-048');
     const validCode = getCodelistCodes('UNECERec20')[0];

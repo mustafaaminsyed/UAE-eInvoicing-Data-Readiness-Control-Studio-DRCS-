@@ -6,6 +6,10 @@ const generateId = () => Math.random().toString(36).substring(2, 15) + Math.rand
 // TRN validation regex (UAE format: 15 digits)
 const TRN_REGEX = /^\d{15}$/;
 
+function resolveLineAllowance(dataLine: DataContext['lines'][number]): number {
+  return dataLine.line_allowance_amount ?? dataLine.line_discount ?? 0;
+}
+
 export const checksRegistry: ComplianceCheck[] = [
   {
     id: 'buyer_trn_missing',
@@ -135,14 +139,14 @@ export const checksRegistry: ComplianceCheck[] = [
   {
     id: 'line_totals_mismatch',
     name: 'Line Totals Mismatch',
-    description: 'Validates line_total_excl_vat = (quantity * unit_price) - line_discount',
+    description: 'Validates line_total_excl_vat = (quantity * unit_price) - line allowance/discount',
     severity: 'High',
     category: 'line',
     run: (data: DataContext): Exception[] => {
       const exceptions: Exception[] = [];
       data.lines.forEach(line => {
-        const discount = line.line_discount || 0;
-        const expected = (line.quantity * line.unit_price) - discount;
+        const allowance = resolveLineAllowance(line);
+        const expected = (line.quantity * line.unit_price) - allowance;
         const diff = Math.abs(line.line_total_excl_vat - expected);
         if (diff > 0.01) {
           const header = data.headerMap.get(line.invoice_id);
@@ -151,7 +155,7 @@ export const checksRegistry: ComplianceCheck[] = [
             checkId: 'line_totals_mismatch',
             checkName: 'Line Totals Mismatch',
             severity: 'High',
-            message: `Line ${line.line_number}: line_total_excl_vat (${line.line_total_excl_vat}) != (${line.quantity} * ${line.unit_price}) - ${discount}`,
+            message: `Line ${line.line_number}: line_total_excl_vat (${line.line_total_excl_vat}) != (${line.quantity} * ${line.unit_price}) - ${allowance}`,
             invoiceId: line.invoice_id,
             invoiceNumber: header?.invoice_number,
             sellerTrn: header?.seller_trn,

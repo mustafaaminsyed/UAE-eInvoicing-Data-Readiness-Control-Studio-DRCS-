@@ -9,7 +9,7 @@ import { getControlsRegistry, ControlEntry } from '@/lib/registry/controlsRegist
 import { computeTraceabilityMatrix, CoverageStatus, TraceabilityRow } from '@/lib/coverage/conformanceEngine';
 import { DatasetPopulation } from '@/lib/coverage/populationCoverage';
 import { CONFORMANCE_CONFIG } from '@/config/conformance';
-import { ExecutionLayer, FailureClass, PintAEException, RuleType } from '@/types/pintAE';
+import { ExecutionLayer, FailureClass, PintAEException, ReadinessQualification, RuleType, ValidationRunMode } from '@/types/pintAE';
 import { Buyer, InvoiceHeader, InvoiceLine } from '@/types/compliance';
 import { getValidationDRTargets } from '@/lib/registry/validationToDRMap';
 import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
@@ -22,6 +22,9 @@ export interface EvidencePackBuildOverrides {
   totalInvoices?: number;
   totalBuyers?: number;
   totalLines?: number;
+  runMode?: ValidationRunMode;
+  readinessQualification?: ReadinessQualification;
+  mappingCoveragePercent?: number | null;
   executionTelemetry?: EvidenceRuleExecutionTelemetryRow[];
   sourceMode?: EvidenceSourceMode;
   entityScopeStatus?: EvidenceEntityScopeStatus;
@@ -45,6 +48,9 @@ export interface EvidenceOverview {
   specVersion: string;
   drVersion: string;
   datasetName: string;
+  runMode?: ValidationRunMode;
+  readinessQualification?: ReadinessQualification;
+  mappingCoveragePercent?: number | null;
   sourceMode: EvidenceSourceMode;
   entityScopeStatus: EvidenceEntityScopeStatus;
   legalEntityCount: number;
@@ -310,6 +316,9 @@ export function buildEvidencePackData(
     specVersion: 'PINT-AE 2025-Q2',
     drVersion: 'UAE DR v1.0.1',
     datasetName,
+    runMode: overrides.runMode,
+    readinessQualification: overrides.readinessQualification,
+    mappingCoveragePercent: overrides.mappingCoveragePercent ?? null,
     sourceMode,
     entityScopeStatus: entityScope.entityScopeStatus,
     legalEntityCount: entityScope.legalEntityCount,

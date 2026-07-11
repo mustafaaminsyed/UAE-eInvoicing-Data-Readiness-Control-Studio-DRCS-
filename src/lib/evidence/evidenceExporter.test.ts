@@ -1,4 +1,5 @@
 import JSZip from 'jszip';
+import * as XLSX from 'xlsx';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { EvidencePackData } from './evidenceDataBuilder';
@@ -17,6 +18,9 @@ function buildEvidencePackData(): EvidencePackData {
       specVersion: 'PINT-AE 2025-Q2',
       drVersion: 'UAE DR v1.0.1',
       datasetName: 'Test Dataset',
+      runMode: 'diagnostic_mapping',
+      readinessQualification: 'diagnostic_only',
+      mappingCoveragePercent: 82,
       sourceMode: 'current_in_memory_run',
       entityScopeStatus: 'single_entity',
       legalEntityCount: 1,
@@ -148,6 +152,32 @@ describe('generateEvidencePackZip', () => {
     expect(
       fileSpy.mock.calls.some(([filename]) => filename === '01_scope_summary.xlsx')
     ).toBe(true);
+  });
+
+  it('includes run classification metadata in the scope summary workbook', async () => {
+    const fileSpy = vi.spyOn(JSZip.prototype, 'file');
+    vi.spyOn(JSZip.prototype, 'generateAsync').mockResolvedValue(new Blob());
+
+    await generateEvidencePackZip(buildEvidencePackData());
+
+    const scopeWorkbookPayload = fileSpy.mock.calls.find(([filename]) => filename === '01_scope_summary.xlsx')?.[1];
+    expect(scopeWorkbookPayload).toBeTruthy();
+
+    const workbookBytes =
+      scopeWorkbookPayload instanceof Uint8Array
+        ? scopeWorkbookPayload
+        : new Uint8Array(scopeWorkbookPayload as ArrayBuffer);
+    const workbook = XLSX.read(workbookBytes, { type: 'array' });
+    const sheet = workbook.Sheets['Scope Summary'];
+    const rows = XLSX.utils.sheet_to_json<{ field: string; value: string }>(sheet);
+
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        { field: 'Run Classification', value: 'Diagnostic only' },
+        { field: 'Run Mode', value: 'Diagnostic mapping run' },
+        { field: 'Mapping Coverage Context', value: '82%' },
+      ]),
+    );
   });
 });
 

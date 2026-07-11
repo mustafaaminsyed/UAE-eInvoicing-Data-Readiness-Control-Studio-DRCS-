@@ -10,12 +10,12 @@ B003,Tech Solutions DMCC,300000000000003,Floor 12 Almas Tower JLT,AE,Dubai,AE-DU
 export const headersSample = `invoice_id,invoice_number,issue_date,invoice_type,seller_trn,seller_name,seller_address,seller_city,seller_country,seller_subdivision,seller_electronic_address,seller_legal_reg_id,seller_legal_reg_id_type,buyer_id,currency,transaction_type_code,principal_id,invoicing_period_start_date,invoicing_period_end_date,deliver_to_address_line_1,deliver_to_city,deliver_to_country_subdivision,deliver_to_country_code,payment_due_date,payment_means_code,fx_rate,total_excl_vat,vat_total,total_incl_vat,amount_due,tax_category_code,tax_category_rate,credit_note_reason_code,credit_note_reason_text,preceding_invoice_reference,preceding_invoice_issue_date
 INV001,UAE-2025-0001,2025-01-15,380,100000000000001,Dariba Tax Technologies LLC,Al Sila Tower ADGM,Abu Dhabi,AE,AE-AZ,dariba@peppol.ae,TL-123456,TL,B001,AED,01000000,,,,,,,,2025-02-14,30,1.000000,1000.00,50.00,1050.00,1050.00,S,5.00,,,,
 INV002,UAE-2025-0002,2025-01-16,380,100000000000001,Dariba Tax Technologies LLC,Al Sila Tower ADGM,Abu Dhabi,AE,AE-AZ,dariba@peppol.ae,TL-123456,TL,B002,AED,01000000,,,,,,,,2025-02-15,30,1.000000,2000.00,100.00,2100.00,2100.00,S,5.00,,,,
-INV003,UAE-2025-0003,2025-01-17,381,100000000000001,Dariba Tax Technologies LLC,Al Sila Tower ADGM,Abu Dhabi,AE,AE-AZ,dariba@peppol.ae,TL-123456,TL,B003,AED,01000000,,,,,,,,2025-02-16,30,1.000000,500.00,25.00,525.00,525.00,S,5.00,ADJ,Price adjustment for original invoice,UAE-2024-1099,2024-12-31`;
+INV003,UAE-2025-0003,2025-01-17,381,100000000000001,Dariba Tax Technologies LLC,Al Sila Tower ADGM,Abu Dhabi,AE,AE-AZ,dariba@peppol.ae,TL-123456,TL,B003,AED,01000000,,,,,,,,2025-02-16,30,1.000000,500.00,25.00,525.00,525.00,S,5.00,VD,Value correction linked to original invoice,UAE-2024-1099,2024-12-31`;
 
-export const linesSample = `line_id,invoice_id,line_number,description,quantity,unit_of_measure,unit_price,line_discount,line_total_excl_vat,vat_rate,vat_amount,tax_category_code
-L001,INV001,1,Consulting Services - Tax Advisory,10,EA,100.00,0.00,1000.00,5.00,50.00,S
-L002,INV002,1,E-Invoicing Integration Package,1,EA,2000.00,0.00,2000.00,5.00,100.00,S
-L003,INV003,1,Compliance Readiness Assessment,5,EA,100.00,0.00,500.00,5.00,25.00,S`;
+export const linesSample = `line_id,invoice_id,line_number,description,item_name,quantity,unit_of_measure,unit_price,line_discount,line_total_excl_vat,vat_rate,vat_amount,tax_category_code,exemption_reason_code,exemption_reason_text,goods_service_type,line_allowance_amount,line_charge_amount
+L001,INV001,1,Consulting Services - Tax Advisory,Tax Advisory Services,10,EA,100.00,,1000.00,5.00,50.00,S,,,,0.00,
+L002,INV002,1,E-Invoicing Integration Package,Integration Package,1,EA,2000.00,,2000.00,5.00,100.00,S,,,,0.00,
+L003,INV003,1,Compliance Readiness Assessment,Readiness Assessment,5,EA,100.00,,500.00,5.00,25.00,S,,,,0.00,`;
 
 export const buyersNegativeSample = `buyer_id,buyer_name,buyer_trn,buyer_address,buyer_country,buyer_city,buyer_subdivision,buyer_electronic_address
 B001,Acme Corporation LLC,100000000000003,Office 42 Business Bay Tower,AE,Dubai,AE-DU,acme@peppol.ae
@@ -27,10 +27,10 @@ INV001,UAE-2025-0001,2025-01-15,380,100000000000001,Dariba Tax Technologies LLC,
 INV002,UAE-2025-0002,2025-01-16,380,100000000000001,Dariba Tax Technologies LLC,Al Sila Tower ADGM,Abu Dhabi,AE,AE-XX,dariba@peppol.ae,TL-123456,TL,B002,AED,01000000,,,,,,,,,30,1.000000,2000.00,100.00,2100.00,2100.00,S,5.00,,,,
 INV003,UAE-2025-0003,2025-01-17,381,100000000000001,Dariba Tax Technologies LLC,Al Sila Tower ADGM,Abu Dhabi,AE,AE-AZ,dariba@peppol.ae,TL-123456,TL,B003,AED,01000000,,,,,,,,2025-02-16,30,1.000000,500.00,20.00,525.00,525.00,S,5.00,,,,`;
 
-export const linesNegativeSample = `line_id,invoice_id,line_number,description,quantity,unit_of_measure,unit_price,line_discount,line_total_excl_vat,vat_rate,vat_amount,tax_category_code
-L001,INV001,1,Consulting Services - Tax Advisory,10,EA,100.00,0.00,1000.00,5.00,50.00,S
-L002,INV002,1,E-Invoicing Integration Package,1,EA,2000.00,0.00,2000.00,5.00,140.00,S
-L003,INV003,1,Compliance Readiness Assessment,5,EA,100.00,0.00,500.00,5.00,25.00,S`;
+export const linesNegativeSample = `line_id,invoice_id,line_number,description,item_name,quantity,unit_of_measure,unit_price,line_discount,line_total_excl_vat,vat_rate,vat_amount,tax_category_code,exemption_reason_code,exemption_reason_text,goods_service_type,line_allowance_amount,line_charge_amount
+L001,INV001,1,Consulting Services - Tax Advisory,Tax Advisory Services,10,EA,100.00,0.00,1000.00,5.00,50.00,S,,,,,
+L002,INV002,1,E-Invoicing Integration Package,Integration Package,1,EA,2000.00,0.00,2000.00,5.00,140.00,S,,,,,
+L003,INV003,1,Compliance Readiness Assessment,Readiness Assessment,5,EA,100.00,0.00,500.00,5.00,25.00,S,,,,,`;
 
 const apPartiesSample = buyersSample
   .replace(/buyer_id/g, 'supplier_id')
@@ -129,6 +129,6 @@ export const TEMPLATE_MANIFEST = {
   templates: [
     { file: 'buyers_template.csv', dataset: 'Buyers', columns: 8 },
     { file: 'invoice_headers_template.csv', dataset: 'Invoice Headers', columns: 36 },
-    { file: 'invoice_lines_template.csv', dataset: 'Invoice Lines', columns: 12 },
+    { file: 'invoice_lines_template.csv', dataset: 'Invoice Lines', columns: 18 },
   ],
 };

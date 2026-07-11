@@ -262,27 +262,32 @@ export async function parseLinesFile(file: File, options: ParseOptions = {}): Pr
   const text = await file.text();
   const records = parseCSV(text);
 
-  return records.map((record, index) => ({
-    line_id: record.line_id || '',
-    invoice_id: record.invoice_id || '',
-    line_number: parseInt(record.line_number) || 0,
-    description: str(record, 'description', 'item_name'),
-    item_name: str(record, 'item_name', 'description'),
-    quantity: parseFloat(record.quantity) || 0,
-    unit_price: parseFloat(record.unit_price) || 0,
-    line_discount: record.line_discount ? parseFloat(record.line_discount) : undefined,
-    line_total_excl_vat: num(record, 'line_total_excl_vat', 'line_net_amount') || 0,
-    vat_rate: parseFloat(record.vat_rate) || 0,
-    vat_amount: parseFloat(record.vat_amount) || 0,
-    unit_of_measure: str(record, 'unit_of_measure', 'unit_code'),
-    tax_category_code: str(record, 'tax_category_code'),
-    exemption_reason_code: str(record, 'exemption_reason_code', 'vat_exemption_reason_code'),
-    exemption_reason_text: str(record, 'exemption_reason_text', 'vat_exemption_reason_text'),
-    goods_service_type: str(record, 'goods_service_type', 'reverse_charge_goods_type'),
-    line_allowance_amount: num(record, 'line_allowance_amount'),
-    line_charge_amount: num(record, 'line_charge_amount'),
-    source_row_number: index + 2,
-    upload_session_id: options.uploadSessionId,
-    upload_manifest_id: options.uploadManifestId,
-  }));
+  return records.map((record, index) => {
+    const lineAllowanceAmount = num(record, 'line_allowance_amount', 'line_discount');
+    const lineDiscount = num(record, 'line_discount', 'line_allowance_amount');
+
+    return {
+      line_id: record.line_id || '',
+      invoice_id: record.invoice_id || '',
+      line_number: parseInt(record.line_number) || 0,
+      description: str(record, 'description', 'item_name'),
+      item_name: str(record, 'item_name', 'description'),
+      quantity: parseFloat(record.quantity) || 0,
+      unit_price: parseFloat(record.unit_price) || 0,
+      line_discount: lineDiscount,
+      line_total_excl_vat: num(record, 'line_total_excl_vat', 'line_net_amount') || 0,
+      vat_rate: parseFloat(record.vat_rate) || 0,
+      vat_amount: parseFloat(record.vat_amount) || 0,
+      unit_of_measure: str(record, 'unit_of_measure', 'unit_code'),
+      tax_category_code: str(record, 'tax_category_code'),
+      exemption_reason_code: str(record, 'exemption_reason_code', 'vat_exemption_reason_code'),
+      exemption_reason_text: str(record, 'exemption_reason_text', 'vat_exemption_reason_text'),
+      goods_service_type: str(record, 'goods_service_type', 'reverse_charge_goods_type'),
+      line_allowance_amount: lineAllowanceAmount,
+      line_charge_amount: num(record, 'line_charge_amount'),
+      source_row_number: index + 2,
+      upload_session_id: options.uploadSessionId,
+      upload_manifest_id: options.uploadManifestId,
+    };
+  });
 }

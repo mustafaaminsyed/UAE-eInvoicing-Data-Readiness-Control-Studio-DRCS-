@@ -26,6 +26,7 @@ import { StatsCard } from '@/components/StatsCard';
 import { SeverityBadge } from '@/components/SeverityBadge';
 import { ReadinessMethodologyTooltip } from '@/components/shared/ReadinessMethodologyTooltip';
 import { TopBlockerActionList } from '@/components/shared/TopBlockerActionList';
+import { WorkflowNavigator, buildWorkflowItems } from '@/components/shared/WorkflowNavigator';
 import { EXECUTIVE_KPI_LABELS } from '@/constants/dashboardLabels';
 import { useCompliance } from '@/context/ComplianceContext';
 import { computeDashboardMetrics } from '@/hooks/useDashboardMetrics';
@@ -756,12 +757,48 @@ function describeReadiness(score: number | null, criticalIssues: number) {
   return 'Readiness remains materially constrained by unresolved data quality, rule conformance, or scenario coverage issues.';
 }
 
+function getRunModeBadge(runSummary: { run_mode?: string; readiness_qualification?: string; mapping_coverage_percent?: number | null } | null) {
+  if (!runSummary?.run_mode) return null;
+
+  if (runSummary.run_mode === 'diagnostic_mapping') {
+    return {
+      label: 'Diagnostic run',
+      toneClass: 'border-amber-500/25 bg-amber-500/10 text-amber-700',
+      detail:
+        runSummary.mapping_coverage_percent !== null && runSummary.mapping_coverage_percent !== undefined
+          ? `Mapped coverage ${Math.round(runSummary.mapping_coverage_percent)}%`
+          : 'Partial mapping coverage',
+    };
+  }
+
+  if (runSummary.run_mode === 'governed_mapping') {
+    return {
+      label: 'Governed mapping run',
+      toneClass: 'border-primary/20 bg-primary/10 text-primary',
+      detail:
+        runSummary.mapping_coverage_percent !== null && runSummary.mapping_coverage_percent !== undefined
+          ? `Mapped coverage ${Math.round(runSummary.mapping_coverage_percent)}%`
+          : 'Mapped execution path',
+    };
+  }
+
+  return {
+    label: 'Raw template run',
+    toneClass: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700',
+    detail:
+      runSummary.readiness_qualification === 'diagnostic_only'
+        ? 'Diagnostic only'
+        : 'Canonical source columns detected',
+  };
+}
+
 export default function DashboardPage() {
   const navigate = useNavigate();
   const {
     isChecksRun,
     isDataLoaded,
     isRunning,
+    runSummary,
     activeDatasetType,
     setActiveDatasetType,
     getDashboardStats,
@@ -822,6 +859,7 @@ export default function DashboardPage() {
   }, [snapshot]);
 
   const goLiveBand = readinessBand(snapshot.goLiveReadiness);
+  const runModeBadge = getRunModeBadge(runSummary);
   const readinessNarrative = describeReadiness(snapshot.goLiveReadiness, snapshot.criticalIssues);
   const conditionalFieldScopeAbsent = snapshot.conditionalFieldDocumentCount === 0;
   const blockerChipCaption =
@@ -1150,6 +1188,14 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        <WorkflowNavigator
+          current="dashboard"
+          fallbackPath="/run"
+          className="mt-5"
+          helperText="Move between readiness, remediation, controls, traceability, and evidence views without losing workflow context."
+          items={buildWorkflowItems(['dashboard', 'exceptions', 'controls', 'traceability', 'evidence'])}
+        />
+
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <ContextChip
             label="Current scope"
@@ -1201,6 +1247,11 @@ export default function DashboardPage() {
                       >
                         {goLiveBand.label}
                       </Badge>
+                      {runModeBadge ? (
+                        <Badge variant="outline" className={runModeBadge.toneClass}>
+                          {runModeBadge.label}
+                        </Badge>
+                      ) : null}
                       <MetricTooltip
                         title="Go-Live Readiness"
                         content={
@@ -1225,6 +1276,11 @@ export default function DashboardPage() {
                       <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
                         {readinessNarrative}
                       </p>
+                      {runModeBadge ? (
+                        <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                          {runModeBadge.detail}
+                        </p>
+                      ) : null}
                     </div>
 
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">

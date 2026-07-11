@@ -39,6 +39,8 @@ import { CONFORMANCE_CONFIG } from '@/config/conformance';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { SeverityBadge } from '@/components/SeverityBadge';
+import { WorkflowNavigator, buildWorkflowItems } from '@/components/shared/WorkflowNavigator';
+import { WorkflowPageHeader } from '@/components/shared/WorkflowPageHeader';
 
 const ruleTypeDisplayLabels: Record<string, string> = {
   dynamic_codelist: 'Dynamic Codelist',
@@ -75,6 +77,58 @@ function formatExecutionLayerLabel(value: string): string {
 
 function formatFailureClassLabel(value: string): string {
   return failureClassDisplayLabels[value] ?? value.replace(/_/g, ' ');
+}
+
+function getRunContextSummary(
+  runSummary: {
+    run_mode?: string;
+    readiness_qualification?: string;
+    mapping_coverage_percent?: number | null;
+  } | null,
+) {
+  if (!runSummary?.run_mode) return null;
+
+  const coverageLabel =
+    runSummary.mapping_coverage_percent !== null && runSummary.mapping_coverage_percent !== undefined
+      ? `Mapping coverage ${Math.round(runSummary.mapping_coverage_percent)}%`
+      : null;
+
+  if (runSummary.run_mode === 'diagnostic_mapping') {
+    return {
+      statusLabel: 'Diagnostic only',
+      statusClass: 'border-amber-500/30 bg-amber-500/10 text-amber-700',
+      modeLabel: 'Diagnostic mapping run',
+      modeClass: 'border-amber-500/30 bg-amber-500/10 text-amber-700',
+      coverageLabel: coverageLabel ?? 'Partial mapping coverage',
+      narrative: 'This run was executed with a governed mapping profile, but mandatory mapping coverage was incomplete. Treat the pack as diagnostic evidence rather than a decision-ready readiness conclusion.',
+    };
+  }
+
+  if (runSummary.run_mode === 'governed_mapping') {
+    return {
+      statusLabel: runSummary.readiness_qualification === 'diagnostic_only' ? 'Diagnostic only' : 'Decision-ready basis',
+      statusClass:
+        runSummary.readiness_qualification === 'diagnostic_only'
+          ? 'border-amber-500/30 bg-amber-500/10 text-amber-700'
+          : 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700',
+      modeLabel: 'Governed mapping run',
+      modeClass: 'border-primary/20 bg-primary/10 text-primary',
+      coverageLabel: coverageLabel ?? 'Mapped execution path',
+      narrative: 'This run used a saved mapping profile and the persisted pack reflects the governed transformation context used during validation.',
+    };
+  }
+
+  return {
+    statusLabel: runSummary.readiness_qualification === 'diagnostic_only' ? 'Diagnostic only' : 'Decision-ready basis',
+    statusClass:
+      runSummary.readiness_qualification === 'diagnostic_only'
+        ? 'border-amber-500/30 bg-amber-500/10 text-amber-700'
+        : 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700',
+    modeLabel: 'Raw template run',
+    modeClass: 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700',
+    coverageLabel: coverageLabel ?? 'Canonical source columns detected',
+    narrative: 'This run executed directly against source files that already matched the DRCS canonical template shape.',
+  };
 }
 
 export default function EvidencePackPage() {
@@ -145,6 +199,14 @@ export default function EvidencePackPage() {
   const isHistoricalSnapshotMissing = Boolean(isHistoricalRun && !selectedRunSnapshot);
   const canBuildEvidence = (isChecksRun && isCurrentContextRun) || canUseHistoricalSnapshot;
   const showLegacyRunSummary = false;
+  const selectedRunSummary = useMemo(
+    () =>
+      (isCurrentContextRun
+        ? runSummary
+        : (selectedRun?.results_summary as typeof runSummary | null) ?? null),
+    [isCurrentContextRun, runSummary, selectedRun],
+  );
+  const selectedRunContext = getRunContextSummary(selectedRunSummary);
 
   // Build populations from raw data for evidence
   const populations = useMemo(() => {
@@ -178,12 +240,15 @@ export default function EvidencePackPage() {
       canUseHistoricalSnapshot ? [] : lines,
       selectedRunExceptions,
       populations,
-      selectedRunSnapshot
+          selectedRunSnapshot
         ? {
             datasetName: selectedRunSnapshot.dataset_name,
             totalInvoices: selectedRunSnapshot.counts.totalInvoices,
             totalBuyers: selectedRunSnapshot.counts.totalBuyers,
             totalLines: selectedRunSnapshot.counts.totalLines,
+            runMode: selectedRunSummary?.run_mode,
+            readinessQualification: selectedRunSummary?.readiness_qualification,
+            mappingCoveragePercent: selectedRunSummary?.mapping_coverage_percent ?? null,
             sourceMode: canUseHistoricalSnapshot ? 'persisted_snapshot' : 'current_in_memory_run',
             entityScopeStatus: selectedRunSnapshot.entity_scope_status,
             legalEntityCount: selectedRunSnapshot.legal_entity_count,
@@ -191,6 +256,9 @@ export default function EvidencePackPage() {
             executionTelemetry: canUseHistoricalSnapshot ? selectedRunTelemetry : lastPintRuleTelemetry,
           }
         : {
+            runMode: selectedRunSummary?.run_mode,
+            readinessQualification: selectedRunSummary?.readiness_qualification,
+            mappingCoveragePercent: selectedRunSummary?.mapping_coverage_percent ?? null,
             sourceMode: canUseHistoricalSnapshot ? 'persisted_snapshot' : 'current_in_memory_run',
             executionTelemetry: lastPintRuleTelemetry,
           }
@@ -206,6 +274,7 @@ export default function EvidencePackPage() {
     selectedRunExceptions,
     populations,
     selectedRunSnapshot,
+    selectedRunSummary,
     selectedRunTelemetry,
     lastPintRuleTelemetry,
   ]);
@@ -282,6 +351,9 @@ export default function EvidencePackPage() {
           entityPopulations,
           {
             datasetName: group.entityLabel,
+            runMode: runSummary?.run_mode,
+            readinessQualification: runSummary?.readiness_qualification,
+            mappingCoveragePercent: runSummary?.mapping_coverage_percent ?? null,
             sourceMode: 'current_in_memory_run',
             entityScopeStatus: 'single_entity',
             legalEntityCount: 1,
@@ -290,7 +362,18 @@ export default function EvidencePackPage() {
         ),
       };
     });
-  }, [buyers, headers, isCurrentContextRun, lines, runId, runTimestamp, selectedRunExceptions]);
+  }, [
+    buyers,
+    headers,
+    isCurrentContextRun,
+    lines,
+    runId,
+    runTimestamp,
+    selectedRunExceptions,
+    runSummary?.mapping_coverage_percent,
+    runSummary?.readiness_qualification,
+    runSummary?.run_mode,
+  ]);
 
   const canExportPerEntity =
     exportFormat === 'excel' &&
@@ -498,6 +581,13 @@ export default function EvidencePackPage() {
               </>
             )}
           </div>
+          <WorkflowNavigator
+            current="evidence"
+            fallbackPath="/dashboard"
+            className="mt-5"
+            helperText="Move between readiness, remediation, controls, traceability, and evidence views without losing workflow context."
+            items={buildWorkflowItems(['dashboard', 'exceptions', 'controls', 'traceability', 'evidence'])}
+          />
         </div>
       </div>
     );
@@ -508,46 +598,65 @@ export default function EvidencePackPage() {
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-background">
       <div className="container py-8 max-w-7xl space-y-6">
-        {/* Header */}
-        <div className="flex items-start justify-between flex-wrap gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-              <Shield className="w-6 h-6 text-primary" />
-              Evidence Pack
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Regulator-ready audit artifact | {ov.specVersion} | {ov.drVersion}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Select value={exportFormat} onValueChange={(v) => setExportFormat(v as 'excel' | 'pdf')}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="excel">Excel ZIP</SelectItem>
-                <SelectItem value="pdf">PDF Report</SelectItem>
-              </SelectContent>
-            </Select>
-            {exportFormat === 'excel' ? (
-              <Select value={exportScope} onValueChange={(v) => setExportScope(v as 'consolidated' | 'per_entity')}>
-                <SelectTrigger className="w-[190px]">
+        <WorkflowPageHeader
+          title="Evidence Pack"
+          description={`Regulator-ready audit artifact | ${ov.specVersion} | ${ov.drVersion}`}
+          icon={<Shield className="h-6 w-6" />}
+          className="animate-fade-in"
+          meta={
+            selectedRunContext ? (
+              <>
+                <Badge variant="outline" className={selectedRunContext.statusClass}>
+                  {selectedRunContext.statusLabel}
+                </Badge>
+                <Badge variant="outline" className={selectedRunContext.modeClass}>
+                  {selectedRunContext.modeLabel}
+                </Badge>
+                <Badge variant="outline" className="text-xs">
+                  {selectedRunContext.coverageLabel}
+                </Badge>
+              </>
+            ) : null
+          }
+          actions={
+            <>
+              <Select value={exportFormat} onValueChange={(v) => setExportFormat(v as 'excel' | 'pdf')}>
+                <SelectTrigger className="w-[150px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="consolidated">Consolidated pack</SelectItem>
-                  {canExportPerEntity ? (
-                    <SelectItem value="per_entity">Per legal entity</SelectItem>
-                  ) : null}
+                  <SelectItem value="excel">Excel ZIP</SelectItem>
+                  <SelectItem value="pdf">PDF Report</SelectItem>
                 </SelectContent>
               </Select>
-            ) : null}
-            <Button onClick={handleExport} disabled={exporting} className="gap-2">
-              {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-              Generate {exportFormat === 'pdf' ? 'PDF Report' : 'Evidence Pack'}
-            </Button>
-          </div>
-        </div>
+              {exportFormat === 'excel' ? (
+                <Select value={exportScope} onValueChange={(v) => setExportScope(v as 'consolidated' | 'per_entity')}>
+                  <SelectTrigger className="w-[190px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="consolidated">Consolidated pack</SelectItem>
+                    {canExportPerEntity ? (
+                      <SelectItem value="per_entity">Per legal entity</SelectItem>
+                    ) : null}
+                  </SelectContent>
+                </Select>
+              ) : null}
+              <Button onClick={handleExport} disabled={exporting} className="gap-2 rounded-full">
+                {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                Generate {exportFormat === 'pdf' ? 'PDF Report' : 'Evidence Pack'}
+              </Button>
+            </>
+          }
+        />
+
+        <WorkflowNavigator
+          current="evidence"
+          fallbackPath="/dashboard"
+          className="mt-4"
+          helperText="Move between readiness, remediation, controls, traceability, and evidence views without losing workflow context."
+          items={buildWorkflowItems(['dashboard', 'exceptions', 'controls', 'traceability', 'evidence'])}
+        />
 
         <Card>
           <CardContent className="p-4">
@@ -559,6 +668,11 @@ export default function EvidencePackPage() {
             <p className="text-xs text-muted-foreground mt-1">
               Historical runs no longer fall back to current loaded data for population and supporting evidence context.
             </p>
+            {selectedRunContext ? (
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                {selectedRunContext.narrative}
+              </p>
+            ) : null}
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <Badge variant="outline" className="text-xs">
                 Source: {ov.sourceMode === 'persisted_snapshot' ? 'Persisted snapshot' : 'Current in-memory run'}
