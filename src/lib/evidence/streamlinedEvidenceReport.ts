@@ -17,6 +17,17 @@ export interface StreamlinedMetricItem {
   tone: 'good' | 'warning' | 'critical' | 'neutral';
 }
 
+export interface StreamlinedScopeItem {
+  label: string;
+  value: string;
+  helper?: string;
+}
+
+export interface StreamlinedMethodologyItem {
+  title: string;
+  detail: string;
+}
+
 export interface StreamlinedBlocker {
   title: string;
   severity: string;
@@ -38,15 +49,40 @@ export interface StreamlinedDomainReadiness {
   inScope: boolean;
 }
 
+export interface StreamlinedTemplateSummary {
+  template: 'buyers' | 'invoice_headers' | 'invoice_lines';
+  label: string;
+  recordsInScope: number;
+  mandatoryFieldFailures: number;
+  lowPopulationFields: number;
+  structuralGaps: number;
+  keyFinding: string;
+}
+
+export interface StreamlinedRemediationAction {
+  priority: 'P1' | 'P2' | 'P3';
+  title: string;
+  affectedArea: string;
+  rationale: string;
+  action: string;
+  owner: string;
+}
+
 export interface StreamlinedEvidenceReport {
   verdict: StreamlinedVerdict;
+  verdictLabel: string;
   evidenceConfidence: EvidenceConfidence;
+  evidenceConfidenceLabel: string;
   recommendedDecision: DecisionRecommendation;
   residualRisk: ResidualRisk;
   summaryText: string;
+  scopeSummary: StreamlinedScopeItem[];
+  methodology: StreamlinedMethodologyItem[];
   topMetrics: StreamlinedMetricItem[];
   blockers: StreamlinedBlocker[];
+  remediationPriorities: StreamlinedRemediationAction[];
   mitigationSnapshot: string[];
+  templateSummaries: StreamlinedTemplateSummary[];
   domainReadiness: StreamlinedDomainReadiness[];
   includedScopeNote: string;
   excludedScopeNote: string;
@@ -65,12 +101,38 @@ type ExceptionGroup = {
   decisionImpact: string;
 };
 
+type TemplateKey = 'buyers' | 'invoice_headers' | 'invoice_lines';
+
 const SEVERITY_RANK: Record<string, number> = {
   Critical: 4,
   High: 3,
   Medium: 2,
   Low: 1,
 };
+
+export function formatVerdictLabel(verdict: StreamlinedVerdict): string {
+  switch (verdict) {
+    case 'Conditionally Ready':
+      return 'Ready with actions';
+    case 'Insufficient Evidence':
+      return 'Assessment basis incomplete';
+    default:
+      return verdict;
+  }
+}
+
+export function formatEvidenceConfidenceLabel(confidence: EvidenceConfidence): string {
+  switch (confidence) {
+    case 'High':
+      return 'High confidence';
+    case 'Medium':
+      return 'Moderate confidence';
+    case 'Low':
+      return 'Limited confidence';
+    case 'Unavailable':
+      return 'Confidence unavailable';
+  }
+}
 
 function pickHighestSeverity(left: string, right: string): string {
   return (SEVERITY_RANK[left] ?? 0) >= (SEVERITY_RANK[right] ?? 0) ? left : right;
@@ -220,8 +282,11 @@ function buildTopMetrics(
   return [
     {
       label: 'Readiness verdict',
-      value: verdict,
-      helper: 'Decision state for this evidence pack.',
+      value: formatVerdictLabel(verdict),
+      helper:
+        verdict === 'Conditionally Ready'
+          ? 'The portfolio can proceed only after the listed actions are completed and rerun.'
+          : 'Decision state for this evidence pack.',
       tone: verdict === 'Ready' ? 'good' : verdict === 'Conditionally Ready' ? 'warning' : 'critical',
     },
     {
@@ -255,6 +320,160 @@ function buildTopMetrics(
       tone: data.overview.counts.openExceptions > 0 ? 'warning' : 'good',
     },
   ];
+}
+
+function buildScopeSummary(data: EvidencePackData): StreamlinedScopeItem[] {
+  const runModeLabel =
+    data.overview.runMode === 'diagnostic_mapping'
+      ? 'Diagnostic mapping run'
+      : data.overview.runMode === 'governed_mapping'
+        ? 'Governed mapping run'
+        : data.overview.runMode === 'raw_template'
+          ? 'Raw template run'
+          : 'Not recorded';
+  const entityScopeLabel =
+    data.overview.entityScopeStatus === 'single_entity'
+      ? 'Single legal entity'
+      : data.overview.entityScopeStatus === 'multi_entity'
+        ? 'Multiple legal entities'
+        : 'Unknown entity scope';
+
+  return [
+    {
+      label: 'Portfolio scope',
+      value: `${data.overview.counts.totalInvoices} invoices | ${data.overview.counts.totalLines} lines | ${data.overview.counts.totalBuyers} buyers`,
+      helper: 'Population covered by this evidence pack.',
+    },
+    {
+      label: 'Assessment basis',
+      value: runModeLabel,
+      helper: 'How the selected run was executed before evidence generation.',
+    },
+    {
+      label: 'Entity coverage',
+      value: entityScopeLabel,
+      helper:
+        data.overview.legalEntityLabels.length > 0
+          ? data.overview.legalEntityLabels.join('; ')
+          : 'Legal entity labels were not captured in this run.',
+    },
+    {
+      label: 'Specification basis',
+      value: `${data.overview.specVersion} | ${data.overview.drVersion}`,
+      helper: 'Regulatory and DR reference versions used for the evidence pack.',
+    },
+  ];
+}
+
+function buildMethodology(data: EvidencePackData): StreamlinedMethodologyItem[] {
+  const scopeSource =
+    data.overview.sourceMode === 'persisted_snapshot'
+      ? 'persisted run snapshot'
+      : 'current validation run context';
+
+  return [
+    {
+      title: 'Ingest and align',
+      detail:
+        'DCS ingests the buyers, invoice header, and invoice line datasets in scope and aligns them into a canonical structure before validation begins.',
+    },
+    {
+      title: 'Evaluate rule outcomes',
+      detail:
+        'DCS executes mandatory-field, format, tax, and structural checks against the aligned dataset. One invoice can produce many rule outcomes and many exceptions.',
+    },
+    {
+      title: 'Classify findings',
+      detail:
+        'Each failed check is classified by severity, impacted field or business term, and remediation context so the pack can prioritise what blocks readiness first.',
+    },
+    {
+      title: 'Evidence basis',
+      detail: `This report is generated from the ${scopeSource} and supported by the technical appendix tabs below.`,
+    },
+  ];
+}
+
+function mapTemplateLabel(template: TemplateKey): string {
+  switch (template) {
+    case 'buyers':
+      return 'Buyers template';
+    case 'invoice_headers':
+      return 'Invoice headers template';
+    case 'invoice_lines':
+      return 'Invoice lines template';
+  }
+}
+
+function deriveTemplateKey(value: string): TemplateKey | null {
+  const normalized = value.trim().toLowerCase();
+  if (normalized.includes('buyer')) return 'buyers';
+  if (normalized.includes('header')) return 'invoice_headers';
+  if (normalized.includes('line')) return 'invoice_lines';
+  return null;
+}
+
+function buildTemplateSummaries(data: EvidencePackData): StreamlinedTemplateSummary[] {
+  const templateConfigs: Array<{ key: TemplateKey; recordsInScope: number }> = [
+    { key: 'buyers', recordsInScope: data.overview.counts.totalBuyers },
+    { key: 'invoice_headers', recordsInScope: data.overview.counts.totalInvoices },
+    { key: 'invoice_lines', recordsInScope: data.overview.counts.totalLines },
+  ];
+
+  return templateConfigs.map(({ key, recordsInScope }) => {
+    const drRows = data.drCoverage.filter((row) => deriveTemplateKey(row.template) === key);
+    const populationRows = data.populationQuality.filter((row) => {
+      const coverageRow = data.drCoverage.find((coverage) => coverage.dr_id === row.dr_id);
+      return coverageRow ? deriveTemplateKey(coverageRow.template) === key : false;
+    });
+
+    const mandatoryFieldFailures = populationRows.filter((row) => row.mandatory && row.pass_fail === 'Fail').length;
+    const lowPopulationFields = populationRows.filter((row) => row.pass_fail === 'Fail').length;
+    const structuralGaps = drRows.filter((row) => row.coverage_status === 'NO_RULE' || row.coverage_status === 'NO_CONTROL').length;
+    const topGap = drRows.find((row) => row.coverage_status === 'NO_RULE' || row.coverage_status === 'NO_CONTROL');
+    const topPopulationIssue = populationRows.find((row) => row.pass_fail === 'Fail');
+
+    return {
+      template: key,
+      label: mapTemplateLabel(key),
+      recordsInScope,
+      mandatoryFieldFailures,
+      lowPopulationFields,
+      structuralGaps,
+      keyFinding:
+        topGap?.business_term
+          ? `${topGap.business_term} still lacks full executable coverage.`
+          : topPopulationIssue?.business_term
+            ? `${topPopulationIssue.business_term} is below the expected population threshold.`
+            : 'No material template-specific gap is highlighted in the current evidence summary.',
+    };
+  });
+}
+
+function deriveAffectedArea(blocker: ExceptionGroup, data: EvidencePackData): string {
+  const matchingException = data.exceptions.find(
+    (exception) => (exception.check_name || exception.rule_id) === blocker.title,
+  );
+  const firstDrId = matchingException?.dr_id?.split(';')[0]?.trim();
+  if (!firstDrId) return 'Cross-template validation flow';
+
+  const coverage = data.drCoverage.find((row) => row.dr_id === firstDrId);
+  const templateKey = coverage ? deriveTemplateKey(coverage.template) : null;
+  return templateKey ? mapTemplateLabel(templateKey) : 'Cross-template validation flow';
+}
+
+function buildRemediationPriorities(
+  groupedExceptions: ExceptionGroup[],
+  data: EvidencePackData,
+): StreamlinedRemediationAction[] {
+  return groupedExceptions.slice(0, 5).map((blocker, index) => ({
+    priority: index < 2 ? 'P1' : index < 4 ? 'P2' : 'P3',
+    title: blocker.title,
+    affectedArea: deriveAffectedArea(blocker, data),
+    rationale: blocker.impact,
+    action: blocker.mitigation,
+    owner: blocker.owner,
+  }));
 }
 
 function buildDomainReadiness(
@@ -359,6 +578,10 @@ export function buildStreamlinedEvidenceReport(data: EvidencePackData): Streamli
   const topMetrics = buildTopMetrics(data, verdict, criticalOpen, groupedExceptions);
   const mitigationSnapshot = groupedExceptions.slice(0, 3).map((group) => group.mitigation);
   const domainReadiness = buildDomainReadiness(data, verdict, evidenceConfidence, groupedExceptions);
+  const scopeSummary = buildScopeSummary(data);
+  const methodology = buildMethodology(data);
+  const templateSummaries = buildTemplateSummaries(data);
+  const remediationPriorities = buildRemediationPriorities(groupedExceptions, data);
 
   let summaryText = 'The selected run does not present a material onboarding blocker.';
   if (verdict === 'Not Ready') {
@@ -372,9 +595,13 @@ export function buildStreamlinedEvidenceReport(data: EvidencePackData): Streamli
   return {
     verdict,
     evidenceConfidence,
+    verdictLabel: formatVerdictLabel(verdict),
+    evidenceConfidenceLabel: formatEvidenceConfidenceLabel(evidenceConfidence),
     recommendedDecision,
     residualRisk,
     summaryText,
+    scopeSummary,
+    methodology,
     topMetrics,
     blockers: groupedExceptions.slice(0, 5).map((group) => ({
       title: group.title,
@@ -386,12 +613,14 @@ export function buildStreamlinedEvidenceReport(data: EvidencePackData): Streamli
       residualRisk: group.residualRisk,
       decisionImpact: group.decisionImpact,
     })),
+    remediationPriorities,
     mitigationSnapshot: mitigationSnapshot.length > 0 ? mitigationSnapshot : ['No mitigation actions are currently recorded for this run.'],
+    templateSummaries,
     domainReadiness,
     includedScopeNote:
       'This report assesses data readiness, mapping support, UAE conformance posture, and exception remediation context for the selected run.',
     excludedScopeNote:
-      'This streamlined MVP does not assess downstream ASP submission execution, transport, or acknowledgement handling.',
+      'This evidence pack does not assess downstream ASP submission execution, transport, or acknowledgement handling.',
     appendixNote:
       'Full DR coverage, rules, exceptions, controls, and population evidence remain available below as supporting appendices.',
   };

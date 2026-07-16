@@ -137,7 +137,7 @@ describe('generateEvidencePackZip', () => {
     expect(
       fileSpy.mock.calls.some(
         ([filename, payload]) =>
-          filename === '00_executive_decision.xlsx' &&
+          filename === '00_executive_verdict.xlsx' &&
           (payload instanceof Uint8Array || payload instanceof ArrayBuffer)
       )
     ).toBe(true);
@@ -173,9 +173,9 @@ describe('generateEvidencePackZip', () => {
 
     expect(rows).toEqual(
       expect.arrayContaining([
-        { field: 'Run Classification', value: 'Diagnostic only' },
+        { field: 'Run Classification', value: 'Diagnostic assessment' },
         { field: 'Run Mode', value: 'Diagnostic mapping run' },
-        { field: 'Mapping Coverage Context', value: '82%' },
+        { field: 'Source-to-Canonical Mapping Coverage', value: '82%' },
       ]),
     );
   });

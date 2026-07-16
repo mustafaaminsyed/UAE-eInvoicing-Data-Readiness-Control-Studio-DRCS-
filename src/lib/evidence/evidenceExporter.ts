@@ -11,6 +11,7 @@ import { EvidencePackData } from './evidenceDataBuilder';
 import { runConsistencyChecks, ConsistencyReport } from '@/lib/coverage/consistencyValidator';
 import { buildEvidenceSummary } from './evidenceSummary';
 import { buildStreamlinedEvidenceReport } from './streamlinedEvidenceReport';
+import daribaLogo from '@/assets/dariba-logo.png';
 
 export interface ExportValidationResult {
   valid: boolean;
@@ -21,6 +22,26 @@ export interface EntityEvidencePackExport {
   entityKey: string;
   entityLabel: string;
   evidence: EvidencePackData;
+}
+
+let cachedLogoDataUrl: string | null = null;
+
+async function assetUrlToDataUrl(url: string): Promise<string | null> {
+  if (cachedLogoDataUrl) return cachedLogoDataUrl;
+
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    cachedLogoDataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+    return cachedLogoDataUrl;
+  } catch {
+    return null;
+  }
 }
 
 /** Part 7: Validate consistency before export */
@@ -145,22 +166,22 @@ function executiveDecisionRows(data: EvidencePackData) {
           : 'Not recorded';
   const readinessQualificationLabel =
     data.overview.readinessQualification === 'diagnostic_only'
-      ? 'Diagnostic only'
+      ? 'Diagnostic assessment'
       : data.overview.readinessQualification === 'decision_ready'
-        ? 'Decision-ready basis'
+        ? 'Decision-ready assessment'
         : 'Not recorded';
 
   return [
     { field: 'Run classification', value: `${readinessQualificationLabel} | ${runModeLabel}` },
     {
-      field: 'Mapping coverage context',
+      field: 'Source-to-canonical mapping coverage',
       value:
         data.overview.mappingCoveragePercent !== null && data.overview.mappingCoveragePercent !== undefined
           ? `${Math.round(data.overview.mappingCoveragePercent)}%`
           : 'Not recorded',
     },
-    { field: 'Readiness Verdict', value: report.verdict },
-    { field: 'Evidence Confidence', value: report.evidenceConfidence },
+    { field: 'Readiness Verdict', value: report.verdictLabel },
+    { field: 'Assessment Confidence', value: report.evidenceConfidenceLabel },
     { field: 'Recommended Decision', value: report.recommendedDecision },
     { field: 'Residual Risk', value: report.residualRisk },
     { field: 'Summary', value: report.summaryText },
@@ -170,6 +191,24 @@ function executiveDecisionRows(data: EvidencePackData) {
     })),
     { field: 'Included Scope', value: report.includedScopeNote },
     { field: 'Excluded Scope', value: report.excludedScopeNote },
+  ];
+}
+
+function scopeAndMethodologyRows(data: EvidencePackData) {
+  const report = buildStreamlinedEvidenceReport(data);
+  return [
+    ...report.scopeSummary.map((item) => ({
+      section: 'Assessment scope',
+      title: item.label,
+      detail: item.value,
+      notes: item.helper ?? '',
+    })),
+    ...report.methodology.map((item) => ({
+      section: 'Methodology',
+      title: item.title,
+      detail: item.detail,
+      notes: '',
+    })),
   ];
 }
 
@@ -183,7 +222,19 @@ function exceptionMitigationRows(data: EvidencePackData) {
     Owner: blocker.owner,
     Status: blocker.status,
     'Residual Risk': blocker.residualRisk,
-    'Decision Impact': blocker.decisionImpact,
+      'Decision Impact': blocker.decisionImpact,
+  }));
+}
+
+function remediationPriorityRows(data: EvidencePackData) {
+  const report = buildStreamlinedEvidenceReport(data);
+  return report.remediationPriorities.map((action) => ({
+    Priority: action.priority,
+    Action: action.title,
+    'Affected Area': action.affectedArea,
+    Rationale: action.rationale,
+    'Recommended Fix': action.action,
+    Owner: action.owner,
   }));
 }
 
@@ -201,16 +252,47 @@ function domainReadinessRows(data: EvidencePackData) {
     }));
 }
 
+function templateFindingRows(data: EvidencePackData) {
+  const report = buildStreamlinedEvidenceReport(data);
+  return report.templateSummaries.map((summary) => ({
+    Template: summary.label,
+    'Records In Scope': summary.recordsInScope,
+    'Mandatory Field Failures': summary.mandatoryFieldFailures,
+    'Low Population Fields': summary.lowPopulationFields,
+    'Structural Gaps': summary.structuralGaps,
+    'Key Finding': summary.keyFinding,
+  }));
+}
+
 function appendEvidencePackFiles(zip: JSZip, data: EvidencePackData, prefix = ''): void {
   const summary = buildEvidenceSummary(data);
 
   zip.file(
-    `${prefix}00_executive_decision.xlsx`,
-    workbookToBuffer(createWorkbook(executiveDecisionRows(data), 'Executive Decision'))
+    `${prefix}00_executive_verdict.xlsx`,
+    workbookToBuffer(createWorkbook(executiveDecisionRows(data), 'Executive Verdict'))
   );
   const groupedExceptions = exceptionMitigationRows(data);
   zip.file(
-    `${prefix}00a_exceptions_and_mitigations.xlsx`,
+    `${prefix}00a_scope_and_methodology.xlsx`,
+    workbookToBuffer(createWorkbook(scopeAndMethodologyRows(data), 'Scope & Methodology'))
+  );
+  zip.file(
+    `${prefix}00b_priority_actions.xlsx`,
+    workbookToBuffer(
+      createWorkbook(
+        remediationPriorityRows(data).length > 0
+          ? remediationPriorityRows(data)
+          : [{ Priority: '', Action: 'No remediation actions recorded', 'Affected Area': '', Rationale: '', 'Recommended Fix': '', Owner: '' }],
+        'Priority Actions',
+      )
+    )
+  );
+  zip.file(
+    `${prefix}00c_template_findings.xlsx`,
+    workbookToBuffer(createWorkbook(templateFindingRows(data), 'Template Findings'))
+  );
+  zip.file(
+    `${prefix}00d_exceptions_and_mitigations.xlsx`,
     workbookToBuffer(
       createWorkbook(
         groupedExceptions.length > 0
@@ -221,7 +303,7 @@ function appendEvidencePackFiles(zip: JSZip, data: EvidencePackData, prefix = ''
     )
   );
   zip.file(
-    `${prefix}00b_domain_readiness.xlsx`,
+    `${prefix}00e_domain_readiness.xlsx`,
     workbookToBuffer(createWorkbook(domainReadinessRows(data), 'Domain Readiness'))
   );
 
@@ -236,9 +318,9 @@ function appendEvidencePackFiles(zip: JSZip, data: EvidencePackData, prefix = ''
       field: 'Run Classification',
       value:
         data.overview.readinessQualification === 'diagnostic_only'
-          ? 'Diagnostic only'
+          ? 'Diagnostic assessment'
           : data.overview.readinessQualification === 'decision_ready'
-            ? 'Decision-ready basis'
+            ? 'Decision-ready assessment'
             : 'Not recorded',
     },
     {
@@ -253,18 +335,18 @@ function appendEvidencePackFiles(zip: JSZip, data: EvidencePackData, prefix = ''
               : 'Not recorded',
     },
     {
-      field: 'Mapping Coverage Context',
+      field: 'Source-to-Canonical Mapping Coverage',
       value:
         data.overview.mappingCoveragePercent !== null && data.overview.mappingCoveragePercent !== undefined
           ? `${Math.round(data.overview.mappingCoveragePercent)}%`
           : 'Not recorded',
     },
     {
-      field: 'Evidence Source Mode',
+      field: 'Evidence Source',
       value:
         data.overview.sourceMode === 'persisted_snapshot'
-          ? 'Persisted snapshot'
-          : 'Current in-memory run',
+          ? 'Saved assessment snapshot'
+          : 'Current assessment run',
     },
     { field: 'Scope', value: data.overview.scope },
     { field: 'PINT-AE Version', value: data.overview.specVersion },
@@ -289,11 +371,11 @@ function appendEvidencePackFiles(zip: JSZip, data: EvidencePackData, prefix = ''
     { field: 'Total Invoices', value: data.overview.counts.totalInvoices },
     { field: 'Total Buyers', value: data.overview.counts.totalBuyers },
     { field: 'Total Lines', value: data.overview.counts.totalLines },
-    { field: 'Total DRs', value: data.overview.counts.totalDRs },
-    { field: 'Mandatory DRs', value: data.overview.counts.mandatoryDRs },
-    { field: 'Covered DRs', value: data.overview.counts.coveredDRs },
-    { field: 'DRs with No Rules', value: data.overview.counts.drsNoRules },
-    { field: 'DRs with No Controls', value: data.overview.counts.drsNoControls },
+    { field: 'Total Data Requirements', value: data.overview.counts.totalDRs },
+    { field: 'Mandatory Data Requirements', value: data.overview.counts.mandatoryDRs },
+    { field: 'Covered Data Requirements', value: data.overview.counts.coveredDRs },
+    { field: 'Data Requirements With No Rules', value: data.overview.counts.drsNoRules },
+    { field: 'Data Requirements With No Controls', value: data.overview.counts.drsNoControls },
     { field: 'Open Exceptions', value: data.overview.counts.openExceptions },
     { field: 'Overall Status', value: summary.overallStatus },
     { field: 'Top Failure Class', value: summary.topFailureClass },
@@ -307,7 +389,7 @@ function appendEvidencePackFiles(zip: JSZip, data: EvidencePackData, prefix = ''
 
   // 02_dr_coverage.xlsx
   const drRows = data.drCoverage.map(r => ({
-    'DR ID': r.dr_id,
+    'Data Requirement ID': r.dr_id,
     'Business Term': r.business_term,
     'Mandatory': r.mandatory ? 'Yes' : 'No',
     'Template': r.template,
@@ -319,7 +401,7 @@ function appendEvidencePackFiles(zip: JSZip, data: EvidencePackData, prefix = ''
     'Population %': r.population_percentage !== null ? Number(r.population_percentage.toFixed(1)) : '',
     'Coverage Status': r.coverage_status,
   }));
-  zip.file(`${prefix}02_dr_coverage.xlsx`, workbookToBuffer(createWorkbook(drRows, 'DR Coverage')));
+  zip.file(`${prefix}02_dr_coverage.xlsx`, workbookToBuffer(createWorkbook(drRows, 'Data Requirement Coverage')));
 
   // 03_rule_execution.xlsx
   const ruleRows = data.ruleExecution.map(r => ({
@@ -329,7 +411,7 @@ function appendEvidencePackFiles(zip: JSZip, data: EvidencePackData, prefix = ''
     'Rule Type': r.rule_type,
     'Execution Layer': r.execution_layer,
     'Failure Class': r.failure_class,
-    'Linked DR IDs': r.linked_dr_ids,
+    'Linked Data Requirement IDs': r.linked_dr_ids,
     'Execution Count': r.execution_count,
     'Failure Count': r.failure_count,
     'Execution Count Source': r.execution_source,
@@ -339,7 +421,7 @@ function appendEvidencePackFiles(zip: JSZip, data: EvidencePackData, prefix = ''
   // 04_exceptions_and_cases.xlsx
   const excRows = data.exceptions.map(e => ({
     'Exception ID': e.exception_id,
-    'DR ID': e.dr_id,
+    'Data Requirement ID': e.dr_id,
     'Rule ID': e.rule_id,
     'Rule Type': e.rule_type,
     'Execution Layer': e.execution_layer,
@@ -352,7 +434,7 @@ function appendEvidencePackFiles(zip: JSZip, data: EvidencePackData, prefix = ''
     'Case Status': e.case_status,
   }));
   zip.file(`${prefix}04_exceptions_and_cases.xlsx`, workbookToBuffer(createWorkbook(
-    excRows.length > 0 ? excRows : [{ 'Exception ID': '', 'DR ID': '', 'Rule ID': '', 'Rule Type': '', 'Execution Layer': '', 'Failure Class': '', 'Record Reference': '', 'Severity': '', 'Message': 'No exceptions', 'Exception Status': '', 'Case ID': '', 'Case Status': '' }],
+    excRows.length > 0 ? excRows : [{ 'Exception ID': '', 'Data Requirement ID': '', 'Rule ID': '', 'Rule Type': '', 'Execution Layer': '', 'Failure Class': '', 'Record Reference': '', 'Severity': '', 'Message': 'No exceptions', 'Exception Status': '', 'Case ID': '', 'Case Status': '' }],
     'Exceptions'
   )));
 
@@ -362,14 +444,14 @@ function appendEvidencePackFiles(zip: JSZip, data: EvidencePackData, prefix = ''
     'Control Name': c.control_name,
     'Control Type': c.control_type,
     'Covered Rule IDs': c.covered_rule_ids,
-    'Covered DR IDs': c.covered_dr_ids,
+    'Covered Data Requirement IDs': c.covered_dr_ids,
     'Linked Exceptions': c.linked_exception_count,
   }));
   zip.file(`${prefix}05_controls_mapping.xlsx`, workbookToBuffer(createWorkbook(ctrlRows, 'Controls')));
 
   // 06_population_quality.xlsx
   const popRows = data.populationQuality.map(p => ({
-    'DR ID': p.dr_id,
+    'Data Requirement ID': p.dr_id,
     'Business Term': p.business_term,
     'Mandatory': p.mandatory ? 'Yes' : 'No',
     'Population %': p.population_percentage !== null ? Number(p.population_percentage.toFixed(1)) : 'N/A',
@@ -380,7 +462,7 @@ function appendEvidencePackFiles(zip: JSZip, data: EvidencePackData, prefix = ''
 
   // 07_traceability_matrix.xlsx
   const traceabilityRows = data.traceabilityRows.map((row) => ({
-    'DR ID': row.dr_id,
+    'Data Requirement ID': row.dr_id,
     'Business Term': row.business_term,
     Mandatory: row.mandatory ? 'Yes' : 'No',
     'VAT Law Status': row.vatLawStatus,
@@ -427,9 +509,9 @@ export async function generateEvidencePackZipByEntity(
     'Assessment Run ID': pack.evidence.overview.assessmentRunId,
     'Run Classification':
       pack.evidence.overview.readinessQualification === 'diagnostic_only'
-        ? 'Diagnostic only'
+        ? 'Diagnostic assessment'
         : pack.evidence.overview.readinessQualification === 'decision_ready'
-          ? 'Decision-ready basis'
+          ? 'Decision-ready assessment'
           : 'Not recorded',
     'Run Mode':
       pack.evidence.overview.runMode === 'diagnostic_mapping'
@@ -443,7 +525,7 @@ export async function generateEvidencePackZipByEntity(
     'Buyers': pack.evidence.overview.counts.totalBuyers,
     'Lines': pack.evidence.overview.counts.totalLines,
     'Open Exceptions': pack.evidence.overview.counts.openExceptions,
-    'Covered DRs': pack.evidence.overview.counts.coveredDRs,
+    'Covered Data Requirements': pack.evidence.overview.counts.coveredDRs,
   }));
   zip.file(
     '00_export_scope_manifest.xlsx',
@@ -462,16 +544,67 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
   const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
   const ov = data.overview;
   const report = buildStreamlinedEvidenceReport(data);
+  const logoDataUrl = await assetUrlToDataUrl(daribaLogo);
   const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
   const marginX = 40;
-  const titleColor: [number, number, number] = [16, 91, 161];
-  const textColor: [number, number, number] = [38, 51, 77];
+  const brandDark: [number, number, number] = [7, 83, 71];
+  const brandDarkAlt: [number, number, number] = [11, 70, 61];
+  const brandAccent: [number, number, number] = [198, 245, 173];
+  const brandLine: [number, number, number] = [133, 172, 162];
+  const panelTint: [number, number, number] = [237, 246, 241];
+  const textColor: [number, number, number] = [34, 52, 46];
+  const mutedTextColor: [number, number, number] = [88, 107, 100];
+  const white: [number, number, number] = [255, 255, 255];
+
+  const tableHeadStyles = { fillColor: brandDark, textColor: white };
+  const tableBodyStyles = { fontSize: 8.5, cellPadding: 5, overflow: 'linebreak' as const, textColor };
+
+  const addLogo = (x: number, y: number, width: number, height: number) => {
+    if (!logoDataUrl) return;
+    doc.addImage(logoDataUrl, 'PNG', x, y, width, height);
+  };
+
+  const drawCoverBackground = () => {
+    doc.setFillColor(...brandDark);
+    doc.rect(0, 0, pageWidth, pageHeight, 'F');
+
+    doc.setDrawColor(...brandLine);
+    doc.setLineWidth(1.2);
+    doc.circle(pageWidth + 70, pageHeight / 2, 255, 'S');
+
+    doc.setFillColor(23, 101, 87);
+    doc.circle(pageWidth - 95, 250, 110, 'F');
+    doc.setFillColor(26, 95, 82);
+    doc.circle(pageWidth - 160, 215, 42, 'F');
+    doc.setFillColor(20, 92, 78);
+    doc.circle(280, 385, 120, 'F');
+  };
+
+  const drawPageChrome = (pageTitle?: string) => {
+    doc.setFillColor(...brandDark);
+    doc.rect(0, 0, pageWidth, 54, 'F');
+    doc.setDrawColor(...brandAccent);
+    doc.setLineWidth(0.8);
+    doc.line(marginX, 55, pageWidth - marginX, 55);
+    if (pageTitle) {
+      doc.setTextColor(...white);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text(pageTitle, marginX, 33);
+    }
+    if (logoDataUrl) {
+      addLogo(pageWidth - 114, 10, 74, 28);
+    }
+  };
 
   const sectionTitle = (title: string, y: number) => {
+    doc.setFillColor(...panelTint);
+    doc.roundedRect(marginX, y - 18, 220, 24, 8, 8, 'F');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.setTextColor(...titleColor);
-    doc.text(title, marginX, y);
+    doc.setFontSize(12);
+    doc.setTextColor(...brandDarkAlt);
+    doc.text(title, marginX + 12, y - 2);
   };
   const runModeLabel =
     ov.runMode === 'diagnostic_mapping'
@@ -483,27 +616,66 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
           : 'Not recorded';
   const readinessQualificationLabel =
     ov.readinessQualification === 'diagnostic_only'
-      ? 'Diagnostic only'
+      ? 'Diagnostic assessment'
       : ov.readinessQualification === 'decision_ready'
-        ? 'Decision-ready basis'
+        ? 'Decision-ready assessment'
         : 'Not recorded';
 
-  doc.setFillColor(...titleColor);
-  doc.rect(0, 0, pageWidth, 78, 'F');
-  doc.setTextColor(255, 255, 255);
+  drawCoverBackground();
+  doc.setTextColor(...white);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(18);
+  doc.text('Evidence Pack', marginX, 330);
+  doc.setTextColor(...brandAccent);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(20);
-  doc.text('UAE eInvoicing Evidence Pack', marginX, 36);
+  doc.setFontSize(42);
+  doc.text('UAE eInvoicing', marginX, 392);
+  doc.text('Readiness Report', marginX, 438);
+  doc.setTextColor(...white);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(12);
+  const subtitle = [
+    `${ov.datasetName || 'Client portfolio'} | Generated by Dariba DCS`,
+    `${readinessQualificationLabel} | ${runModeLabel}`,
+    `${ov.specVersion} | ${ov.drVersion}`,
+  ];
+  doc.text(subtitle, marginX, 486, { lineHeightFactor: 1.5 });
+
+  doc.setFillColor(244, 249, 246);
+  doc.roundedRect(marginX, 535, 245, 96, 16, 16, 'F');
+  doc.setTextColor(...brandDark);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('Assessment snapshot', marginX + 18, 560);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(11);
+  doc.text(
+    [
+      `Invoices in scope: ${ov.counts.totalInvoices}`,
+      `Open exceptions: ${ov.counts.openExceptions}`,
+      `Overall readiness: ${report.verdictLabel}`,
+    ],
+    marginX + 18,
+    584,
+    { lineHeightFactor: 1.55 },
+  );
+
+  if (logoDataUrl) {
+    addLogo(marginX, pageHeight - 110, 150, 70);
+  }
+
+  doc.setTextColor(...brandAccent);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
-  doc.text(`${ov.specVersion} | ${ov.drVersion}`, marginX, 56);
-  doc.setFontSize(9);
-  doc.text(`${readinessQualificationLabel} | ${runModeLabel}`, marginX, 70);
+  doc.text('Prepared for client review and implementation governance', marginX, pageHeight - 34);
+
+  doc.addPage();
+  drawPageChrome('Executive Summary');
 
   doc.setTextColor(...textColor);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);
-  doc.text('Executive Decision', marginX, 106);
+  doc.text('1. Executive Verdict', marginX, 92);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
@@ -512,8 +684,8 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
     ['Execution Time', new Date(ov.executionTimestamp).toLocaleString()],
     ['Run classification', readinessQualificationLabel],
     ['Run mode', runModeLabel],
-    ['Mapping coverage context', ov.mappingCoveragePercent !== null && ov.mappingCoveragePercent !== undefined ? `${Math.round(ov.mappingCoveragePercent)}%` : 'Not recorded'],
-    ['Evidence Source', ov.sourceMode === 'persisted_snapshot' ? 'Persisted snapshot' : 'Current in-memory run'],
+    ['Source-to-canonical mapping coverage', ov.mappingCoveragePercent !== null && ov.mappingCoveragePercent !== undefined ? `${Math.round(ov.mappingCoveragePercent)}%` : 'Not recorded'],
+    ['Evidence Source', ov.sourceMode === 'persisted_snapshot' ? 'Saved assessment snapshot' : 'Current assessment run'],
     ['Scope', ov.scope],
     ['Dataset', ov.datasetName || '-'],
     ['Entity Scope', ov.entityScopeStatus === 'single_entity' ? 'Single entity' : ov.entityScopeStatus === 'multi_entity' ? 'Multi-entity' : 'Unknown'],
@@ -523,34 +695,48 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
     ['Lines', String(ov.counts.totalLines)],
   ];
   autoTable(doc, {
-    startY: 118,
+    startY: 104,
     head: [['Field', 'Value']],
     body: summaryRows,
     theme: 'grid',
-    styles: { fontSize: 9, cellPadding: 6 },
-    headStyles: { fillColor: [236, 243, 252], textColor: [24, 40, 72] },
+    styles: { ...tableBodyStyles, fontSize: 9 },
+    headStyles: tableHeadStyles,
+    alternateRowStyles: { fillColor: [248, 251, 249] },
     margin: { left: marginX, right: marginX },
   });
 
   const executiveY = (doc as any).lastAutoTable.finalY + 18;
-  sectionTitle('Decision Summary', executiveY);
+  sectionTitle('2. Decision Summary', executiveY);
   autoTable(doc, {
     startY: executiveY + 8,
     head: [['Metric', 'Value']],
     body: [
-      ['Readiness verdict', report.verdict],
-      ['Evidence confidence', report.evidenceConfidence],
+      ['Readiness verdict', report.verdictLabel],
+      ['Assessment confidence', report.evidenceConfidenceLabel],
       ['Recommended decision', report.recommendedDecision],
       ['Residual risk', report.residualRisk],
     ],
     theme: 'striped',
-    styles: { fontSize: 9, cellPadding: 6 },
-    headStyles: { fillColor: [236, 243, 252], textColor: [24, 40, 72] },
+    styles: { ...tableBodyStyles, fontSize: 9 },
+    headStyles: tableHeadStyles,
+    margin: { left: marginX, right: marginX },
+  });
+
+  const scopeY = (doc as any).lastAutoTable.finalY + 18;
+  sectionTitle('3. Scope Of Assessment', scopeY);
+  const reportScope = buildStreamlinedEvidenceReport(data);
+  autoTable(doc, {
+    startY: scopeY + 8,
+    head: [['Scope item', 'Detail']],
+    body: reportScope.scopeSummary.map((item) => [item.label, `${item.value}${item.helper ? ` | ${item.helper}` : ''}`]),
+    theme: 'striped',
+    styles: { ...tableBodyStyles, fontSize: 9 },
+    headStyles: tableHeadStyles,
     margin: { left: marginX, right: marginX },
   });
 
   const findingsY = (doc as any).lastAutoTable.finalY + 18;
-  sectionTitle('Top Blockers', findingsY);
+  sectionTitle('4. Priority Blockers', findingsY);
   autoTable(doc, {
     startY: findingsY + 8,
     head: [['Exception', 'Severity', 'Mitigation', 'Decision Impact']],
@@ -561,27 +747,67 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
       blocker.decisionImpact,
     ]),
     theme: 'grid',
-    styles: { fontSize: 9, cellPadding: 6, overflow: 'linebreak' },
-    headStyles: { fillColor: [236, 243, 252], textColor: [24, 40, 72] },
+    styles: { ...tableBodyStyles, fontSize: 9 },
+    headStyles: tableHeadStyles,
     margin: { left: marginX, right: marginX },
   });
 
   const kpiY = (doc as any).lastAutoTable.finalY + 18;
-  sectionTitle('Headline KPIs', kpiY);
+  sectionTitle('5. Readiness Highlights', kpiY);
   autoTable(doc, {
     startY: kpiY + 8,
     head: [['Metric', 'Value']],
     body: report.topMetrics.map((metric) => [metric.label, `${metric.value} | ${metric.helper}`]),
     theme: 'striped',
-    styles: { fontSize: 9, cellPadding: 6 },
-    headStyles: { fillColor: [236, 243, 252], textColor: [24, 40, 72] },
+    styles: { ...tableBodyStyles, fontSize: 9 },
+    headStyles: tableHeadStyles,
     margin: { left: marginX, right: marginX },
   });
 
   doc.addPage();
-  sectionTitle('Exceptions And Mitigations', 50);
+  drawPageChrome('Remediation And Findings');
+  sectionTitle('6. Priority Remediation Actions', 76);
   autoTable(doc, {
-    startY: 62,
+    startY: 88,
+    head: [['Priority', 'Action', 'Affected Area', 'Recommended Fix', 'Owner']],
+    body: report.remediationPriorities.map((action) => [
+      action.priority,
+      action.title,
+      action.affectedArea,
+      action.action,
+      action.owner,
+    ]),
+    theme: 'grid',
+    styles: tableBodyStyles,
+    headStyles: tableHeadStyles,
+    margin: { left: marginX, right: marginX },
+    columnStyles: { 2: { cellWidth: 100 }, 3: { cellWidth: 170 } },
+  });
+
+  const templateY = (doc as any).lastAutoTable.finalY + 18;
+  sectionTitle('7. Template Findings Summary', templateY);
+  autoTable(doc, {
+    startY: templateY + 8,
+    head: [['Template', 'Scope', 'Mandatory Fails', 'Structural Gaps', 'Key Finding']],
+    body: report.templateSummaries.map((summary) => [
+      summary.label,
+      String(summary.recordsInScope),
+      String(summary.mandatoryFieldFailures),
+      String(summary.structuralGaps),
+      summary.keyFinding,
+    ]),
+    theme: 'grid',
+    styles: tableBodyStyles,
+    headStyles: tableHeadStyles,
+    margin: { left: marginX, right: marginX },
+    columnStyles: { 4: { cellWidth: 190 } },
+  });
+
+  doc.addPage();
+  drawPageChrome('Exception Themes');
+  sectionTitle('8. Exceptions And Mitigations', 76);
+  autoTable(doc, {
+    startY: 88,
     head: [['Exception', 'Severity', 'Impact', 'Mitigation', 'Owner', 'Status', 'Residual Risk']],
     body: report.blockers.map((blocker) => [
       blocker.title,
@@ -593,16 +819,17 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
       blocker.residualRisk,
     ]),
     theme: 'grid',
-    styles: { fontSize: 8, cellPadding: 4, overflow: 'linebreak' },
-    headStyles: { fillColor: [236, 243, 252], textColor: [24, 40, 72] },
+    styles: tableBodyStyles,
+    headStyles: tableHeadStyles,
     margin: { left: marginX, right: marginX },
     columnStyles: { 2: { cellWidth: 110 }, 3: { cellWidth: 140 } },
   });
 
   doc.addPage();
-  sectionTitle('Domain Readiness', 50);
+  drawPageChrome('Domain Summary');
+  sectionTitle('Domain Readiness', 76);
   autoTable(doc, {
-    startY: 62,
+    startY: 88,
     head: [['Domain', 'Status', 'Confidence', 'Main Exception', 'Mitigation Status', 'Residual Risk']],
     body: report.domainReadiness
       .filter((domain) => domain.inScope)
@@ -615,8 +842,8 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
         domain.residualRisk,
       ]),
     theme: 'striped',
-    styles: { fontSize: 8, cellPadding: 4, overflow: 'linebreak' },
-    headStyles: { fillColor: [236, 243, 252], textColor: [24, 40, 72] },
+    styles: tableBodyStyles,
+    headStyles: tableHeadStyles,
     margin: { left: marginX, right: marginX },
     columnStyles: { 3: { cellWidth: 180 }, 4: { cellWidth: 150 } },
   });
@@ -632,16 +859,17 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
       ['Appendix guidance', report.appendixNote],
     ],
     theme: 'grid',
-    styles: { fontSize: 8, cellPadding: 4, overflow: 'linebreak' },
-    headStyles: { fillColor: [236, 243, 252], textColor: [24, 40, 72] },
+    styles: tableBodyStyles,
+    headStyles: tableHeadStyles,
     margin: { left: marginX, right: marginX },
   });
 
   doc.addPage();
-  sectionTitle('Appendix A: DR Coverage Matrix', 50);
+  drawPageChrome('Technical Appendix');
+  sectionTitle('Appendix A: Data Requirement Coverage Matrix', 76);
   autoTable(doc, {
-    startY: 62,
-    head: [['DR ID', 'Term', 'Mandatory', 'Template', 'Rules', 'Controls', 'Pop %', 'Status']],
+    startY: 88,
+    head: [['Data Requirement ID', 'Term', 'Mandatory', 'Template', 'Rules', 'Controls', 'Pop %', 'Status']],
     body: data.drCoverage.map((r) => [
       r.dr_id,
       r.business_term,
@@ -653,16 +881,17 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
       r.coverage_status,
     ]),
     theme: 'grid',
-    styles: { fontSize: 8, cellPadding: 4, overflow: 'linebreak' },
-    headStyles: { fillColor: [236, 243, 252], textColor: [24, 40, 72] },
+    styles: tableBodyStyles,
+    headStyles: tableHeadStyles,
     margin: { left: marginX, right: marginX },
     columnStyles: { 1: { cellWidth: 140 } },
   });
 
   doc.addPage();
-  sectionTitle('Appendix B: Rules and Exceptions', 50);
+  drawPageChrome('Technical Appendix');
+  sectionTitle('Appendix B: Rules and Exceptions', 76);
   autoTable(doc, {
-    startY: 62,
+    startY: 88,
     head: [['Rule ID', 'Rule Name', 'Severity', 'Type', 'Layer', 'Executions', 'Failures']],
     body: data.ruleExecution.map((r) => [
       r.rule_id,
@@ -674,8 +903,8 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
       String(r.failure_count),
     ]),
     theme: 'striped',
-    styles: { fontSize: 8, cellPadding: 4, overflow: 'linebreak' },
-    headStyles: { fillColor: [236, 243, 252], textColor: [24, 40, 72] },
+    styles: tableBodyStyles,
+    headStyles: tableHeadStyles,
     margin: { left: marginX, right: marginX },
     columnStyles: { 1: { cellWidth: 220 } },
   });
@@ -684,7 +913,7 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
   sectionTitle('Top Exceptions (first 100)', afterRulesY);
   autoTable(doc, {
     startY: afterRulesY + 8,
-    head: [['Exception ID', 'DR ID', 'Rule ID', 'Type', 'Layer', 'Severity', 'Status']],
+    head: [['Exception ID', 'Data Requirement ID', 'Rule ID', 'Type', 'Layer', 'Severity', 'Status']],
     body: data.exceptions.slice(0, 100).map((e) => [
       e.exception_id.slice(0, 8),
       e.dr_id,
@@ -695,15 +924,16 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
       e.exception_status,
     ]),
     theme: 'grid',
-    styles: { fontSize: 8, cellPadding: 4, overflow: 'linebreak' },
-    headStyles: { fillColor: [236, 243, 252], textColor: [24, 40, 72] },
+    styles: tableBodyStyles,
+    headStyles: tableHeadStyles,
     margin: { left: marginX, right: marginX },
   });
 
   doc.addPage();
-  sectionTitle('Controls and Population Quality', 50);
+  drawPageChrome('Technical Appendix');
+  sectionTitle('Controls and Population Quality', 76);
   autoTable(doc, {
-    startY: 62,
+    startY: 88,
     head: [['Control ID', 'Control Name', 'Type', 'Linked Exceptions']],
     body: data.controlsCoverage.map((c) => [
       c.control_id,
@@ -712,8 +942,8 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
       String(c.linked_exception_count),
     ]),
     theme: 'striped',
-    styles: { fontSize: 8, cellPadding: 4, overflow: 'linebreak' },
-    headStyles: { fillColor: [236, 243, 252], textColor: [24, 40, 72] },
+    styles: tableBodyStyles,
+    headStyles: tableHeadStyles,
     margin: { left: marginX, right: marginX },
     columnStyles: { 1: { cellWidth: 250 } },
   });
@@ -722,7 +952,7 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
   sectionTitle('Population Quality', afterControlsY);
   autoTable(doc, {
     startY: afterControlsY + 8,
-    head: [['DR ID', 'Business Term', 'Mandatory', 'Population %', 'Threshold', 'Pass/Fail']],
+    head: [['Data Requirement ID', 'Business Term', 'Mandatory', 'Population %', 'Threshold', 'Pass/Fail']],
     body: data.populationQuality.map((p) => [
       p.dr_id,
       p.business_term,
@@ -732,8 +962,8 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
       p.pass_fail,
     ]),
     theme: 'grid',
-    styles: { fontSize: 8, cellPadding: 4, overflow: 'linebreak' },
-    headStyles: { fillColor: [236, 243, 252], textColor: [24, 40, 72] },
+    styles: tableBodyStyles,
+    headStyles: tableHeadStyles,
     margin: { left: marginX, right: marginX },
     columnStyles: { 1: { cellWidth: 180 } },
   });
@@ -743,8 +973,15 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
     doc.setPage(page);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
-    doc.setTextColor(110, 122, 145);
-    doc.text(`Evidence Pack Report | Page ${page} of ${pageCount}`, marginX, doc.internal.pageSize.getHeight() - 18);
+    doc.setTextColor(...mutedTextColor);
+    doc.setDrawColor(...brandLine);
+    doc.setLineWidth(0.6);
+    doc.line(marginX, doc.internal.pageSize.getHeight() - 28, pageWidth - marginX, doc.internal.pageSize.getHeight() - 28);
+    if (page !== 1 && logoDataUrl) {
+      addLogo(marginX, doc.internal.pageSize.getHeight() - 24, 44, 18);
+    }
+    doc.text(`Dariba DCS Evidence Pack`, page === 1 ? marginX : marginX + 54, doc.internal.pageSize.getHeight() - 14);
+    doc.text(`Page ${page} of ${pageCount}`, pageWidth - marginX - 56, doc.internal.pageSize.getHeight() - 14);
   }
 
   return doc.output('blob');

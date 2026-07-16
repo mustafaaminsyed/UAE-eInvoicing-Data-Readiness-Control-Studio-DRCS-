@@ -120,6 +120,12 @@ describe('buildStreamlinedEvidenceReport', () => {
     expect(report.verdict).toBe('Not Ready');
     expect(report.evidenceConfidence).toBe('Low');
     expect(report.recommendedDecision).toBe('Do not proceed');
+    expect(report.scopeSummary.length).toBeGreaterThan(0);
+    expect(report.methodology.length).toBeGreaterThan(0);
+    expect(report.templateSummaries.map((summary) => summary.template)).toEqual(
+      expect.arrayContaining(['buyers', 'invoice_headers', 'invoice_lines']),
+    );
+    expect(report.remediationPriorities.length).toBeGreaterThan(0);
     expect(report.blockers[0]).toMatchObject({
       title: 'Buyer TRN format',
       owner: 'Client Finance',
