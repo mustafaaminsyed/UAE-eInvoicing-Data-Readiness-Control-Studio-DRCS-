@@ -29,6 +29,7 @@ import { buildEvidenceSummary } from '@/lib/evidence/evidenceSummary';
 import { getEvidenceRuleExecutionTelemetry, getEvidenceRunSnapshot } from '@/lib/evidence/evidenceRunSnapshot';
 import {
   buildStreamlinedEvidenceReport,
+  formatVerdictLabel,
   StreamlinedBlocker,
   StreamlinedDomainReadiness,
 } from '@/lib/evidence/streamlinedEvidenceReport';
@@ -95,7 +96,7 @@ function getRunContextSummary(
 
   if (runSummary.run_mode === 'diagnostic_mapping') {
     return {
-      statusLabel: 'Diagnostic only',
+      statusLabel: 'Diagnostic assessment',
       statusClass: 'border-amber-500/30 bg-amber-500/10 text-amber-700',
       modeLabel: 'Diagnostic mapping run',
       modeClass: 'border-amber-500/30 bg-amber-500/10 text-amber-700',
@@ -106,7 +107,7 @@ function getRunContextSummary(
 
   if (runSummary.run_mode === 'governed_mapping') {
     return {
-      statusLabel: runSummary.readiness_qualification === 'diagnostic_only' ? 'Diagnostic only' : 'Decision-ready basis',
+      statusLabel: runSummary.readiness_qualification === 'diagnostic_only' ? 'Diagnostic assessment' : 'Decision-ready assessment',
       statusClass:
         runSummary.readiness_qualification === 'diagnostic_only'
           ? 'border-amber-500/30 bg-amber-500/10 text-amber-700'
@@ -119,7 +120,7 @@ function getRunContextSummary(
   }
 
   return {
-    statusLabel: runSummary.readiness_qualification === 'diagnostic_only' ? 'Diagnostic only' : 'Decision-ready basis',
+      statusLabel: runSummary.readiness_qualification === 'diagnostic_only' ? 'Diagnostic assessment' : 'Decision-ready assessment',
     statusClass:
       runSummary.readiness_qualification === 'diagnostic_only'
         ? 'border-amber-500/30 bg-amber-500/10 text-amber-700'
@@ -662,11 +663,11 @@ export default function EvidencePackPage() {
           <CardContent className="p-4">
             <p className="text-sm font-medium text-foreground">
               {canUseHistoricalSnapshot
-                ? 'This evidence pack is being reconstructed from the persisted snapshot captured for the selected run.'
-                : 'This evidence pack is being generated from the current in-memory run context.'}
+                ? 'This evidence pack is being reconstructed from the saved assessment snapshot captured for the selected run.'
+                : 'This evidence pack is being generated from the current assessment run.'}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Historical runs no longer fall back to current loaded data for population and supporting evidence context.
+              Historical runs use their own saved evidence context rather than current on-screen data.
             </p>
             {selectedRunContext ? (
               <p className="mt-2 text-xs leading-5 text-muted-foreground">
@@ -675,7 +676,7 @@ export default function EvidencePackPage() {
             ) : null}
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <Badge variant="outline" className="text-xs">
-                Source: {ov.sourceMode === 'persisted_snapshot' ? 'Persisted snapshot' : 'Current in-memory run'}
+                Evidence source: {ov.sourceMode === 'persisted_snapshot' ? 'Saved assessment snapshot' : 'Current assessment run'}
               </Badge>
               <Badge variant="outline" className="text-xs">
                 Entity scope:{' '}
@@ -905,19 +906,46 @@ export default function EvidencePackPage() {
             <CardContent className="p-4 md:p-5 space-y-4">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-foreground">Executive decision</p>
+                  <p className="text-sm font-semibold text-foreground">1. Executive verdict</p>
                   <p className="text-xs text-muted-foreground mt-1 max-w-3xl">{streamlinedReport.summaryText}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="outline" className={verdictBadgeClassName(streamlinedReport.verdict)}>
-                    {streamlinedReport.verdict}
+                    {formatVerdictLabel(streamlinedReport.verdict)}
                   </Badge>
                   <Badge variant="outline" className="text-xs">
-                    Evidence confidence: {streamlinedReport.evidenceConfidence}
+                    Assessment confidence: {streamlinedReport.evidenceConfidenceLabel}
                   </Badge>
                   <Badge variant="secondary" className="text-xs">
                     Recommended decision: {streamlinedReport.recommendedDecision}
                   </Badge>
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {streamlinedReport.scopeSummary.map((item) => (
+                  <div key={item.label} className="rounded-lg border bg-muted/20 p-3">
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{item.label}</p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">{item.value}</p>
+                    {item.helper ? <p className="mt-1 text-[11px] text-muted-foreground">{item.helper}</p> : null}
+                  </div>
+                ))}
+              </div>
+
+              <div className="rounded-lg border bg-muted/20 p-4">
+                <div>
+                  <p className="text-sm font-medium text-foreground">2. How DCS assessed the data</p>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    This section explains the basis of the evidence pack in plain language for reviewers and client stakeholders.
+                  </p>
+                </div>
+                <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                  {streamlinedReport.methodology.map((item) => (
+                    <div key={item.title} className="rounded-md border bg-background/80 p-3">
+                      <p className="text-xs font-medium text-foreground">{item.title}</p>
+                      <p className="mt-1 text-[11px] text-muted-foreground">{item.detail}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -934,7 +962,7 @@ export default function EvidencePackPage() {
               <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
                 <div className="rounded-lg border bg-muted/20 p-4">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-medium text-foreground">Top blockers</p>
+                    <p className="text-sm font-medium text-foreground">3. Priority blockers and remediation</p>
                     <Badge variant="outline" className="text-xs">
                       Residual risk: {streamlinedReport.residualRisk}
                     </Badge>
@@ -948,23 +976,60 @@ export default function EvidencePackPage() {
 
                 <div className="rounded-lg border bg-muted/20 p-4 space-y-3">
                   <div>
-                    <p className="text-sm font-medium text-foreground">Mitigations in place</p>
+                    <p className="text-sm font-medium text-foreground">Recommended actions</p>
                     <p className="text-[11px] text-muted-foreground mt-1">
-                      Keep the main body focused on the actions that reduce onboarding risk. Full detail remains in the appendices below.
+                      Keep the main body focused on the actions that reduce readiness risk first. Full detail remains in the appendices below.
                     </p>
                   </div>
-                  <ul className="space-y-2 text-xs text-muted-foreground">
-                    {streamlinedReport.mitigationSnapshot.map((mitigation) => (
-                      <li key={mitigation} className="rounded-md border bg-background/80 px-3 py-2">
-                        {mitigation}
-                      </li>
+                  <div className="space-y-2">
+                    {streamlinedReport.remediationPriorities.slice(0, 3).map((action) => (
+                      <div key={`${action.priority}-${action.title}`} className="rounded-md border bg-background/80 px-3 py-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-xs font-medium text-foreground">{action.title}</p>
+                          <Badge variant="outline" className="text-[10px]">{action.priority}</Badge>
+                        </div>
+                        <p className="mt-1 text-[11px] text-muted-foreground">{action.affectedArea}</p>
+                        <p className="mt-1 text-[11px] text-muted-foreground">{action.action}</p>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                   <div className="rounded-md border bg-background/80 p-3">
                     <p className="text-xs font-medium text-foreground">Scope boundary</p>
                     <p className="mt-1 text-[11px] text-muted-foreground">{streamlinedReport.includedScopeNote}</p>
                     <p className="mt-1 text-[11px] text-muted-foreground">{streamlinedReport.excludedScopeNote}</p>
                   </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border bg-muted/20 p-4 space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">4. Template findings summary</p>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Use this view to understand which uploaded template needs remediation attention first before moving into the technical appendix.
+                  </p>
+                </div>
+                <div className="grid gap-3 lg:grid-cols-3">
+                  {streamlinedReport.templateSummaries.map((summary) => (
+                    <div key={summary.template} className="rounded-md border bg-background/80 p-3">
+                      <p className="text-xs font-medium text-foreground">{summary.label}</p>
+                      <p className="mt-1 text-[11px] text-muted-foreground">{summary.recordsInScope} records in scope</p>
+                      <div className="mt-3 grid grid-cols-3 gap-2">
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Mandatory fails</p>
+                          <p className="text-sm font-semibold text-foreground">{summary.mandatoryFieldFailures}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Low population</p>
+                          <p className="text-sm font-semibold text-foreground">{summary.lowPopulationFields}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Structural gaps</p>
+                          <p className="text-sm font-semibold text-foreground">{summary.structuralGaps}</p>
+                        </div>
+                      </div>
+                      <p className="mt-3 text-[11px] text-muted-foreground">{summary.keyFinding}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
             </CardContent>
@@ -1015,7 +1080,7 @@ export default function EvidencePackPage() {
               <div className="rounded-lg border bg-muted/20 p-3">
                 <p className="text-xs font-medium text-foreground">Download guidance</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Detailed DR coverage, full rule execution, exception inventories, and control mappings are intended to be consumed from the downloadable evidence files.
+                  Detailed data-requirement coverage, full rule execution, exception inventories, and control mappings are intended to be consumed from the downloadable evidence files.
                 </p>
                 <p className="mt-1 text-[11px] text-muted-foreground">{evidenceSummary.executionCountNote}</p>
               </div>
@@ -1031,7 +1096,7 @@ export default function EvidencePackPage() {
                   <div>
                     <p className="text-sm font-semibold text-foreground">Exceptions and mitigations</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      This page is intentionally limited to the most material grouped exception themes. Use the appendix tabs below for the full register.
+                      This section is intentionally limited to the most material grouped exception themes. Use the appendix tabs below for the full register.
                     </p>
                   </div>
                   <Badge variant="outline" className="text-xs">
@@ -1086,7 +1151,7 @@ export default function EvidencePackPage() {
                   <div>
                     <p className="text-sm font-semibold text-foreground">Domain readiness</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Keep this view short. It should tell reviewers whether the risk is isolated or systemic before they move into the technical appendices.
+                      This provides a short operational reading before reviewers move into the technical appendices.
                     </p>
                   </div>
                   <Badge variant="outline" className="text-xs">
@@ -1108,7 +1173,7 @@ export default function EvidencePackPage() {
               <CardContent className="p-4">
                 <p className="text-sm font-semibold text-foreground">Appendix detail</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  The tabs below preserve the current DR coverage, rule execution, exception, control, and population evidence as the technical appendix for audit and client handover.
+                  The tabs below preserve the current data-requirement coverage, rule execution, exception, control, and population evidence as the technical appendix for audit and client handover.
                 </p>
               </CardContent>
             </Card>
@@ -1127,7 +1192,7 @@ export default function EvidencePackPage() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList className="flex flex-wrap h-auto gap-1">
-            <TabsTrigger value="dr-coverage" className="gap-1 text-xs"><Shield className="w-3 h-3" /> DR Coverage</TabsTrigger>
+            <TabsTrigger value="dr-coverage" className="gap-1 text-xs"><Shield className="w-3 h-3" /> Data Requirements</TabsTrigger>
             <TabsTrigger value="rules" className="gap-1 text-xs"><Scale className="w-3 h-3" /> Rules</TabsTrigger>
             <TabsTrigger value="exceptions" className="gap-1 text-xs"><Bug className="w-3 h-3" /> Exceptions</TabsTrigger>
             <TabsTrigger value="controls" className="gap-1 text-xs"><BarChart3 className="w-3 h-3" /> Controls</TabsTrigger>
@@ -1138,7 +1203,7 @@ export default function EvidencePackPage() {
           <TabsContent value="dr-coverage">
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">DR Coverage Matrix</CardTitle>
+                <CardTitle className="text-base">Data Requirement Coverage Matrix</CardTitle>
                 <CardDescription>{drCoverageRows.length} data requirements</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
@@ -1147,7 +1212,7 @@ export default function EvidencePackPage() {
                     <Table className="min-w-max">
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="text-xs">DR ID</TableHead>
+                          <TableHead className="text-xs">Data Requirement ID</TableHead>
                           <TableHead className="text-xs">Business Term</TableHead>
                           <TableHead className="text-xs">Mandatory</TableHead>
                           <TableHead className="text-xs">Template</TableHead>
@@ -1209,7 +1274,7 @@ export default function EvidencePackPage() {
                           <TableHead className="text-xs">Type</TableHead>
                           <TableHead className="text-xs">Layer</TableHead>
                           <TableHead className="text-xs">Failure Class</TableHead>
-                          <TableHead className="text-xs">Linked DRs</TableHead>
+                          <TableHead className="text-xs">Linked Data Requirements</TableHead>
                           <TableHead className="text-xs text-right">Executions</TableHead>
                           <TableHead className="text-xs text-right">Failures</TableHead>
                           <TableHead className="text-xs">Source</TableHead>
@@ -1261,7 +1326,7 @@ export default function EvidencePackPage() {
                       <TableHeader>
                         <TableRow>
                           <TableHead className="text-xs">Exception ID</TableHead>
-                          <TableHead className="text-xs">DR ID</TableHead>
+                          <TableHead className="text-xs">Data Requirement ID</TableHead>
                           <TableHead className="text-xs">Rule ID</TableHead>
                           <TableHead className="text-xs">Type</TableHead>
                           <TableHead className="text-xs">Layer</TableHead>
@@ -1325,7 +1390,7 @@ export default function EvidencePackPage() {
                           <TableHead className="text-xs">Name</TableHead>
                           <TableHead className="text-xs">Type</TableHead>
                           <TableHead className="text-xs">Covered Rules</TableHead>
-                          <TableHead className="text-xs">Covered DRs</TableHead>
+                          <TableHead className="text-xs">Covered Data Requirements</TableHead>
                           <TableHead className="text-xs text-right">Exceptions</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1363,7 +1428,7 @@ export default function EvidencePackPage() {
                     <Table className="min-w-max">
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="text-xs">DR ID</TableHead>
+                          <TableHead className="text-xs">Data Requirement ID</TableHead>
                           <TableHead className="text-xs">Business Term</TableHead>
                           <TableHead className="text-xs">Mandatory</TableHead>
                           <TableHead className="text-xs text-right">Population %</TableHead>
