@@ -24,6 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 import { SeverityBadge } from '@/components/SeverityBadge';
 import { CustomCheckConfig } from '@/types/customChecks';
 import { Severity } from '@/types/compliance';
+import { validateCustomCheckConfig } from '@/lib/checks/customCheckConfigValidation';
 import {
   fetchAllCustomChecks,
   createCustomCheck,
@@ -84,6 +85,10 @@ const defaultCheck: Omit<CustomCheckConfig, 'id'> = {
   is_active: true,
 };
 
+function getAllowedFieldsForScope(scope: CustomCheckConfig['dataset_scope']): string[] {
+  return FIELD_OPTIONS[scope] || [];
+}
+
 export default function CheckBuilderPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -131,8 +136,16 @@ export default function CheckBuilderPage() {
   };
 
   const handleSave = async () => {
-    if (!formData.name.trim()) {
-      toast({ title: 'Error', description: 'Check name is required', variant: 'destructive' });
+    const validationErrors = validateCustomCheckConfig(formData, {
+      allowedFields: getAllowedFieldsForScope(formData.dataset_scope),
+    });
+
+    if (validationErrors.length > 0) {
+      toast({
+        title: 'Check configuration incomplete',
+        description: validationErrors[0],
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -171,6 +184,19 @@ export default function CheckBuilderPage() {
 
   const handleToggleActive = async (check: CustomCheckConfig) => {
     if (!check.id) return;
+    if (!check.is_active) {
+      const validationErrors = validateCustomCheckConfig(check, {
+        allowedFields: getAllowedFieldsForScope(check.dataset_scope),
+      });
+      if (validationErrors.length > 0) {
+        toast({
+          title: 'Cannot activate check',
+          description: validationErrors[0],
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
     const success = await updateCustomCheck(check.id, { is_active: !check.is_active });
     if (success) {
       loadChecks();
@@ -635,6 +661,14 @@ export default function CheckBuilderPage() {
                   />
                   <p className="text-xs text-muted-foreground mt-1">
                     Use {`{field_name}`} to include field values in the message
+                  </p>
+                </div>
+
+                <div className="col-span-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-3">
+                  <p className="text-sm font-medium text-foreground">Activation safeguard</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Incomplete checks cannot be saved or re-activated. This protects the runtime
+                    validation flow from partial custom rule configurations.
                   </p>
                 </div>
               </div>

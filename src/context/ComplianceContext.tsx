@@ -10,7 +10,7 @@ import {
   Severity
 } from '@/types/compliance';
 import { PintAEException, ReadinessQualification, RunSummary, ValidationRunMode } from '@/types/pintAE';
-import { saveCheckRun, saveEntityScores } from '@/lib/api/checksApi';
+import { saveCheckRun, saveEntityScores, saveInvestigationFlags } from '@/lib/api/checksApi';
 import { calculateScore } from '@/types/customChecks';
 import { DEFAULT_DIRECTION, Direction, OrganizationProfile } from '@/types/direction';
 import { 
@@ -115,7 +115,7 @@ function ComplianceStateProvider({ children }: { children: ReactNode }) {
   const [lines, setLines] = useState<InvoiceLine[]>([]);
   const [checkResults, setCheckResults] = useState<CheckResult[]>([]);
   const [exceptions, setExceptions] = useState<Exception[]>([]);
-  const [investigationFlags] = useState<InvestigationFlag[]>([]);
+  const [investigationFlags, setInvestigationFlags] = useState<InvestigationFlag[]>([]);
   const [pintAEExceptions, setPintAEExceptions] = useState<PintAEException[]>([]);
   const [runSummary, setRunSummary] = useState<RunSummary | null>(null);
   const [lastPintRuleTelemetry, setLastPintRuleTelemetry] = useState<EvidenceRuleExecutionTelemetryRow[]>([]);
@@ -199,9 +199,10 @@ function ComplianceStateProvider({ children }: { children: ReactNode }) {
     setLines(normalizedData.lines);
     setIsDataLoaded(true);
     setIsChecksRun(false);
-    setCheckResults([]);
-    setExceptions([]);
-    setPintAEExceptions([]);
+      setCheckResults([]);
+      setExceptions([]);
+      setInvestigationFlags([]);
+      setPintAEExceptions([]);
     setRunSummary(null);
     setLastChecksRunAt(null);
     setLastChecksRunDatasetType(null);
@@ -237,16 +238,26 @@ function ComplianceStateProvider({ children }: { children: ReactNode }) {
 
       const {
         builtInResults,
+        customValidationResults,
         coreTelemetry,
         pintAEChecks,
         pintExceptions,
         pintTelemetry,
         orgProfileTelemetry,
+        investigationFlags: runInvestigationFlags,
+        customChecksExecuted,
         allExceptions,
       } = orchestrationResult;
       const combinedTelemetry = [...coreTelemetry, ...pintTelemetry, ...orgProfileTelemetry];
-      setCheckResults(builtInResults.map((result) => ({ ...result, direction, datasetType: direction })));
+      setCheckResults(
+        [...builtInResults, ...customValidationResults].map((result) => ({
+          ...result,
+          direction,
+          datasetType: direction,
+        }))
+      );
       setExceptions(allExceptions);
+      setInvestigationFlags(runInvestigationFlags);
       setPintAEExceptions(pintExceptions);
       setLastPintRuleTelemetry(combinedTelemetry);
       setIsChecksRun(true);
@@ -257,16 +268,16 @@ function ComplianceStateProvider({ children }: { children: ReactNode }) {
       const stats = calculateStats(allExceptions, headers.length);
       const evidenceSnapshot = buildEvidenceRunSnapshot(buyers, headers, lines);
       const runId = await saveCheckRun({
-        run_date: new Date().toISOString(),
-        total_invoices: headers.length,
-        total_exceptions: allExceptions.length,
+          run_date: new Date().toISOString(),
+          total_invoices: headers.length,
+          total_exceptions: allExceptions.length,
         critical_count: stats.exceptionsBySeverity.Critical,
         high_count: stats.exceptionsBySeverity.High,
         medium_count: stats.exceptionsBySeverity.Medium,
         low_count: stats.exceptionsBySeverity.Low,
         pass_rate: stats.passRate,
         results_summary: {
-          checkCount: builtInResults.length + pintAEChecks.length,
+          checkCount: builtInResults.length + pintAEChecks.length + customChecksExecuted,
           direction,
           ruleset: activeRuleset,
           rulesetVersion: RULESET_VERSION,
@@ -301,6 +312,7 @@ function ComplianceStateProvider({ children }: { children: ReactNode }) {
         clientScoresSaved,
         runSummarySaved,
         entityScoresSaved,
+        investigationFlagsSaved,
       ] = await Promise.all([
         saveExceptions(runId, pintExceptions),
         saveClientRiskScores(runId, clientScores),
@@ -309,6 +321,7 @@ function ComplianceStateProvider({ children }: { children: ReactNode }) {
           ...sellerScores.map(s => ({ ...s, run_id: runId })),
           ...invoiceScores.map(s => ({ ...s, run_id: runId })),
         ]),
+        saveInvestigationFlags(runId, runInvestigationFlags),
       ]);
 
       if (exceptionsSaved) {
@@ -318,7 +331,7 @@ function ComplianceStateProvider({ children }: { children: ReactNode }) {
         setRunSummary(summary);
       }
 
-      if (!exceptionsSaved || !clientScoresSaved || !runSummarySaved || !entityScoresSaved) {
+      if (!exceptionsSaved || !clientScoresSaved || !runSummarySaved || !entityScoresSaved || !investigationFlagsSaved) {
         toast.info('Checks completed, but some run artifacts could not be saved.');
       }
     } catch (error) {
@@ -378,7 +391,7 @@ function ComplianceStateProvider({ children }: { children: ReactNode }) {
       AP: { buyers: [], headers: [], lines: [], direction: 'AP' },
     });
     setBuyers([]); setHeaders([]); setLines([]);
-    setCheckResults([]); setExceptions([]); setPintAEExceptions([]);
+    setCheckResults([]); setExceptions([]); setInvestigationFlags([]); setPintAEExceptions([]);
     setRunSummary(null);
     setLastPintRuleTelemetry([]);
     setLastChecksRunAt(null);

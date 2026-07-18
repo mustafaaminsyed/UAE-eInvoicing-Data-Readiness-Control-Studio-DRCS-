@@ -8,6 +8,9 @@ import { Direction, OrganizationProfile } from '@/types/direction';
 import { PintAECheck, PintAEException } from '@/types/pintAE';
 import { resolveDirection } from '@/lib/direction/directionUtils';
 import { EvidenceRuleExecutionTelemetryRow } from '@/types/evidence';
+import { fetchCustomChecks } from '@/lib/api/checksApi';
+import { runCustomCheck, runSearchCheck } from '@/lib/checks/customCheckRunner';
+import { InvestigationFlag } from '@/types/customChecks';
 
 type OrchestratorOptions = {
   direction: Direction;
@@ -24,6 +27,7 @@ type OrchestratorOptions = {
 export interface RunChecksOrchestrationResult {
   dataContext: DataContext;
   builtInResults: CheckResult[];
+  customValidationResults: CheckResult[];
   coreTelemetry: EvidenceRuleExecutionTelemetryRow[];
   pintAEChecks: PintAECheck[];
   pintExceptions: PintAEException[];
@@ -31,8 +35,27 @@ export interface RunChecksOrchestrationResult {
   legacyPintExceptions: Exception[];
   orgProfileExceptions: Exception[];
   orgProfileTelemetry: EvidenceRuleExecutionTelemetryRow[];
+  investigationFlags: InvestigationFlag[];
+  customChecksExecuted: number;
   allExceptions: Exception[];
   runArtifact: RunArtifact;
+}
+
+function getCustomScopePopulation(
+  scope: 'header' | 'lines' | 'buyers' | 'cross-file',
+  dataContext: DataContext
+): number {
+  switch (scope) {
+    case 'buyers':
+      return dataContext.buyers.length;
+    case 'lines':
+      return dataContext.lines.length;
+    case 'cross-file':
+      return dataContext.headers.length;
+    case 'header':
+    default:
+      return dataContext.headers.length;
+  }
 }
 
 function buildDataContext(buyers: Buyer[], headers: InvoiceHeader[], lines: InvoiceLine[]): DataContext {
@@ -139,12 +162,41 @@ export async function runChecksOrchestrator(
     mappingProfileId: options.mappingProfileId,
     rulesetVersion: options.rulesetVersion,
   });
+  const activeCustomChecks = await fetchCustomChecks();
+  const validationChecks = activeCustomChecks.filter(
+    (check) => (check.check_type || 'VALIDATION') !== 'SEARCH_CHECK'
+  );
+  const searchChecks = activeCustomChecks.filter(
+    (check) => (check.check_type || 'VALIDATION') === 'SEARCH_CHECK'
+  );
+  const customValidationResults: CheckResult[] = validationChecks.map((check) => {
+    const exceptions = runCustomCheck(check, dataContext);
+    const population = getCustomScopePopulation(check.dataset_scope, dataContext);
+    const failed = exceptions.length;
+
+    return {
+      checkId: check.id || `custom-${check.name}`,
+      checkName: check.name,
+      severity: check.severity,
+      passed: Math.max(population - failed, 0),
+      failed,
+      exceptions,
+    };
+  });
+  const customValidationExceptions = customValidationResults.flatMap((result) => result.exceptions);
+  const investigationFlags =
+    options.direction === 'AP'
+      ? searchChecks.flatMap((check) => runSearchCheck(check, dataContext, options.direction))
+      : [];
+  const customChecksExecuted =
+    validationChecks.length + (options.direction === 'AP' ? searchChecks.length : 0);
 
   const allExceptions = enrichLegacyExceptions(
     [
       ...builtInResults.flatMap((result) => result.exceptions),
       ...legacyPintExceptions,
       ...orgProfileExceptions,
+      ...customValidationExceptions,
     ],
     {
       direction: options.direction,
@@ -160,7 +212,10 @@ export async function runChecksOrchestrator(
     { layer: 'core' }
   );
   const pintFindings = mapPintExceptionsToFindings(pintExceptions);
-  const orgFindings = mapLegacyExceptionsToFindings(orgProfileExceptions, { layer: 'custom' });
+  const orgFindings = mapLegacyExceptionsToFindings(
+    [...orgProfileExceptions, ...customValidationExceptions],
+    { layer: 'custom' }
+  );
 
   const layerResults: LayerResult[] = [
     buildLayerResult('core', coreFindings),
@@ -183,6 +238,10 @@ export async function runChecksOrchestrator(
       pintTelemetryRules: pintTelemetry.length,
       orgProfileExceptions: orgProfileExceptions.length,
       orgProfileTelemetryRules: orgProfileTelemetry.length,
+      customValidationChecks: customValidationResults.length,
+      customValidationExceptions: customValidationExceptions.length,
+      investigationFlags: investigationFlags.length,
+      customChecksExecuted,
       allExceptions: allExceptions.length,
     },
   };
@@ -190,6 +249,7 @@ export async function runChecksOrchestrator(
   return {
     dataContext,
     builtInResults,
+    customValidationResults,
     coreTelemetry,
     pintAEChecks,
     pintExceptions,
@@ -197,6 +257,8 @@ export async function runChecksOrchestrator(
     legacyPintExceptions,
     orgProfileExceptions,
     orgProfileTelemetry,
+    investigationFlags,
+    customChecksExecuted,
     allExceptions,
     runArtifact,
   };
