@@ -19,7 +19,12 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCompliance } from '@/context/ComplianceContext';
+import { WorkflowPageHeader } from '@/components/shared/WorkflowPageHeader';
 import { cn } from '@/lib/utils';
+import {
+  WORKFLOW_OUTLINE_BADGE_CLASS,
+  WORKFLOW_UTILITY_BUTTON_CLASS,
+} from '@/lib/workflowShellStyles';
 import type { Exception, InvoiceHeader, ParsedData, Severity } from '@/types/compliance';
 
 type DatasetFilter = 'all' | 'AR' | 'AP';
@@ -699,6 +704,13 @@ export default function DataTwinPage() {
 
   return (
     <div className="space-y-4 animate-fade-in">
+      <WorkflowPageHeader
+        title="Invoice Digital Twin"
+        description="Trace invoice journey context across source, mapping, rule, exception, and evidence stages with a structured operational view."
+        icon={<GitBranch className="h-7 w-7" />}
+        className="animate-fade-in"
+      />
+
       <section className="surface-glass rounded-[28px] border border-border/70 p-5 shadow-[0_16px_34px_-28px_rgba(15,23,42,0.24)]">
         <div className="grid gap-4 xl:grid-cols-[1.3fr_0.7fr]">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -733,7 +745,7 @@ export default function DataTwinPage() {
                   <span className="text-sm text-muted-foreground">{activeContext.entity}</span>
                 </div>
               </div>
-              <Badge variant="outline" className="border-border/70 bg-background/80">
+              <Badge variant="outline" className={WORKFLOW_OUTLINE_BADGE_CLASS}>
                 {VIEW_MODE_LABELS[viewMode]}
               </Badge>
             </div>
@@ -764,9 +776,9 @@ export default function DataTwinPage() {
                 <div className="space-y-2">
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="outline" className="border-primary/15 bg-primary/8 text-primary">
-                        {VIEW_MODE_LABELS[viewMode]}
-                      </Badge>
+                        <Badge variant="outline" className="border-primary/15 bg-primary/8 text-primary">
+                          {VIEW_MODE_LABELS[viewMode]}
+                        </Badge>
                     </div>
                     <p className="max-w-3xl text-sm leading-6 text-foreground">{activeContext.viewHint}</p>
                   </div>
@@ -902,12 +914,12 @@ export default function DataTwinPage() {
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">{selectedNode.nextAction}</p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {secondaryAction ? (
-                    <Button variant="outline" className="rounded-full" onClick={() => navigate(secondaryAction.path)}>
+                    <Button variant="outline" className={WORKFLOW_UTILITY_BUTTON_CLASS} onClick={() => navigate(secondaryAction.path)}>
                       {secondaryAction.label}
                     </Button>
                   ) : null}
                   {primaryAction ? (
-                    <Button className="rounded-full" onClick={() => navigate(primaryAction.path)}>
+                    <Button className={WORKFLOW_UTILITY_BUTTON_CLASS} onClick={() => navigate(primaryAction.path)}>
                       {primaryAction.label}
                       <ArrowRight className="h-4 w-4" />
                     </Button>
@@ -983,11 +995,11 @@ export default function DataTwinPage() {
                     </div>
                     <p className="mt-2 text-sm leading-6 text-muted-foreground">{issue.note}</p>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <Button variant="outline" size="sm" className="rounded-full" onClick={() => navigate('/exceptions')}>
+                      <Button variant="outline" size="sm" className={WORKFLOW_UTILITY_BUTTON_CLASS} onClick={() => navigate('/exceptions')}>
                         Review In Exceptions
                       </Button>
                       {issue.invoiceId ? (
-                        <Button variant="ghost" size="sm" className="rounded-full" onClick={() => navigate(`/invoice/${encodeURIComponent(issue.invoiceId)}`)}>
+                        <Button variant="ghost" size="sm" className={WORKFLOW_UTILITY_BUTTON_CLASS} onClick={() => navigate(`/invoice/${encodeURIComponent(issue.invoiceId)}`)}>
                           Open Invoice Detail
                         </Button>
                       ) : null}

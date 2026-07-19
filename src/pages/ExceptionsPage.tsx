@@ -28,6 +28,7 @@ import { ExplanationPackPanel } from '@/components/explanations/ExplanationPackP
 import { LastRunContextBanner } from '@/components/run/LastRunContextBanner';
 import { WorkflowNavigator, buildWorkflowItems } from '@/components/shared/WorkflowNavigator';
 import { WorkflowPageHeader } from '@/components/shared/WorkflowPageHeader';
+import { WORKFLOW_UTILITY_BUTTON_CLASS } from '@/lib/workflowShellStyles';
 import {
   COMPLIANCE_RADAR_DIMENSIONS,
   getComplianceRadarDimensionDefinition,
@@ -282,7 +283,7 @@ export default function ExceptionsPage() {
           description={`${filteredExceptions.length} of ${exceptions.length} exceptions shown`}
           className="mb-8 animate-fade-in"
           actions={
-            <Button onClick={handleExport} variant="outline" className="gap-2 rounded-full">
+            <Button onClick={handleExport} variant="outline" size="sm" className={WORKFLOW_UTILITY_BUTTON_CLASS}>
               <Download className="w-4 h-4" />
               Export CSV
             </Button>
@@ -319,8 +320,8 @@ export default function ExceptionsPage() {
           </div>
         ) : null}
 
-        <div className="surface-glass rounded-2xl border border-white/70 shadow-sm p-4 mb-6 animate-slide-up">
-          <div className="flex items-center gap-2 mb-4">
+        <div className="mb-6 animate-slide-up surface-glass rounded-2xl border border-white/70 p-3.5 shadow-sm md:p-4">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
             <Button
               size="sm"
               variant={datasetFilter === 'AR' ? 'default' : 'outline'}
@@ -337,8 +338,8 @@ export default function ExceptionsPage() {
             </Button>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+            <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Search by invoice number, TRN, buyer ID..."
@@ -352,7 +353,7 @@ export default function ExceptionsPage() {
               value={severityFilter}
               onValueChange={(value) => setSeverityFilter(value as Severity | 'all')}
             >
-              <SelectTrigger className="w-full sm:w-40">
+              <SelectTrigger className="w-full sm:w-[170px]">
                 <SelectValue placeholder="Severity" />
               </SelectTrigger>
               <SelectContent>
@@ -365,7 +366,7 @@ export default function ExceptionsPage() {
             </Select>
 
             <Select value={checkFilter} onValueChange={setCheckFilter}>
-              <SelectTrigger className="w-full sm:w-56">
+              <SelectTrigger className="w-full sm:w-[220px]">
                 <SelectValue placeholder="Check" />
               </SelectTrigger>
               <SelectContent>

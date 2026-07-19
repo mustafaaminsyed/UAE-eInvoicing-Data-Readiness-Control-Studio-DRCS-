@@ -35,6 +35,10 @@
     --ring: 142 50% 35%;
 
     --radius: 0.5rem;
+    --surface-radius-lg: 1.75rem;
+    --surface-radius-md: 1.25rem;
+    --surface-shadow: 0 14px 28px -24px rgba(15, 23, 42, 0.18);
+    --surface-shadow-strong: 0 28px 52px -34px rgba(15, 23, 42, 0.24);
 
     /* Severity Colors */
     --severity-critical: 0 84% 60%;
@@ -150,10 +154,10 @@
   }
 
   .surface-glass {
-    background: hsl(var(--card) / 0.94);
+    background: hsl(var(--card) / 0.96);
     border: 1px solid hsl(var(--border) / 0.95) !important;
-    box-shadow: 0 14px 28px -24px rgba(15, 23, 42, 0.26);
-    backdrop-filter: blur(3px);
+    box-shadow: var(--surface-shadow);
+    backdrop-filter: blur(1.5px);
   }
 
   .grid-veil {

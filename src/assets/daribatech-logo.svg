@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="428" height="124" viewBox="0 0 428 124" role="img" aria-labelledby="title desc">
+  <title id="title">Daribatech logo</title>
+  <desc id="desc">Daribatech horizontal logo with icon and wordmark.</desc>
+  <rect x="22" y="23" width="56" height="56" rx="12" fill="#064F46"/>
+  <g fill="none" stroke="#B8D29B" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M31 54c0 10 7 17 18 17 10 0 18-5 22-13" stroke-width="4.4"/>
+    <path d="M65 55c0-8-5-15-13-17-7-2-14 1-18 8" stroke-width="4.4"/>
+    <path d="M52 39c0 10 6 18 16 20" stroke-width="4.2"/>
+    <circle cx="58.5" cy="31.5" r="3.8" fill="#B8D29B" stroke="none"/>
+    <circle cx="43.5" cy="38.5" r="2.8" fill="#B8D29B" stroke="none"/>
+  </g>
+  <text x="88" y="71" font-family="Aptos, Segoe UI, Arial, Helvetica, sans-serif" font-size="31" font-weight="500" letter-spacing="-1.1">
+    <tspan fill="#064F46">dariba</tspan><tspan fill="#A9D19D">tech</tspan>
+  </text>
+</svg>

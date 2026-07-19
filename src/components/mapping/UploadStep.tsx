@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Upload, FileSpreadsheet, AlertCircle, Database, Calendar, Hash, Type, RefreshCw, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -150,6 +151,43 @@ function buildPreviewData(fileName: string, text: string, datasetType: DatasetTy
   };
 }
 
+function isSpreadsheetFile(file: File): boolean {
+  const lower = file.name.toLowerCase();
+  return lower.endsWith('.xlsx') || lower.endsWith('.xls');
+}
+
+function extractWorkbookCSV(file: File, workbook: XLSX.WorkBook): string {
+  const candidateSheetName = workbook.SheetNames.find((sheetName) => {
+    const worksheet = workbook.Sheets[sheetName];
+    if (!worksheet || !worksheet['!ref']) return false;
+    const range = XLSX.utils.decode_range(worksheet['!ref']);
+    return range.e.r >= range.s.r && range.e.c >= range.s.c;
+  });
+
+  if (!candidateSheetName) {
+    throw new Error(`Workbook "${file.name}" does not contain a readable worksheet.`);
+  }
+
+  const worksheet = workbook.Sheets[candidateSheetName];
+  const csv = XLSX.utils.sheet_to_csv(worksheet, { blankrows: false });
+
+  if (!csv.trim()) {
+    throw new Error(`Worksheet "${candidateSheetName}" in "${file.name}" is empty.`);
+  }
+
+  return csv;
+}
+
+async function readUploadText(file: File): Promise<string> {
+  if (!isSpreadsheetFile(file)) {
+    return file.text();
+  }
+
+  const workbookBuffer = await file.arrayBuffer();
+  const workbook = XLSX.read(workbookBuffer, { type: 'array' });
+  return extractWorkbookCSV(file, workbook);
+}
+
 export function UploadStep({ onDataLoaded, previewData, onReset, direction = 'AR' }: UploadStepProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -169,7 +207,7 @@ export function UploadStep({ onDataLoaded, previewData, onReset, direction = 'AR
     setError(null);
 
     try {
-      const text = await file.text();
+      const text = await readUploadText(file);
       const rows = parseCSV(text);
       if (rows.length === 0) {
         throw new Error('File appears to be empty or invalid');
@@ -186,7 +224,11 @@ export function UploadStep({ onDataLoaded, previewData, onReset, direction = 'AR
       onDataLoaded(buildPreviewData(file.name, text, resolvedDatasetType));
     } catch (err) {
       console.error('Error parsing file:', err);
-      setError(err instanceof Error ? err.message : 'Failed to parse file. Please ensure it is a valid CSV.');
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to parse file. Please upload a valid CSV or Excel workbook.'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -370,11 +412,11 @@ export function UploadStep({ onDataLoaded, previewData, onReset, direction = 'AR
               {isDragging ? 'Drop your file here' : 'Drag and drop your ERP extract'}
             </p>
             <p className="text-sm text-muted-foreground mb-4">
-              Supports CSV files. Maximum 10MB.
+              Supports CSV and Excel files (`.csv`, `.txt`, `.xlsx`, `.xls`). Maximum 10MB.
             </p>
             <input
               type="file"
-              accept=".csv,.txt"
+              accept=".csv,.txt,.xlsx,.xls"
               className="hidden"
               id="erp-file-input"
               ref={fileInputRef}

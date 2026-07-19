@@ -30,6 +30,10 @@ import { WorkflowNavigator, buildWorkflowItems } from '@/components/shared/Workf
 import { EXECUTIVE_KPI_LABELS } from '@/constants/dashboardLabels';
 import { useCompliance } from '@/context/ComplianceContext';
 import { computeDashboardMetrics } from '@/hooks/useDashboardMetrics';
+import {
+  WORKFLOW_OUTLINE_BADGE_CLASS,
+  WORKFLOW_UTILITY_BADGE_CLASS,
+} from '@/lib/workflowShellStyles';
 import type { Severity } from '@/types/compliance';
 
 type DatasetScope = 'AR' | 'AP';
@@ -1138,15 +1142,16 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-5 animate-fade-in">
-      <section className="surface-glass rounded-[28px] border border-border/70 p-4 shadow-[0_16px_34px_-28px_rgba(15,23,42,0.24)]">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="inline-flex rounded-xl border border-border/70 bg-background/80 p-1">
+      <section className="surface-glass rounded-[var(--surface-radius-lg)] border border-border/70 p-4 md:p-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div className="inline-flex rounded-2xl border border-border/70 bg-background/90 p-1 shadow-sm">
               <Button
                 size="sm"
                 variant={activeDatasetType === 'AR' ? 'default' : 'ghost'}
                 onClick={() => setActiveDatasetType('AR')}
-                className="h-8 rounded-lg px-3 text-xs"
+                className="h-9 rounded-xl px-3.5 text-[12px] font-semibold"
               >
                 AR / Outbound
               </Button>
@@ -1154,71 +1159,86 @@ export default function DashboardPage() {
                 size="sm"
                 variant={activeDatasetType === 'AP' ? 'default' : 'ghost'}
                 onClick={() => setActiveDatasetType('AP')}
-                className="h-8 rounded-lg px-3 text-xs"
+                className="h-9 rounded-xl px-3.5 text-[12px] font-semibold"
               >
                 AP / Inbound
               </Button>
+              </div>
+              <Badge variant="outline" className={WORKFLOW_OUTLINE_BADGE_CLASS}>
+                {snapshot.modeLabel}
+              </Badge>
+              <Badge
+                variant="outline"
+                className={
+                  isRunning
+                    ? `${WORKFLOW_UTILITY_BADGE_CLASS} border-primary/25 bg-primary/10 text-primary`
+                    : snapshot.criticalIssues > 0
+                      ? `${WORKFLOW_UTILITY_BADGE_CLASS} border-severity-medium/25 bg-severity-medium/10 text-severity-medium`
+                      : `${WORKFLOW_UTILITY_BADGE_CLASS} border-success/25 bg-success/10 text-success`
+                }
+              >
+                {isRunning ? 'Validation running' : snapshot.criticalIssues > 0 ? 'Executive attention required' : 'Executive ready'}
+              </Badge>
             </div>
-            <Badge variant="outline" className="border-border/70 bg-background/70 text-muted-foreground">
-              {snapshot.modeLabel}
-            </Badge>
-            <Badge
-              variant="outline"
-              className={
-                isRunning
-                  ? 'border-primary/25 bg-primary/10 text-primary'
-                  : snapshot.criticalIssues > 0
-                    ? 'border-severity-medium/25 bg-severity-medium/10 text-severity-medium'
-                    : 'border-success/25 bg-success/10 text-success'
-              }
-            >
-              {isRunning ? 'Validation running' : snapshot.criticalIssues > 0 ? 'Executive attention required' : 'Executive ready'}
-            </Badge>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <ContextChip
+                label="Current scope"
+                value={activeDatasetType === 'AR' ? 'AR / Outbound' : 'AP / Inbound'}
+                caption={snapshot.modeLabel}
+              />
+              <ContextChip
+                label="Invoices in scope"
+                value={formatNumber(snapshot.totalInvoices)}
+                caption="Header population under active dashboard review"
+              />
+              <ContextChip
+                label="Rule outcomes"
+                value={formatNumber(snapshot.executedRuleOutcomes)}
+                caption="Executed validation outcomes in the selected direction"
+              />
+              <ContextChip
+                label="Critical blocker exposure"
+                value={formatNumber(snapshot.criticalBlockerOutcomes)}
+                caption={blockerChipCaption}
+                tone={snapshot.criticalBlockerOutcomes > 0 ? 'danger' : 'success'}
+              />
+            </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" className="rounded-full" onClick={() => navigate('/validation')}>
-              Open Validation
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-            <Button className="rounded-full" onClick={() => navigate('/exceptions')}>
-              Review Exceptions
-              <ArrowRight className="h-4 w-4" />
-            </Button>
+          <div className="flex w-full flex-col gap-3 xl:w-auto xl:min-w-[280px] xl:max-w-[320px]">
+            <div className="rounded-[var(--surface-radius-md)] border border-border/70 bg-background/82 p-4 shadow-[var(--surface-shadow)]">
+              <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Executive focus
+              </p>
+              <p className="mt-2 text-base font-semibold text-foreground">
+                {snapshot.criticalIssues > 0 ? 'Resolve blocker concentration before production readiness.' : 'Maintain current conformance posture and monitor reruns.'}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Use validation for rule-level detail and exceptions for targeted remediation on the checks driving the largest portfolio impact.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" className="rounded-full" onClick={() => navigate('/validation')}>
+                Open Validation
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+              <Button size="sm" className="rounded-full" onClick={() => navigate('/exceptions')}>
+                Review Exceptions
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
 
         <WorkflowNavigator
           current="dashboard"
           fallbackPath="/run"
-          className="mt-5"
+          className="mt-4"
           helperText="Move between readiness, remediation, controls, traceability, and evidence views without losing workflow context."
           items={buildWorkflowItems(['dashboard', 'exceptions', 'controls', 'traceability', 'evidence'])}
         />
-
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <ContextChip
-            label="Current scope"
-            value={activeDatasetType === 'AR' ? 'AR / Outbound' : 'AP / Inbound'}
-            caption={snapshot.modeLabel}
-          />
-          <ContextChip
-            label="Invoices in scope"
-            value={formatNumber(snapshot.totalInvoices)}
-            caption="Header population under active dashboard review"
-          />
-          <ContextChip
-            label="Rule outcomes"
-            value={formatNumber(snapshot.executedRuleOutcomes)}
-            caption="Executed validation outcomes in the selected direction"
-          />
-          <ContextChip
-            label="Critical blocker exposure"
-            value={formatNumber(snapshot.criticalBlockerOutcomes)}
-            caption={blockerChipCaption}
-            tone={snapshot.criticalBlockerOutcomes > 0 ? 'danger' : 'success'}
-          />
-        </div>
       </section>
 
       <DashboardSection
@@ -1228,9 +1248,9 @@ export default function DashboardPage() {
       >
         {snapshot.hasLiveSignals ? (
           <div className="space-y-4">
-            <Card className="overflow-hidden rounded-[24px] border-border/70 bg-card/95 shadow-[0_18px_36px_-28px_rgba(15,23,42,0.24)]">
+            <Card className="overflow-hidden rounded-[var(--surface-radius-lg)] border-border/70 bg-card/95 shadow-[var(--surface-shadow-strong)]">
               <CardContent className="p-6">
-                <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
+                <div className="grid gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(300px,0.7fr)]">
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge
@@ -1265,7 +1285,7 @@ export default function DashboardPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                         Go-Live Readiness
                       </p>
                       <ReadinessMethodologyTooltip type="go-live" dimensions={readinessInputs}>
@@ -1285,7 +1305,7 @@ export default function DashboardPage() {
 
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                       {readinessInputs.map((input) => (
-                        <div key={input.label} className="rounded-2xl border border-border/70 bg-background/75 p-4">
+                        <div key={input.label} className="rounded-[var(--surface-radius-md)] border border-border/70 bg-background/82 p-4 shadow-[var(--surface-shadow)]">
                           <div className="flex items-center justify-between gap-3">
                             <p className="text-sm font-medium text-foreground">{input.label}</p>
                             <Badge variant="outline" className="border-border/70 bg-background/80 text-[11px] text-muted-foreground">
@@ -1299,11 +1319,11 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-		                  <div className="space-y-4">
-		                    <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
-		                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-		                        Recommended next action
-		                      </p>
+			                  <div className="space-y-4">
+			                    <div className="rounded-[var(--surface-radius-md)] border border-border/70 bg-background/82 p-4 shadow-[var(--surface-shadow)]">
+			                      <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+			                        Recommended next action
+			                      </p>
 		                      {criticalBlockingActions.length > 0 ? (
 		                        <div className="mt-3 space-y-4">
 		                          <div>
@@ -1339,10 +1359,10 @@ export default function DashboardPage() {
 		                      )}
 		                    </div>
 
-	                    <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
-	                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-	                        Portfolio Scope
-	                      </p>
+		                    <div className="rounded-[var(--surface-radius-md)] border border-border/70 bg-background/82 p-4 shadow-[var(--surface-shadow)]">
+		                      <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+		                        Portfolio Scope
+		                      </p>
 	                      <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
 	                        <div>
 	                          <p className="text-xs text-muted-foreground">Invoices in scope</p>
@@ -1382,9 +1402,9 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {supportExecutiveMetrics.map((metric) => (
-                <StatsCard
+	            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+	              {supportExecutiveMetrics.map((metric) => (
+	                <StatsCard
                   key={metric.title}
                   title={metric.title}
                   value={metric.value}
@@ -1394,10 +1414,10 @@ export default function DashboardPage() {
                   helpContent={metric.helpContent}
                   scopeAbsent={metric.scopeAbsent}
                   scopeAbsentTooltip={metric.scopeAbsentTooltip}
-                  className="rounded-[24px] border-border/70 bg-card/94 shadow-[0_14px_28px_-24px_rgba(15,23,42,0.22)]"
-                />
-              ))}
-            </div>
+	                  className="rounded-[var(--surface-radius-lg)] border-border/70 bg-card/94 shadow-[var(--surface-shadow)]"
+	                />
+	              ))}
+	            </div>
           </div>
         ) : (
           <DashboardEmptyState
@@ -1415,9 +1435,9 @@ export default function DashboardPage() {
         description="Profile mandatory and conditional completeness, structural defects, and quality leakage that will undermine submission readiness."
       >
         {snapshot.hasLiveSignals ? (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-            {dataQualityMetrics.map((metric) => (
-              <StatsCard
+	          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+	            {dataQualityMetrics.map((metric) => (
+	              <StatsCard
                 key={metric.title}
                 title={metric.title}
                 value={metric.value}
@@ -1425,9 +1445,9 @@ export default function DashboardPage() {
                 icon={metric.icon}
                 variant={metric.variant}
                 helpContent={metric.helpContent}
-                className="rounded-[24px] border-border/70 bg-card/94 shadow-[0_14px_28px_-24px_rgba(15,23,42,0.22)]"
-              />
-            ))}
+	                className="rounded-[var(--surface-radius-lg)] border-border/70 bg-card/94 shadow-[var(--surface-shadow)]"
+	              />
+	            ))}
           </div>
         ) : (
           <DashboardEmptyState
@@ -1463,13 +1483,13 @@ export default function DashboardPage() {
           description="Move beyond a simple queue count by showing severity posture, recurring blockers, and where remediation effort is clustering."
         >
           {snapshot.hasLiveSignals ? (
-            <div className="space-y-4">
-	              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-	                {(Object.entries(snapshot.exceptionsBySeverity) as Array<[Severity, number]>).map(([severity, count]) => (
-                  <div
-                    key={severity}
-                    className="rounded-2xl border border-border/70 bg-background/75 p-4 shadow-[0_10px_20px_-18px_rgba(15,23,42,0.18)]"
-                  >
+	            <div className="space-y-4">
+		              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+		                {(Object.entries(snapshot.exceptionsBySeverity) as Array<[Severity, number]>).map(([severity, count]) => (
+	                  <div
+	                    key={severity}
+	                    className="rounded-[var(--surface-radius-md)] border border-border/70 bg-background/82 p-4 shadow-[var(--surface-shadow)]"
+	                  >
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{severity}</p>
@@ -1482,8 +1502,8 @@ export default function DashboardPage() {
 	              </div>
 	              <SeverityContextNote />
 
-	              <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-                <div className="rounded-2xl border border-border/70 bg-background/75 p-4 shadow-[0_10px_20px_-18px_rgba(15,23,42,0.18)]">
+		              <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+	                <div className="rounded-[var(--surface-radius-md)] border border-border/70 bg-background/82 p-4 shadow-[var(--surface-shadow)]">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-foreground">Top blocking issues</p>
@@ -1491,15 +1511,15 @@ export default function DashboardPage() {
                         Ranked by recurring occurrence in the current dashboard scope.
                       </p>
                     </div>
-                    <Badge variant="outline" className="border-border/70 bg-background/70 text-muted-foreground">
-                      {formatNumber(snapshot.exceptionsTotal)} open exceptions
-                    </Badge>
+	                    <Badge variant="outline" className="border-border/70 bg-background/80 text-muted-foreground">
+	                      {formatNumber(snapshot.exceptionsTotal)} open exceptions
+	                    </Badge>
                   </div>
 
                   <div className="mt-4 space-y-3">
                     {snapshot.blockingIssues.length > 0 ? (
-                      snapshot.blockingIssues.map((issue, index) => (
-                        <div key={issue.key} className="rounded-2xl border border-border/70 bg-card/90 p-4">
+	                      snapshot.blockingIssues.map((issue, index) => (
+	                        <div key={issue.key} className="rounded-[var(--surface-radius-md)] border border-border/70 bg-card/92 p-4 shadow-[var(--surface-shadow)]">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-border/70 bg-background px-2 text-[11px] font-semibold text-muted-foreground">
                               {index + 1}
@@ -1509,7 +1529,7 @@ export default function DashboardPage() {
                           </div>
                           <div className="mt-2 flex items-center justify-between gap-3">
                             <p className="text-sm leading-6 text-muted-foreground">{issue.description}</p>
-                            <div className="shrink-0 rounded-xl border border-border/70 bg-background px-3 py-2 text-right">
+	                            <div className="shrink-0 rounded-xl border border-border/70 bg-background/96 px-3 py-2 text-right">
                               <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
                                 {issue.hasInvoiceCoverage ? 'Invoices' : 'Outcomes'}
                               </p>
@@ -1521,26 +1541,26 @@ export default function DashboardPage() {
                         </div>
                       ))
                     ) : (
-                      <div className="rounded-2xl border border-border/70 bg-card/90 p-4 text-sm text-muted-foreground">
-                        No open exception clusters are currently surfaced for this live portfolio view.
-                      </div>
+	                      <div className="rounded-[var(--surface-radius-md)] border border-border/70 bg-card/92 p-4 text-sm text-muted-foreground">
+	                        No open exception clusters are currently surfaced for this live portfolio view.
+	                      </div>
                     )}
                   </div>
                 </div>
 
-                  <div className="space-y-4">
-                    {snapshot.exceptionThemes.map((theme) => (
-                      <div
-                        key={theme.title}
-                      className="rounded-2xl border border-border/70 bg-background/75 p-4 shadow-[0_10px_20px_-18px_rgba(15,23,42,0.18)]"
-                    >
+	                  <div className="space-y-4">
+	                    {snapshot.exceptionThemes.map((theme) => (
+	                      <div
+	                        key={theme.title}
+	                      className="rounded-[var(--surface-radius-md)] border border-border/70 bg-background/82 p-4 shadow-[var(--surface-shadow)]"
+	                    >
                       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{theme.title}</p>
                       <p className="mt-2 text-2xl font-semibold text-foreground">{theme.value}</p>
                       <p className="mt-1 text-xs leading-5 text-muted-foreground">{theme.subtitle}</p>
                     </div>
                   ))}
 
-                  <div className="rounded-2xl border border-primary/15 bg-primary/8 p-4">
+	                  <div className="rounded-[var(--surface-radius-md)] border border-primary/15 bg-primary/8 p-4 shadow-[var(--surface-shadow)]">
                     <div className="flex items-start gap-3">
                       <AlertTriangle className="mt-0.5 h-4 w-4 text-primary" />
                       <div>
@@ -1578,11 +1598,11 @@ function DashboardSection({
   children: ReactNode;
 }) {
   return (
-    <section className="surface-glass rounded-[28px] border border-border/70 p-5 shadow-[0_16px_34px_-28px_rgba(15,23,42,0.24)]">
+    <section className="surface-glass rounded-[var(--surface-radius-lg)] border border-border/70 p-5 md:p-6">
       <div className="mb-5">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{eyebrow}</p>
-        <h2 className="mt-1 text-xl font-semibold text-foreground">{title}</h2>
-        <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p>
+        <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{eyebrow}</p>
+        <h2 className="mt-1.5 text-[1.35rem] font-semibold tracking-tight text-foreground md:text-[1.45rem]">{title}</h2>
+        <p className="mt-1.5 max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p>
       </div>
       {children}
     </section>
@@ -1592,11 +1612,11 @@ function DashboardSection({
 function SeverityContextNote() {
   return (
     <Collapsible>
-      <div className="rounded-2xl border border-border/70 bg-background/65 px-4 py-3">
+      <div className="rounded-[var(--surface-radius-md)] border border-border/70 bg-background/78 px-4 py-3 shadow-[var(--surface-shadow)]">
         <CollapsibleTrigger asChild>
           <button
             type="button"
-            className="text-left text-[12px] text-muted-foreground transition-colors hover:text-foreground"
+            className="text-left text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             Why is the severity distribution skewed? ↓
           </button>
@@ -1629,15 +1649,15 @@ function ContextChip({
     <div
       className={
         tone === 'danger'
-          ? 'rounded-2xl border border-severity-critical/15 bg-severity-critical/5 px-4 py-3'
+          ? 'rounded-[var(--surface-radius-md)] border border-severity-critical/15 bg-severity-critical/5 px-4 py-3 shadow-[var(--surface-shadow)]'
           : tone === 'success'
-            ? 'rounded-2xl border border-success/15 bg-success/5 px-4 py-3'
-            : 'rounded-2xl border border-border/70 bg-background/70 px-4 py-3'
+            ? 'rounded-[var(--surface-radius-md)] border border-success/15 bg-success/5 px-4 py-3 shadow-[var(--surface-shadow)]'
+            : 'rounded-[var(--surface-radius-md)] border border-border/70 bg-background/82 px-4 py-3 shadow-[var(--surface-shadow)]'
       }
     >
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
-      <p className="mt-1 text-sm font-medium text-foreground">{value}</p>
-      {caption ? <p className="mt-1 text-xs leading-5 text-muted-foreground">{caption}</p> : null}
+      <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+      <p className="mt-1.5 text-base font-semibold text-foreground">{value}</p>
+      {caption ? <p className="mt-1.5 text-sm leading-6 text-muted-foreground">{caption}</p> : null}
     </div>
   );
 }
@@ -1654,10 +1674,10 @@ function DashboardEmptyState({
   secondaryAction?: { label: string; onClick: () => void };
 }) {
   return (
-    <div className="rounded-[24px] border border-dashed border-border/80 bg-background/70 p-6">
+    <div className="rounded-[var(--surface-radius-lg)] border border-dashed border-border/80 bg-background/78 p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex items-start gap-3">
-          <div className="rounded-2xl border border-border/70 bg-background p-3">
+          <div className="rounded-[var(--surface-radius-md)] border border-border/70 bg-background p-3 shadow-[var(--surface-shadow)]">
             <CircleDashed className="h-5 w-5 text-muted-foreground" />
           </div>
           <div className="space-y-2">
@@ -1689,11 +1709,11 @@ function CoverageWidget({ metric }: { metric: CoverageMetric }) {
   const badgeLabel = metric.tone === 'success' ? 'Healthy' : metric.tone === 'warning' ? 'Watch' : 'Attention';
 
   return (
-    <Card className="rounded-[24px] border-border/70 bg-card/94 shadow-[0_14px_28px_-24px_rgba(15,23,42,0.22)]">
+    <Card className="rounded-[var(--surface-radius-lg)] border-border/70 bg-card/94 shadow-[var(--surface-shadow)]">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <Badge variant="outline" className="mb-3 border-border/70 bg-background/75 text-[11px] text-muted-foreground">
+            <Badge variant="outline" className="mb-3 border-border/70 bg-background/80 text-[12px] font-medium text-muted-foreground">
               {badgeLabel}
             </Badge>
             <CardTitle className="text-base">{metric.title}</CardTitle>
@@ -1716,7 +1736,7 @@ function CoverageWidget({ metric }: { metric: CoverageMetric }) {
         />
         <div className="space-y-2">
           {metric.supportingPoints.map((point) => (
-            <div key={point} className="rounded-xl border border-border/70 bg-background/75 px-3 py-2 text-xs leading-5 text-muted-foreground">
+            <div key={point} className="rounded-xl border border-border/70 bg-background/82 px-3 py-2 text-sm leading-6 text-muted-foreground">
               {point}
             </div>
           ))}

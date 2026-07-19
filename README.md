@@ -51,7 +51,7 @@ It now provides:
 - priority blockers and remediation actions
 - template-by-template findings summary
 - detailed technical appendix for data requirements, rules, exceptions, controls, and population evidence
-- branded PDF export aligned to Dariba client-report styling
+- branded PDF export aligned to Daribatech client-report styling
 
 Evidence output is historical-run safe and can be reconstructed from saved run snapshots where available.
 
@@ -306,7 +306,7 @@ Latest saved checkpoint:
 - Scope:
   - Evidence Pack redesigned into a more client-facing narrative structure
   - Evidence Pack wording simplified for end users (`Data Requirements`, `Assessment confidence`, clearer readiness labels)
-  - Branded Dariba PDF export styling added, including cover-page treatment and section chrome
+  - Branded Daribatech PDF export styling added, including cover-page treatment and section chrome
   - Evidence preview aligned to executive verdict, methodology, remediation, and template findings sections
 
 Previous major checkpoint:
@@ -347,7 +347,7 @@ Latest platform highlights on the active branch:
 - Landing experience redesigned into a premium DCS-specific hero/header system:
   - floating landing nav/header bar
   - restored theme toggle
-  - Dariba-aligned dark-mode palette
+  - Daribatech-aligned dark-mode palette
   - simplified executive preview composition
 - Shared app shell and route loading were refined:
   - floating/sticky workspace sidebar treatment

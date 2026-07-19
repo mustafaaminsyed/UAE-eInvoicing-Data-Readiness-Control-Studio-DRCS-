@@ -5,7 +5,6 @@ import {
   ArrowRight,
   ArrowUpRight,
   CheckCircle2,
-  Clock3,
   Database,
   FileCode2,
   FileDown,
@@ -29,7 +28,7 @@ import { fetchActiveTemplates } from "@/lib/api/mappingApi";
 import { fetchCases } from "@/lib/api/casesApi";
 import { analyzeCoverage } from "@/lib/mapping/coverageAnalyzer";
 import { cn } from "@/lib/utils";
-import daribaLogo from "@/assets/New-Dariba-Tech-Logo.png";
+import daribaLogo from "@/assets/daribatech-logo-transparent.png";
 import type { MappingTemplate } from "@/types/fieldMapping";
 import type { Case } from "@/types/cases";
 
@@ -208,70 +207,92 @@ export default function LandingPage() {
     return { label: "Open control dashboard", path: "/dashboard" };
   }, [hasActiveMapping, isChecksRun, isDataLoaded]);
 
+  const readinessSignal = mandatoryCoverage >= 95 ? "Strong alignment" : mandatoryCoverage >= 80 ? "Watch list" : "Remediation first";
+  const evidenceSignal = isChecksRun ? "Evidence ready" : "Awaiting validation run";
+  const workspaceStatusItems = [
+    {
+      label: "Data intake",
+      value: isDataLoaded ? "Loaded" : "Pending",
+      active: isDataLoaded,
+    },
+    {
+      label: "Mapping",
+      value: hasActiveMapping ? "Active" : "Pending",
+      active: hasActiveMapping,
+    },
+    {
+      label: "Checks",
+      value: isChecksRun ? "Executed" : "Pending",
+      active: isChecksRun,
+    },
+  ];
+
   return (
     <div className="min-h-screen">
-      <div className="container mx-auto max-w-7xl px-4 py-8 md:py-12">
-        <div className="sticky top-4 z-40 mb-6">
-          <div className="mx-auto max-w-6xl rounded-[1.5rem] border border-white/70 bg-white/78 px-4 py-3 shadow-[0_20px_44px_-34px_rgba(9,28,42,0.38)] backdrop-blur-xl dark:border-emerald-900/35 dark:bg-[#10201a]/92 dark:shadow-[0_24px_48px_-34px_rgba(0,0,0,0.82)] md:px-5">
-            <div className="flex flex-col gap-3">
+      <div className="container mx-auto max-w-[1320px] px-4 py-6 sm:px-5 md:px-6 md:py-8 xl:px-8 xl:py-10">
+        <div className="sticky top-4 z-40 mb-5">
+          <div className="surface-glass rounded-[var(--surface-radius-lg)] px-4 py-3 md:px-5 md:py-4">
+            <div className="flex flex-col gap-3.5">
               <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="rounded-2xl border border-white/65 bg-white/88 p-2 shadow-sm dark:border-emerald-900/25 dark:bg-white/[0.03]">
-                    <img src={daribaLogo} alt="Dariba Tech" className="h-8 w-auto" />
+                <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center md:gap-4">
+                  <div className="inline-flex w-fit items-center rounded-[var(--surface-radius-md)] border border-border/70 bg-background/96 px-3 py-2 shadow-sm">
+                    <img
+                      src={daribaLogo}
+                      alt="Daribatech"
+                      className="h-10 w-auto max-w-[170px] object-contain"
+                    />
                   </div>
                   <div className="min-w-0">
-                    <p className="truncate font-display text-lg font-semibold text-slate-950 dark:text-emerald-50">
+                    <p className="truncate font-display text-xl font-semibold tracking-tight text-foreground">
                       Controls Studio
                     </p>
-                    <p className="truncate text-sm text-slate-500 dark:text-emerald-100/65">
+                    <p className="truncate text-sm font-medium text-muted-foreground">
                       UAE eInvoicing Compliance
                     </p>
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-start gap-2 xl:justify-end">
-                  <div className="flex h-11 items-center gap-3 rounded-full border border-white/70 bg-white/78 px-3.5 shadow-sm dark:border-emerald-900/25 dark:bg-white/[0.03]">
+                <div className="flex flex-wrap items-center gap-2.5 xl:justify-end">
+                  <div className="flex min-h-11 items-center gap-3 rounded-full border border-border/70 bg-background/92 px-3.5 py-2 shadow-sm">
                     <UaeFlagMark />
                     <div className="leading-tight">
-                      <p className="text-xs font-semibold text-slate-900 dark:text-emerald-50">
-                        {activeRegionScope.country}
-                      </p>
-                      <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500 dark:text-emerald-100/55">
+                      <p className="text-sm font-semibold text-foreground">{activeRegionScope.country}</p>
+                      <p className="text-[12px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
                         Current scope
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 rounded-full border border-white/70 bg-white/78 p-1.5 shadow-sm dark:border-emerald-900/25 dark:bg-white/[0.03]">
+                  <div className="flex items-center gap-2 rounded-full border border-border/70 bg-background/92 p-1.5 shadow-sm">
                     <EnvironmentAccessToggle value={clientEnvironment} onChange={setClientEnvironment} />
 
-                    <div className="flex h-9 items-center gap-2 rounded-full border border-white/70 bg-white/88 px-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04]">
-                      <Sun className={cn("h-3.5 w-3.5", !isDark ? "text-amber-500" : "text-emerald-100/55")} />
+                    <div className="flex h-9 items-center gap-2 rounded-full border border-border/70 bg-background px-3 shadow-sm">
+                      <Sun className={cn("h-3.5 w-3.5", !isDark ? "text-amber-500" : "text-muted-foreground")} />
                       <Switch
                         checked={isDark}
                         onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
                         aria-label={isDark ? "Dark mode enabled" : "Light mode enabled"}
                       />
-                      <Moon className={cn("h-3.5 w-3.5", isDark ? "text-emerald-300" : "text-slate-500")} />
+                      <Moon className={cn("h-3.5 w-3.5", isDark ? "text-primary" : "text-muted-foreground")} />
                     </div>
                   </div>
 
                   <Button
                     variant="outline"
-                    className="h-11 rounded-full border-primary/20 bg-primary/6 px-4 text-sm font-semibold text-primary shadow-sm hover:bg-primary/10 dark:border-emerald-700/30 dark:bg-emerald-500/[0.1] dark:text-emerald-300 dark:hover:bg-emerald-500/[0.16]"
+                    className="h-11 rounded-full border-primary/18 bg-background/92 px-4 text-sm font-semibold text-primary shadow-sm hover:bg-primary/5 dark:border-primary/25 dark:bg-background/86"
                   >
                     Compliance Command Center
                   </Button>
                 </div>
               </div>
 
-              <div className="border-t border-white/55 pt-3 dark:border-emerald-900/30">
-                <nav className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-1.5">
+              <div className="border-t border-border/60 pt-3">
+                <nav className="flex flex-wrap items-center gap-2 lg:justify-center">
                   {heroNavLinks.map((item) => (
                     <Link
                       key={item.path}
                       to={item.path}
-                      className="inline-flex h-9 items-center rounded-full px-3.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-950/[0.04] hover:text-slate-950 dark:text-emerald-50/80 dark:hover:bg-emerald-500/[0.08] dark:hover:text-emerald-50"
+                      className="inline-flex min-h-9 items-center rounded-full px-3.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-950/[0.04] hover:text-slate-950 dark:text-emerald-50/85 dark:hover:bg-emerald-500/[0.08] dark:hover:text-emerald-50"
                     >
                       {item.label}
                     </Link>
@@ -282,40 +303,25 @@ export default function LandingPage() {
           </div>
         </div>
 
-        <section className="relative overflow-hidden rounded-[2rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,249,252,0.95))] px-5 py-5 shadow-[0_38px_90px_-46px_rgba(14,35,52,0.35)] dark:border-emerald-900/30 dark:bg-[linear-gradient(180deg,rgba(14,22,20,0.96),rgba(9,15,14,0.99))] dark:shadow-[0_42px_100px_-52px_rgba(0,0,0,0.8)] md:px-8 md:py-7">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_8%_20%,rgba(102,208,255,0.25),transparent_24%),radial-gradient(circle_at_92%_18%,rgba(93,196,255,0.22),transparent_22%),radial-gradient(circle_at_50%_100%,rgba(54,163,111,0.12),transparent_32%)] dark:bg-[radial-gradient(circle_at_10%_18%,rgba(47,153,95,0.18),transparent_26%),radial-gradient(circle_at_88%_12%,rgba(29,92,72,0.14),transparent_24%),radial-gradient(circle_at_50%_100%,rgba(36,130,76,0.1),transparent_34%)]" />
-          <div
-            className="absolute inset-3 rounded-[1.7rem] border border-white/70 bg-white/18 backdrop-blur-[1px] dark:border-emerald-900/20 dark:bg-white/[0.02]"
-            aria-hidden="true"
-          />
-          <div className="relative z-10">
-            <div className="mx-auto mt-8 max-w-4xl text-center">
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-white/78 px-4 py-1.5 text-xs font-semibold text-primary shadow-sm dark:border-emerald-700/25 dark:bg-emerald-500/[0.06] dark:text-emerald-300">
-                <span className="h-2 w-2 rounded-full bg-accent" />
-                Trusted for UAE readiness, traceability, and control evidence
+        <section className="surface-glass relative overflow-hidden rounded-[var(--surface-radius-lg)] px-5 py-6 md:px-6 md:py-7 lg:px-8 lg:py-8 xl:px-10">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_8%_18%,rgba(102,208,255,0.10),transparent_24%),radial-gradient(circle_at_88%_15%,rgba(73,173,134,0.10),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,250,252,0.98))] dark:bg-[radial-gradient(circle_at_10%_14%,rgba(47,153,95,0.12),transparent_24%),radial-gradient(circle_at_88%_12%,rgba(29,92,72,0.12),transparent_24%),linear-gradient(180deg,rgba(13,21,19,0.98),rgba(10,16,15,0.99))]" />
+          <div className="relative z-10 grid items-start gap-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] xl:gap-10">
+            <div className="max-w-[34rem] pt-1">
+              <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-background/94 px-4 py-2 text-[12px] font-semibold text-primary shadow-sm">
+                <span className="h-2.5 w-2.5 rounded-full bg-accent" />
+                UAE eInvoicing readiness workspace
               </div>
 
-              <div className="mt-3 flex justify-center">
-                <div className="w-[320px] max-w-[82vw] overflow-hidden md:w-[420px] lg:w-[500px]">
-                  <img
-                    src={daribaLogo}
-                    alt="Dariba Tech"
-                    className="h-auto w-full -mb-[18%] -mt-[6%] opacity-92 drop-shadow-[0_18px_30px_rgba(8,24,19,0.12)] dark:opacity-85 dark:drop-shadow-[0_20px_34px_rgba(0,0,0,0.34)]"
-                  />
-                </div>
-              </div>
-
-              <h1 className="mx-auto mt-1.5 max-w-4xl font-display text-4xl font-semibold leading-[0.95] tracking-[-0.05em] text-foreground md:text-6xl xl:text-[4.9rem]">
+              <h1 className="mt-5 max-w-[10.4ch] font-display text-[3.5rem] font-semibold leading-[0.94] tracking-[-0.045em] text-foreground md:text-[4.1rem] lg:text-[4.35rem] xl:text-[4.7rem]">
                 Turn invoice data into compliance intelligence.
               </h1>
 
-              <p className="mx-auto mt-5 max-w-3xl text-base leading-7 text-muted-foreground md:text-lg">
-                Validate data before transmission, trace every field from source to control to exception,
-                and improve UAE e-Invoicing readiness, conformance coverage, and operational risk visibility in one premium workspace.
+              <p className="mt-4 max-w-[32rem] text-[1.05rem] leading-8 text-slate-600 dark:text-emerald-50/76">
+                Profile source data, validate PINT-AE readiness, resolve blocking exceptions, and generate evidence-grade traceability in one controlled UAE compliance workspace.
               </p>
 
-              <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-                <Button asChild size="lg" className="rounded-full px-7 shadow-[0_22px_40px_-26px_hsl(var(--primary))]">
+              <div className="mt-6 flex flex-wrap items-center gap-3">
+                <Button asChild size="lg" className="h-12 rounded-full px-6 shadow-sm">
                   <Link to={nextAction.path}>
                     {nextAction.label}
                     <ArrowRight className="h-4 w-4" />
@@ -325,7 +331,7 @@ export default function LandingPage() {
                   asChild
                   size="lg"
                   variant="outline"
-                  className="rounded-full border-white/90 bg-white/78 px-7 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.35)] dark:border-emerald-900/20 dark:bg-white/[0.04] dark:text-emerald-50 dark:hover:bg-emerald-500/[0.08]"
+                  className="h-12 rounded-full border-border/80 bg-background/94 px-6 text-foreground shadow-sm hover:bg-slate-950/[0.03] dark:bg-background/82 dark:text-emerald-50"
                 >
                   <Link to="/traceability">
                     Explore traceability
@@ -334,200 +340,229 @@ export default function LandingPage() {
                 </Button>
               </div>
 
-              <div className="mt-7 flex flex-wrap items-center justify-center gap-2">
+              <div className="mt-6 flex flex-wrap items-center gap-2.5">
                 {trustPills.map((pill) => (
                   <Badge
                     key={pill}
                     variant="outline"
-                    className="rounded-full border-white/75 bg-white/58 px-3 py-1 text-[11px] font-medium text-muted-foreground dark:border-emerald-900/20 dark:bg-white/[0.04] dark:text-emerald-100/80"
+                    className="rounded-full border-border/75 bg-background/90 px-3 py-1.5 text-[12px] font-semibold text-slate-600 dark:text-emerald-100/82"
                   >
                     {pill}
                   </Badge>
                 ))}
               </div>
+
+              <div className="mt-7 grid gap-3 sm:grid-cols-2">
+                <HeroSummaryCard
+                  title="Workspace signal"
+                  value={readinessSignal}
+                  detail={`${Math.round(mandatoryCoverage)}% mandatory coverage${blockingGaps > 0 ? ` | ${blockingGaps} blocking gap(s)` : " | no blocking gaps"}`}
+                />
+                <HeroSummaryCard
+                  title="Operating context"
+                  value={operatingContext.time}
+                  detail={`${activeEnvironmentConfig.label} access | ${operatingContext.timezoneLabel}`}
+                />
+              </div>
+
+              <div className="mt-5 space-y-3">
+                {heroMessages.map((message, index) => (
+                  <div
+                    key={message}
+                    className="rounded-[var(--surface-radius-md)] border border-border/70 bg-background/92 p-4 shadow-[var(--surface-shadow)]"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-primary/15 bg-primary/8 text-sm font-semibold text-primary">
+                        {index + 1}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">{message}</p>
+                        <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
+                          {index === 0 &&
+                            "Detect mandatory gaps, structural defects, and source-data issues before transmission or onboarding."}
+                          {index === 1 &&
+                            "Maintain one regulator-friendly chain from source mapping to rule outcome, exception, and evidence."}
+                          {index === 2 &&
+                            "Give operational teams and executives a common view of readiness, remediation, and audit posture."}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <div className="mx-auto mt-10 max-w-6xl rounded-[2rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.8),rgba(246,250,253,0.96))] p-3 shadow-[0_34px_70px_-42px_rgba(11,36,59,0.42)] backdrop-blur dark:border-emerald-900/25 dark:bg-[linear-gradient(180deg,rgba(15,24,21,0.88),rgba(10,16,15,0.98))] dark:shadow-[0_42px_82px_-42px_rgba(0,0,0,0.84)]">
-              <div className="rounded-[1.65rem] border border-white/85 bg-white/92 p-4 shadow-inner dark:border-emerald-900/20 dark:bg-[#101917]/88 md:p-5">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5">
-                      <span className="h-3 w-3 rounded-full bg-slate-300/80" />
-                      <span className="h-3 w-3 rounded-full bg-slate-300/80" />
-                      <span className="h-3 w-3 rounded-full bg-slate-300/80" />
-                    </div>
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/90">
-                        Executive preview
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-foreground">
-                        UAE readiness and control intelligence
-                      </p>
-                    </div>
-                  </div>
+            <div className="relative mx-auto w-full max-w-[780px] lg:min-h-[600px] lg:pt-4">
+              <div className="absolute right-[6%] top-[12%] hidden h-[66%] w-[72%] rounded-[36px] bg-[radial-gradient(circle_at_top_left,rgba(58,179,139,0.16),transparent_48%),linear-gradient(180deg,rgba(12,98,82,0.08),rgba(255,255,255,0.02))] blur-xl lg:block" />
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge
-                      variant="outline"
-                      className="rounded-full border-primary/15 bg-primary/6 px-3 py-1 text-[11px] font-semibold text-primary dark:border-emerald-700/30 dark:bg-emerald-500/[0.08] dark:text-emerald-300"
-                    >
-                      {clientEnvironment} access
-                    </Badge>
-                    <div className="flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1.5 text-xs text-muted-foreground dark:border-emerald-900/20 dark:bg-white/[0.04] dark:text-emerald-50/75">
-                      <Search className="h-3.5 w-3.5" />
-                      Search readiness, controls, or exceptions
-                    </div>
+              <div className="hidden lg:absolute lg:left-0 lg:top-5 lg:z-20 lg:block lg:w-[250px]">
+                <div className="rounded-[var(--surface-radius-md)] border border-border/75 bg-background/95 p-4 shadow-[var(--surface-shadow-strong)]">
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    Workspace status
+                  </p>
+                  <div className="mt-3 space-y-2.5">
+                    {workspaceStatusItems.map((item) => (
+                      <div key={item.label} className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={cn(
+                              "h-2.5 w-2.5 rounded-full",
+                              item.active ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"
+                            )}
+                          />
+                          <span className="text-sm font-medium text-foreground">{item.label}</span>
+                        </div>
+                        <span className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                          {item.value}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
+              </div>
 
-                <div className="mt-4 space-y-4">
-                  <div className="grid gap-3 md:grid-cols-4">
-                    <PreviewMetricCard
-                      title="Mandatory coverage"
-                      value={`${Math.round(mandatoryCoverage)}%`}
-                      detail={blockingGaps > 0 ? `${blockingGaps} blocking gap(s)` : "No blocking gaps"}
-                      icon={Wand2}
-                    />
-                    <PreviewMetricCard
-                      title="Open control cases"
-                      value={String(openCases.length)}
-                      detail={
-                        criticalCases.length > 0 ? `${criticalCases.length} critical case(s)` : "No critical escalations"
-                      }
-                      icon={AlertTriangle}
-                    />
-                    <PreviewMetricCard
-                      title="Observed invoices"
-                      value={String(headers.length)}
-                      detail={isChecksRun ? "Latest validation executed" : "Ready for next run"}
-                      icon={Database}
-                    />
-                    <PreviewMetricCard
-                      title="Regional clock"
-                      value={operatingContext.time}
-                      detail={`${operatingContext.date} / ${operatingContext.timezoneLabel}`}
-                      icon={Clock3}
-                    />
-                  </div>
-
-                  <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-                    <div className="rounded-[1.35rem] border border-border/60 bg-slate-950/[0.03] p-5 dark:border-emerald-900/20 dark:bg-white/[0.025]">
-                      <div className="mb-4 flex items-center justify-between">
+              <div className="relative z-10 mx-auto w-full max-w-[720px] lg:ml-auto lg:translate-x-2 lg:translate-y-8 lg:rotate-[1.8deg]">
+                <div className="rounded-[var(--surface-radius-lg)] border border-border/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(247,250,252,0.99))] p-3 shadow-[var(--surface-shadow-strong)] dark:bg-[linear-gradient(180deg,rgba(15,24,22,0.96),rgba(11,18,16,0.99))]">
+                  <div className="rounded-[var(--surface-radius-lg)] border border-border/70 bg-background/96 p-4 md:p-5">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1.5">
+                          <span className="h-3 w-3 rounded-full bg-slate-300/90" />
+                          <span className="h-3 w-3 rounded-full bg-slate-300/90" />
+                          <span className="h-3 w-3 rounded-full bg-slate-300/90" />
+                        </div>
                         <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                            Source to control flow
+                          <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-primary">
+                            Compliance workspace preview
                           </p>
                           <p className="mt-1 text-sm font-semibold text-foreground">
-                            One operating model from ingestion to evidence
+                            Readiness, exceptions, and evidence in one surface
                           </p>
                         </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
                         <Badge
                           variant="outline"
-                          className="rounded-full border-white/85 bg-white/75 px-3 py-1 text-[11px] dark:border-emerald-900/20 dark:bg-white/[0.04] dark:text-emerald-50/85"
+                          className="rounded-full border-primary/15 bg-primary/6 px-3 py-1.5 text-[12px] font-semibold text-primary dark:border-emerald-700/30 dark:bg-emerald-500/[0.08] dark:text-emerald-300"
                         >
-                          {hasActiveMapping ? "Mapping active" : "Mapping pending"}
+                          {clientEnvironment} access
                         </Badge>
-                      </div>
-
-                      <div className="space-y-3">
-                        {heroMessages.map((message, index) => (
-                          <div
-                            key={message}
-                            className="flex items-start gap-3 rounded-2xl border border-white/75 bg-white/76 p-4 shadow-[0_16px_34px_-34px_rgba(15,23,42,0.6)] dark:border-emerald-900/20 dark:bg-white/[0.04]"
-                          >
-                            <div className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-primary/15 bg-primary/8 text-sm font-semibold text-primary">
-                              {index + 1}
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-foreground">{message}</p>
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                {index === 0 &&
-                                  "Detect missing mandatory fields, structural issues, and source-data blockers before transmission."}
-                                {index === 1 &&
-                                  "Maintain authoritative links between validation, coverage, control ownership, and evidence outputs."}
-                                {index === 2 &&
-                                  "Provide one view of readiness, exception posture, and conformance risk for executive review."}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="mt-4 rounded-2xl border border-primary/15 bg-primary/6 p-4 dark:border-emerald-700/25 dark:bg-emerald-500/[0.08]">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Readiness signal</span>
-                          <span className="font-semibold text-foreground">{Math.round(mandatoryCoverage)}%</span>
+                        <div className="flex items-center gap-2 rounded-full border border-border/70 bg-background px-3 py-1.5 text-sm font-medium text-muted-foreground dark:bg-white/[0.03]">
+                          <Search className="h-3.5 w-3.5" />
+                          Search readiness, controls, or exceptions
                         </div>
-                        <Progress value={mandatoryCoverage} className="mt-2 h-2.5" />
-                        <p className="mt-3 text-xs text-muted-foreground">
-                          {isChecksRun
-                            ? "The latest validation run has completed and evidence outputs are available."
-                            : "Run the latest check pack to generate traceability and evidence outputs."}
-                        </p>
                       </div>
                     </div>
 
-                    <div className="space-y-4">
-                      <div className="rounded-[1.35rem] border border-border/60 bg-slate-950/[0.03] p-5 dark:border-emerald-900/20 dark:bg-white/[0.025]">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                          Next recommended action
-                        </p>
-                        <p className="mt-2 text-lg font-semibold text-foreground">{nextAction.label}</p>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Move directly into the next operational step for this workspace.
-                        </p>
-                        <Button asChild className="mt-4 w-full rounded-2xl">
-                          <Link to={nextAction.path}>
-                            Continue workflow
-                            <ArrowRight className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                      </div>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <HeroMetricTile title="Mandatory coverage" value={`${Math.round(mandatoryCoverage)}%`} icon={Wand2} tone="primary" />
+                      <HeroMetricTile title="Open control cases" value={String(openCases.length)} icon={AlertTriangle} tone="warning" />
+                      <HeroMetricTile title="Observed invoices" value={String(headers.length)} icon={Database} tone="neutral" />
+                      <HeroMetricTile title="Evidence posture" value={isChecksRun ? "Ready" : "Pending"} icon={FileDown} tone="success" />
+                    </div>
 
-                      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
-                        <div className="rounded-2xl border border-white/75 bg-white/82 p-4 dark:border-emerald-900/20 dark:bg-white/[0.04]">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                            Operating context
-                          </p>
-                          <p className="mt-2 font-display text-xl font-semibold text-foreground">
-                            {activeEnvironmentConfig.label}
-                          </p>
-                          <p className="mt-1 text-xs text-muted-foreground">{activeEnvironmentConfig.caption}</p>
-                        </div>
-
-                        <div className="rounded-2xl border border-white/75 bg-white/82 p-4 dark:border-emerald-900/20 dark:bg-white/[0.04]">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                            Evidence posture
-                          </p>
-                          <p className="mt-2 font-display text-xl font-semibold text-foreground">
-                            {isChecksRun ? "Ready" : "Pending"}
-                          </p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {isChecksRun ? "Traceability and Evidence Pack available" : "Awaiting validation run"}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl border border-white/75 bg-white/82 p-4 dark:border-emerald-900/20 dark:bg-white/[0.04]">
-                        <div className="flex items-start justify-between gap-3">
+                    <div className="mt-4 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+                      <div className="rounded-[var(--surface-radius-md)] border border-border/70 bg-slate-950/[0.02] p-4 dark:bg-white/[0.025]">
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                           <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                              Local clock
+                            <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                              Workflow progression
                             </p>
-                            <p className="mt-2 font-display text-2xl font-semibold text-foreground">
-                              {operatingContext.time}
-                            </p>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              {operatingContext.date} / {operatingContext.timezoneLabel}
+                            <p className="mt-1 text-sm font-semibold text-foreground">
+                              Source-to-evidence operating model
                             </p>
                           </div>
-                          <ShieldCheck className="h-5 w-5 text-primary" />
+                          <Badge
+                            variant="outline"
+                            className="rounded-full border-border/70 bg-background px-3 py-1 text-[12px] font-semibold text-muted-foreground dark:bg-white/[0.03] dark:text-emerald-50/82"
+                          >
+                            {hasActiveMapping ? "Mapping active" : "Mapping pending"}
+                          </Badge>
+                        </div>
+
+                        <div className="space-y-2.5">
+                          <HeroWorkflowStep icon={Upload} label="Upload" detail="Source datasets profiled and qualified." active={isDataLoaded} />
+                          <HeroWorkflowStep icon={FileCode2} label="Mapping" detail={hasActiveMapping ? "Canonical mapping profile available." : "Activate a mapping profile for governed alignment."} active={hasActiveMapping} />
+                          <HeroWorkflowStep icon={Play} label="Validation" detail={isChecksRun ? "Latest check pack executed for current scope." : "Run the latest compliance pack to populate findings."} active={isChecksRun} />
+                          <HeroWorkflowStep icon={LayoutDashboard} label="Control review" detail="Move from failed rules into exceptions, cases, and operational response." active />
+                        </div>
+
+                        <div className="mt-4 rounded-[var(--surface-radius-md)] border border-primary/15 bg-primary/6 p-4 dark:border-emerald-700/25 dark:bg-emerald-500/[0.08]">
+                          <div className="flex items-center justify-between gap-3 text-sm">
+                            <span className="font-medium text-muted-foreground">Readiness signal</span>
+                            <span className="font-semibold text-foreground">{Math.round(mandatoryCoverage)}%</span>
+                          </div>
+                          <Progress value={mandatoryCoverage} className="mt-2 h-2.5" />
+                          <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                            {blockingGaps > 0
+                              ? `${blockingGaps} mandatory gap(s) still need remediation before clean submission readiness.`
+                              : "No mandatory gaps are currently blocking the active readiness view."}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="rounded-[var(--surface-radius-md)] border border-border/70 bg-slate-950/[0.02] p-4 dark:bg-white/[0.025]">
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                              Operational focus
+                            </p>
+                            <p className="mt-1 text-sm font-semibold text-foreground">
+                              Queue, traceability, and evidence posture
+                            </p>
+                          </div>
+                          <Badge
+                            variant="outline"
+                            className="rounded-full border-primary/15 bg-primary/6 px-3 py-1 text-[12px] font-semibold text-primary dark:border-emerald-700/30 dark:bg-emerald-500/[0.08] dark:text-emerald-300"
+                          >
+                            {readinessSignal}
+                          </Badge>
+                        </div>
+
+                        <div className="space-y-2.5">
+                          <HeroQueueItem
+                            title={criticalCases.length > 0 ? "Critical remediation cases open" : "No critical escalations"}
+                            detail={criticalCases.length > 0 ? `${criticalCases.length} critical case(s) need attention` : "Exception escalation queue is currently controlled"}
+                            icon={AlertTriangle}
+                            tone={criticalCases.length > 0 ? "warning" : "success"}
+                          />
+                          <HeroQueueItem
+                            title="Traceability links retained"
+                            detail="Source, mapping, rule, exception, and evidence references remain connected."
+                            icon={ShieldCheck}
+                            tone="primary"
+                          />
+                          <HeroQueueItem
+                            title={isChecksRun ? "Evidence Pack generation unlocked" : "Evidence output waiting for run"}
+                            detail={isChecksRun ? "Current run context is ready for defensible evidence export." : "Execute checks to populate export-grade readiness context."}
+                            icon={FileDown}
+                            tone={isChecksRun ? "success" : "neutral"}
+                          />
+                        </div>
+
+                        <div className="mt-4 rounded-[var(--surface-radius-md)] border border-border/70 bg-background/96 p-4 dark:bg-white/[0.04]">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                                Workspace environment
+                              </p>
+                              <p className="mt-1 text-base font-semibold text-foreground">{activeEnvironmentConfig.label}</p>
+                            </div>
+                            <div className="text-left sm:text-right">
+                              <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                                Regional clock
+                              </p>
+                              <p className="mt-1 text-base font-semibold text-foreground">{operatingContext.time}</p>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
+
             </div>
           </div>
         </section>
@@ -604,29 +639,138 @@ export default function LandingPage() {
   );
 }
 
-function PreviewMetricCard({
-  icon: Icon,
+function HeroSummaryCard({
   title,
   value,
   detail,
 }: {
-  icon: ComponentType<{ className?: string }>;
   title: string;
   value: string;
   detail: string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/78 bg-white/82 p-4 shadow-[0_18px_34px_-36px_rgba(15,23,42,0.65)] dark:border-white/10 dark:bg-white/5 dark:shadow-[0_18px_34px_-36px_rgba(0,0,0,0.8)]">
+    <div className="rounded-[var(--surface-radius-md)] border border-border/70 bg-background/94 p-4 shadow-[var(--surface-shadow)] dark:bg-white/[0.04]">
+      <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{title}</p>
+      <p className="mt-2 font-display text-[1.7rem] font-semibold text-foreground">{value}</p>
+      <p className="mt-1.5 text-sm leading-6 text-muted-foreground">{detail}</p>
+    </div>
+  );
+}
+
+function HeroMetricTile({
+  icon: Icon,
+  title,
+  value,
+  tone,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  title: string;
+  value: string;
+  tone: "primary" | "warning" | "neutral" | "success";
+}) {
+  const toneClass =
+    tone === "primary"
+      ? "border-primary/15 bg-primary/6 text-primary"
+      : tone === "warning"
+        ? "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+        : tone === "success"
+          ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+          : "border-border/70 bg-background/78 text-muted-foreground";
+
+  return (
+    <div className="rounded-[var(--surface-radius-md)] border border-border/70 bg-background/94 p-3.5 shadow-[var(--surface-shadow)] dark:bg-white/[0.04]">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{title}</p>
-          <p className="mt-2 font-display text-2xl font-semibold text-foreground">{value}</p>
+          <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{title}</p>
+          <p className="mt-2 text-xl font-semibold text-foreground">{value}</p>
         </div>
-        <div className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-primary/15 bg-primary/6 text-primary">
+        <div className={cn("inline-flex h-9 w-9 items-center justify-center rounded-2xl border", toneClass)}>
           <Icon className="h-4 w-4" />
         </div>
       </div>
-      <p className="mt-2 text-xs text-muted-foreground">{detail}</p>
+    </div>
+  );
+}
+
+function HeroWorkflowStep({
+  icon: Icon,
+  label,
+  detail,
+  active = false,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  label: string;
+  detail: string;
+  active?: boolean;
+}) {
+  return (
+    <div className="flex items-start gap-3 rounded-[var(--surface-radius-md)] border border-border/70 bg-background/94 p-3.5 shadow-[var(--surface-shadow)] dark:bg-white/[0.04]">
+      <div
+        className={cn(
+          "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border",
+          active
+            ? "border-primary/15 bg-primary/8 text-primary"
+            : "border-border/70 bg-background/78 text-muted-foreground"
+        )}
+      >
+        <Icon className="h-4 w-4" />
+      </div>
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-medium text-foreground">{label}</p>
+          <span
+            className={cn(
+              "inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.1em]",
+              active
+                ? "border-primary/15 bg-primary/8 text-primary"
+                : "border-border/70 bg-background/70 text-muted-foreground"
+            )}
+          >
+            {active ? "Active" : "Pending"}
+          </span>
+        </div>
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">{detail}</p>
+      </div>
+    </div>
+  );
+}
+
+function HeroQueueItem({
+  icon: Icon,
+  title,
+  detail,
+  tone,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  title: string;
+  detail: string;
+  tone: "primary" | "warning" | "neutral" | "success";
+}) {
+  const toneClass =
+    tone === "primary"
+      ? "border-primary/15 bg-primary/8 text-primary"
+      : tone === "warning"
+        ? "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+        : tone === "success"
+          ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+          : "border-border/70 bg-background/78 text-muted-foreground";
+
+  return (
+    <div className="rounded-[var(--surface-radius-md)] border border-border/70 bg-background/94 p-4 shadow-[var(--surface-shadow)] dark:bg-white/[0.04]">
+      <div className="flex items-start gap-3">
+        <div
+          className={cn(
+            "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border",
+            toneClass
+          )}
+        >
+          <Icon className="h-4 w-4" />
+        </div>
+        <div>
+          <p className="text-sm font-medium text-foreground">{title}</p>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">{detail}</p>
+        </div>
+      </div>
     </div>
   );
 }

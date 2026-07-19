@@ -31,6 +31,11 @@ import { defaultMoFReadinessRunner } from '@/engine/runners/mof';
 import { getAffectedDRIdsForRule } from '@/lib/rules/ruleTraceability';
 import { analyzeCoverage } from '@/lib/mapping/coverageAnalyzer';
 import { formatElapsedTime, yieldToBrowser } from '@/lib/processingFeedback';
+import {
+  WORKFLOW_CARD_HEADER_COMPACT_CLASS,
+  WORKFLOW_UTILITY_BADGE_CLASS,
+  WORKFLOW_UTILITY_BUTTON_CLASS,
+} from '@/lib/workflowShellStyles';
 
 type ConnectionTestStatus = 'idle' | 'running' | 'passed' | 'failed';
 
@@ -632,7 +637,7 @@ export default function RunChecksPage() {
 
         {/* Mapping Template Selector */}
         <Card className="mb-8 animate-slide-up surface-glass rounded-2xl border border-white/70">
-          <CardHeader>
+          <CardHeader className={WORKFLOW_CARD_HEADER_COMPACT_CLASS}>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Map className="h-5 w-5" />
               Mapping Template
@@ -659,9 +664,9 @@ export default function RunChecksPage() {
                         <div className="flex items-center gap-2">
                           <span>{template.templateName}</span>
                           {template.erpType && (
-                            <Badge variant="outline" className="text-xs">{template.erpType}</Badge>
+                            <Badge variant="outline" className={WORKFLOW_UTILITY_BADGE_CLASS}>{template.erpType}</Badge>
                           )}
-                          <Badge variant="secondary" className="text-xs">v{template.version}</Badge>
+                          <Badge variant="secondary" className={WORKFLOW_UTILITY_BADGE_CLASS}>v{template.version}</Badge>
                         </div>
                       </SelectItem>
                     ))}
@@ -752,24 +757,24 @@ export default function RunChecksPage() {
         </div>
 
         {/* Checks Library */}
-        <div className="surface-glass rounded-2xl border border-white/70 shadow-sm mb-8 animate-slide-up">
-          <div className="p-6 border-b flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-semibold text-foreground">
-                  Checks Library ({isLoadingChecks ? '...' : pintAEChecks.length} checks)
-                </h2>
-                {diagnostics?.dataSource === 'supabase' && (
-                  <Badge variant="outline" className="text-xs gap-1">
-                    <Database className="w-3 h-3" />
-                    Supabase
-                  </Badge>
-                )}
-                {diagnostics?.dataSource === 'hardcoded' && (
-                  <Badge variant="secondary" className="text-xs gap-1">
-                    <Database className="w-3 h-3" />
-                    Local Fallback
-                  </Badge>
+	        <div className="surface-glass rounded-2xl border border-white/70 shadow-sm mb-8 animate-slide-up">
+	          <div className="flex flex-col gap-3 border-b p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6">
+	            <div>
+	              <div className="flex items-center gap-2">
+	                <h2 className="text-lg font-semibold text-foreground">
+	                  Checks Library ({isLoadingChecks ? '...' : pintAEChecks.length} checks)
+	                </h2>
+	                {diagnostics?.dataSource === 'supabase' && (
+		                  <Badge variant="outline" className={`gap-1 ${WORKFLOW_UTILITY_BADGE_CLASS}`}>
+	                    <Database className="w-3 h-3" />
+	                    Supabase
+	                  </Badge>
+	                )}
+	                {diagnostics?.dataSource === 'hardcoded' && (
+		                  <Badge variant="secondary" className={`gap-1 ${WORKFLOW_UTILITY_BADGE_CLASS}`}>
+	                    <Database className="w-3 h-3" />
+	                    Local Fallback
+	                  </Badge>
                 )}
               </div>
               <p className="text-sm text-muted-foreground mt-1">
@@ -779,26 +784,26 @@ export default function RunChecksPage() {
                 Authoritative DR coverage is mapping-driven. Reference terms remain metadata context only.
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleTestConnection}
-                disabled={connectionTest.status === 'running'}
-                className="gap-1"
-              >
-                <Database className={`w-4 h-4 ${connectionTest.status === 'running' ? 'animate-pulse' : ''}`} />
-                Test Connection
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleRefreshChecks}
-                disabled={isLoadingChecks}
-                className="gap-1"
-              >
-                <RefreshCw className={`w-4 h-4 ${isLoadingChecks ? 'animate-spin' : ''}`} />
-                Refresh
+	            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+	              <Button
+	                variant="outline"
+	                size="sm"
+	                onClick={handleTestConnection}
+	                disabled={connectionTest.status === 'running'}
+		                className={WORKFLOW_UTILITY_BUTTON_CLASS}
+	              >
+	                <Database className={`w-4 h-4 ${connectionTest.status === 'running' ? 'animate-pulse' : ''}`} />
+	                Test Connection
+	              </Button>
+	              <Button
+	                variant="outline"
+	                size="sm"
+	                onClick={handleRefreshChecks}
+	                disabled={isLoadingChecks}
+		                className={WORKFLOW_UTILITY_BUTTON_CLASS}
+	              >
+	                <RefreshCw className={`w-4 h-4 ${isLoadingChecks ? 'animate-spin' : ''}`} />
+	                Refresh
               </Button>
             </div>
           </div>
