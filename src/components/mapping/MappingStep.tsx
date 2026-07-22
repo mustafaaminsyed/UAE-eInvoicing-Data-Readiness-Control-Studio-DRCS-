@@ -31,6 +31,9 @@ interface MappingStepProps {
   onMappingsChange: (mappings: FieldMapping[]) => void;
   onDatasetTypeChange?: (datasetType: DatasetType) => void;
   focusedField?: string | null;
+  onClearFocus?: () => void;
+  showOnlyPending?: boolean;
+  onShowOnlyPendingChange?: (value: boolean) => void;
 }
 
 export function MappingStep({
@@ -39,11 +42,15 @@ export function MappingStep({
   onMappingsChange,
   onDatasetTypeChange,
   focusedField,
+  onClearFocus,
+  showOnlyPending: controlledShowOnlyPending,
+  onShowOnlyPendingChange,
 }: MappingStepProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [showOnlyPending, setShowOnlyPending] = useState(false);
+  const [internalShowOnlyPending, setInternalShowOnlyPending] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
+  const showOnlyPending = controlledShowOnlyPending ?? internalShowOnlyPending;
 
   // Generate suggestions when data changes
   const handleGenerateSuggestions = useCallback(() => {
@@ -67,6 +74,16 @@ export function MappingStep({
       setSearchTerm(focusedField);
     }
   }, [focusedField]);
+
+  const handleClearFocusClick = () => {
+    setSearchTerm('');
+    onClearFocus?.();
+  };
+
+  const handleShowOnlyPendingChange = (value: boolean) => {
+    setInternalShowOnlyPending(value);
+    onShowOnlyPendingChange?.(value);
+  };
 
   const handleConfirmMapping = (mappingId: string) => {
     const updated = mappings.map(m => 
@@ -164,6 +181,18 @@ export function MappingStep({
     });
   }, [mappings, searchTerm, showOnlyPending]);
 
+  useEffect(() => {
+    if (!focusedField) return;
+
+    const normalizedFocus = focusedField.toLowerCase();
+    window.requestAnimationFrame(() => {
+      const focusedRow = document.querySelector<HTMLElement>(
+        `[data-target-field-id="${normalizedFocus}"], [data-erp-column-id="${normalizedFocus}"]`
+      );
+      focusedRow?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }, [focusedField, filteredMappings.length]);
+
   const confirmedCount = mappings.filter(m => m.isConfirmed).length;
   const pendingCount = mappings.filter(m => !m.isConfirmed).length;
   const highConfidenceUnconfirmed = mappings.filter(m => m.confidence >= 0.85 && !m.isConfirmed).length;
@@ -200,7 +229,7 @@ export function MappingStep({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       {/* Duplicate Error Alert */}
       {duplicateError && (
         <Alert variant="destructive">
@@ -241,7 +270,7 @@ export function MappingStep({
       )}
 
       {/* Stats Bar */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4 2xl:grid-cols-4">
         <Card>
           <CardContent className="pt-4">
             <div className="text-2xl font-bold">{previewData.columns.length}</div>
@@ -271,34 +300,42 @@ export function MappingStep({
       {/* Actions Bar */}
       <Card>
         <CardContent className="pt-4">
-          <div className="flex items-center gap-4 flex-wrap">
-            <Button onClick={handleGenerateSuggestions} disabled={isGenerating} variant="outline">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <Button onClick={handleGenerateSuggestions} disabled={isGenerating} variant="outline">
               <Wand2 className="h-4 w-4 mr-2" />
               {isGenerating ? 'Analyzing...' : 'Re-analyze Columns'}
-            </Button>
-            {highConfidenceUnconfirmed > 0 && (
-              <Button onClick={handleBulkAcceptHighConfidence} variant="default">
-                <Check className="h-4 w-4 mr-2" />
-                Accept {highConfidenceUnconfirmed} High-Confidence
               </Button>
-            )}
-            <div className="flex-1" />
-            <div className="relative">
+              {highConfidenceUnconfirmed > 0 && (
+                <Button onClick={handleBulkAcceptHighConfidence} variant="default">
+                  <Check className="h-4 w-4 mr-2" />
+                  Accept {highConfidenceUnconfirmed} High-Confidence
+                </Button>
+              )}
+            </div>
+            <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center xl:justify-end">
+              <div className="relative w-full sm:max-w-xs">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search columns or fields..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-64"
+                className="w-full pl-10"
               />
+              </div>
+              {focusedField ? (
+                <Button type="button" variant="outline" onClick={handleClearFocusClick}>
+                  Clear focus
+                </Button>
+              ) : null}
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox 
+                  checked={showOnlyPending} 
+                  onCheckedChange={(c) => handleShowOnlyPendingChange(c === true)} 
+                />
+                Show pending only
+              </label>
             </div>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox 
-                checked={showOnlyPending} 
-                onCheckedChange={(c) => setShowOnlyPending(c === true)} 
-              />
-              Show pending only
-            </label>
           </div>
         </CardContent>
       </Card>
@@ -312,8 +349,8 @@ export function MappingStep({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="border rounded-lg overflow-auto max-h-[560px]">
-            <Table>
+          <div className="w-full min-w-0 overflow-x-auto overflow-y-auto rounded-lg border max-h-[560px]">
+            <Table className="min-w-[1110px]">
               <TableHeader className="sticky top-0 bg-background z-10">
                 <TableRow>
                   <TableHead className="w-[200px]">ERP Column</TableHead>
@@ -337,12 +374,16 @@ export function MappingStep({
                     <TableRow
                       key={mapping.id}
                       data-focused-match={isFocusedMapping(mapping) ? 'true' : undefined}
+                      data-target-field-id={mapping.targetField.id.toLowerCase()}
+                      data-erp-column-id={mapping.erpColumn.toLowerCase()}
                       className={cn(
                         'hover:bg-white/5',
                         isFocusedMapping(mapping) && 'bg-primary/5 ring-1 ring-inset ring-primary/20'
                       )}
                     >
-                      <TableCell className="align-middle font-mono text-sm">{mapping.erpColumn}</TableCell>
+                      <TableCell className="align-middle font-mono text-sm">
+                        <span className="block max-w-[220px] truncate xl:max-w-none">{mapping.erpColumn}</span>
+                      </TableCell>
                       <TableCell className="align-middle text-center">
                         <ArrowRight className="h-4 w-4 mx-auto text-muted-foreground" />
                       </TableCell>
@@ -427,13 +468,13 @@ export function MappingStep({
                   {unmappedColumns.map(col => {
                     const sampleValues = previewData.rows.slice(0, 3).map(r => r[col] || '').join(', ');
                     return (
-                      <div key={col} className="flex items-center gap-4 p-3 border rounded-lg bg-background/30">
+                      <div key={col} className="flex flex-col gap-3 rounded-lg border bg-background/30 p-3 lg:flex-row lg:items-center lg:gap-4">
                         <div className="flex-1 min-w-0">
                           <div className="font-mono text-sm truncate">{col}</div>
                           <div className="text-xs text-muted-foreground truncate">{sampleValues || 'No values'}</div>
                         </div>
                         <Select onValueChange={(v) => handleAddManualMapping(col, v)}>
-                          <SelectTrigger className="w-[280px] bg-background/70">
+                          <SelectTrigger className="w-full bg-background/70 lg:w-[280px]">
                             <SelectValue placeholder="Map to..." />
                           </SelectTrigger>
                           <SelectContent>

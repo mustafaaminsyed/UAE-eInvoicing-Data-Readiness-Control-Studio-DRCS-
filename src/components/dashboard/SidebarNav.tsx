@@ -20,12 +20,12 @@ export function SidebarNav() {
   return (
     <>
       <SidebarHeader className="px-2.5 pb-2 pt-3">
-        <div className="rounded-[22px] border border-sidebar-border/90 bg-sidebar-accent/70 p-3.5 text-sidebar-foreground shadow-[0_10px_24px_-18px_rgba(15,23,42,0.35)]">
+        <div className="rounded-[20px] border border-sidebar-border/90 bg-sidebar-accent/70 p-3 text-sidebar-foreground shadow-[0_10px_24px_-18px_rgba(15,23,42,0.35)]">
           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/55">
-            Dariba Tech
+            Daribatech
           </p>
-          <h2 className="mt-1.5 font-display text-[1.05rem] font-semibold">Controls Studio</h2>
-          <p className="mt-1.5 text-xs leading-5 text-sidebar-foreground/68">
+          <h2 className="mt-1 font-display text-base font-semibold">Controls Studio</h2>
+          <p className="mt-1 text-[11px] leading-5 text-sidebar-foreground/68">
             Workflow navigation for the UAE eInvoicing compliance workspace.
           </p>
         </div>
@@ -83,7 +83,7 @@ export function SidebarNav() {
       </SidebarContent>
 
       <SidebarFooter className="px-2.5 pb-3 pt-1.5">
-        <div className="rounded-[20px] border border-sidebar-border/80 bg-background/55 p-3 text-[11px] leading-5 text-sidebar-foreground/60">
+        <div className="rounded-[18px] border border-sidebar-border/80 bg-background/55 p-2.5 text-[11px] leading-5 text-sidebar-foreground/60">
           Existing screens remain available while each workflow area is introduced in the shared shell.
         </div>
       </SidebarFooter>

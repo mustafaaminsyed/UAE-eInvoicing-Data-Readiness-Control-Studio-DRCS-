@@ -15,6 +15,7 @@ import { MappingStep } from '@/components/mapping/MappingStep';
 import { AnalysisStep } from '@/components/mapping/AnalysisStep';
 import { SaveStep } from '@/components/mapping/SaveStep';
 import { WorkflowNavigator, buildWorkflowItems } from '@/components/shared/WorkflowNavigator';
+import { WorkflowPageHeader } from '@/components/shared/WorkflowPageHeader';
 import {
   ERPPreviewData,
   DetectedColumn,
@@ -30,6 +31,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { detectLikelyDatasetType } from '@/lib/mapping/datasetFieldCatalog';
+import { WORKFLOW_CARD_HEADER_COMPACT_CLASS } from '@/lib/workflowShellStyles';
 
 const STEPS: { id: MappingWizardStep; label: string }[] = [
   { id: 'upload', label: 'Upload Sample' },
@@ -37,6 +39,8 @@ const STEPS: { id: MappingWizardStep; label: string }[] = [
   { id: 'analysis', label: 'Coverage & Validation' },
   { id: 'save', label: 'Transformations & Save' },
 ];
+
+type DrFilterId = 'all' | 'headers' | 'lines' | 'buyers' | 'uae';
 
 export default function MappingPage() {
   const navigate = useNavigate();
@@ -48,7 +52,17 @@ export default function MappingPage() {
   const activeTab = searchParams.get('tab') || 'templates';
   const requestedDataset = searchParams.get('dataset');
   const requestedDirection = requestedDataset === 'AR' || requestedDataset === 'AP' ? requestedDataset : null;
-  const focusedField = searchParams.get('field')?.trim() || null;
+  const queryFocusedField = searchParams.get('field')?.trim() || null;
+  const requestedDrFilter = searchParams.get('drFilter');
+  const queryDrFilter: DrFilterId =
+    requestedDrFilter === 'headers' ||
+    requestedDrFilter === 'lines' ||
+    requestedDrFilter === 'buyers' ||
+    requestedDrFilter === 'uae'
+      ? requestedDrFilter
+      : 'all';
+  const queryDrSearch = searchParams.get('drSearch')?.trim() || '';
+  const queryShowPendingOnly = searchParams.get('pendingOnly') === 'true';
   
   // Template list state
   const [templates, setTemplates] = useState<MappingTemplate[]>([]);
@@ -69,6 +83,11 @@ export default function MappingPage() {
   const [showPostSaveCTA, setShowPostSaveCTA] = useState(false);
   const [templateSeed, setTemplateSeed] = useState<Partial<MappingTemplate> | null>(null);
   const [saveMode, setSaveMode] = useState<'create' | 'duplicate' | 'edit'>('create');
+  const [focusedField, setFocusedField] = useState<string | null>(queryFocusedField);
+  const mappingContentRef = React.useRef<HTMLDivElement | null>(null);
+  const [drFilter, setDrFilter] = useState<DrFilterId>(queryDrFilter);
+  const [drSearch, setDrSearch] = useState<string>(queryDrSearch);
+  const [showOnlyPending, setShowOnlyPending] = useState<boolean>(queryShowPendingOnly);
 
   const currentStepIndex = STEPS.findIndex(s => s.id === currentStep);
 
@@ -89,6 +108,22 @@ export default function MappingPage() {
       setDirection(requestedDirection);
     }
   }, [direction, requestedDirection, setDirection]);
+
+  useEffect(() => {
+    setFocusedField(queryFocusedField);
+  }, [queryFocusedField]);
+
+  useEffect(() => {
+    setDrFilter(queryDrFilter);
+  }, [queryDrFilter]);
+
+  useEffect(() => {
+    setDrSearch(queryDrSearch);
+  }, [queryDrSearch]);
+
+  useEffect(() => {
+    setShowOnlyPending(queryShowPendingOnly);
+  }, [queryShowPendingOnly]);
 
   const detectColumnType = useCallback((values: string[]): DetectedColumn['detectedType'] => {
     const nonEmpty = values.filter((value) => value && value.trim() !== '');
@@ -165,6 +200,12 @@ export default function MappingPage() {
       rows,
       totalRows: rowCount,
       datasetType,
+      documentBaseline:
+        template.documentType === 'UC1 Credit Note'
+          ? '381'
+          : template.documentType === 'UC1 Standard Tax Invoice'
+            ? '380'
+            : 'mixed',
     };
   }, [detectColumnType, inferDatasetTypeFromMappings]);
 
@@ -217,6 +258,67 @@ export default function MappingPage() {
     setConditionalAnswers({});
     setShowPostSaveCTA(false);
   }, []);
+
+  const handleCoverageFieldClick = useCallback((fieldId: string) => {
+    setFocusedField(fieldId);
+    setSearchParams((currentParams) => {
+      const nextParams = new URLSearchParams(currentParams);
+      nextParams.set('field', fieldId);
+      return nextParams;
+    });
+    window.requestAnimationFrame(() => {
+      mappingContentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, [setSearchParams]);
+
+  const handleClearFocusedField = useCallback(() => {
+    setFocusedField(null);
+    setSearchParams((currentParams) => {
+      const nextParams = new URLSearchParams(currentParams);
+      nextParams.delete('field');
+      return nextParams;
+    });
+  }, [setSearchParams]);
+
+  const handleDrFilterChange = useCallback((nextFilter: DrFilterId) => {
+    setDrFilter(nextFilter);
+    setSearchParams((currentParams) => {
+      const nextParams = new URLSearchParams(currentParams);
+      if (nextFilter === 'all') {
+        nextParams.delete('drFilter');
+      } else {
+        nextParams.set('drFilter', nextFilter);
+      }
+      return nextParams;
+    });
+  }, [setSearchParams]);
+
+  const handleDrSearchChange = useCallback((nextSearch: string) => {
+    setDrSearch(nextSearch);
+    setSearchParams((currentParams) => {
+      const nextParams = new URLSearchParams(currentParams);
+      const normalizedSearch = nextSearch.trim();
+      if (normalizedSearch) {
+        nextParams.set('drSearch', normalizedSearch);
+      } else {
+        nextParams.delete('drSearch');
+      }
+      return nextParams;
+    });
+  }, [setSearchParams]);
+
+  const handleShowOnlyPendingChange = useCallback((nextValue: boolean) => {
+    setShowOnlyPending(nextValue);
+    setSearchParams((currentParams) => {
+      const nextParams = new URLSearchParams(currentParams);
+      if (nextValue) {
+        nextParams.set('pendingOnly', 'true');
+      } else {
+        nextParams.delete('pendingOnly');
+      }
+      return nextParams;
+    });
+  }, [setSearchParams]);
 
   // Template list filtering
   const filteredTemplates = templates.filter(t => {
@@ -326,54 +428,58 @@ export default function MappingPage() {
   const uniqueErpTypes = [...new Set(templates.map(t => t.erpType).filter(Boolean))];
   const uniqueDocTypes = [...new Set(templates.map(t => t.documentType))];
 
-  return (
-    <div className="min-h-screen">
-      <div className="container mx-auto max-w-7xl px-6 py-8 md:py-10">
-        {/* Profile Banner */}
-	        <div className="mb-6 flex items-center justify-between rounded-2xl border border-white/70 p-4 surface-glass">
-          <div className="flex items-center gap-4">
-            <div>
-              <h1 className="font-display text-2xl font-semibold">Field Mapping Assistant</h1>
-              <p className="text-sm text-muted-foreground">ERP {'->'} PINT-AE Field Transformation Wizard</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant={direction === 'AR' ? 'default' : 'outline'}
-                onClick={() => setDirection('AR')}
-              >
-                Outbound (AR)
-              </Button>
-              <Button
-                size="sm"
-                variant={direction === 'AP' ? 'default' : 'outline'}
-                onClick={() => setDirection('AP')}
-              >
-                Inbound (AP)
-              </Button>
-            </div>
-            {activeTab === 'create' && (
-              <div className="flex items-center gap-2 ml-4">
-                <Badge variant={templateStatus === 'active' ? 'default' : 'secondary'}>
-                  {templateStatus === 'active' ? 'Active' : templateName ? 'Draft' : 'New Draft'}
-                </Badge>
-                {templateName && <span className="text-sm font-medium">{templateName}</span>}
-                {lastSavedAt && (
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    Saved {format(new Date(lastSavedAt), 'HH:mm')}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-	          <Badge variant="outline" className="text-xs font-normal text-muted-foreground">
-	            MoF baseline + PINT-AE technical layer
-	          </Badge>
-	        </div>
+	return (
+	    <div className="min-h-screen">
+	      <div className="container mx-auto max-w-7xl px-6 py-8 md:py-10">
+	        <WorkflowPageHeader
+	          title="Field Mapping Assistant"
+	          description="Transform ERP source columns into the canonical PINT-AE structure used across validation, traceability, and evidence workflows."
+	          className="mb-6 animate-fade-in"
+	          meta={
+	            <>
+	              <Badge variant="outline" className="text-xs font-normal text-muted-foreground">
+	                MoF baseline + PINT-AE technical layer
+	              </Badge>
+	              {activeTab === 'create' ? (
+	                <>
+	                  <Badge variant={templateStatus === 'active' ? 'default' : 'secondary'}>
+	                    {templateStatus === 'active' ? 'Active' : templateName ? 'Draft' : 'New Draft'}
+	                  </Badge>
+	                  {templateName ? <span className="text-sm font-medium text-foreground">{templateName}</span> : null}
+	                  {lastSavedAt ? (
+	                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+	                      <Clock className="h-3 w-3" />
+	                      Saved {format(new Date(lastSavedAt), 'HH:mm')}
+	                    </span>
+	                  ) : null}
+	                </>
+	              ) : null}
+	            </>
+	          }
+	          actions={
+	            <div className="inline-flex rounded-xl border border-border/70 bg-background/80 p-1">
+	              <Button
+	                size="sm"
+	                variant={direction === 'AR' ? 'default' : 'ghost'}
+	                className="h-8 rounded-lg px-3 text-xs"
+	                onClick={() => setDirection('AR')}
+	              >
+	                Outbound (AR)
+	              </Button>
+	              <Button
+	                size="sm"
+	                variant={direction === 'AP' ? 'default' : 'ghost'}
+	                className="h-8 rounded-lg px-3 text-xs"
+	                onClick={() => setDirection('AP')}
+	              >
+	                Inbound (AP)
+	              </Button>
+	            </div>
+	          }
+	        />
 
-          <WorkflowNavigator
-            current="mapping"
+	          <WorkflowNavigator
+	            current="mapping"
             fallbackPath="/upload"
             className="mb-6"
             helperText="Move through the ingestion workflow without losing context as you progress into mapping and validation."
@@ -381,48 +487,48 @@ export default function MappingPage() {
           />
 
 	        <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList className="mb-6 surface-glass border border-white/70">
-            <TabsTrigger value="templates" className="gap-2">
-              <FileText className="h-4 w-4" />
-              Templates
-            </TabsTrigger>
-            <TabsTrigger value="create" className="gap-2">
-              <Plus className="h-4 w-4" />
-              Create New
-            </TabsTrigger>
+	          <TabsList className="mb-5 h-auto flex-wrap gap-1 rounded-2xl border border-white/70 p-1 surface-glass">
+	            <TabsTrigger value="templates" className="gap-2 rounded-xl px-3 py-2">
+	              <FileText className="h-4 w-4" />
+	              Templates
+	            </TabsTrigger>
+	            <TabsTrigger value="create" className="gap-2 rounded-xl px-3 py-2">
+	              <Plus className="h-4 w-4" />
+	              Create New
+	            </TabsTrigger>
           </TabsList>
 
           {/* Templates Tab */}
           <TabsContent value="templates">
-            <Card className="surface-glass rounded-2xl border border-white/70">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Mapping Templates</CardTitle>
-                    <CardDescription>Manage your saved field mapping configurations</CardDescription>
-                  </div>
-                  <Button onClick={() => handleTabChange('create')}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Template
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {/* Filters */}
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="relative flex-1 max-w-sm">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
+	            <Card className="surface-glass rounded-2xl border border-white/70">
+	              <CardHeader className={WORKFLOW_CARD_HEADER_COMPACT_CLASS}>
+	                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+	                  <div>
+	                    <CardTitle>Mapping Templates</CardTitle>
+	                    <CardDescription>Manage your saved field mapping configurations</CardDescription>
+	                  </div>
+	                  <Button onClick={() => handleTabChange('create')} className="w-full sm:w-auto">
+	                    <Plus className="h-4 w-4 mr-2" />
+	                    Create Template
+	                  </Button>
+	                </div>
+	              </CardHeader>
+	              <CardContent>
+	                {/* Filters */}
+	                <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center">
+	                  <div className="relative flex-1 max-w-sm">
+	                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+	                    <Input
                       placeholder="Search templates..."
                       value={templateSearch}
                       onChange={(e) => setTemplateSearch(e.target.value)}
                       className="pl-10"
                     />
                   </div>
-                  <Select value={erpTypeFilter} onValueChange={setErpTypeFilter}>
-                    <SelectTrigger className="w-[180px]">
-                      <Filter className="h-4 w-4 mr-2" />
-                      <SelectValue placeholder="ERP Type" />
+	                  <Select value={erpTypeFilter} onValueChange={setErpTypeFilter}>
+	                    <SelectTrigger className="w-full md:w-[180px]">
+	                      <Filter className="h-4 w-4 mr-2" />
+	                      <SelectValue placeholder="ERP Type" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All ERP Types</SelectItem>
@@ -431,9 +537,9 @@ export default function MappingPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Select value={docTypeFilter} onValueChange={setDocTypeFilter}>
-                    <SelectTrigger className="w-[200px]">
-                      <SelectValue placeholder="Document Type" />
+	                  <Select value={docTypeFilter} onValueChange={setDocTypeFilter}>
+	                    <SelectTrigger className="w-full md:w-[200px]">
+	                      <SelectValue placeholder="Document Type" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Document Types</SelectItem>
@@ -623,20 +729,44 @@ export default function MappingPage() {
               />
             )}
             {currentStep === 'mapping' && previewData && (
-              <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-6">
-                <MappingStep
-                  previewData={previewData}
-                  mappings={mappings}
-                  onMappingsChange={setMappings}
-                  onDatasetTypeChange={handleDatasetTypeChange}
-                  focusedField={focusedField}
-                />
-                <div className="hidden xl:block">
+              <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[minmax(0,1fr)_380px]">
+                <div ref={mappingContentRef} className="min-w-0 space-y-6">
+                  <MappingStep
+                    previewData={previewData}
+                    mappings={mappings}
+                    onMappingsChange={setMappings}
+                    onDatasetTypeChange={handleDatasetTypeChange}
+                    focusedField={focusedField}
+                    onClearFocus={handleClearFocusedField}
+                    showOnlyPending={showOnlyPending}
+                    onShowOnlyPendingChange={handleShowOnlyPendingChange}
+                  />
+                  <div className="2xl:hidden">
+                    <MappingCoveragePanel
+                      mappings={mappings}
+                      datasetType={previewData.datasetType}
+                      totalSourceColumns={previewData.columns.length}
+                      onFieldClick={handleCoverageFieldClick}
+                      currentFocusedField={focusedField}
+                      activeDrFilter={drFilter}
+                      drSearch={drSearch}
+                      onDrFilterChange={handleDrFilterChange}
+                      onDrSearchChange={handleDrSearchChange}
+                    />
+                  </div>
+                </div>
+                <div className="hidden min-w-0 2xl:block">
                   <div className="sticky top-8">
                     <MappingCoveragePanel
                       mappings={mappings}
                       datasetType={previewData.datasetType}
                       totalSourceColumns={previewData.columns.length}
+                      onFieldClick={handleCoverageFieldClick}
+                      currentFocusedField={focusedField}
+                      activeDrFilter={drFilter}
+                      drSearch={drSearch}
+                      onDrFilterChange={handleDrFilterChange}
+                      onDrSearchChange={handleDrSearchChange}
                     />
                   </div>
                 </div>

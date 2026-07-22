@@ -4,9 +4,11 @@ import { runAllChecksWithTelemetry } from '@/lib/checks/checksRegistry';
 import { runAllPintAEChecksWithTelemetry } from '@/lib/checks/pintAECheckRunner';
 import { buildOrganizationProfileExceptions } from '@/lib/validation/rulesetRouter';
 import { fetchEnabledPintAEChecks, seedUC1CheckPack } from '@/lib/api/pintAEApi';
+import { fetchCustomChecks } from '@/lib/api/checksApi';
 import { CheckResult, Exception, ParsedData } from '@/types/compliance';
 import { PintAECheck, PintAEException } from '@/types/pintAE';
 import { OrganizationProfile } from '@/types/direction';
+import { CustomCheckConfig } from '@/types/customChecks';
 
 vi.mock('@/lib/checks/checksRegistry', () => ({
   runAllChecksWithTelemetry: vi.fn(),
@@ -25,12 +27,17 @@ vi.mock('@/lib/api/pintAEApi', () => ({
   seedUC1CheckPack: vi.fn(),
 }));
 
+vi.mock('@/lib/api/checksApi', () => ({
+  fetchCustomChecks: vi.fn(),
+}));
+
 describe('runChecksOrchestrator', () => {
   const mockedRunAllChecksWithTelemetry = vi.mocked(runAllChecksWithTelemetry);
   const mockedRunAllPintAEChecksWithTelemetry = vi.mocked(runAllPintAEChecksWithTelemetry);
   const mockedBuildOrganizationProfileExceptions = vi.mocked(buildOrganizationProfileExceptions);
   const mockedFetchEnabledPintAEChecks = vi.mocked(fetchEnabledPintAEChecks);
   const mockedSeedUC1CheckPack = vi.mocked(seedUC1CheckPack);
+  const mockedFetchCustomChecks = vi.mocked(fetchCustomChecks);
 
   const parsedData: ParsedData = {
     buyers: [{ buyer_id: 'B-1', buyer_name: 'Buyer One', buyer_trn: '100000000000001' }],
@@ -66,6 +73,7 @@ describe('runChecksOrchestrator', () => {
     vi.resetAllMocks();
     mockedSeedUC1CheckPack.mockResolvedValue({ success: true, message: 'ok' });
     mockedFetchEnabledPintAEChecks.mockResolvedValue([]);
+    mockedFetchCustomChecks.mockResolvedValue([]);
     mockedRunAllChecksWithTelemetry.mockReturnValue({ checkResults: [], telemetry: [] });
     mockedRunAllPintAEChecksWithTelemetry.mockReturnValue({ exceptions: [], telemetry: [] });
     mockedBuildOrganizationProfileExceptions.mockReturnValue([]);
@@ -433,5 +441,88 @@ describe('runChecksOrchestrator', () => {
       'UAE-UC1-CHK-001',
       'org_profile_our_entity_alignment',
     ]);
+  });
+
+  it('executes active custom validation checks and AP search checks', async () => {
+    const customChecks: CustomCheckConfig[] = [
+      {
+        id: 'custom-missing-currency',
+        name: 'Header Currency Present',
+        description: 'Checks currency is populated.',
+        severity: 'High',
+        check_type: 'VALIDATION',
+        dataset_scope: 'header',
+        rule_type: 'missing',
+        parameters: { field: 'currency' },
+        message_template: 'Currency missing for {invoice_number}',
+        is_active: true,
+      },
+      {
+        id: 'custom-ap-search',
+        name: 'Possible Duplicate (Vendor + Amount + Date)',
+        description: 'Investigation search check.',
+        severity: 'Low',
+        check_type: 'SEARCH_CHECK',
+        dataset_scope: 'header',
+        rule_type: 'fuzzy_duplicate',
+        parameters: {
+          vendor_similarity_threshold: 0.9,
+          amount_tolerance: 0.01,
+          date_window_days: 3,
+        },
+        message_template: 'Potential duplicate AP invoice detected',
+        is_active: true,
+      },
+    ];
+
+    mockedFetchCustomChecks.mockResolvedValue(customChecks);
+
+    const result = await runChecksOrchestrator({
+      direction: 'AP',
+      buyers: parsedData.buyers,
+      headers: [
+        {
+          ...parsedData.headers[0],
+          currency: '',
+          seller_name: 'Vendor A',
+        },
+        {
+          ...parsedData.headers[0],
+          invoice_id: 'INV-2',
+          invoice_number: 'A-1002',
+          currency: 'AED',
+          seller_name: 'Vendor A',
+        },
+      ],
+      lines: [
+        parsedData.lines[0],
+        {
+          ...parsedData.lines[0],
+          line_id: 'LINE-2',
+          invoice_id: 'INV-2',
+        },
+      ],
+      organizationProfile: orgProfile,
+      rulesetVersion: 'v1.0.0',
+    });
+
+    expect(result.customValidationResults).toHaveLength(1);
+    expect(result.customValidationResults[0]).toMatchObject({
+      checkId: 'custom-missing-currency',
+      checkName: 'Header Currency Present',
+      failed: 1,
+      passed: 1,
+    });
+    expect(result.allExceptions.map((exception) => exception.checkId)).toContain(
+      'custom-missing-currency'
+    );
+    expect(result.investigationFlags).toHaveLength(2);
+    expect(result.customChecksExecuted).toBe(2);
+    expect(result.runArtifact.metadata).toMatchObject({
+      customValidationChecks: 1,
+      customValidationExceptions: 1,
+      investigationFlags: 2,
+      customChecksExecuted: 2,
+    });
   });
 });

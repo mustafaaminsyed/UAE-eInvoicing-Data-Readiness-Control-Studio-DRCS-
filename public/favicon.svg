@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" role="img" aria-labelledby="title desc">
+  <title id="title">Daribatech mark</title>
+  <desc id="desc">Dariba icon mark only, without wordmark, for browser tabs.</desc>
+  <rect x="12" y="12" width="136" height="136" rx="28" fill="#0b5a4c"/>
+  <g fill="none" stroke="#bbd2a1" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M45 92c8 0 15 3 20 9 6 7 11 12 21 12 11 0 19-8 19-20 0-7-2-13-8-19" stroke-width="9"/>
+    <path d="M64 57c10 5 17 15 17 28" stroke-width="9"/>
+    <circle cx="98" cy="43" r="7" fill="#bbd2a1" stroke="none"/>
+    <circle cx="80" cy="58" r="5.5" fill="#bbd2a1" stroke="none"/>
+  </g>
+</svg>

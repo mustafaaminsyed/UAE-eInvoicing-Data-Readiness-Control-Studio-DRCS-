@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ComplianceProvider, useCompliance } from '@/context/ComplianceContext';
 import { ParsedData } from '@/types/compliance';
 import { runChecksOrchestrator } from '@/engine/orchestrator';
-import { saveCheckRun, saveEntityScores } from '@/lib/api/checksApi';
+import { saveCheckRun, saveEntityScores, saveInvestigationFlags } from '@/lib/api/checksApi';
 import {
   calculateClientScores,
   generateRunSummary,
@@ -19,6 +19,7 @@ vi.mock('@/engine/orchestrator', () => ({
 vi.mock('@/lib/api/checksApi', () => ({
   saveCheckRun: vi.fn(),
   saveEntityScores: vi.fn(),
+  saveInvestigationFlags: vi.fn(),
 }));
 
 vi.mock('@/lib/api/pintAEApi', () => ({
@@ -63,6 +64,7 @@ function Harness() {
       <button type="button" onClick={() => void context.runChecks().catch(() => undefined)}>run-checks</button>
       <span data-testid="exceptions-count">{context.exceptions.length}</span>
       <span data-testid="check-results-count">{context.checkResults.length}</span>
+      <span data-testid="flags-count">{context.investigationFlags.length}</span>
       <span data-testid="pint-count">{context.pintAEExceptions.length}</span>
       <span data-testid="is-running">{String(context.isRunning)}</span>
     </div>
@@ -74,6 +76,7 @@ describe('ComplianceContext.runChecks delegation', () => {
     const mockedRunChecksOrchestrator = vi.mocked(runChecksOrchestrator);
     const mockedSaveCheckRun = vi.mocked(saveCheckRun);
     const mockedSaveEntityScores = vi.mocked(saveEntityScores);
+    const mockedSaveInvestigationFlags = vi.mocked(saveInvestigationFlags);
     const mockedSaveExceptions = vi.mocked(saveExceptions);
     const mockedSaveClientRiskScores = vi.mocked(saveClientRiskScores);
     const mockedSaveRunSummary = vi.mocked(saveRunSummary);
@@ -103,6 +106,25 @@ describe('ComplianceContext.runChecks delegation', () => {
               checkName: 'Buyer TRN Missing',
               severity: 'Critical',
               message: 'Missing TRN',
+            },
+          ],
+        },
+      ],
+      customValidationResults: [
+        {
+          checkId: 'custom-header-currency',
+          checkName: 'Header Currency Present',
+          severity: 'High',
+          passed: 0,
+          failed: 1,
+          exceptions: [
+            {
+              id: 'custom-1',
+              checkId: 'custom-header-currency',
+              checkName: 'Header Currency Present',
+              severity: 'High',
+              message: 'Currency missing',
+              invoiceId: 'INV-1',
             },
           ],
         },
@@ -172,6 +194,19 @@ describe('ComplianceContext.runChecks delegation', () => {
           execution_source: 'runtime',
         },
       ],
+      investigationFlags: [
+        {
+          id: 'flag-1',
+          checkId: 'custom-search-1',
+          checkName: 'Possible Duplicate',
+          datasetType: 'AR',
+          invoiceId: 'INV-1',
+          invoiceNumber: 'A-1001',
+          message: 'Potential duplicate pattern',
+          createdAt: '2026-03-11T01:00:00.000Z',
+        },
+      ],
+      customChecksExecuted: 2,
       allExceptions: [
         {
           id: 'core-1',
@@ -182,6 +217,19 @@ describe('ComplianceContext.runChecks delegation', () => {
           datasetType: 'AR',
           direction: 'AR',
           ruleId: 'buyer_trn_missing',
+          rulesetVersion: 'v1.0.0',
+          status: 'Open',
+        },
+        {
+          id: 'custom-1',
+          checkId: 'custom-header-currency',
+          checkName: 'Header Currency Present',
+          severity: 'High',
+          message: 'Currency missing',
+          datasetType: 'AR',
+          direction: 'AR',
+          invoiceId: 'INV-1',
+          ruleId: 'custom-header-currency',
           rulesetVersion: 'v1.0.0',
           status: 'Open',
         },
@@ -200,13 +248,14 @@ describe('ComplianceContext.runChecks delegation', () => {
     mockedSaveClientRiskScores.mockResolvedValue(true);
     mockedSaveRunSummary.mockResolvedValue(true);
     mockedSaveEntityScores.mockResolvedValue(true);
+    mockedSaveInvestigationFlags.mockResolvedValue(true);
     mockedCalculateClientScores.mockReturnValue([]);
     mockedGenerateRunSummary.mockReturnValue({
       run_id: 'run-1',
       total_invoices_tested: 1,
-      total_exceptions: 1,
+      total_exceptions: 2,
       pass_rate_percent: 0,
-      exceptions_by_severity: { Critical: 1, High: 0, Medium: 0, Low: 0 },
+      exceptions_by_severity: { Critical: 1, High: 1, Medium: 0, Low: 0 },
       top_10_failing_checks: [],
       top_10_clients_by_risk: [],
     });
@@ -226,8 +275,8 @@ describe('ComplianceContext.runChecks delegation', () => {
 
     expect(mockedSaveCheckRun).toHaveBeenCalledTimes(1);
     const saveCheckRunPayload = mockedSaveCheckRun.mock.calls[0][0];
-    expect(saveCheckRunPayload.total_exceptions).toBe(1);
-    expect(saveCheckRunPayload.results_summary.checkCount).toBe(2);
+    expect(saveCheckRunPayload.total_exceptions).toBe(2);
+    expect(saveCheckRunPayload.results_summary.checkCount).toBe(4);
     expect(saveCheckRunPayload.results_summary.rulesetVersion).toBe('v1.0.0');
     expect(saveCheckRunPayload.results_summary.runMode).toBe('raw_template');
     expect(saveCheckRunPayload.results_summary.readinessQualification).toBe('decision_ready');
@@ -264,6 +313,12 @@ describe('ComplianceContext.runChecks delegation', () => {
     expect(mockedSaveExceptions).toHaveBeenCalledTimes(1);
     expect(mockedSaveClientRiskScores).toHaveBeenCalledTimes(1);
     expect(mockedSaveRunSummary).toHaveBeenCalledTimes(1);
+    expect(mockedSaveInvestigationFlags).toHaveBeenCalledWith('run-1', [
+      expect.objectContaining({
+        id: 'flag-1',
+        checkId: 'custom-search-1',
+      }),
+    ]);
     expect(mockedGenerateRunSummary).toHaveBeenCalledWith(
       'run-1',
       1,
@@ -278,8 +333,9 @@ describe('ComplianceContext.runChecks delegation', () => {
     expect(mockedSaveEntityScores).toHaveBeenCalledTimes(1);
 
     await waitFor(() => {
-      expect(screen.getByTestId('exceptions-count').textContent).toBe('1');
-      expect(screen.getByTestId('check-results-count').textContent).toBe('1');
+      expect(screen.getByTestId('exceptions-count').textContent).toBe('2');
+      expect(screen.getByTestId('check-results-count').textContent).toBe('2');
+      expect(screen.getByTestId('flags-count').textContent).toBe('1');
       expect(screen.getByTestId('pint-count').textContent).toBe('1');
       expect(screen.getByTestId('is-running').textContent).toBe('false');
     });

@@ -13,6 +13,10 @@ vi.mock('@/lib/api/pintAEApi', async () => {
   };
 });
 
+vi.mock('@/lib/api/checksApi', () => ({
+  fetchCustomChecks: vi.fn(async () => []),
+}));
+
 function buildFile(content: string, name: string): File {
   return {
     name,

@@ -10,22 +10,50 @@ It supports:
 - AR and AP dataset ingestion and separation
 - Mapping ERP columns to PINT-AE UC1 fields
 - Standard PINT-AE/UAE check execution
+- Credit note scenario support for field coverage and scenario-specific checks
 - Semantic crosswalk alignment between MoF fields, PINT/BT/BTUAE semantics, DCS canonical fields, and traceability state
 - Mapping-driven DR coverage and traceability attribution
+- Governed mapping runs and diagnostic mapping runs with readiness qualification
 - Custom validation checks and AP search checks
 - AI-generated validation explanations per exception (with cached responses)
 - Traceability coverage and conformance gating
 - Exception, case, rejection, and lifecycle views
-- Evidence Pack export for audit/regulatory use
+- End-user Evidence Pack generation with client-facing narrative summaries, technical appendices, and branded export
 - Historical run-safe evidence snapshots and runtime-backed execution telemetry
 
 ## End-to-end workflow
 
 1. Upload AR and/or AP files.
 2. Build or select a mapping template.
-3. Run checks for AR, AP, or ALL scope.
-4. Review exceptions, cases, and controls insights.
-5. Export an Evidence Pack.
+3. Run governed or diagnostic checks for AR, AP, or ALL scope.
+4. Review dashboard, exceptions, controls, and traceability outputs.
+5. Generate a client-ready Evidence Pack with technical appendix support.
+
+## Validation workflow
+
+The runtime workflow is now explicitly organized around:
+
+1. Upload and dataset qualification
+2. Mapping and canonical alignment
+3. Run Checks with governed or diagnostic execution context
+4. Review of readiness, blockers, and remediation views
+5. Evidence Pack generation from current or historical run context
+
+Historical runs preserve their own evidence basis and do not fall back to whatever data is currently loaded in the browser.
+
+## Evidence Pack
+
+The Evidence Pack is no longer only a raw export bundle.
+
+It now provides:
+- executive verdict and readiness summary
+- scope and methodology explanation
+- priority blockers and remediation actions
+- template-by-template findings summary
+- detailed technical appendix for data requirements, rules, exceptions, controls, and population evidence
+- branded PDF export aligned to Daribatech client-report styling
+
+Evidence output is historical-run safe and can be reconstructed from saved run snapshots where available.
 
 ## Key application modules
 
@@ -223,6 +251,12 @@ npm test -- src/pages/ControlsDashboardPage.allTime.test.tsx src/pages/ControlsD
 npm test -- src/pages/RunChecksPage.localFallback.test.tsx
 ```
 
+Focused evidence-pack validation tests:
+
+```bash
+npm test -- src/lib/evidence/streamlinedEvidenceReport.test.ts src/lib/evidence/evidenceExporter.test.ts
+```
+
 ## Current UX status notes
 
 - Traceability is the primary explainability surface and now includes:
@@ -233,6 +267,11 @@ npm test -- src/pages/RunChecksPage.localFallback.test.tsx
   - top operational KPI panel
   - diagnostic readiness radar
   - operational risk snapshot
+- Evidence Pack now separates:
+  - client-facing narrative report sections
+  - remediation-focused exception summary
+  - technical appendix evidence tables
+- Workflow navigation has been normalized across dashboard, exceptions, controls, traceability, and evidence screens to support end-to-end review without losing context
 - Some lower dashboard analytics remain intentionally heuristic/preview-oriented and are labeled as such until their runtime definitions are formalized.
 
 ## Spec utilities
@@ -260,45 +299,47 @@ This is a static Vite app. Deploy the `dist/` output to any static host after `n
 
 Use annotated Git tags as rollback-safe checkpoints for production.
 
-Latest checkpoint:
-- Tag: `checkpoint-2026-03-07-prod-runchecks-hardening`
-- Commit: `813ccc5`
+Latest saved checkpoint:
+- Commit: `cc448bf`
+- Date: `2026-07-17`
+- Branch: `feat/semantic-crosswalk-alignment`
 - Scope:
-  - Run Checks conformance gate diagnostics
-  - Raw template mode support (no mapping profile required when canonical structure is present)
-  - Last run context banner (Run Checks + Exceptions)
-  - Safe UC1 sync behavior (no automatic overwrite of DB-managed check registry settings)
+  - Evidence Pack redesigned into a more client-facing narrative structure
+  - Evidence Pack wording simplified for end users (`Data Requirements`, `Assessment confidence`, clearer readiness labels)
+  - Branded Daribatech PDF export styling added, including cover-page treatment and section chrome
+  - Evidence preview aligned to executive verdict, methodology, remediation, and template findings sections
 
-Latest production updates (after the checkpoint above):
+Previous major checkpoint:
+- Commit: `d89905b`
+- Date: `2026-07-16`
+- Branch: `feat/semantic-crosswalk-alignment`
+- Scope:
+  - DRCS workflow and validation updates checkpointed
+  - workflow navigation and cross-screen UX hardening
+  - template/parser alignment for invoice line allowance/discount compatibility
+  - credit-note-related readiness and validation updates carried forward in the active feature branch
+
+Latest platform highlights on the active branch:
 - Traceability uses canonical MoF source registry overlay (`specs/uae/mof/source-schema-v1.json`) instead of legacy docs JSON.
 - Run Checks supports raw-template execution mode when canonical upload structure is already present.
 - `IBT-023` and `IBT-024` are classified as `system_default_allowed` (not generic ASP-derived), with strict PINT-AE validation still enforced.
-- Evidence/Traceability labels now distinguish:
+- Evidence/Traceability labels distinguish:
   - `System Default` fields (no upload column required, controlled default path)
   - `ASP Derived` fields (technical/derived fields not expected from upload templates)
-- UI/UX consistency layer added across all app routes:
-  - shared background gradient + grid overlay system in app shell
-  - sidebar-area grid masking and shell isolation to prevent visual bleed lines
-  - top navigation chrome alignment for consistent dark-mode rendering
-- Landing page redesigned as a premium SaaS entry experience:
-  - two-column hero, capability cards, workflow narrative, module cards, trust/intelligence section, and CTA banner
-  - added direct hero CTA to `Check Registry` alongside `Explore Traceability`
-- Controls Dashboard upgraded with clearer executive logic:
-  - readiness score band with visible thresholds and legend
-  - removal of SLA breach KPI from the executive row
-  - explicit PINT-AE DR coverage + MoF mandatory coverage KPI tiles
-  - readiness score weighting disclosure (pass-rate, DR coverage, MoF coverage, critical pressure)
-
-Latest platform hardening updates:
-- Evidence Pack is now historical-run safe:
+- Workflow navigation has been normalized across dashboard, exceptions, controls, traceability, and evidence screens.
+- Controls Dashboard has clearer executive KPI logic and weighting disclosure.
+- Evidence Pack is historical-run safe:
   - historical evidence uses persisted run snapshots instead of current in-memory populations
   - historical export is blocked when required snapshot data is unavailable
-- Evidence execution counts are now runtime-backed across the active validation layers:
+- Evidence execution counts are runtime-backed across the active validation layers:
   - core runner telemetry
   - PINT/UAE runner telemetry
   - org-profile runner telemetry
-- Evidence Pack execution rows now surface multi-layer rule execution rather than only the PINT/UAE subset.
-- Dashboard high-level exception preview now derives from the normalized exception inventory instead of check-result summary counts.
+- Evidence Pack now supports:
+  - client-facing narrative sections
+  - remediation-focused exception summaries
+  - technical appendix evidence tables
+  - branded PDF export styling
 - Control registry was aligned for executable UAE VAT/runtime rules so governed rules now map to explicit controls.
 - `ComplianceContext` was modularized incrementally:
   - workspace/session state extracted into `WorkspaceContext`
@@ -306,7 +347,7 @@ Latest platform hardening updates:
 - Landing experience redesigned into a premium DCS-specific hero/header system:
   - floating landing nav/header bar
   - restored theme toggle
-  - Dariba-aligned dark-mode palette
+  - Daribatech-aligned dark-mode palette
   - simplified executive preview composition
 - Shared app shell and route loading were refined:
   - floating/sticky workspace sidebar treatment

@@ -11,6 +11,7 @@ import {
 import { StatsCard } from '@/components/StatsCard';
 import { SeverityBadge } from '@/components/SeverityBadge';
 import { WorkflowNavigator, buildWorkflowItems } from '@/components/shared/WorkflowNavigator';
+import { WorkflowPageHeader } from '@/components/shared/WorkflowPageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -29,6 +30,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { WORKFLOW_UTILITY_BUTTON_CLASS } from '@/lib/workflowShellStyles';
 import type { Severity } from '@/types/compliance';
 
 type ValidationCategory =
@@ -219,9 +221,28 @@ export default function ValidationPage() {
 
   return (
     <div className="space-y-4 animate-fade-in">
+      <WorkflowPageHeader
+        title="Validation Explorer"
+        description="Review rule outcomes, filter the current validation surface, and inspect failure context without leaving the workflow shell."
+        icon={<FileSearch className="h-7 w-7" />}
+        className="animate-fade-in"
+        actions={
+          <>
+            <Button variant="outline" size="sm" className={WORKFLOW_UTILITY_BUTTON_CLASS} onClick={() => navigate('/check-registry')}>
+              Open Check Registry
+            </Button>
+            <Button size="sm" className={WORKFLOW_UTILITY_BUTTON_CLASS} onClick={() => navigate('/run')}>
+              Open Run Checks
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </>
+        }
+      />
+
       <WorkflowNavigator
         current="validation"
         fallbackPath="/run"
+        className="animate-fade-in"
         helperText="Move through the ingestion workflow without losing context as you progress into mapping and validation."
         items={buildWorkflowItems(['mapping', 'run', 'validation', 'dashboard', 'exceptions'])}
       />
@@ -273,15 +294,6 @@ export default function ValidationPage() {
                   Review the current validation surface, filter rule outcomes, and inspect rule-level context without
                   leaving the workflow shell.
                 </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" className="rounded-full" onClick={() => navigate('/check-registry')}>
-                  Open Check Registry
-                </Button>
-                <Button className="rounded-full" onClick={() => navigate('/run')}>
-                  Open Run Checks
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
               </div>
             </div>
 

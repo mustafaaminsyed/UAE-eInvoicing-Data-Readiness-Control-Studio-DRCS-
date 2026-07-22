@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { Loader2 } from "lucide-react";
 import { ComplianceProvider } from "@/context/ComplianceContext";
@@ -46,6 +46,50 @@ function RouteLoadingFallback() {
   );
 }
 
+function AppFrame() {
+  const location = useLocation();
+  const isLandingRoute = location.pathname === "/";
+
+  return (
+    <div className="app-shell min-h-screen relative overflow-x-clip">
+      <div className="pointer-events-none absolute inset-0 app-gradient-wash" />
+      {!isLandingRoute ? <div className="pointer-events-none absolute inset-0 app-grid-veil" /> : null}
+      <Navigation />
+      <main className="relative z-10">
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route element={<WorkspaceShell />}>
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/submissions" element={<SubmissionsPage />} />
+              <Route path="/data-twin" element={<DataTwinPage />} />
+              <Route path="/validation" element={<ValidationPage />} />
+              <Route path="/exceptions" element={<ExceptionsPage />} />
+              <Route path="/evidence" element={<EvidenceWorkspacePage />} />
+              <Route path="/analytics" element={<WorkflowSectionPage sectionPath="/analytics" />} />
+              <Route path="/settings" element={<WorkflowSectionPage sectionPath="/settings" />} />
+              <Route path="/upload" element={<UploadPage />} />
+              <Route path="/run" element={<RunChecksPage />} />
+              <Route path="/invoice/:invoiceId" element={<InvoiceDetailPage />} />
+              <Route path="/check-builder" element={<CheckBuilderPage />} />
+              <Route path="/check-registry" element={<CheckRegistryPage />} />
+              <Route path="/upload-audit" element={<UploadAuditPage />} />
+              <Route path="/ap-explorer" element={<APInvoiceExplorerPage />} />
+              <Route path="/controls" element={<ControlsDashboardPage />} />
+              <Route path="/cases" element={<CasesPage />} />
+              <Route path="/rejections" element={<RejectionsPage />} />
+              <Route path="/mapping" element={<MappingPage />} />
+              <Route path="/evidence-pack" element={<EvidencePackPage />} />
+              <Route path="/traceability" element={<TraceabilityPage />} />
+            </Route>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
+      </main>
+    </div>
+  );
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider
@@ -60,42 +104,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <div className="app-shell min-h-screen relative overflow-x-clip">
-              <div className="pointer-events-none absolute inset-0 app-gradient-wash" />
-              <div className="pointer-events-none absolute inset-0 app-grid-veil" />
-              <Navigation />
-              <main className="relative z-10">
-                <Suspense fallback={<RouteLoadingFallback />}>
-                  <Routes>
-                    <Route path="/" element={<LandingPage />} />
-                    <Route element={<WorkspaceShell />}>
-                      <Route path="/dashboard" element={<DashboardPage />} />
-                      <Route path="/submissions" element={<SubmissionsPage />} />
-                      <Route path="/data-twin" element={<DataTwinPage />} />
-                      <Route path="/validation" element={<ValidationPage />} />
-                      <Route path="/exceptions" element={<ExceptionsPage />} />
-                      <Route path="/evidence" element={<EvidenceWorkspacePage />} />
-                      <Route path="/analytics" element={<WorkflowSectionPage sectionPath="/analytics" />} />
-                      <Route path="/settings" element={<WorkflowSectionPage sectionPath="/settings" />} />
-                      <Route path="/upload" element={<UploadPage />} />
-                      <Route path="/run" element={<RunChecksPage />} />
-                      <Route path="/invoice/:invoiceId" element={<InvoiceDetailPage />} />
-                      <Route path="/check-builder" element={<CheckBuilderPage />} />
-                      <Route path="/check-registry" element={<CheckRegistryPage />} />
-                      <Route path="/upload-audit" element={<UploadAuditPage />} />
-                      <Route path="/ap-explorer" element={<APInvoiceExplorerPage />} />
-                      <Route path="/controls" element={<ControlsDashboardPage />} />
-                      <Route path="/cases" element={<CasesPage />} />
-                      <Route path="/rejections" element={<RejectionsPage />} />
-                      <Route path="/mapping" element={<MappingPage />} />
-                      <Route path="/evidence-pack" element={<EvidencePackPage />} />
-                      <Route path="/traceability" element={<TraceabilityPage />} />
-                    </Route>
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </Suspense>
-              </main>
-            </div>
+            <AppFrame />
           </BrowserRouter>
         </ComplianceProvider>
       </TooltipProvider>

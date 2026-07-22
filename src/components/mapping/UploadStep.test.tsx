@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import * as XLSX from 'xlsx';
 
 import { UploadStep } from '@/components/mapping/UploadStep';
 import type { ERPPreviewData } from '@/types/fieldMapping';
@@ -79,6 +80,70 @@ describe('UploadStep', () => {
         expect.objectContaining({
           fileName: 'headers.csv',
           datasetType: 'header',
+          documentBaseline: 'mixed',
+        })
+      );
+    });
+  });
+
+  it('persists the selected document baseline into preview data', () => {
+    const onDataLoaded = vi.fn();
+
+    render(<UploadStep previewData={previewData} onDataLoaded={onDataLoaded} />);
+
+    fireEvent.click(screen.getByRole('radio', { name: /381 credit note/i }));
+
+    expect(onDataLoaded).toHaveBeenCalledWith(
+      expect.objectContaining({
+        documentBaseline: '381',
+      })
+    );
+  });
+
+  it('parses Excel workbook uploads before analyzing columns', async () => {
+    const onDataLoaded = vi.fn();
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet([
+      {
+        invoice_id: 'INV001',
+        invoice_number: 'UAE-2025-0001',
+        issue_date: '2025-01-01',
+        invoice_type: '380',
+        currency: 'AED',
+        buyer_id: 'BUY001',
+        total_excl_vat: '100',
+        vat_total: '5',
+        total_incl_vat: '105',
+      },
+    ]);
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Headers');
+
+    const workbookBytes = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer | Uint8Array;
+    const workbookArrayBuffer =
+      workbookBytes instanceof ArrayBuffer
+        ? workbookBytes
+        : workbookBytes.buffer.slice(
+            workbookBytes.byteOffset,
+            workbookBytes.byteOffset + workbookBytes.byteLength
+          );
+    const file = new File([workbookArrayBuffer], 'headers.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    Object.defineProperty(file, 'arrayBuffer', {
+      value: () => Promise.resolve(workbookArrayBuffer),
+    });
+
+    render(<UploadStep previewData={null} onDataLoaded={onDataLoaded} />);
+
+    const input = document.querySelector('#erp-file-input') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(onDataLoaded).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fileName: 'headers.xlsx',
+          datasetType: 'header',
+          columns: expect.arrayContaining(['invoice_id', 'invoice_number', 'issue_date']),
         })
       );
     });

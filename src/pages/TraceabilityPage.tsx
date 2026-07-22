@@ -45,6 +45,11 @@ import {
   getBuyerSemanticAliasByMoFFieldNumber,
   type BuyerSemanticAliasInterpretation,
 } from '@/lib/registry/semanticCrosswalkBuyerAlias';
+import {
+  WORKFLOW_MICRO_BADGE_CLASS,
+  WORKFLOW_UTILITY_BUTTON_CLASS,
+  WORKFLOW_UTILITY_BADGE_CLASS,
+} from '@/lib/workflowShellStyles';
 
 type FilterType = 'all' | 'mandatory' | 'pint-new' | 'pint-legacy' | 'unmapped' | 'not-ingestible' | 'low-population' | 'no-rules' | 'no-controls' | 'covered';
 type TraceabilityViewMode = 'pint' | 'mof';
@@ -526,8 +531,8 @@ export default function TraceabilityPage() {
             <CardContent className="p-4">
               <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                 <span className="font-semibold text-foreground">Digital Twin context</span>
-                {twinInvoice ? <Badge variant="outline">Invoice: {twinInvoice}</Badge> : null}
-                {twinField ? <Badge variant="outline">Field: {twinField}</Badge> : null}
+                {twinInvoice ? <Badge variant="outline" className={WORKFLOW_UTILITY_BADGE_CLASS}>Invoice: {twinInvoice}</Badge> : null}
+                {twinField ? <Badge variant="outline" className={WORKFLOW_UTILITY_BADGE_CLASS}>Field: {twinField}</Badge> : null}
                 <span>
                   {twinField
                     ? 'Search is pre-focused to the selected field for trace review.'
@@ -591,8 +596,8 @@ export default function TraceabilityPage() {
         )}
 
         {/* Filters, Search & Export */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-4">
-          <div className="flex items-center gap-2">
+        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant={viewMode === 'pint' ? 'default' : 'outline'}
               size="sm"
@@ -610,7 +615,7 @@ export default function TraceabilityPage() {
               MoF Overlay View
             </Button>
           </div>
-          <div className="flex items-center gap-1 flex-wrap">
+          <div className="flex flex-wrap items-center gap-1">
             {viewMode === 'pint' && filters.map(f => (
               <Button
                 key={f.key}
@@ -620,22 +625,22 @@ export default function TraceabilityPage() {
                 className="text-xs gap-1"
               >
                 {f.label}
-                <Badge variant="secondary" className="text-xs ml-1 px-1.5">{f.count}</Badge>
+                <Badge variant="secondary" className={`${WORKFLOW_MICRO_BADGE_CLASS} ml-1 px-1.5`}>{f.count}</Badge>
               </Button>
             ))}
           </div>
-          <div className="flex items-center gap-2 ml-auto">
+          <div className="flex w-full flex-col gap-2 sm:flex-row lg:ml-auto lg:w-auto">
             <Button
               variant="outline"
               size="sm"
               onClick={() => exportTraceabilityReport(rows)}
-              className="text-xs gap-1"
+              className={`${WORKFLOW_UTILITY_BUTTON_CLASS} text-xs`}
               disabled={viewMode !== 'pint'}
             >
               <Download className="w-3 h-3" />
               Export Report
             </Button>
-            <div className="relative max-w-xs">
+            <div className="relative w-full sm:max-w-xs">
               <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder={viewMode === 'pint' ? 'Search DR ID, term, column...' : 'Search MoF #, field, mapped column...'}

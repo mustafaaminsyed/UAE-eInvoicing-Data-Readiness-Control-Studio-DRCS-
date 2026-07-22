@@ -31,3 +31,7 @@ dev.err
 supabase/.temp/
 test-results/
 playwright-report/
+e2e/artifacts/
+transformed/
+tmp_*.xlsx
+.git-worktree-route-fix/

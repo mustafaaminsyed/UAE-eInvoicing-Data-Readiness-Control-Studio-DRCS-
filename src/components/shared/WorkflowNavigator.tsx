@@ -81,13 +81,13 @@ export function WorkflowNavigator({
   };
 
   return (
-    <div
-      className={cn(
-        'flex flex-col gap-2.5 rounded-[22px] border border-border/65 bg-background/78 px-3 py-2.5 shadow-[0_12px_28px_-24px_rgba(15,23,42,0.28)] backdrop-blur-sm lg:flex-row lg:items-center lg:justify-between',
+      <div
+        className={cn(
+        'flex flex-col gap-2 rounded-[22px] border border-border/65 bg-background/78 px-3 py-2 shadow-[0_12px_28px_-24px_rgba(15,23,42,0.28)] backdrop-blur-sm lg:flex-row lg:items-center lg:justify-between',
         className
       )}
     >
-      <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+      <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
         <Button
           variant="ghost"
           size="sm"
@@ -102,7 +102,7 @@ export function WorkflowNavigator({
         </span>
       </div>
 
-      <div className="flex flex-wrap gap-1.5 lg:justify-end">
+      <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 lg:mx-0 lg:flex-wrap lg:justify-end lg:overflow-visible lg:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {navigationItems.map((item) => {
           const Icon = item.icon;
           const isActive = item.id === current || location.pathname === item.path;
@@ -112,7 +112,7 @@ export function WorkflowNavigator({
               key={item.id}
               variant={isActive ? 'default' : 'outline'}
               size="sm"
-              className="h-8 gap-1.5 whitespace-nowrap rounded-full px-2.5 text-[11px] font-medium sm:px-3 sm:text-xs"
+              className="h-8 shrink-0 gap-1.5 whitespace-nowrap rounded-full px-2.5 text-[11px] font-medium sm:px-3 sm:text-xs"
               onClick={() => navigate(item.path)}
               aria-current={isActive ? 'page' : undefined}
             >

@@ -42,6 +42,11 @@ import { useToast } from '@/hooks/use-toast';
 import { SeverityBadge } from '@/components/SeverityBadge';
 import { WorkflowNavigator, buildWorkflowItems } from '@/components/shared/WorkflowNavigator';
 import { WorkflowPageHeader } from '@/components/shared/WorkflowPageHeader';
+import {
+  WORKFLOW_OUTLINE_BADGE_CLASS,
+  WORKFLOW_UTILITY_BADGE_CLASS,
+  WORKFLOW_UTILITY_BUTTON_CLASS,
+} from '@/lib/workflowShellStyles';
 
 const ruleTypeDisplayLabels: Record<string, string> = {
   dynamic_codelist: 'Dynamic Codelist',
@@ -607,13 +612,13 @@ export default function EvidencePackPage() {
           meta={
             selectedRunContext ? (
               <>
-                <Badge variant="outline" className={selectedRunContext.statusClass}>
+                <Badge variant="outline" className={`${WORKFLOW_UTILITY_BADGE_CLASS} ${selectedRunContext.statusClass}`}>
                   {selectedRunContext.statusLabel}
                 </Badge>
-                <Badge variant="outline" className={selectedRunContext.modeClass}>
+                <Badge variant="outline" className={`${WORKFLOW_UTILITY_BADGE_CLASS} ${selectedRunContext.modeClass}`}>
                   {selectedRunContext.modeLabel}
                 </Badge>
-                <Badge variant="outline" className="text-xs">
+                <Badge variant="outline" className={WORKFLOW_UTILITY_BADGE_CLASS}>
                   {selectedRunContext.coverageLabel}
                 </Badge>
               </>
@@ -622,7 +627,7 @@ export default function EvidencePackPage() {
           actions={
             <>
               <Select value={exportFormat} onValueChange={(v) => setExportFormat(v as 'excel' | 'pdf')}>
-                <SelectTrigger className="w-[150px]">
+                <SelectTrigger className="w-full sm:w-[150px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -632,7 +637,7 @@ export default function EvidencePackPage() {
               </Select>
               {exportFormat === 'excel' ? (
                 <Select value={exportScope} onValueChange={(v) => setExportScope(v as 'consolidated' | 'per_entity')}>
-                  <SelectTrigger className="w-[190px]">
+                  <SelectTrigger className="w-full sm:w-[190px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -643,7 +648,7 @@ export default function EvidencePackPage() {
                   </SelectContent>
                 </Select>
               ) : null}
-              <Button onClick={handleExport} disabled={exporting} className="gap-2 rounded-full">
+              <Button onClick={handleExport} disabled={exporting} className={WORKFLOW_UTILITY_BUTTON_CLASS}>
                 {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                 Generate {exportFormat === 'pdf' ? 'PDF Report' : 'Evidence Pack'}
               </Button>
@@ -675,10 +680,10 @@ export default function EvidencePackPage() {
               </p>
             ) : null}
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className="text-xs">
+              <Badge variant="outline" className={WORKFLOW_OUTLINE_BADGE_CLASS}>
                 Evidence source: {ov.sourceMode === 'persisted_snapshot' ? 'Saved assessment snapshot' : 'Current assessment run'}
               </Badge>
-              <Badge variant="outline" className="text-xs">
+              <Badge variant="outline" className={WORKFLOW_OUTLINE_BADGE_CLASS}>
                 Entity scope:{' '}
                 {ov.entityScopeStatus === 'single_entity'
                   ? 'Single entity'
@@ -687,7 +692,7 @@ export default function EvidencePackPage() {
                     : 'Unknown'}
               </Badge>
               {ov.legalEntityCount > 0 ? (
-                <Badge variant="outline" className="text-xs">
+                <Badge variant="outline" className={WORKFLOW_OUTLINE_BADGE_CLASS}>
                   Legal entities: {ov.legalEntityCount}
                 </Badge>
               ) : null}

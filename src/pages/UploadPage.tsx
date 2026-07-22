@@ -15,6 +15,7 @@ import { SampleScenario } from '@/lib/sampleData';
 import { addUploadAuditLog } from '@/lib/uploadAudit';
 import { DatasetType } from '@/types/datasets';
 import { formatElapsedTime, yieldToBrowser } from '@/lib/processingFeedback';
+import { WORKFLOW_MICRO_BADGE_CLASS } from '@/lib/workflowShellStyles';
 
 type StepKey = 'upload' | 'validation' | 'mapping';
 
@@ -278,11 +279,11 @@ export default function UploadPage() {
           items={buildWorkflowItems(['upload', 'mapping', 'run', 'validation', 'dashboard'])}
         />
 
-        <div className="space-y-6 animate-slide-up">
-          <div className="surface-glass rounded-2xl border border-white/70 shadow-sm p-4">
-            <div className="mb-4">
+        <div className="space-y-5 animate-slide-up">
+          <div className="surface-glass rounded-2xl border border-white/70 p-3.5 shadow-sm md:p-4">
+            <div className="mb-3.5">
               <p className="text-sm font-semibold text-foreground">Dataset Type</p>
-              <p className="text-xs text-muted-foreground mb-2">
+              <p className="mb-2 text-xs text-muted-foreground">
                 Select whether these uploads are outbound AR invoices or inbound AP invoices.
               </p>
               <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Dataset type">
@@ -306,7 +307,7 @@ export default function UploadPage() {
                 </Button>
               </div>
             </div>
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-col gap-3.5 md:flex-row md:items-center md:justify-between">
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-foreground">Sample Testing Mode</p>
                 <p className="text-xs text-muted-foreground">
@@ -334,15 +335,15 @@ export default function UploadPage() {
             </div>
           </div>
 
-          <div className="surface-glass rounded-2xl border border-white/70 shadow-sm p-4">
-            <div className="flex items-center gap-2 mb-3">
+          <div className="surface-glass rounded-2xl border border-white/70 p-3.5 shadow-sm md:p-4">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
               <p className="text-sm font-semibold text-foreground">Supported Document Scenarios</p>
-              <Badge variant="outline" className="text-[10px] uppercase tracking-wide">UC1</Badge>
+              <Badge variant="outline" className={`${WORKFLOW_MICRO_BADGE_CLASS} uppercase tracking-wide`}>UC1</Badge>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <div className="rounded-xl border bg-background/70 p-3">
                 <div className="flex items-center gap-2 mb-1">
-                  <Badge variant="secondary">380</Badge>
+                  <Badge variant="secondary" className={WORKFLOW_MICRO_BADGE_CLASS}>380</Badge>
                   <span className="text-sm font-medium text-foreground">Standard Invoice</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -351,7 +352,7 @@ export default function UploadPage() {
               </div>
               <div className="rounded-xl border bg-background/70 p-3">
                 <div className="flex items-center gap-2 mb-1">
-                  <Badge variant="secondary">381</Badge>
+                  <Badge variant="secondary" className={WORKFLOW_MICRO_BADGE_CLASS}>381</Badge>
                   <span className="text-sm font-medium text-foreground">Credit Note</span>
                 </div>
                 <div className="space-y-2 text-xs text-muted-foreground">
@@ -399,7 +400,7 @@ export default function UploadPage() {
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                   <p className="text-xs font-semibold text-foreground">Credit Note Requirements</p>
                   {hasCreditNoteHeaders && (
-                    <Badge variant="outline" className="text-[10px]">Credit note rows detected</Badge>
+                    <Badge variant="outline" className={WORKFLOW_MICRO_BADGE_CLASS}>Credit note rows detected</Badge>
                   )}
                 </div>
                 <div className="space-y-2 text-xs text-muted-foreground">

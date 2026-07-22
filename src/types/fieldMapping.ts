@@ -49,6 +49,7 @@ export interface FieldMapping {
 
 // Dataset type for upload
 export type DatasetType = 'header' | 'lines' | 'parties' | 'combined';
+export type DocumentBaseline = '380' | '381' | 'mixed' | '386' | '388';
 
 // Detected column type
 export interface DetectedColumn {
@@ -114,6 +115,7 @@ export interface ERPPreviewData {
   rows: Record<string, string>[];
   totalRows: number;
   datasetType: DatasetType;
+  documentBaseline?: DocumentBaseline;
 }
 
 // Mapping Suggestion
