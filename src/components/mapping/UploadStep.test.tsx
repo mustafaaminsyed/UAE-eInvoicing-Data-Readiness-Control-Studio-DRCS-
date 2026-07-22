@@ -80,9 +80,24 @@ describe('UploadStep', () => {
         expect.objectContaining({
           fileName: 'headers.csv',
           datasetType: 'header',
+          documentBaseline: 'mixed',
         })
       );
     });
+  });
+
+  it('persists the selected document baseline into preview data', () => {
+    const onDataLoaded = vi.fn();
+
+    render(<UploadStep previewData={previewData} onDataLoaded={onDataLoaded} />);
+
+    fireEvent.click(screen.getByRole('radio', { name: /381 credit note/i }));
+
+    expect(onDataLoaded).toHaveBeenCalledWith(
+      expect.objectContaining({
+        documentBaseline: '381',
+      })
+    );
   });
 
   it('parses Excel workbook uploads before analyzing columns', async () => {

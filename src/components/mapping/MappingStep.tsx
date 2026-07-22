@@ -31,6 +31,9 @@ interface MappingStepProps {
   onMappingsChange: (mappings: FieldMapping[]) => void;
   onDatasetTypeChange?: (datasetType: DatasetType) => void;
   focusedField?: string | null;
+  onClearFocus?: () => void;
+  showOnlyPending?: boolean;
+  onShowOnlyPendingChange?: (value: boolean) => void;
 }
 
 export function MappingStep({
@@ -39,11 +42,15 @@ export function MappingStep({
   onMappingsChange,
   onDatasetTypeChange,
   focusedField,
+  onClearFocus,
+  showOnlyPending: controlledShowOnlyPending,
+  onShowOnlyPendingChange,
 }: MappingStepProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [showOnlyPending, setShowOnlyPending] = useState(false);
+  const [internalShowOnlyPending, setInternalShowOnlyPending] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
+  const showOnlyPending = controlledShowOnlyPending ?? internalShowOnlyPending;
 
   // Generate suggestions when data changes
   const handleGenerateSuggestions = useCallback(() => {
@@ -67,6 +74,16 @@ export function MappingStep({
       setSearchTerm(focusedField);
     }
   }, [focusedField]);
+
+  const handleClearFocusClick = () => {
+    setSearchTerm('');
+    onClearFocus?.();
+  };
+
+  const handleShowOnlyPendingChange = (value: boolean) => {
+    setInternalShowOnlyPending(value);
+    onShowOnlyPendingChange?.(value);
+  };
 
   const handleConfirmMapping = (mappingId: string) => {
     const updated = mappings.map(m => 
@@ -163,6 +180,18 @@ export function MappingStep({
       return matchesSearch && matchesPending;
     });
   }, [mappings, searchTerm, showOnlyPending]);
+
+  useEffect(() => {
+    if (!focusedField) return;
+
+    const normalizedFocus = focusedField.toLowerCase();
+    window.requestAnimationFrame(() => {
+      const focusedRow = document.querySelector<HTMLElement>(
+        `[data-target-field-id="${normalizedFocus}"], [data-erp-column-id="${normalizedFocus}"]`
+      );
+      focusedRow?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }, [focusedField, filteredMappings.length]);
 
   const confirmedCount = mappings.filter(m => m.isConfirmed).length;
   const pendingCount = mappings.filter(m => !m.isConfirmed).length;
@@ -294,10 +323,15 @@ export function MappingStep({
                 className="w-full pl-10"
               />
               </div>
+              {focusedField ? (
+                <Button type="button" variant="outline" onClick={handleClearFocusClick}>
+                  Clear focus
+                </Button>
+              ) : null}
               <label className="flex items-center gap-2 text-sm">
                 <Checkbox 
                   checked={showOnlyPending} 
-                  onCheckedChange={(c) => setShowOnlyPending(c === true)} 
+                  onCheckedChange={(c) => handleShowOnlyPendingChange(c === true)} 
                 />
                 Show pending only
               </label>
@@ -340,6 +374,8 @@ export function MappingStep({
                     <TableRow
                       key={mapping.id}
                       data-focused-match={isFocusedMapping(mapping) ? 'true' : undefined}
+                      data-target-field-id={mapping.targetField.id.toLowerCase()}
+                      data-erp-column-id={mapping.erpColumn.toLowerCase()}
                       className={cn(
                         'hover:bg-white/5',
                         isFocusedMapping(mapping) && 'bg-primary/5 ring-1 ring-inset ring-primary/20'

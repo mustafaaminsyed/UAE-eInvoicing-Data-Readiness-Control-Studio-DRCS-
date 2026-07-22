@@ -5,7 +5,7 @@ import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import { useCompliance } from '@/context/ComplianceContext';
 import { Switch } from '@/components/ui/switch';
-import daribaLogo from '@/assets/daribatech-logo-transparent.png';
+import daribaLogo from '@/assets/Clean_DaribaTech_logo_transparent.png';
 import { FEATURE_FLAGS } from '@/config/features';
 import {
   DropdownMenu,
@@ -77,12 +77,16 @@ function NavigationContent() {
       <div className="container flex flex-col gap-2 py-2 md:py-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2.5 md:flex-nowrap md:gap-3">
           <Link to="/" className="flex min-w-0 shrink-0 items-center gap-3">
-            <div className="surface-glass rounded-xl px-2.5 py-1.5 md:px-3 md:py-2">
-              <img src={daribaLogo} alt="Daribatech" className="h-7 w-auto max-w-[136px] object-contain md:h-9 md:max-w-[164px]" />
+            <div className="surface-glass w-[188px] overflow-hidden rounded-xl px-3 py-1.5 md:w-[224px] md:px-3.5 md:py-2">
+              <img
+                src={daribaLogo}
+                alt="Daribatech"
+                className="block h-9 w-auto max-w-full object-contain md:h-10"
+              />
             </div>
-            <div className="hidden min-w-0 md:block">
+            <div className="hidden min-w-[220px] md:block">
               <p className="font-display text-sm font-semibold leading-none text-foreground">Controls Studio</p>
-              <p className="mt-1 hidden text-[11px] text-muted-foreground lg:block">UAE eInvoicing Compliance</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">UAE eInvoicing Compliance</p>
             </div>
           </Link>
 
@@ -120,7 +124,7 @@ function NavigationContent() {
                     to={state === 'disabled' ? '#' : item.path}
                     data-active={isActive ? 'true' : 'false'}
                     className={cn(
-                      'flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1.5 text-[13px] font-medium transition-all sm:px-3 sm:py-2 sm:text-sm',
+                      'flex min-h-11 items-center gap-2 whitespace-nowrap rounded-full px-3 py-2 text-[13px] font-medium transition-all sm:px-3.5 sm:text-sm',
                       isActive
                         ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
                         : state === 'disabled'
@@ -129,7 +133,9 @@ function NavigationContent() {
                     )}
                     onClick={(e) => state === 'disabled' && e.preventDefault()}
                   >
-                    <Icon className="h-4 w-4" />
+                    <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center">
+                      <Icon className="h-4 w-4" />
+                    </span>
                     <span>{item.label}</span>
                   </Link>
                 );
@@ -141,14 +147,16 @@ function NavigationContent() {
                 <button
                   type="button"
                   className={cn(
-                    'inline-flex h-9 w-full shrink-0 items-center justify-center gap-1.5 rounded-full border px-3 text-sm font-medium transition-colors sm:w-auto',
+                    'inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-full border px-3.5 text-sm font-medium transition-colors sm:w-auto',
                     isOverflowActive
                       ? 'border-primary/20 bg-primary/8 text-primary'
                       : 'border-border/70 bg-background/80 text-muted-foreground hover:bg-muted/60 hover:text-foreground'
                   )}
                   aria-label="Open more navigation"
                 >
-                  <MoreHorizontal className="h-4 w-4" />
+                  <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </span>
                   <span className="hidden sm:inline">More</span>
                 </button>
               </DropdownMenuTrigger>
@@ -163,7 +171,7 @@ function NavigationContent() {
                       {index === 4 ? <DropdownMenuSeparator /> : null}
                       <DropdownMenuItem
                         className={cn(
-                          'gap-2',
+                          'gap-2.5',
                           state === 'disabled' && 'pointer-events-none opacity-45',
                           isActive && 'bg-accent text-accent-foreground'
                         )}
@@ -173,7 +181,9 @@ function NavigationContent() {
                           navigate(item.path);
                         }}
                       >
-                        <Icon className="h-4 w-4" />
+                        <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center">
+                          <Icon className="h-4 w-4" />
+                        </span>
                         <span>{item.label}</span>
                       </DropdownMenuItem>
                     </div>

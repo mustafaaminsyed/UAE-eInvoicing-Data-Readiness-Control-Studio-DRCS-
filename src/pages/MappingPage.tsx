@@ -40,6 +40,8 @@ const STEPS: { id: MappingWizardStep; label: string }[] = [
   { id: 'save', label: 'Transformations & Save' },
 ];
 
+type DrFilterId = 'all' | 'headers' | 'lines' | 'buyers' | 'uae';
+
 export default function MappingPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -50,7 +52,17 @@ export default function MappingPage() {
   const activeTab = searchParams.get('tab') || 'templates';
   const requestedDataset = searchParams.get('dataset');
   const requestedDirection = requestedDataset === 'AR' || requestedDataset === 'AP' ? requestedDataset : null;
-  const focusedField = searchParams.get('field')?.trim() || null;
+  const queryFocusedField = searchParams.get('field')?.trim() || null;
+  const requestedDrFilter = searchParams.get('drFilter');
+  const queryDrFilter: DrFilterId =
+    requestedDrFilter === 'headers' ||
+    requestedDrFilter === 'lines' ||
+    requestedDrFilter === 'buyers' ||
+    requestedDrFilter === 'uae'
+      ? requestedDrFilter
+      : 'all';
+  const queryDrSearch = searchParams.get('drSearch')?.trim() || '';
+  const queryShowPendingOnly = searchParams.get('pendingOnly') === 'true';
   
   // Template list state
   const [templates, setTemplates] = useState<MappingTemplate[]>([]);
@@ -71,6 +83,11 @@ export default function MappingPage() {
   const [showPostSaveCTA, setShowPostSaveCTA] = useState(false);
   const [templateSeed, setTemplateSeed] = useState<Partial<MappingTemplate> | null>(null);
   const [saveMode, setSaveMode] = useState<'create' | 'duplicate' | 'edit'>('create');
+  const [focusedField, setFocusedField] = useState<string | null>(queryFocusedField);
+  const mappingContentRef = React.useRef<HTMLDivElement | null>(null);
+  const [drFilter, setDrFilter] = useState<DrFilterId>(queryDrFilter);
+  const [drSearch, setDrSearch] = useState<string>(queryDrSearch);
+  const [showOnlyPending, setShowOnlyPending] = useState<boolean>(queryShowPendingOnly);
 
   const currentStepIndex = STEPS.findIndex(s => s.id === currentStep);
 
@@ -91,6 +108,22 @@ export default function MappingPage() {
       setDirection(requestedDirection);
     }
   }, [direction, requestedDirection, setDirection]);
+
+  useEffect(() => {
+    setFocusedField(queryFocusedField);
+  }, [queryFocusedField]);
+
+  useEffect(() => {
+    setDrFilter(queryDrFilter);
+  }, [queryDrFilter]);
+
+  useEffect(() => {
+    setDrSearch(queryDrSearch);
+  }, [queryDrSearch]);
+
+  useEffect(() => {
+    setShowOnlyPending(queryShowPendingOnly);
+  }, [queryShowPendingOnly]);
 
   const detectColumnType = useCallback((values: string[]): DetectedColumn['detectedType'] => {
     const nonEmpty = values.filter((value) => value && value.trim() !== '');
@@ -167,6 +200,12 @@ export default function MappingPage() {
       rows,
       totalRows: rowCount,
       datasetType,
+      documentBaseline:
+        template.documentType === 'UC1 Credit Note'
+          ? '381'
+          : template.documentType === 'UC1 Standard Tax Invoice'
+            ? '380'
+            : 'mixed',
     };
   }, [detectColumnType, inferDatasetTypeFromMappings]);
 
@@ -219,6 +258,67 @@ export default function MappingPage() {
     setConditionalAnswers({});
     setShowPostSaveCTA(false);
   }, []);
+
+  const handleCoverageFieldClick = useCallback((fieldId: string) => {
+    setFocusedField(fieldId);
+    setSearchParams((currentParams) => {
+      const nextParams = new URLSearchParams(currentParams);
+      nextParams.set('field', fieldId);
+      return nextParams;
+    });
+    window.requestAnimationFrame(() => {
+      mappingContentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, [setSearchParams]);
+
+  const handleClearFocusedField = useCallback(() => {
+    setFocusedField(null);
+    setSearchParams((currentParams) => {
+      const nextParams = new URLSearchParams(currentParams);
+      nextParams.delete('field');
+      return nextParams;
+    });
+  }, [setSearchParams]);
+
+  const handleDrFilterChange = useCallback((nextFilter: DrFilterId) => {
+    setDrFilter(nextFilter);
+    setSearchParams((currentParams) => {
+      const nextParams = new URLSearchParams(currentParams);
+      if (nextFilter === 'all') {
+        nextParams.delete('drFilter');
+      } else {
+        nextParams.set('drFilter', nextFilter);
+      }
+      return nextParams;
+    });
+  }, [setSearchParams]);
+
+  const handleDrSearchChange = useCallback((nextSearch: string) => {
+    setDrSearch(nextSearch);
+    setSearchParams((currentParams) => {
+      const nextParams = new URLSearchParams(currentParams);
+      const normalizedSearch = nextSearch.trim();
+      if (normalizedSearch) {
+        nextParams.set('drSearch', normalizedSearch);
+      } else {
+        nextParams.delete('drSearch');
+      }
+      return nextParams;
+    });
+  }, [setSearchParams]);
+
+  const handleShowOnlyPendingChange = useCallback((nextValue: boolean) => {
+    setShowOnlyPending(nextValue);
+    setSearchParams((currentParams) => {
+      const nextParams = new URLSearchParams(currentParams);
+      if (nextValue) {
+        nextParams.set('pendingOnly', 'true');
+      } else {
+        nextParams.delete('pendingOnly');
+      }
+      return nextParams;
+    });
+  }, [setSearchParams]);
 
   // Template list filtering
   const filteredTemplates = templates.filter(t => {
@@ -629,22 +729,44 @@ export default function MappingPage() {
               />
             )}
             {currentStep === 'mapping' && previewData && (
-              <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
-                <div className="min-w-0">
+              <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[minmax(0,1fr)_380px]">
+                <div ref={mappingContentRef} className="min-w-0 space-y-6">
                   <MappingStep
                     previewData={previewData}
                     mappings={mappings}
                     onMappingsChange={setMappings}
                     onDatasetTypeChange={handleDatasetTypeChange}
                     focusedField={focusedField}
+                    onClearFocus={handleClearFocusedField}
+                    showOnlyPending={showOnlyPending}
+                    onShowOnlyPendingChange={handleShowOnlyPendingChange}
                   />
+                  <div className="2xl:hidden">
+                    <MappingCoveragePanel
+                      mappings={mappings}
+                      datasetType={previewData.datasetType}
+                      totalSourceColumns={previewData.columns.length}
+                      onFieldClick={handleCoverageFieldClick}
+                      currentFocusedField={focusedField}
+                      activeDrFilter={drFilter}
+                      drSearch={drSearch}
+                      onDrFilterChange={handleDrFilterChange}
+                      onDrSearchChange={handleDrSearchChange}
+                    />
+                  </div>
                 </div>
-                <div className="hidden xl:block">
+                <div className="hidden min-w-0 2xl:block">
                   <div className="sticky top-8">
                     <MappingCoveragePanel
                       mappings={mappings}
                       datasetType={previewData.datasetType}
                       totalSourceColumns={previewData.columns.length}
+                      onFieldClick={handleCoverageFieldClick}
+                      currentFocusedField={focusedField}
+                      activeDrFilter={drFilter}
+                      drSearch={drSearch}
+                      onDrFilterChange={handleDrFilterChange}
+                      onDrSearchChange={handleDrSearchChange}
                     />
                   </div>
                 </div>

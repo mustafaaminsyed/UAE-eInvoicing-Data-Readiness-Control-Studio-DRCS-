@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Save, FileText, Building, Hash, Tag, Settings, Play, AlertCircle, Check, X, Trash2, Plus, Shield, AlertTriangle } from 'lucide-react';
+import { Save, FileText, Building, Hash, Tag, Settings, Play, AlertCircle, Check, X, Trash2, Plus, Shield, AlertTriangle, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +27,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Direction } from '@/types/direction';
+import { buildMappedTemplateExport, downloadSampleCSV, type MappedTemplateExport, type SampleDataset } from '@/lib/sampleData';
 
 interface SaveStepProps {
   mappings: FieldMapping[];
@@ -48,6 +49,12 @@ const TRANSFORMATION_TYPES: { value: TransformationType; label: string; descript
   { value: 'combine', label: 'Combine Columns', description: 'Combine multiple columns' },
   { value: 'lookup', label: 'Lookup Table', description: 'Map values using a lookup' },
 ];
+
+function getDocumentTypeDefaultFromBaseline(previewData: ERPPreviewData | null | undefined) {
+  if (!previewData?.documentBaseline) return 'UC1 Standard Tax Invoice';
+  if (previewData.documentBaseline === '381') return 'UC1 Credit Note';
+  return 'UC1 Standard Tax Invoice';
+}
 
 export function SaveStep({
   mappings,
@@ -80,6 +87,7 @@ export function SaveStep({
   });
 
   useEffect(() => {
+    const derivedDocumentType = initialTemplate?.documentType || getDocumentTypeDefaultFromBaseline(previewData);
     setFormData({
       templateName: initialTemplate?.templateName || '',
       description: initialTemplate?.description || '',
@@ -88,11 +96,11 @@ export function SaveStep({
       legalEntity: initialTemplate?.legalEntity || '',
       sellerTrn: initialTemplate?.sellerTrn || '',
       erpType: initialTemplate?.erpType || '',
-      documentType: initialTemplate?.documentType || 'UC1 Standard Tax Invoice',
+      documentType: derivedDocumentType,
       effectiveDate: initialTemplate?.effectiveDate || '',
       notes: initialTemplate?.notes || '',
     });
-  }, [initialTemplate]);
+  }, [initialTemplate, previewData]);
 
   const confirmedMappings = useMemo(
     () => normalizeFieldMappings(mappings.filter((mapping) => mapping.isConfirmed)),
@@ -203,6 +211,47 @@ export function SaveStep({
     [confirmedMappings, previewData?.datasetType]
   );
   const hasBlockingGaps = coverage.unmappedMandatory.length > 0;
+  const mappedTemplateExports = useMemo(() => {
+    if (!previewData || confirmedMappings.length === 0) return [];
+
+    const exportDatasets: SampleDataset[] =
+      previewData.datasetType === 'header'
+        ? ['headers']
+        : previewData.datasetType === 'lines'
+          ? ['lines']
+          : previewData.datasetType === 'parties'
+            ? ['buyers']
+            : ['headers', 'lines'];
+
+    return exportDatasets
+      .map((dataset) =>
+        buildMappedTemplateExport(
+          dataset,
+          confirmedMappings.map((mapping) => mapping.targetField.id),
+          direction,
+          formData.templateName
+        )
+      )
+      .filter((templateExport) => templateExport.columns.length > 0);
+  }, [confirmedMappings, direction, formData.templateName, previewData]);
+
+  const handleDownloadMappedTemplate = (templateExport: MappedTemplateExport) => {
+    downloadSampleCSV(templateExport.filename, templateExport.content);
+    toast({
+      title: 'Mapped CSV template downloaded',
+      description: `${templateExport.columns.length} mapped column(s) exported for offline use.`,
+    });
+  };
+
+  const getTemplateExportLabel = (dataset: SampleDataset) => {
+    if (dataset === 'buyers') {
+      return direction === 'AP' ? 'Supplier master CSV' : 'Buyer master CSV';
+    }
+    if (dataset === 'headers') {
+      return previewData?.documentBaseline === '381' ? 'Credit note headers CSV' : 'Invoice headers CSV';
+    }
+    return 'Invoice lines CSV';
+  };
 
   const handleSave = async (activate: boolean = false) => {
     if (!formData.templateName.trim()) {
@@ -447,6 +496,100 @@ export function SaveStep({
               )}
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Download className="h-5 w-5" />
+            Offline CSV Template Export
+          </CardTitle>
+          <CardDescription>
+            Convert the confirmed mappings into downloadable CSV templates so the mapped canonical columns can be populated offline.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Alert className="border-sky-500/20 bg-sky-500/5">
+            <AlertDescription className="space-y-2 text-sm text-muted-foreground">
+              <p>
+                DRCS exports the offline CSV by canonical invoice structure, not by the original ERP column grouping.
+              </p>
+              <p>
+                <strong className="text-foreground">Invoice number</strong> (<code>IBT-001</code>) belongs in the
+                invoice headers template because it is a document-level field. Invoice lines are linked back to the
+                header through <code>invoice_id</code> and line-level fields such as <code>line_number</code>,{' '}
+                <code>quantity</code>, and <code>line_total_excl_vat</code>.
+              </p>
+              <p>
+                Party exports hold buyer or supplier master data only, while combined exports are split into separate
+                header and line CSV outputs so the governed DRCS templates stay regulator-aligned.
+              </p>
+              {previewData?.documentBaseline === '381' && (
+                <p>
+                  Because the declared baseline is <strong>381 Credit Note</strong>, make sure the exported header CSV
+                  includes the mapped reference and reason fields before offline completion.
+                </p>
+              )}
+            </AlertDescription>
+          </Alert>
+
+          {mappedTemplateExports.length > 0 ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              {mappedTemplateExports.map((templateExport) => (
+                <div
+                  key={templateExport.filename}
+                  className="rounded-xl border border-border/70 bg-muted/20 p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <p className="font-medium">{getTemplateExportLabel(templateExport.dataset)}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {templateExport.columns.length} mapped column(s) in canonical template order
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDownloadMappedTemplate(templateExport)}
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      Download
+                    </Button>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {templateExport.columns.slice(0, 6).map((column) => (
+                      <Badge key={column} variant="secondary" className="text-xs">
+                        {column}
+                      </Badge>
+                    ))}
+                    {templateExport.columns.length > 6 && (
+                      <Badge variant="outline" className="text-xs">
+                        +{templateExport.columns.length - 6} more
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <Alert>
+              <AlertDescription className="text-sm text-muted-foreground">
+                Confirm at least one mapping for this dataset before exporting an offline CSV template.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {previewData?.datasetType === 'combined' && (
+            <p className="text-sm text-muted-foreground">
+              Combined exports are split into the canonical header and line CSV outputs because DRCS governs those invoice structures separately.
+            </p>
+          )}
+          {previewData?.documentBaseline && (
+            <p className="text-sm text-muted-foreground">
+              Template baseline for this export: <strong>{previewData.documentBaseline === '381' ? '381 Credit Note' : previewData.documentBaseline === '380' ? '380 Standard Tax Invoice' : 'Mixed / Detect From Source'}</strong>.
+            </p>
+          )}
         </CardContent>
       </Card>
 

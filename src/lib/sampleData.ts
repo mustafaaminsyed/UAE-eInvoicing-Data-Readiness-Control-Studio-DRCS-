@@ -1,6 +1,12 @@
 export type SampleScenario = 'positive' | 'negative';
 export type SampleDataset = 'buyers' | 'headers' | 'lines';
 export type SampleDirection = 'AR' | 'AP';
+export interface MappedTemplateExport {
+  dataset: SampleDataset;
+  filename: string;
+  content: string;
+  columns: string[];
+}
 
 export const buyersSample = `buyer_id,buyer_name,buyer_trn,buyer_address,buyer_country,buyer_city,buyer_subdivision,buyer_electronic_address
 B001,Acme Corporation LLC,100000000000003,Office 42 Business Bay Tower,AE,Dubai,AE-DU,acme@peppol.ae
@@ -99,6 +105,65 @@ const SAMPLE_BY_SCENARIO: Record<SampleScenario, Record<SampleDirection, Record<
 
 export function getSampleData(dataset: SampleDataset, scenario: SampleScenario = 'positive', direction: SampleDirection = 'AR') {
   return SAMPLE_BY_SCENARIO[scenario][direction][dataset];
+}
+
+const AP_TEMPLATE_COLUMN_ALIASES: Record<string, string> = {
+  supplier_id: 'buyer_id',
+  supplier_name: 'buyer_name',
+  supplier_trn: 'buyer_trn',
+  supplier_address: 'buyer_address',
+  supplier_country: 'buyer_country',
+  supplier_city: 'buyer_city',
+  supplier_subdivision: 'buyer_subdivision',
+  supplier_electronic_address: 'buyer_electronic_address',
+};
+
+function getTemplateHeaderColumns(dataset: SampleDataset, direction: SampleDirection): string[] {
+  const sample = getSampleData(dataset, 'positive', direction);
+  return sample.content
+    .split(/\r?\n/, 1)[0]
+    .split(',')
+    .map((column) => column.trim())
+    .filter(Boolean);
+}
+
+function resolveTemplateColumnCanonicalId(column: string, direction: SampleDirection): string {
+  if (direction === 'AP') {
+    return AP_TEMPLATE_COLUMN_ALIASES[column] || column;
+  }
+  return column;
+}
+
+function sanitizeFilenameSegment(value: string | undefined): string {
+  if (!value) return 'mapped';
+  const sanitized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return sanitized || 'mapped';
+}
+
+export function buildMappedTemplateExport(
+  dataset: SampleDataset,
+  mappedFieldIds: Iterable<string>,
+  direction: SampleDirection = 'AR',
+  templateName?: string
+): MappedTemplateExport {
+  const sample = getSampleData(dataset, 'positive', direction);
+  const mappedFieldIdSet = new Set(mappedFieldIds);
+  const columns = getTemplateHeaderColumns(dataset, direction).filter((column) =>
+    mappedFieldIdSet.has(resolveTemplateColumnCanonicalId(column, direction))
+  );
+  const filenamePrefix = sanitizeFilenameSegment(templateName);
+  const filename = `${filenamePrefix}_${sample.filename.replace(/\.csv$/i, '')}_mapped.csv`;
+
+  return {
+    dataset,
+    filename,
+    columns,
+    content: columns.length > 0 ? `${columns.join(',')}\n` : '',
+  };
 }
 
 export function downloadSampleCSV(filename: string, content: string) {

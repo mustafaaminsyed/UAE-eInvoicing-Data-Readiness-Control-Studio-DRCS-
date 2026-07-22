@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { CheckCircle, XCircle, AlertTriangle, HelpCircle, ChevronDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -11,6 +12,7 @@ import {
   ERPPreviewData, 
   CONDITIONAL_QUESTIONS,
   getPintFieldById,
+  type DocumentBaseline,
 } from '@/types/fieldMapping';
 import { getDatasetTargetFields } from '@/lib/mapping/datasetFieldCatalog';
 import { analyzeCoverage, validateMappedData, getCoverageStats } from '@/lib/mapping/coverageAnalyzer';
@@ -22,6 +24,27 @@ interface AnalysisStepProps {
   onConditionalAnswersChange: (answers: Record<string, boolean>) => void;
 }
 
+const CREDIT_NOTE_FIELD_IDS = [
+  'credit_note_reason_code',
+  'credit_note_reason_text',
+  'preceding_invoice_reference',
+  'preceding_invoice_issue_date',
+] as const;
+
+function detectObservedInvoiceTypes(previewData: ERPPreviewData): string[] {
+  if (previewData.datasetType !== 'header' && previewData.datasetType !== 'combined') {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      previewData.rows
+        .map((row) => String(row.invoice_type || row.invoice_type_code || '').trim())
+        .filter(Boolean)
+    )
+  ).sort();
+}
+
 export function AnalysisStep({ 
   previewData, 
   mappings, 
@@ -29,6 +52,11 @@ export function AnalysisStep({
   onConditionalAnswersChange 
 }: AnalysisStepProps) {
   const [showAllValidation, setShowAllValidation] = useState(false);
+  const declaredBaseline: DocumentBaseline = previewData.documentBaseline ?? 'mixed';
+  const observedInvoiceTypes = useMemo(() => detectObservedInvoiceTypes(previewData), [previewData]);
+  const creditNoteScenarioInScope =
+    declaredBaseline === '381' ||
+    (declaredBaseline === 'mixed' && observedInvoiceTypes.some((invoiceType) => invoiceType === '381'));
 
   // Calculate coverage analysis
   const coverage = useMemo(
@@ -80,6 +108,14 @@ export function AnalysisStep({
   const mappedUploadedColumns = mappings.filter((mapping) => mapping.isConfirmed).length;
   const uploadedColumnsPct =
     previewData.columns.length > 0 ? Math.round((mappedUploadedColumns / previewData.columns.length) * 100) : 100;
+  const creditNoteMappedCount = useMemo(
+    () =>
+      mappings.filter(
+        (mapping) => mapping.isConfirmed && CREDIT_NOTE_FIELD_IDS.includes(mapping.targetField.id as typeof CREDIT_NOTE_FIELD_IDS[number])
+      ).length,
+    [mappings]
+  );
+  const creditNoteCoveragePct = Math.round((creditNoteMappedCount / CREDIT_NOTE_FIELD_IDS.length) * 100);
 
   const filteredValidation = showAllValidation 
     ? validationResults 
@@ -96,8 +132,32 @@ export function AnalysisStep({
 
   return (
     <div className="space-y-6">
+      <Alert className="border-primary/15 bg-primary/5">
+        <HelpCircle className="h-4 w-4 text-primary" />
+        <AlertDescription className="space-y-2 text-sm">
+          <p>
+            <strong>Declared baseline:</strong>{' '}
+            {declaredBaseline === '380'
+              ? '380 Standard Tax Invoice'
+              : declaredBaseline === '381'
+                ? '381 Credit Note'
+                : 'Mixed / Detect From Source'}
+          </p>
+          <p>
+            {creditNoteScenarioInScope
+              ? 'Credit-note scenario fields are currently in scope for this mapping run, so DRCS will treat reference and reason-code readiness as relevant.'
+              : 'Credit-note scenario fields are currently out of scope for this mapping run unless uploaded header rows indicate invoice type 381.'}
+          </p>
+          {observedInvoiceTypes.length > 0 && (
+            <p>
+              <strong>Observed invoice types in sample rows:</strong> {observedInvoiceTypes.join(', ')}
+            </p>
+          )}
+        </AlertDescription>
+      </Alert>
+
       {/* Coverage Stats */}
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Uploaded File Fit</CardTitle>
@@ -178,6 +238,54 @@ export function AnalysisStep({
           </CardContent>
         </Card>
       </div>
+
+      {creditNoteScenarioInScope && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Credit Note Scenario Readiness</CardTitle>
+            <CardDescription>
+              Mapping coverage for the additional header fields DRCS expects when credit notes are in scope
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <div className="mb-2 flex justify-between">
+                  <span className="text-sm font-medium">
+                    {creditNoteMappedCount} of {CREDIT_NOTE_FIELD_IDS.length} credit-note fields mapped
+                  </span>
+                  <span className="text-sm font-bold">{creditNoteCoveragePct}%</span>
+                </div>
+                <Progress value={creditNoteCoveragePct} className="h-3" />
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {CREDIT_NOTE_FIELD_IDS.map((fieldId) => {
+                  const field = getPintFieldById(fieldId);
+                  const isMapped = mappings.some((mapping) => mapping.isConfirmed && mapping.targetField.id === fieldId);
+                  if (!field) return null;
+
+                  return (
+                    <div
+                      key={fieldId}
+                      className={`rounded-lg border p-3 ${isMapped ? 'border-emerald-200 bg-emerald-50/60' : 'border-amber-200 bg-amber-50/50'}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {isMapped ? (
+                          <CheckCircle className="h-4 w-4 text-emerald-600" />
+                        ) : (
+                          <AlertTriangle className="h-4 w-4 text-amber-600" />
+                        )}
+                        <span className="font-medium">{field.name}</span>
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">{field.ibtReference}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
