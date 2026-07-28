@@ -11,7 +11,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ERPPreviewData, DatasetType, DetectedColumn, DocumentBaseline } from '@/types/fieldMapping';
 import { parseCSV } from '@/lib/csvParser';
-import { downloadSampleCSV, getSampleData } from '@/lib/sampleData';
+import { buildBlankTemplateExport, downloadSampleCSV, getSampleData } from '@/lib/sampleData';
 import { Direction } from '@/types/direction';
 import { detectLikelyDatasetType } from '@/lib/mapping/datasetFieldCatalog';
 
@@ -461,8 +461,8 @@ export function UploadStep({ onDataLoaded, previewData, onReset, direction = 'AR
   }, [direction, onDataLoaded, selectedDocumentBaseline]);
 
   const handleDownloadBuiltInTemplate = useCallback((sampleType: BuiltInTemplateType) => {
-    const sample = getSampleData(sampleType, 'positive', direction);
-    downloadSampleCSV(sample.filename, sample.content);
+    const blankTemplate = buildBlankTemplateExport(sampleType, direction);
+    downloadSampleCSV(blankTemplate.filename, blankTemplate.content);
   }, [direction]);
 
   const builtInTemplates = BUILT_IN_TEMPLATE_OPTIONS[selectedDatasetType];
@@ -696,44 +696,55 @@ export function UploadStep({ onDataLoaded, previewData, onReset, direction = 'AR
             Built-in Template Files
           </CardTitle>
           <CardDescription>
-            Load a canonical DRCS sample template directly into the wizard or download the CSV for offline use.
+            Load canonical DRCS sample data into the wizard or download a blank CSV structure for offline population.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {builtInTemplates.map((template) => {
             const sample = getSampleData(template.sampleType, 'positive', direction);
+            const blankTemplate = buildBlankTemplateExport(template.sampleType, direction);
             return (
               <div
                 key={`${selectedDatasetType}-${template.sampleType}`}
-                className="flex flex-col gap-3 rounded-lg border border-dashed p-4 md:flex-row md:items-center md:justify-between"
+                className="grid gap-4 rounded-lg border border-dashed p-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center"
               >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
+                <div className="min-w-0 space-y-2">
+                  <div className="space-y-2">
                     <p className="font-medium">{template.title}</p>
-                    <Badge variant="outline">{sample.filename}</Badge>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="outline" className="max-w-full whitespace-normal break-all text-left">
+                        Sample: {sample.filename}
+                      </Badge>
+                      <Badge variant="secondary" className="max-w-full whitespace-normal break-all text-left">
+                        Blank: {blankTemplate.filename}
+                      </Badge>
+                    </div>
                   </div>
                   <p className="text-sm text-muted-foreground">{template.description}</p>
+                  <p className="max-w-[70ch] text-xs text-muted-foreground">
+                    Loading inserts illustrative rows for mapping practice. Downloading gives you headers only.
+                  </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-col gap-2 lg:items-stretch">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => handleDownloadBuiltInTemplate(template.sampleType)}
                     disabled={isLoading}
-                    className="h-12 min-w-[176px] justify-center gap-2.5"
+                    className="h-12 w-full justify-center gap-2.5"
                   >
                     <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center">
                       <Download className="h-4 w-4" />
                     </span>
-                    Download
+                    Download blank template
                   </Button>
                   <Button
                     type="button"
                     onClick={() => handleLoadBuiltInTemplate(template.sampleType, template.wizardDatasetType)}
                     disabled={isLoading}
-                    className="h-12 min-w-[290px] justify-center gap-2.5"
+                    className="h-12 w-full justify-center gap-2.5"
                   >
-                    Load {template.title}
+                    Load sample data
                   </Button>
                 </div>
               </div>
