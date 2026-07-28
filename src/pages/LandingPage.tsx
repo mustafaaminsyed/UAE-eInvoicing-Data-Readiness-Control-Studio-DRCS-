@@ -20,6 +20,7 @@ import { analyzeCoverage } from "@/lib/mapping/coverageAnalyzer";
 import { cn } from "@/lib/utils";
 import daribaLogo from "@/assets/Clean_DaribaTech_logo_transparent.png";
 import dcsLandingDashboardMockup from "@/assets/DCS Landing Page Image - Mock-up of Dashboard.png";
+import dcsLandingDashboardLight from "@/assets/dcs-landing-dashboard-transparent-light.png";
 import type { MappingTemplate } from "@/types/fieldMapping";
 import type { Case } from "@/types/cases";
 
@@ -222,6 +223,14 @@ export default function LandingPage() {
   }, [clientEnvironment]);
 
   const isDark = resolvedTheme === "dark";
+  const heroPreviewStyle = isDark
+    ? undefined
+    : {
+        WebkitMaskImage:
+          "radial-gradient(ellipse 88% 84% at 50% 50%, rgba(0,0,0,1) 68%, rgba(0,0,0,0.82) 80%, rgba(0,0,0,0.28) 92%, transparent 100%)",
+        maskImage:
+          "radial-gradient(ellipse 88% 84% at 50% 50%, rgba(0,0,0,1) 68%, rgba(0,0,0,0.82) 80%, rgba(0,0,0,0.28) 92%, transparent 100%)",
+      };
   const hasActiveMapping = activeTemplates.length > 0;
   const activeTemplate = activeTemplates[0];
   const coverage = activeTemplate ? analyzeCoverage(activeTemplate.mappings) : null;
@@ -526,17 +535,20 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="mx-auto w-full max-w-[780px]">
-              <div className="relative px-2 pt-4 lg:px-4">
-                <div className="absolute inset-x-[14%] bottom-[10%] h-[18%] rounded-full bg-primary/14 blur-3xl" />
-                <div className="absolute right-[8%] top-[4%] z-20 rounded-full border border-primary/18 bg-background/92 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary shadow-sm">
-                  {clientEnvironment} workspace preview
-                </div>
-                <img
-                  src={dcsLandingDashboardMockup}
-                  alt="Controls Studio dashboard mock-up"
-                  className="relative z-10 h-auto w-full object-contain mix-blend-screen opacity-[0.98] drop-shadow-[0_30px_48px_rgba(15,23,42,0.12)] dark:mix-blend-normal dark:opacity-[0.92]"
-                />
+		            <div className="mx-auto w-full max-w-[780px]">
+		              <div className="relative px-2 pt-4 lg:px-4">
+			                <div className="absolute inset-x-[14%] bottom-[10%] h-[18%] rounded-full bg-primary/12 blur-3xl" />
+			                <img
+			                  src={isDark ? dcsLandingDashboardMockup : dcsLandingDashboardLight}
+			                  alt="Controls Studio dashboard mock-up"
+			                  style={heroPreviewStyle}
+			                  className={cn(
+			                    "relative z-10 h-auto w-full object-contain",
+			                    isDark
+			                      ? "mix-blend-normal opacity-[0.92] drop-shadow-[0_30px_48px_rgba(15,23,42,0.18)]"
+			                      : "mix-blend-normal opacity-[0.99] drop-shadow-[0_18px_30px_rgba(148,163,184,0.12)]"
+			                  )}
+			                />
                 <div className="hidden rounded-[28px] border border-emerald-900/70 bg-[linear-gradient(180deg,rgba(8,25,18,0.98),rgba(5,17,12,0.99))] p-5 text-emerald-50 md:p-6">
                   <div className="flex flex-wrap items-start justify-between gap-4 border-b border-emerald-900/70 pb-5">
                     <div>
@@ -657,7 +669,41 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <ol className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-8 rounded-[28px] border border-border/70 bg-muted/20 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] dark:shadow-none">
+            <div className="relative">
+              <div className="pointer-events-none absolute left-[8%] right-[8%] top-1/2 hidden h-px -translate-y-1/2 bg-[linear-gradient(90deg,rgba(148,163,184,0.0),rgba(148,163,184,0.35),rgba(148,163,184,0.0))] xl:block" />
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {workflowStages.map((stage) => {
+                const accent = getWorkflowStageAccent(stage.stage);
+                const statusTone = getWorkflowStatusTone(stage.status);
+
+                return (
+                  <div
+                    key={`workflow-summary-${stage.stage}`}
+                    className="rounded-[22px] border border-border/70 bg-background/88 px-4 py-3.5"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <span className={cn("inline-flex h-9 min-w-9 items-center justify-center rounded-full border px-2.5 text-[11px] font-semibold tracking-[0.16em]", accent.badge)}>
+                          {stage.stage}
+                        </span>
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                          {stage.verb}
+                        </span>
+                      </div>
+                      <span className={cn("inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]", statusTone.badge)}>
+                        {stage.status}
+                      </span>
+                    </div>
+                    <p className="mt-3 text-sm font-medium text-foreground">{stage.actionLabel}</p>
+                  </div>
+                );
+              })}
+              </div>
+            </div>
+          </div>
+
+          <ol className="mt-8 grid gap-5 xl:grid-cols-2">
             {workflowStages.map((stage) => (
               <li key={stage.stage} className="relative">
                 <WorkflowStageCard stage={stage} />
@@ -667,7 +713,7 @@ export default function LandingPage() {
         </section>
 
         <section
-          className="mt-10 rounded-[36px] border border-border/80 bg-[linear-gradient(180deg,rgba(255,252,247,0.98),rgba(255,255,255,0.98))] px-6 py-8 shadow-[0_22px_46px_-36px_rgba(15,23,42,0.14)] md:px-7 md:py-9 xl:px-8 dark:bg-[linear-gradient(180deg,rgba(17,24,22,0.98),rgba(13,18,17,0.98))]"
+          className="mt-8 rounded-[36px] border border-border/80 bg-[linear-gradient(180deg,rgba(255,252,247,0.98),rgba(255,255,255,0.98))] px-6 py-8 shadow-[0_22px_46px_-36px_rgba(15,23,42,0.14)] md:px-7 md:py-9 xl:px-8 dark:bg-[linear-gradient(180deg,rgba(17,24,22,0.98),rgba(13,18,17,0.98))]"
           aria-labelledby="landing-surfaces-heading"
         >
           <div className="grid gap-8 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,0.8fr)] xl:items-start">
@@ -737,6 +783,8 @@ function WorkflowStageCard({
   stage: WorkflowStage;
 }) {
   const Icon = stage.icon;
+  const accent = getWorkflowStageAccent(stage.stage);
+  const statusTone = getWorkflowStatusTone(stage.status);
 
   return (
     <Link
@@ -744,58 +792,67 @@ function WorkflowStageCard({
       className="group block h-full rounded-[30px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       aria-label={`${stage.stage} ${stage.title}: ${stage.actionLabel}`}
     >
-      <article className="flex h-full min-h-[560px] flex-col rounded-[30px] border border-border/80 bg-card p-6 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.16)] transition-all duration-200 group-hover:-translate-y-0.5 group-hover:border-primary/28 group-hover:shadow-[0_24px_50px_-32px_rgba(15,23,42,0.18)] motion-reduce:transition-none">
-        <div className="flex items-start justify-between gap-4">
-          <div className="inline-flex items-center gap-3">
-            <span className="inline-flex min-w-[56px] items-center justify-center rounded-full border border-primary/18 bg-primary/8 px-3 py-1.5 text-[12px] font-semibold tracking-[0.16em] text-primary">
-              {stage.stage}
-            </span>
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-[18px] border border-primary/18 bg-primary/10 text-primary">
-              <Icon className="h-5 w-5" aria-hidden="true" />
+      <article className="grid h-full gap-6 rounded-[32px] border border-border/80 bg-card/98 p-6 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.16)] transition-all duration-200 group-hover:-translate-y-0.5 group-hover:border-primary/28 group-hover:shadow-[0_24px_50px_-32px_rgba(15,23,42,0.18)] motion-reduce:transition-none md:p-7 lg:grid-cols-[minmax(0,1fr)_minmax(250px,0.9fr)]">
+        <div className="flex min-w-0 flex-col">
+          <div className="flex items-start justify-between gap-4">
+            <div className="inline-flex items-center gap-3">
+              <span className={cn("inline-flex min-w-[56px] items-center justify-center rounded-full border px-3 py-1.5 text-[12px] font-semibold tracking-[0.16em]", accent.badge)}>
+                {stage.stage}
+              </span>
+              <div className={cn("inline-flex h-12 w-12 items-center justify-center rounded-[18px] border", accent.iconWrap)}>
+                <Icon className="h-5 w-5" aria-hidden="true" />
+              </div>
             </div>
+            <span className={cn("inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]", statusTone.badge)}>
+              {stage.status}
+            </span>
           </div>
-          <span className="rounded-full border border-border/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            {stage.verb}
-          </span>
-        </div>
 
-        <p className="sr-only">
-          Step {stage.stage} / {stage.verb}
-        </p>
-        <p className="mt-6 text-[12px] font-semibold uppercase tracking-[0.24em] text-primary">
-          Step {stage.stage} / {stage.verb}
-        </p>
-
-        <div className="mt-5 flex flex-1 flex-col">
-          <h3 className="max-w-[11ch] font-serif text-[1.95rem] leading-[1.04] tracking-[-0.025em] text-foreground md:text-[2.05rem]">
-            {stage.title}
-          </h3>
-          <p className="mt-4 max-w-[24ch] text-[14.5px] leading-7 text-muted-foreground">
-            {stage.description}
+          <p className="sr-only">
+            Step {stage.stage} / {stage.verb}
+          </p>
+          <p className={cn("mt-6 text-[12px] font-semibold uppercase tracking-[0.24em]", accent.eyebrow)}>
+            Step {stage.stage} / {stage.verb}
           </p>
 
-          <div className="mt-7 rounded-[24px] border border-border/75 bg-muted/25 p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              {formatWorkflowOutputLabel(stage.outputLabel)}
+          <div className="mt-5 flex flex-1 flex-col">
+            <h3 className="max-w-[12ch] font-serif text-[2.05rem] leading-[1.02] tracking-[-0.025em] text-foreground md:text-[2.2rem]">
+              {stage.title}
+            </h3>
+            <p className="mt-4 max-w-[30ch] text-[15px] leading-8 text-muted-foreground">
+              {stage.description}
             </p>
-            <WorkflowArtifactPanel stage={stage} />
-          </div>
 
-          <div className="mt-auto pt-6">
-            <div className="flex min-h-[112px] flex-col justify-between gap-3 rounded-[22px] border border-border/75 bg-card px-4 py-4">
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Current status
-                </p>
-                <p className="mt-1 text-base font-medium text-foreground">{stage.status}</p>
-              </div>
-              <span className="inline-flex shrink-0 items-center gap-1 self-start text-sm font-semibold text-primary">
+            <div className="mt-auto pt-6">
+              <span className={cn("inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition-colors", accent.actionPill)}>
                 {stage.actionLabel}
                 <ArrowRight
                   className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none"
                   aria-hidden="true"
                 />
               </span>
+            </div>
+          </div>
+        </div>
+
+        <div className={cn("rounded-[28px] border p-4 md:p-5", accent.panelShell)}>
+          <div className="flex h-full min-h-[320px] flex-col rounded-[22px] border border-border/70 bg-background/92 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] dark:shadow-none">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                {formatWorkflowOutputLabel(stage.outputLabel)}
+              </p>
+              <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]", statusTone.badge)}>
+                {stage.status}
+              </span>
+            </div>
+
+            <WorkflowArtifactPanel stage={stage} />
+
+            <div className="mt-auto border-t border-border/60 pt-4">
+              <div className="flex items-center justify-between gap-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                <span>Workflow control</span>
+                <span className="text-foreground">{stage.verb}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -809,13 +866,77 @@ function WorkflowArtifactPanel({
 }: {
   stage: WorkflowStage;
 }) {
+  if (stage.panelType === "metrics") {
+    const coverageValue = stage.artifactRows.find((row) => row.label === "Coverage")?.value ?? "0% mandatory";
+    const coverageMatch = coverageValue.match(/(\d+)/);
+    const coveragePct = coverageMatch ? Number(coverageMatch[1]) : 0;
+    const sourceValue = stage.artifactRows.find((row) => row.label === "Source")?.value ?? "Awaiting upload";
+    const rowCount = stage.artifactRows.find((row) => row.label === "Rows scanned")?.value ?? "0";
+    const fingerprint = stage.artifactRows.find((row) => row.label === "Fingerprint")?.value ?? "Pending";
+
+    return (
+      <div className="mt-4 space-y-3">
+        <div className="rounded-[20px] border border-border/70 bg-card px-4 py-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                Source
+              </p>
+              <p className="mt-2 text-base font-semibold text-foreground">{sourceValue}</p>
+            </div>
+            <span className="rounded-full bg-primary/[0.08] px-3 py-1 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-primary">
+              Profiled
+            </span>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-[18px] border border-border/70 bg-card px-4 py-3.5">
+            <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Rows scanned
+            </p>
+            <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">{rowCount}</p>
+          </div>
+          <div className="rounded-[18px] border border-border/70 bg-card px-4 py-3.5">
+            <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Fingerprint
+            </p>
+            <p className="mt-2 text-sm font-semibold text-foreground">{fingerprint}</p>
+          </div>
+        </div>
+
+        <div className="rounded-[18px] border border-border/70 bg-card px-4 py-3.5">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Mandatory coverage
+            </p>
+            <span className="text-sm font-semibold text-foreground">{coverageValue}</span>
+          </div>
+          <div className="mt-3 h-2.5 rounded-full bg-muted/80">
+            <div
+              className={cn(
+                "h-full rounded-full transition-all",
+                coveragePct >= 95
+                  ? "bg-primary"
+                  : coveragePct >= 80
+                    ? "bg-sky-500"
+                    : "bg-amber-500"
+              )}
+              style={{ width: `${Math.max(8, Math.min(coveragePct, 100))}%` }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (stage.panelType === "mapping") {
     return (
       <div className="mt-4 space-y-2.5">
         {stage.artifactRows.map((row) => (
           <div
             key={`${stage.stage}-${row.label}`}
-            className="grid grid-cols-[minmax(0,1fr)_18px_minmax(0,1fr)] items-center gap-2 rounded-2xl border border-border/70 bg-card px-3 py-2.5"
+            className="grid grid-cols-[minmax(0,1fr)_18px_minmax(0,1fr)] items-center gap-2 rounded-2xl border border-border/70 bg-card px-3 py-3"
           >
             <span className="truncate rounded-xl border border-border/70 bg-background px-2.5 py-1.5 font-mono text-[11.5px] text-foreground">
               {formatMappingToken(row.label)}
@@ -826,6 +947,112 @@ function WorkflowArtifactPanel({
             </span>
           </div>
         ))}
+      </div>
+    );
+  }
+
+  if (stage.panelType === "checks") {
+    const primaryRows = stage.artifactRows.slice(0, 2);
+    const secondaryRows = stage.artifactRows.slice(2);
+
+    return (
+      <div className="mt-4 space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          {primaryRows.map((row) => (
+            <div
+              key={`${stage.stage}-${row.label}`}
+              className="rounded-[20px] border border-border/70 bg-card px-4 py-4"
+            >
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                {row.label}
+              </p>
+              <div className="mt-3 flex items-end justify-between gap-3">
+                <span className="text-[1.7rem] font-semibold leading-none tracking-tight text-foreground">
+                  {row.value}
+                </span>
+                <span
+                  className={cn(
+                    "inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]",
+                    row.tone === "success" && "bg-primary/[0.1] text-primary",
+                    row.tone === "warning" && "bg-amber-500/12 text-amber-700 dark:text-amber-300",
+                    row.tone === "info" && "bg-sky-500/10 text-sky-700 dark:text-sky-300",
+                    (!row.tone || row.tone === "neutral") && "bg-background text-foreground"
+                  )}
+                >
+                  {row.tone ?? "neutral"}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="space-y-2.5 rounded-[20px] border border-border/70 bg-card p-3.5">
+          {secondaryRows.map((row) => (
+            <div
+              key={`${stage.stage}-${row.label}`}
+              className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-background/88 px-3 py-2.5"
+            >
+              <span className="text-[11.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                {row.label}
+              </span>
+              <span
+                className={cn(
+                  "inline-flex rounded-full px-2.5 py-1 text-[10.5px] font-semibold",
+                  row.tone === "success" && "bg-primary/[0.1] text-primary",
+                  row.tone === "warning" && "bg-amber-500/12 text-amber-700 dark:text-amber-300",
+                  row.tone === "info" && "bg-sky-500/10 text-sky-700 dark:text-sky-300",
+                  (!row.tone || row.tone === "neutral") && "bg-card text-foreground"
+                )}
+              >
+                {row.value}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (stage.panelType === "evidence") {
+    return (
+      <div className="mt-4 space-y-3">
+        <div className="rounded-[20px] border border-border/70 bg-card px-4 py-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                Remediation posture
+              </p>
+              <p className="mt-2 text-lg font-semibold text-foreground">{stage.status}</p>
+            </div>
+            <span className="rounded-full bg-primary/[0.08] px-3 py-1 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-primary">
+              Audit trail
+            </span>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          {stage.artifactRows.map((row) => (
+            <div
+              key={`${stage.stage}-${row.label}`}
+              className="rounded-[18px] border border-border/70 bg-card px-3.5 py-3.5"
+            >
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                {row.label}
+              </p>
+              <span
+                className={cn(
+                  "mt-3 inline-flex min-h-8 max-w-full items-center rounded-full px-3 py-1 text-[11px] font-semibold",
+                  row.tone === "success" && "bg-primary/[0.1] text-primary",
+                  row.tone === "warning" && "bg-amber-500/12 text-amber-700 dark:text-amber-300",
+                  row.tone === "info" && "bg-sky-500/10 text-sky-700 dark:text-sky-300",
+                  (!row.tone || row.tone === "neutral") && "bg-background text-foreground"
+                )}
+              >
+                {row.value}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -897,6 +1124,66 @@ function SurfaceCapabilityCard({
       </article>
     </Link>
   );
+}
+
+function getWorkflowStageAccent(stage: WorkflowStage["stage"]) {
+  switch (stage) {
+    case "01":
+      return {
+        badge: "border-emerald-500/18 bg-emerald-500/8 text-emerald-700 dark:text-emerald-300",
+        iconWrap: "border-emerald-500/18 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+        eyebrow: "text-emerald-700 dark:text-emerald-300",
+        actionPill:
+          "border-emerald-500/18 bg-emerald-500/8 text-emerald-700 hover:bg-emerald-500/12 dark:text-emerald-300",
+        panelShell: "border-emerald-500/12 bg-[linear-gradient(180deg,rgba(24,196,126,0.06),rgba(255,255,255,0.7))] dark:bg-[linear-gradient(180deg,rgba(24,196,126,0.08),rgba(15,23,20,0.68))]",
+      };
+    case "02":
+      return {
+        badge: "border-sky-500/18 bg-sky-500/8 text-sky-700 dark:text-sky-300",
+        iconWrap: "border-sky-500/18 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+        eyebrow: "text-sky-700 dark:text-sky-300",
+        actionPill:
+          "border-sky-500/18 bg-sky-500/8 text-sky-700 hover:bg-sky-500/12 dark:text-sky-300",
+        panelShell: "border-sky-500/12 bg-[linear-gradient(180deg,rgba(56,189,248,0.06),rgba(255,255,255,0.7))] dark:bg-[linear-gradient(180deg,rgba(56,189,248,0.08),rgba(15,23,20,0.68))]",
+      };
+    case "03":
+      return {
+        badge: "border-amber-500/20 bg-amber-500/8 text-amber-700 dark:text-amber-300",
+        iconWrap: "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+        eyebrow: "text-amber-700 dark:text-amber-300",
+        actionPill:
+          "border-amber-500/20 bg-amber-500/8 text-amber-700 hover:bg-amber-500/12 dark:text-amber-300",
+        panelShell: "border-amber-500/14 bg-[linear-gradient(180deg,rgba(245,158,11,0.06),rgba(255,255,255,0.7))] dark:bg-[linear-gradient(180deg,rgba(245,158,11,0.08),rgba(15,23,20,0.68))]",
+      };
+    default:
+      return {
+        badge: "border-primary/18 bg-primary/8 text-primary",
+        iconWrap: "border-primary/18 bg-primary/10 text-primary",
+        eyebrow: "text-primary",
+        actionPill: "border-primary/18 bg-primary/8 text-primary hover:bg-primary/12",
+        panelShell: "border-primary/12 bg-[linear-gradient(180deg,rgba(47,153,95,0.06),rgba(255,255,255,0.7))] dark:bg-[linear-gradient(180deg,rgba(47,153,95,0.08),rgba(15,23,20,0.68))]",
+      };
+  }
+}
+
+function getWorkflowStatusTone(status: string) {
+  const normalized = status.toLowerCase();
+
+  if (normalized.includes("pending") || normalized.includes("awaiting")) {
+    return {
+      badge: "border border-border/70 bg-background text-muted-foreground",
+    };
+  }
+
+  if (normalized.includes("open") || normalized.includes("review") || normalized.includes("watch")) {
+    return {
+      badge: "bg-amber-500/12 text-amber-700 dark:text-amber-300",
+    };
+  }
+
+  return {
+    badge: "bg-primary/[0.1] text-primary",
+  };
 }
 
 function SurfaceCapabilityVisual({

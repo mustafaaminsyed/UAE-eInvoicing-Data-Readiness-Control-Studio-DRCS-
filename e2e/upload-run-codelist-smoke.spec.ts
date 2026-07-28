@@ -55,6 +55,12 @@ async function uploadAndRunChecks(
 test('smoke: upload -> run checks -> exceptions shows codelist failures', async ({ page }) => {
   await uploadAndRunChecks(page, FIXTURES);
 
+  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+  await expect(page.getByText('Executive compliance view')).toBeVisible();
+  await expect(page.getByText('Source-data quality and integrity')).toBeVisible();
+  await expect(page.getByText('Coverage against UAE and PINT-AE obligations')).toBeVisible();
+  await expect(page.getByText('Exception breakdown and remediation focus')).toBeVisible();
+
   await page.getByRole('link', { name: 'Exceptions' }).first().click();
   await expect(page).toHaveURL(/\/exceptions/);
   await expect(page.getByRole('button', { name: 'Export CSV' })).toBeVisible();

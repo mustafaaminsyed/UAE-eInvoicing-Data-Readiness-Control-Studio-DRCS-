@@ -8,6 +8,13 @@ export interface MappedTemplateExport {
   columns: string[];
 }
 
+export interface BlankTemplateExport {
+  dataset: SampleDataset;
+  filename: string;
+  content: string;
+  columns: string[];
+}
+
 export const buyersSample = `buyer_id,buyer_name,buyer_trn,buyer_address,buyer_country,buyer_city,buyer_subdivision,buyer_electronic_address
 B001,Acme Corporation LLC,100000000000003,Office 42 Business Bay Tower,AE,Dubai,AE-DU,acme@peppol.ae
 B002,Global Traders FZ-LLC,200000000000003,Unit 7 JAFZA South,AE,Dubai,AE-DU,global.traders@peppol.ae
@@ -163,6 +170,21 @@ export function buildMappedTemplateExport(
     filename,
     columns,
     content: columns.length > 0 ? `${columns.join(',')}\n` : '',
+  };
+}
+
+export function buildBlankTemplateExport(
+  dataset: SampleDataset,
+  direction: SampleDirection = 'AR'
+): BlankTemplateExport {
+  const sample = getSampleData(dataset, 'positive', direction);
+  const columns = getTemplateHeaderColumns(dataset, direction);
+
+  return {
+    dataset,
+    filename: sample.filename.replace(/\.csv$/i, '_blank.csv'),
+    columns,
+    content: `${columns.join(',')}\n`,
   };
 }
 
