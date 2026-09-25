@@ -17,6 +17,19 @@ export interface Buyer {
   upload_manifest_id?: string;
 }
 
+export interface TaxBreakdown {
+  tax_category_code: string;
+  tax_category_rate?: number;
+  taxable_amount: number;
+  tax_amount: number;
+}
+
+export interface DocumentAdjustment {
+  amount: number;
+  tax_category_code: string;
+  tax_category_rate?: number;
+}
+
 export interface InvoiceHeader {
   invoice_id: string;
   invoice_number: string;
@@ -44,6 +57,10 @@ export interface InvoiceHeader {
   payment_means_code?: string;
   fx_rate?: number;
   amount_due?: number;
+  paid_amount?: number;
+  tax_breakdowns?: TaxBreakdown[];
+  document_allowances?: DocumentAdjustment[];
+  document_charges?: DocumentAdjustment[];
   tax_category_code?: string;
   tax_category_rate?: number;
   note?: string;
@@ -66,6 +83,7 @@ export interface InvoiceLine {
   description?: string;
   quantity: number;
   unit_price: number;
+  price_base_quantity?: number;
   line_discount?: number;
   line_total_excl_vat: number;
   vat_rate: number;

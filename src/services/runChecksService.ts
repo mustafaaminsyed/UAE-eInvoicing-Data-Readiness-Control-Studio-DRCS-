@@ -11,6 +11,7 @@ import {
 } from '@/types/compliance';
 import { DatasetRunScope, DatasetType } from '@/types/datasets';
 import { PintAEException, RunSummary } from '@/types/pintAE';
+import { RuleExecution } from '@/types/executionLedger';
 import { runAllChecks } from '@/lib/checks/checksRegistry';
 import { runAllPintAEChecks } from '@/lib/checks/pintAECheckRunner';
 import {
@@ -56,6 +57,7 @@ export interface RunChecksPipelineParams {
 }
 
 interface RunArtifactsBase {
+  pintAEExecutions: RuleExecution[];
   mergedCheckResults: CheckResult[];
   allExceptions: Exception[];
   allPintAEExceptions: PintAEException[];
@@ -233,11 +235,12 @@ export async function runChecksPipeline({
   const runLog: RunLogStep[] = [];
 
   const fetchChecksStep = startStep('fetch_enabled_pint_checks');
-  const pintAEChecks = await fetchEnabledPintAEChecks();
+  const pintAEChecks = await fetchEnabledPintAEChecks({ forExecution: true });
   endStep(runLog, fetchChecksStep, { enabledChecks: pintAEChecks.length });
 
   const allBuiltInResults: CheckResult[] = [];
   const allPintExceptions: PintAEException[] = [];
+  const pintAEExecutions: RuleExecution[] = [];
   const allLegacyExceptions: Exception[] = [];
   const allHeadersForScope: InvoiceHeader[] = [];
 
@@ -253,7 +256,7 @@ export async function runChecksPipeline({
     }));
     allBuiltInResults.push(...builtInResults);
 
-    const pintExceptionsForDataset = runAllPintAEChecks(pintAEChecks, dataContext).map(
+    const pintExceptionsForDataset = runAllPintAEChecks(pintAEChecks, dataContext, { datasetType, onExecution: execution => pintAEExecutions.push(execution) }).map(
       (exception) => ({
         ...exception,
         dataset_type: datasetType,
@@ -316,6 +319,8 @@ export async function runChecksPipeline({
       pass_rate: stats.passRate,
       results_summary: {
         checkCount: mergedBuiltInResults.length + pintAEChecks.length,
+        executionLedgerVersion: 1,
+        pintAEExecutions,
         scope: plan.scope,
       },
     });
@@ -364,6 +369,7 @@ export async function runChecksPipeline({
   } catch (persistenceError) {
     return {
       kind: 'persist_failed',
+      pintAEExecutions,
       mergedCheckResults: mergedBuiltInResults,
       allExceptions,
       allPintAEExceptions: allPintExceptions,
@@ -376,6 +382,7 @@ export async function runChecksPipeline({
 
   return {
     kind: 'ok',
+    pintAEExecutions,
     mergedCheckResults: mergedBuiltInResults,
     allExceptions,
     allPintAEExceptions: allPintExceptions,

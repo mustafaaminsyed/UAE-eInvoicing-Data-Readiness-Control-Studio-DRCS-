@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import {
   FileDown, Shield, CheckCircle2, AlertTriangle, XCircle,
   FileSpreadsheet, BarChart3, Scale, Bug, Layers, Database,
@@ -16,23 +16,23 @@ import { useCompliance } from '@/context/ComplianceContext';
 import { computeAllDatasetPopulations } from '@/lib/coverage/populationCoverage';
 import { buildEvidencePackData, EvidencePackData } from '@/lib/evidence/evidenceDataBuilder';
 import { validateBeforeExport, generateEvidencePackZip, generateEvidencePackPdf, downloadBlob } from '@/lib/evidence/evidenceExporter';
-import { fetchCheckRuns } from '@/lib/api/checksApi';
-import { fetchExceptionsByRun } from '@/lib/api/pintAEApi';
-import { CheckRun } from '@/types/customChecks';
+
+
+
 import { CONFORMANCE_CONFIG } from '@/config/conformance';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { SeverityBadge } from '@/components/SeverityBadge';
 
 export default function EvidencePackPage() {
-  const { buyers, headers, lines, pintAEExceptions, isChecksRun, runSummary } = useCompliance();
+  const { buyers, headers, lines, pintAEExceptions, isChecksRun, executionSnapshot, direction } = useCompliance();
   const { toast } = useToast();
   const [exporting, setExporting] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
-  const [runs, setRuns] = useState<CheckRun[]>([]);
-  const [selectedRunId, setSelectedRunId] = useState<string>('');
-  const [selectedRunDate, setSelectedRunDate] = useState<string | null>(null);
-  const [selectedRunExceptions, setSelectedRunExceptions] = useState(pintAEExceptions);
+
+
+
+
   const [exportFormat, setExportFormat] = useState<'excel' | 'pdf'>('excel');
   const [search, setSearch] = useState('');
   const [drQuickFilter, setDrQuickFilter] = useState<'all' | 'mandatory' | 'gaps' | 'asp'>('all');
@@ -41,35 +41,12 @@ export default function EvidencePackPage() {
   const [controlQuickFilter, setControlQuickFilter] = useState<'all' | 'with_exceptions' | 'automated' | 'manual'>('all');
   const [populationQuickFilter, setPopulationQuickFilter] = useState<'all' | 'fail' | 'na' | 'mandatory_fail'>('all');
 
-  useEffect(() => {
-    fetchCheckRuns(25).then((data) => setRuns(data));
-  }, []);
-
-  useEffect(() => {
-    const fallbackRunId = runSummary?.run_id || '';
-    const initial = fallbackRunId || runs[0]?.id || '';
-    if (!selectedRunId && initial) {
-      setSelectedRunId(initial);
-    }
-  }, [runSummary?.run_id, runs, selectedRunId]);
-
-  useEffect(() => {
-    if (!selectedRunId) return;
-    const selected = runs.find((r) => r.id === selectedRunId);
-    setSelectedRunDate(selected?.run_date ?? null);
-
-    if (runSummary?.run_id && selectedRunId === runSummary.run_id) {
-      setSelectedRunExceptions(pintAEExceptions);
-      return;
-    }
-
-    fetchExceptionsByRun(selectedRunId).then((excs) => setSelectedRunExceptions(excs));
-  }, [selectedRunId, runs, runSummary?.run_id, pintAEExceptions]);
-
-  const runId = selectedRunId || runSummary?.run_id || `run-${Date.now()}`;
-  const runTimestamp = selectedRunDate || new Date().toISOString();
-  const isCurrentContextRun = runSummary?.run_id && selectedRunId === runSummary.run_id;
-
+  const selectedRunId = executionSnapshot?.runId || '';
+  const runId = selectedRunId;
+  const runTimestamp = executionSnapshot?.timestamp || '';
+  const isCurrentContextRun = executionSnapshot?.datasetType === direction;
+  const runs = executionSnapshot ? [{ id: executionSnapshot.runId, run_date: executionSnapshot.timestamp }] : [];
+  const selectedRunExceptions = pintAEExceptions;
   // Build populations from raw data for evidence
   const populations = useMemo(() => {
     if (!isChecksRun) return [];
@@ -90,11 +67,11 @@ export default function EvidencePackPage() {
   }, [buyers, headers, lines, isChecksRun]);
 
   const evidence: EvidencePackData | null = useMemo(() => {
-    if (!isChecksRun) return null;
+    if (!isChecksRun || !executionSnapshot || !isCurrentContextRun) return null;
     return buildEvidencePackData(
-      runId, runTimestamp, buyers, headers, lines, selectedRunExceptions, populations
+      runId, runTimestamp, buyers, headers, lines, selectedRunExceptions, populations, executionSnapshot.executions
     );
-  }, [isChecksRun, runId, runTimestamp, buyers, headers, lines, selectedRunExceptions, populations]);
+  }, [isChecksRun, runId, runTimestamp, buyers, headers, lines, selectedRunExceptions, populations, executionSnapshot, isCurrentContextRun]);
 
   const handleExport = useCallback(async () => {
     if (!evidence) return;
@@ -253,7 +230,7 @@ export default function EvidencePackPage() {
               Evidence Pack
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Regulator-ready audit artifact | {ov.specVersion} | {ov.drVersion}
+              Data-readiness assessment | {ov.specVersion} | {ov.drVersion}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -279,7 +256,7 @@ export default function EvidencePackPage() {
             <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Assessment Run</p>
-                <Select value={selectedRunId} onValueChange={setSelectedRunId}>
+                <Select value={selectedRunId} disabled>
                   <SelectTrigger>
                     <SelectValue placeholder="Select run" />
                   </SelectTrigger>
@@ -301,11 +278,7 @@ export default function EvidencePackPage() {
                 />
               </div>
               <div className="flex items-end">
-                {!isCurrentContextRun && (
-                  <Badge variant="outline" className="text-xs">
-                    Selected run uses archived exceptions with current loaded dataset snapshot
-                  </Badge>
-                )}
+                <p className="text-xs text-muted-foreground">Exports use the current assessment. Historical exports require a matching saved dataset snapshot.</p>
               </div>
             </div>
             {activeTab === 'dr-coverage' && (
@@ -480,7 +453,7 @@ export default function EvidencePackPage() {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Rules Execution</CardTitle>
-                <CardDescription>{ruleRows.length} validation rules (execution counts estimated by scope)</CardDescription>
+                <CardDescription>{ruleRows.length} validation rules. Counts come from recorded outcomes; missing records are not treated as passes.</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
                 <ScrollArea className="h-[500px]">
@@ -495,6 +468,10 @@ export default function EvidencePackPage() {
                           <TableHead className="text-xs text-right">Executions</TableHead>
                           <TableHead className="text-xs text-right">Failures</TableHead>
                           <TableHead className="text-xs">Source</TableHead>
+                          <TableHead className="text-xs">Status</TableHead>
+                          <TableHead className="text-xs">N/A</TableHead>
+                          <TableHead className="text-xs">Not evaluated</TableHead>
+                          <TableHead className="text-xs">Errors</TableHead>
                           <TableHead className="text-xs text-right">Pass Rate</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -502,7 +479,7 @@ export default function EvidencePackPage() {
                         {ruleRows.map(r => {
                           const passRate = r.execution_count > 0
                             ? ((r.execution_count - r.failure_count) / r.execution_count * 100)
-                            : 100;
+                            : null;
                           return (
                             <TableRow key={r.rule_id}>
                               <TableCell className="text-xs font-mono">{r.rule_id}</TableCell>
@@ -512,8 +489,12 @@ export default function EvidencePackPage() {
                               <TableCell className="text-xs text-right">{r.execution_count}</TableCell>
                               <TableCell className="text-xs text-right font-medium">{r.failure_count}</TableCell>
                               <TableCell className="text-xs capitalize">{r.execution_source}</TableCell>
-                              <TableCell className={cn('text-xs text-right font-medium', passRate < 100 ? 'text-destructive' : 'text-[hsl(var(--success))]')}>
-                                {passRate.toFixed(1)}%
+                              <TableCell className="text-xs" title={r.reason}>{r.status.replace(/_/g, ' ')}</TableCell>
+                              <TableCell className="text-xs">{r.not_applicable_count}</TableCell>
+                              <TableCell className="text-xs">{r.not_evaluated_count}</TableCell>
+                              <TableCell className="text-xs">{r.error_count}</TableCell>
+                              <TableCell className={cn('text-xs text-right font-medium', passRate !== null && passRate < 100 ? 'text-destructive' : 'text-muted-foreground')}>
+                                {passRate === null ? 'N/A' : passRate.toFixed(1) + '%'}
                               </TableCell>
                             </TableRow>
                           );

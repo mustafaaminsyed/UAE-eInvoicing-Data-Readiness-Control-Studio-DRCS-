@@ -103,7 +103,7 @@ export function UploadStep({ onDataLoaded, previewData }: UploadStepProps) {
       });
     } catch (err) {
       console.error('Error parsing file:', err);
-      setError('Failed to parse file. Please ensure it is a valid CSV.');
+      setError(err instanceof Error ? err.message : 'Failed to parse file. Please ensure it is a valid CSV.');
     } finally {
       setIsLoading(false);
     }

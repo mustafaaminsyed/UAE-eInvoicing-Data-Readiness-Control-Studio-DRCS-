@@ -1,6 +1,11 @@
 import { PintAECheck, PintAEException, SLA_HOURS_BY_SEVERITY } from '@/types/pintAE';
 import { DataContext, Severity } from '@/types/compliance';
 import { isCodeInCodelist } from '@/lib/pintAE/specCatalog';
+import { assertExecutablePintAECheck, assertExecutablePintAERuleset } from './pintAEExecutionGuard';
+import { RuleExecution } from '@/types/executionLedger';
+import { DatasetType } from '@/types/datasets';
+import { evaluateLineAmount } from './lineAmounts';
+import { evaluateInvoiceNet, evaluateInvoiceGross, evaluatePayable, evaluateVatTotal, evaluateVatBreakdowns, suppliedBreakdowns } from './invoiceAmounts';
 
 const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 const PROFILE_DEFAULTS_ENABLED = (import.meta.env.VITE_ENABLE_TECHNICAL_PROFILE_DEFAULTS || 'true').toLowerCase() === 'true';
@@ -62,6 +67,11 @@ function getDatasetForField(field: string, scope: PintAECheck['scope'], data: Da
 }
 
 export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEException[] {
+  assertExecutablePintAECheck(check);
+  return executePintAECheck(check, data);
+}
+
+function executePintAECheck(check: PintAECheck, data: DataContext): PintAEException[] {
   const exceptions: PintAEException[] = [];
   const params = check.parameters || {};
   const timestamp = new Date().toISOString();
@@ -460,74 +470,30 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
       });
       break;
 
-    // Total With Tax = Without Tax + Tax
-    case 'UAE-UC1-CHK-025':
-      data.headers.forEach(header => {
-        if (header.total_incl_vat !== undefined && 
-            header.total_excl_vat !== undefined && 
-            header.vat_total !== undefined) {
-          const expected = header.total_excl_vat + header.vat_total;
-          const diff = Math.abs(header.total_incl_vat - expected);
-          const tolerance = params.tolerance || 0.01;
-          if (diff > tolerance) {
-            exceptions.push(createException({
-              invoiceId: header.invoice_id,
-              invoiceNumber: header.invoice_number,
-              sellerTrn: header.seller_trn,
-              buyerId: header.buyer_id,
-              fieldName: 'total_incl_vat',
-              observedValue: String(header.total_incl_vat),
-              expectedValue: String(expected),
-              message: `Invoice ${header.invoice_number}: Total with VAT (${header.total_incl_vat}) != Excl VAT (${header.total_excl_vat}) + VAT (${header.vat_total})`,
-            }));
-          }
-        }
-      });
-      break;
-
-    // Sum of Line Net Amounts Matches Header
+    // Invoice-level decimal calculations. Missing comparison inputs never pass.
     case 'UAE-UC1-CHK-021':
-      data.headers.forEach(header => {
-        const invoiceLines = data.linesByInvoice.get(header.invoice_id) || [];
-        const lineSum = invoiceLines.reduce((sum, l) => sum + (l.line_total_excl_vat || 0), 0);
-        const headerTotal = header.total_excl_vat || 0;
-        const diff = Math.abs(lineSum - headerTotal);
-        const tolerance = params.tolerance || 0.01;
-        if (diff > tolerance) {
-          exceptions.push(createException({
-            invoiceId: header.invoice_id,
-            invoiceNumber: header.invoice_number,
-            sellerTrn: header.seller_trn,
-            buyerId: header.buyer_id,
-            fieldName: 'total_excl_vat',
-            observedValue: String(headerTotal),
-            expectedValue: `Sum of lines: ${lineSum.toFixed(2)}`,
-            message: `Invoice ${header.invoice_number}: Header total (${headerTotal}) does not match sum of lines (${lineSum.toFixed(2)})`,
-          }));
-        }
-      });
-      break;
-
-    // Tax Total = Sum of Tax Breakdown Amounts
+    case 'UAE-UC1-CHK-025':
+    case 'UAE-UC1-CHK-028':
     case 'UAE-UC1-CHK-029':
+    case 'UAE-UC1-CHK-035':
       data.headers.forEach(header => {
-        const invoiceLines = data.linesByInvoice.get(header.invoice_id) || [];
-        const taxSum = invoiceLines.reduce((sum, l) => sum + (l.vat_amount || 0), 0);
-        const headerTax = header.vat_total || 0;
-        const diff = Math.abs(taxSum - headerTax);
-        const tolerance = params.tolerance || 0.01;
-        if (diff > tolerance) {
-          exceptions.push(createException({
-            invoiceId: header.invoice_id,
-            invoiceNumber: header.invoice_number,
-            sellerTrn: header.seller_trn,
-            buyerId: header.buyer_id,
-            fieldName: 'vat_total',
-            observedValue: String(headerTax),
-            expectedValue: `Sum of line VAT: ${taxSum.toFixed(2)}`,
-            message: `Invoice ${header.invoice_number}: VAT total (${headerTax}) does not match sum of line VAT amounts (${taxSum.toFixed(2)})`,
-          }));
-        }
+        const lines = data.linesByInvoice.get(header.invoice_id) || [];
+        const result = check.check_id.endsWith('021') ? evaluateInvoiceNet(header, lines)
+          : check.check_id.endsWith('025') ? evaluateInvoiceGross(header)
+          : check.check_id.endsWith('028') ? evaluateVatBreakdowns(header, lines)
+          : check.check_id.endsWith('029') ? evaluateVatTotal(header) : evaluatePayable(header);
+        if (result.matches || result.unevaluated) return;
+        const field = check.check_id.endsWith('021') ? 'total_excl_vat'
+          : check.check_id.endsWith('025') ? 'total_incl_vat'
+          : check.check_id.endsWith('028') ? 'tax_breakdowns'
+          : check.check_id.endsWith('029') ? 'vat_total' : 'amount_due';
+        exceptions.push(createException({
+          invoiceId: header.invoice_id, invoiceNumber: header.invoice_number,
+          sellerTrn: header.seller_trn, buyerId: header.buyer_id, fieldName: field,
+          observedValue: JSON.stringify(getFieldValue(header, field)),
+          expectedValue: result.expected ?? result.reason,
+          message: `Invoice ${header.invoice_number}: ${result.reason ?? `${field} must equal ${result.expected}`}`,
+        }));
       });
       break;
 
@@ -594,11 +560,9 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
     case 'UAE-UC1-CHK-034':
       data.lines.forEach(line => {
         const header = data.headerMap.get(line.invoice_id);
-        const discount = line.line_discount || 0;
-        const expected = (line.quantity * line.unit_price) - discount;
-        const diff = Math.abs(line.line_total_excl_vat - expected);
-        const tolerance = params.tolerance || 0.01;
-        if (diff > tolerance) {
+        const calculation = evaluateLineAmount(line);
+        if (calculation.unevaluated) return;
+        if (!calculation.matches) {
           exceptions.push(createException({
             invoiceId: line.invoice_id,
             invoiceNumber: header?.invoice_number,
@@ -607,8 +571,8 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
             lineId: line.line_id,
             fieldName: 'line_total_excl_vat',
             observedValue: String(line.line_total_excl_vat),
-            expectedValue: `(${line.quantity} x ${line.unit_price}) - ${discount} = ${expected.toFixed(2)}`,
-            message: `Invoice ${header?.invoice_number}, Line ${line.line_number}: Net amount (${line.line_total_excl_vat}) != (Qty x Price) - Discount (${expected.toFixed(2)})`,
+            expectedValue: calculation.reason ?? calculation.expected!.toFixed(2),
+            message: `Invoice ${header?.invoice_number}, Line ${line.line_number}: ${calculation.reason ?? `Net amount (${line.line_total_excl_vat}) differs from quantity × (net price / base quantity) + charges − allowances (${calculation.expected!.toFixed(2)})`}`,
           }));
         }
       });
@@ -641,55 +605,22 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
       }
       break;
 
-    // Tax breakdown must exist when taxable amounts are present
+    // A line category is not itself a supplied invoice VAT breakdown.
     case 'UAE-UC1-CHK-027':
       data.headers.forEach(header => {
-        const invoiceLines = data.linesByInvoice.get(header.invoice_id) || [];
-        const hasHeaderBreakdown =
-          !isEmpty(header.tax_category_code) &&
-          header.tax_category_rate !== undefined &&
-          header.tax_category_rate !== null;
-        const hasLineBreakdown = invoiceLines.some((line) => !isEmpty(line.tax_category_code) && line.vat_rate !== undefined && line.vat_rate !== null);
-        const hasTaxableAmount = (header.total_excl_vat || 0) > 0 || invoiceLines.some((line) => (line.line_total_excl_vat || 0) > 0);
-        if (hasTaxableAmount && !hasHeaderBreakdown && !hasLineBreakdown) {
+        const breakdowns = suppliedBreakdowns(header);
+        if (!Array.isArray(breakdowns) || !breakdowns.length) {
           exceptions.push(createException({
-            invoiceId: header.invoice_id,
-            invoiceNumber: header.invoice_number,
-            sellerTrn: header.seller_trn,
-            buyerId: header.buyer_id,
-            fieldName: 'tax_breakdown',
-            observedValue: 'missing',
-            expectedValue: 'At least one tax category breakdown',
-            message: `Invoice ${header.invoice_number}: Missing tax breakdown details (category/rate)`,
+            invoiceId: header.invoice_id, invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn, buyerId: header.buyer_id,
+            fieldName: 'tax_breakdowns', observedValue: 'missing',
+            expectedValue: 'At least one supplied category breakdown',
+            message: `Invoice ${header.invoice_number}: Missing supplied VAT breakdown`,
           }));
         }
       });
       break;
 
-    // VAT Calculation Check
-    case 'UAE-UC1-CHK-028':
-      data.lines.forEach(line => {
-        const header = data.headerMap.get(line.invoice_id);
-        const expected = line.line_total_excl_vat * (line.vat_rate / 100);
-        const diff = Math.abs(line.vat_amount - expected);
-        const tolerance = params.tolerance || 0.01;
-        if (diff > tolerance) {
-          exceptions.push(createException({
-            invoiceId: line.invoice_id,
-            invoiceNumber: header?.invoice_number,
-            sellerTrn: header?.seller_trn,
-            buyerId: header?.buyer_id,
-            lineId: line.line_id,
-            fieldName: 'vat_amount',
-            observedValue: String(line.vat_amount),
-            expectedValue: `${line.line_total_excl_vat} x (${line.vat_rate}/100) = ${expected.toFixed(2)}`,
-            message: `Invoice ${header?.invoice_number}, Line ${line.line_number}: VAT amount (${line.vat_amount}) != Base x Rate/100 (${expected.toFixed(2)})`,
-          }));
-        }
-      });
-      break;
-
-    // Default: Generic presence check for other checks
     default:
       if (check.rule_type === 'CodeList' && params.field && params.codelist) {
         const field = resolveFieldAlias(params.field);
@@ -737,12 +668,95 @@ export function runPintAECheck(check: PintAECheck, data: DataContext): PintAEExc
   return exceptions;
 }
 
-export function runAllPintAEChecks(checks: PintAECheck[], data: DataContext): PintAEException[] {
+// Describe branches that do not establish a pass. The underlying check is still
+// called so this ledger does not silently change the existing exception behavior.
+function usesGenericExecutor(check: PintAECheck): boolean {
+  return !/^UAE-UC1-CHK-(00[1-9]|0[12][0-9]|03[0-5])$/.test(check.check_id)
+    || ['012', '014', '019', '033'].some(suffix => check.check_id === `UAE-UC1-CHK-${suffix}`);
+}
+
+function unevaluatedReason(check: PintAECheck, record: any, data: DataContext): 'notApplicable' | 'notEvaluated' | null {
+  const params = check.parameters;
+  const id = check.check_id;
+  const numeric = (value: unknown) => typeof value === 'number' && Number.isFinite(value);
+  if (id === 'UAE-UC1-CHK-007' && String(record.currency || '').toUpperCase() === String(params.tax_currency || 'AED').toUpperCase() && isEmpty(record.tax_currency)) return 'notApplicable';
+  if (id === 'UAE-UC1-CHK-032' && !numeric(record.quantity)) return 'notEvaluated';
+  if (id === 'UAE-UC1-CHK-008') {
+    const currency = getFieldValue(record, resolveFieldAlias(params.currency_field || 'currency'));
+    if (isEmpty(currency)) return 'notEvaluated';
+    if (String(currency).toUpperCase() === String(params.base_currency || 'AED').toUpperCase()) return 'notApplicable';
+    if (!numeric(getFieldValue(record, resolveFieldAlias(params.fx_field || 'fx_rate')))) return 'notEvaluated';
+  }
+  if (id === 'UAE-UC1-CHK-018' && isEmpty(record.buyer_trn)) return 'notApplicable';
+  const optionalFormatField = id === 'UAE-UC1-CHK-003' ? params.field
+    : id === 'UAE-UC1-CHK-006' ? params.field || 'currency'
+    : id === 'UAE-UC1-CHK-013' ? 'seller_trn'
+    : id === 'UAE-UC1-CHK-016' ? params.field || 'seller_subdivision' : undefined;
+  if (optionalFormatField && isEmpty(getFieldValue(record, resolveFieldAlias(optionalFormatField)))) return 'notEvaluated';
+  if (['022', '023', '024', '026'].some(suffix => id === `UAE-UC1-CHK-${suffix}`) && !numeric(getFieldValue(record, params.field))) return 'notEvaluated';
+  const invoiceLines = data.linesByInvoice.get(record.invoice_id) || [];
+  const monetary = id === 'UAE-UC1-CHK-021' ? evaluateInvoiceNet(record, invoiceLines)
+    : id === 'UAE-UC1-CHK-025' ? evaluateInvoiceGross(record)
+    : id === 'UAE-UC1-CHK-028' ? evaluateVatBreakdowns(record, invoiceLines)
+    : id === 'UAE-UC1-CHK-029' ? evaluateVatTotal(record)
+    : id === 'UAE-UC1-CHK-035' ? evaluatePayable(record) : undefined;
+  if (monetary?.unevaluated) return 'notEvaluated';
+  if (id === 'UAE-UC1-CHK-034' && ![record.quantity, record.unit_price, record.line_total_excl_vat, record.line_discount ?? 0, record.price_base_quantity ?? 1, record.line_allowance_amount ?? 0, record.line_charge_amount ?? 0].every(numeric)) return 'notEvaluated';
+  if (id === 'UAE-UC1-CHK-009') {
+    if (!numeric(record.amount_due)) return 'notEvaluated';
+    if (!isEmpty(record.payment_due_date) && (Number.isNaN(Date.parse(record.payment_due_date)) || isEmpty(record.issue_date) || Number.isNaN(Date.parse(record.issue_date)))) return 'notEvaluated';
+    if (record.amount_due <= 0 && isEmpty(record.payment_due_date)) return 'notApplicable';
+  }
+  if (usesGenericExecutor(check) && check.rule_type === 'CodeList' && isEmpty(getFieldValue(record, resolveFieldAlias(params.field)))) return 'notEvaluated';
+  return null;
+}
+
+export function runAllPintAEChecks(checks: PintAECheck[], data: DataContext, options: {
+  datasetType?: DatasetType;
+  onExecution?: (execution: RuleExecution) => void;
+} = {}): PintAEException[] {
+  assertExecutablePintAERuleset(checks);
   const enabledChecks = checks.filter(c => c.is_enabled);
   const allExceptions: PintAEException[] = [];
   
   for (const check of enabledChecks) {
-    allExceptions.push(...runPintAECheck(check, data));
+    // Party metadata includes both seller (header) and buyer records; mirror the
+    // actual executor target rather than estimating from its display scope.
+    const records = usesGenericExecutor(check) ? getDatasetForField(check.parameters.field, check.scope, data)
+      : ['017', '018', '020'].some(suffix => check.check_id === `UAE-UC1-CHK-${suffix}`) ? data.buyers
+      : ['031', '032', '034'].some(suffix => check.check_id === `UAE-UC1-CHK-${suffix}`) ? data.lines : data.headers;
+    const dataset = records === data.lines ? 'lines' : records === data.buyers ? 'buyers' : 'headers';
+    const execution: RuleExecution = {
+      check: JSON.parse(JSON.stringify(check)), datasetType: options.datasetType || 'AR',
+      evaluatedAt: new Date().toISOString(), engineVersion: 'uc1-execution-v3', status: 'not_evaluated',
+      candidateCount: records.length, passed: 0, failed: 0, notApplicable: 0, notEvaluated: 0, errors: 0, exceptionCount: 0,
+    };
+    for (const record of records) {
+      try {
+        const findings = executePintAECheck(check, { ...data, [dataset]: [record] });
+        allExceptions.push(...findings);
+        execution.exceptionCount += findings.length;
+        if (findings.length) execution.failed++;
+        else {
+          const skipped = unevaluatedReason(check, record, data);
+          if (skipped) execution[skipped]++;
+          else execution.passed++;
+        }
+      } catch (error) {
+        execution.errors++;
+        execution.notEvaluated += records.length - execution.passed - execution.failed - execution.notApplicable - execution.notEvaluated - execution.errors;
+        execution.status = 'error';
+        execution.reason = error instanceof Error ? error.message : 'Rule execution failed';
+        options.onExecution?.(execution);
+        throw error;
+      }
+    }
+    execution.status = execution.failed ? 'fail' : execution.notEvaluated ? 'not_evaluated'
+      : execution.passed ? 'pass' : execution.notApplicable ? 'not_applicable' : 'not_evaluated';
+    if (!records.length) execution.reason = 'No candidate records';
+    else if (execution.notEvaluated) execution.reason = 'Required evaluation inputs are absent or invalid';
+    else if (execution.status === 'not_applicable') execution.reason = 'Current executor condition does not apply';
+    options.onExecution?.(execution);
   }
   
   return allExceptions;

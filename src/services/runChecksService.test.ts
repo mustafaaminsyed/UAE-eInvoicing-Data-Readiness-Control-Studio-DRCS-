@@ -61,6 +61,19 @@ Example artifacts shape (persist_failed):
 */
 
 describe('runChecksService', () => {
+  it('does not execute or persist when ruleset loading fails', async () => {
+    vi.mocked(fetchEnabledPintAEChecks).mockRejectedValueOnce(new Error('Rules unavailable'));
+    await expect(runChecksPipeline({ plan: { scope: 'AR', datasetTypesRan: ['AR'] }, getDataForDataset: () => baseData })).rejects.toThrow('Rules unavailable');
+    expect(fetchEnabledPintAEChecks).toHaveBeenCalledWith({ forExecution: true });
+    expect(runAllPintAEChecks).not.toHaveBeenCalled();
+    expect(saveCheckRun).not.toHaveBeenCalled();
+  });
+
+  it('does not persist when a rule executor fails', async () => {
+    vi.mocked(runAllPintAEChecks).mockImplementationOnce(() => { throw new Error('Unsupported rule'); });
+    await expect(runChecksPipeline({ plan: { scope: 'AR', datasetTypesRan: ['AR'] }, getDataForDataset: () => baseData })).rejects.toThrow('Unsupported rule');
+    expect(saveCheckRun).not.toHaveBeenCalled();
+  });
   const mockedRunAllChecks = vi.mocked(runAllChecks);
   const mockedRunAllPintAEChecks = vi.mocked(runAllPintAEChecks);
   const mockedFetchEnabledPintAEChecks = vi.mocked(fetchEnabledPintAEChecks);

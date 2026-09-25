@@ -1,52 +1,78 @@
 import { Buyer, InvoiceHeader, InvoiceLine } from '@/types/compliance';
 import { Direction } from '@/types/direction';
+import { z } from 'zod';
 
-export function parseCSV(text: string): Record<string, string>[] {
-  const lines = text.trim().split('\n');
-  if (lines.length < 2) return [];
-
-  const headers = parseCSVLine(lines[0]);
-  const records: Record<string, string>[] = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    const values = parseCSVLine(lines[i]);
-    if (values.length === headers.length) {
-      const record: Record<string, string> = {};
-      headers.forEach((header, index) => {
-        record[header.trim()] = values[index];
-      });
-      records.push(record);
-    }
-  }
-
-  return records;
+const categoryFields = { tax_category_code: z.string().trim().min(1), tax_category_rate: z.number().finite().optional() };
+const adjustmentsSchema = z.array(z.object({ ...categoryFields, amount: z.number().finite() }).strict());
+const breakdownsSchema = z.array(z.object({ ...categoryFields, taxable_amount: z.number().finite(), tax_amount: z.number().finite() }).strict());
+function jsonColumn<T>(record: Record<string, string>, field: string, schema: z.ZodType<T>): T | undefined {
+  const value = record[field]?.trim();
+  if (!value) return undefined;
+  try { return schema.parse(JSON.parse(value)); }
+  catch { throw new Error(`CSV row ${sourceRows.get(record) ?? '?'}: ${field} must contain a JSON array with category codes and finite numeric amounts`); }
 }
 
-function parseCSVLine(line: string): string[] {
-  const result: string[] = [];
-  let current = '';
-  let inQuotes = false;
+// Keep source coordinates outside the column namespace used by mapping screens.
+const sourceRows = new WeakMap<Record<string, string>, number>();
 
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
+export function parseCSV(input: string): Record<string, string>[] {
+  const text = input.replace(/^\uFEFF/, '');
+  const rows: { values: string[]; line: number }[] = [];
+  let values: string[] = [];
+  let cell = '';
+  let state: 'plain' | 'quoted' | 'closed' = 'plain';
+  let line = 1;
+  let startLine = 1;
+  let touched = false;
+  const finishCell = () => { values.push(cell); cell = ''; state = 'plain'; };
+  const finishRow = () => {
+    finishCell();
+    if (touched) rows.push({ values, line: startLine });
+    values = [];
+    touched = false;
+  };
 
-    if (char === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        current += '"';
-        i++;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (state === 'quoted') {
+      if (char === '"') {
+        if (text[i + 1] === '"') { cell += '"'; i++; }
+        else state = 'closed';
       } else {
-        inQuotes = !inQuotes;
+        cell += char;
+        if (char === '\n' || (char === '\r' && text[i + 1] !== '\n')) line++;
       }
-    } else if (char === ',' && !inQuotes) {
-      result.push(current.trim());
-      current = '';
-    } else {
-      current += char;
+      continue;
     }
+    if (char === ',' ) { touched = true; finishCell(); }
+    else if (char === '\n' || char === '\r') {
+      finishRow();
+      if (char === '\r' && text[i + 1] === '\n') i++;
+      line++;
+      startLine = line;
+    } else if (state === 'closed') {
+      throw new Error(`CSV row ${line}: unexpected character after closing quote.`);
+    } else if (char === '"') {
+      if (cell !== '') throw new Error(`CSV row ${line}: quote inside an unquoted field.`);
+      state = 'quoted';
+      touched = true;
+    } else { cell += char; touched = true; }
   }
-
-  result.push(current.trim());
-  return result;
+  if (state === 'quoted') throw new Error(`CSV row ${startLine}: unclosed quoted field.`);
+  if (touched) finishRow();
+  if (!rows.length) return [];
+  const headers = rows[0].values.map(value => value.trim());
+  if (headers.some(header => !header) || new Set(headers).size !== headers.length) {
+    throw new Error(`CSV row ${rows[0].line}: column names must be non-empty and unique.`);
+  }
+  return rows.slice(1).map(row => {
+    if (row.values.length !== headers.length) {
+      throw new Error(`CSV row ${row.line}: expected ${headers.length} columns, found ${row.values.length}. No records loaded.`);
+    }
+    const record = Object.fromEntries(headers.map((header, index) => [header, row.values[index]]));
+    sourceRows.set(record, row.line);
+    return record;
+  });
 }
 
 function str(record: Record<string, string>, ...keys: string[]): string | undefined {
@@ -61,11 +87,21 @@ function num(record: Record<string, string>, ...keys: string[]): number | undefi
   for (const key of keys) {
     const v = record[key];
     if (v !== undefined && v !== null && v.trim() !== '') {
-      const n = parseFloat(v);
-      if (!isNaN(n)) return n;
+      const value = v.trim();
+      const n = Number(value);
+      if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(value) || !Number.isFinite(n)) {
+        throw new Error(`CSV row ${sourceRows.get(record)}: ${key} must be a finite decimal; received "${v}".`);
+      }
+      return n;
     }
   }
   return undefined;
+}
+
+function requiredNum(record: Record<string, string>, ...keys: string[]): number {
+  const value = num(record, ...keys);
+  if (value === undefined) throw new Error(`CSV row ${sourceRows.get(record)}: missing numeric field ${keys[0]}.`);
+  return value;
 }
 
 export async function parseBuyersFile(file: File): Promise<Buyer[]> {
@@ -81,7 +117,7 @@ type ParseOptions = {
 function getValue(record: Record<string, string>, keys: string[]): string | undefined {
   for (const key of keys) {
     const value = record[key];
-    if (value !== undefined && value !== null && value !== '') return value;
+    if (value !== undefined && value !== null && value.trim() !== '') return value.trim();
   }
   return undefined;
 }
@@ -113,7 +149,7 @@ export async function parsePartiesFile(file: File, options: ParseOptions = {}): 
     buyer_postcode: str(record, 'buyer_postcode', 'supplier_postcode', 'vendor_postcode'),
     buyer_subdivision: getValue(record, subdivisionKeys),
     buyer_electronic_address: getValue(record, electronicAddressKeys),
-    source_row_number: index + 2,
+    source_row_number: sourceRows.get(record) ?? index + 2,
     upload_session_id: options.uploadSessionId,
     upload_manifest_id: options.uploadManifestId,
   }));
@@ -126,13 +162,13 @@ export async function parseHeadersFile(file: File, options: ParseOptions = {}): 
   const counterpartyIdKeys = direction === 'AP' ? ['supplier_id', 'vendor_id', 'buyer_id'] : ['buyer_id', 'customer_id', 'party_id'];
 
   return records.map((record, index) => ({
-    invoice_id: record.invoice_id || '',
-    invoice_number: record.invoice_number || '',
-    issue_date: record.issue_date || '',
-    seller_trn: record.seller_trn || '',
+    invoice_id: str(record, 'invoice_id') || '',
+    invoice_number: str(record, 'invoice_number') || '',
+    issue_date: str(record, 'issue_date') || '',
+    seller_trn: str(record, 'seller_trn') || '',
     buyer_id: getValue(record, counterpartyIdKeys) || '',
     buyer_trn: str(record, 'buyer_trn'),
-    currency: record.currency || '',
+    currency: str(record, 'currency') || '',
     direction,
     invoice_type: str(record, 'invoice_type_code', 'invoice_type'),
     total_excl_vat: num(record, 'total_excl_vat'),
@@ -151,6 +187,12 @@ export async function parseHeadersFile(file: File, options: ParseOptions = {}): 
     payment_means_code: str(record, 'payment_means_code'),
     fx_rate: num(record, 'fx_rate'),
     amount_due: num(record, 'amount_due'),
+    paid_amount: num(record, 'paid_amount'),
+    // Zod enforces required properties at runtime; this project's non-strict
+    // null configuration otherwise infers its object properties as optional.
+    tax_breakdowns: jsonColumn(record, 'tax_breakdowns', breakdownsSchema) as InvoiceHeader['tax_breakdowns'],
+    document_allowances: jsonColumn(record, 'document_allowances', adjustmentsSchema) as InvoiceHeader['document_allowances'],
+    document_charges: jsonColumn(record, 'document_charges', adjustmentsSchema) as InvoiceHeader['document_charges'],
     tax_category_code: str(record, 'tax_category_code'),
     tax_category_rate: num(record, 'tax_category_rate'),
     note: str(record, 'note'),
@@ -161,7 +203,7 @@ export async function parseHeadersFile(file: File, options: ParseOptions = {}): 
     rounding_amount: num(record, 'rounding_amount'),
     spec_id: str(record, 'spec_id', 'specification_id'),
     business_process: str(record, 'business_process', 'business_process_type'),
-    source_row_number: index + 2,
+    source_row_number: sourceRows.get(record) ?? index + 2,
     upload_session_id: options.uploadSessionId,
     upload_manifest_id: options.uploadManifestId,
   }));
@@ -172,22 +214,23 @@ export async function parseLinesFile(file: File, options: ParseOptions = {}): Pr
   const records = parseCSV(text);
 
   return records.map((record, index) => ({
-    line_id: record.line_id || '',
-    invoice_id: record.invoice_id || '',
-    line_number: parseInt(record.line_number) || 0,
+    line_id: str(record, 'line_id') || '',
+    invoice_id: str(record, 'invoice_id') || '',
+    line_number: requiredNum(record, 'line_number'),
     description: str(record, 'description', 'item_name'),
     item_name: str(record, 'item_name', 'description'),
-    quantity: parseFloat(record.quantity) || 0,
-    unit_price: parseFloat(record.unit_price) || 0,
-    line_discount: record.line_discount ? parseFloat(record.line_discount) : undefined,
-    line_total_excl_vat: num(record, 'line_total_excl_vat', 'line_net_amount') || 0,
-    vat_rate: parseFloat(record.vat_rate) || 0,
-    vat_amount: parseFloat(record.vat_amount) || 0,
+    quantity: requiredNum(record, 'quantity'),
+    unit_price: requiredNum(record, 'unit_price'),
+    line_discount: num(record, 'line_discount'),
+    price_base_quantity: num(record, 'price_base_quantity'),
+    line_total_excl_vat: requiredNum(record, 'line_total_excl_vat', 'line_net_amount'),
+    vat_rate: requiredNum(record, 'vat_rate'),
+    vat_amount: requiredNum(record, 'vat_amount'),
     unit_of_measure: str(record, 'unit_of_measure', 'unit_code'),
     tax_category_code: str(record, 'tax_category_code'),
     line_allowance_amount: num(record, 'line_allowance_amount'),
     line_charge_amount: num(record, 'line_charge_amount'),
-    source_row_number: index + 2,
+    source_row_number: sourceRows.get(record) ?? index + 2,
     upload_session_id: options.uploadSessionId,
     upload_manifest_id: options.uploadManifestId,
   }));

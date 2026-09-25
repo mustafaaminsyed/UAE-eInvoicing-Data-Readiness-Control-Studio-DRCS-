@@ -61,12 +61,13 @@ export async function fetchPintAEChecks(): Promise<PintAECheck[]> {
   }
 }
 
-export async function fetchEnabledPintAEChecks(): Promise<PintAECheck[]> {
+export async function fetchEnabledPintAEChecks(options: { forExecution?: boolean } = {}): Promise<PintAECheck[]> {
   const envStatus = getSupabaseEnvStatus();
   if (!envStatus.configured) {
     if (shouldUseLocalDevFallback()) {
       return UAE_UC1_CHECK_PACK.filter((check) => check.is_enabled);
     }
+    if (options.forExecution) throw new Error('PINT-AE validation is unavailable: Supabase is not configured and local fallback is disabled.');
     console.warn('[PINT-AE] Skipping enabled checks fetch: Supabase env is not configured', envStatus.issues);
     return [];
   }
@@ -80,8 +81,11 @@ export async function fetchEnabledPintAEChecks(): Promise<PintAECheck[]> {
 
     if (error) {
       console.error('Error fetching enabled PINT-AE checks:', error);
+      if (options.forExecution) throw new Error(`Unable to load PINT-AE checks: ${error.message}`);
       return [];
     }
+
+    if (options.forExecution && !data?.length) throw new Error('No enabled PINT-AE checks are available. Validation was not performed.');
 
     return (data || []).map(row => ({
       id: row.id,
@@ -106,6 +110,7 @@ export async function fetchEnabledPintAEChecks(): Promise<PintAECheck[]> {
     }));
   } catch (error) {
     console.error('Error fetching enabled PINT-AE checks:', error);
+    if (options.forExecution) throw error;
     return [];
   }
 }

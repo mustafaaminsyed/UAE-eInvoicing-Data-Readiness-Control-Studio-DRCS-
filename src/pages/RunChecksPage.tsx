@@ -416,11 +416,15 @@ export default function RunChecksPage() {
         version: selectedTemplate.version,
       });
     }
-    await runChecks({
-      mappingProfileId: selectedTemplate?.id,
-      mappingVersion: selectedTemplate?.version,
-    });
-    navigate('/dashboard');
+    try {
+      await runChecks({
+        mappingProfileId: selectedTemplate?.id,
+        mappingVersion: selectedTemplate?.version,
+      });
+      navigate('/dashboard');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Validation could not complete. Please retry.');
+    }
   };
 
   const handleRefreshChecks = () => {

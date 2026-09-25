@@ -1,7 +1,7 @@
 import { PintAECheck } from '@/types/pintAE';
 
 // UAE UC1 Standard Tax Invoice Check Pack
-// 34 checks aligned with PINT-AE / UAE MoF Data Dictionary
+// 35 checks aligned with PINT-AE / UAE MoF Data Dictionary
 
 export const UAE_UC1_CHECK_PACK: PintAECheck[] = [
   // ============ Header Presence & Format Checks (001-011) ============
@@ -389,21 +389,21 @@ export const UAE_UC1_CHECK_PACK: PintAECheck[] = [
   // ============ Totals & Calculation Checks (021-029) ============
   {
     check_id: 'UAE-UC1-CHK-021',
-    check_name: 'Sum of Line Net Amounts Matches Header',
-    description: 'Validates sum of line net amounts equals header total (IBT-106)',
+    check_name: 'Invoice Net Includes Document Adjustments',
+    description: 'Validates invoice net = sum of line net amounts - document allowances + document charges',
     scope: 'Cross',
     rule_type: 'Math',
     severity: 'Critical',
     use_case: 'UC1 Standard Tax Invoice',
-    pint_reference_terms: ['IBT-106', 'IBT-131'],
-    mof_rule_reference: 'BR-CO-10',
-    pass_condition: 'Sum of line net amounts = Invoice total net amount (within tolerance)',
+    pint_reference_terms: ['IBT-106', 'IBT-107', 'IBT-108', 'IBT-109', 'IBT-131'],
+    mof_rule_reference: 'IBR-CO-13',
+    pass_condition: 'Invoice net equals rounded line sum minus document allowances plus document charges',
     fail_condition: 'Line totals do not sum to header amount',
     owner_team_default: 'Client Finance',
     suggested_fix: 'Reconcile line item amounts with invoice total',
     evidence_required: 'Invoice calculation breakdown',
     is_enabled: true,
-    parameters: { tolerance: 0.01 },
+    parameters: {},
   },
   {
     check_id: 'UAE-UC1-CHK-022',
@@ -475,7 +475,7 @@ export const UAE_UC1_CHECK_PACK: PintAECheck[] = [
     suggested_fix: 'Recalculate invoice totals ensuring Total = Net + VAT',
     evidence_required: 'Invoice calculation worksheet',
     is_enabled: true,
-    parameters: { tolerance: 0.01 },
+    parameters: {},
   },
   {
     check_id: 'UAE-UC1-CHK-026',
@@ -515,15 +515,15 @@ export const UAE_UC1_CHECK_PACK: PintAECheck[] = [
   },
   {
     check_id: 'UAE-UC1-CHK-028',
-    check_name: 'Tax Category Tax Amount Formula',
-    description: 'Validates tax amount = taxable amount x rate (IBT-117)',
+    check_name: 'VAT Breakdown Bases and Tax Amounts',
+    description: 'Reconciles supplied category/rate breakdowns to lines and document adjustments, then checks category tax',
     scope: 'Header',
     rule_type: 'Math',
     severity: 'High',
     use_case: 'UC1 Standard Tax Invoice',
     pint_reference_terms: ['IBT-116', 'IBT-117', 'IBT-119', 'IBT-151', 'IBT-152', 'BTUAE-08'],
-    mof_rule_reference: 'BR-CO-17',
-    pass_condition: 'Tax amount = Taxable base x VAT rate (within rounding tolerance)',
+    mof_rule_reference: 'ALIGNED-IBRP-S-08 / S-09 / category-specific rules',
+    pass_condition: 'Every supported category reconciles; standard-rated amounts use 0.02 slack and zero-tax categories have zero VAT',
     fail_condition: 'Tax calculation does not match formula',
     owner_team_default: 'Client Finance',
     suggested_fix: 'Verify VAT calculation: Tax = Base x Rate',
@@ -547,7 +547,7 @@ export const UAE_UC1_CHECK_PACK: PintAECheck[] = [
     suggested_fix: 'Reconcile tax breakdown categories with total VAT',
     evidence_required: 'Tax category breakdown vs total reconciliation',
     is_enabled: true,
-    parameters: { tolerance: 0.01 },
+    parameters: {},
   },
 
   // ============ Line Item Checks (030-034) ============
@@ -626,20 +626,35 @@ export const UAE_UC1_CHECK_PACK: PintAECheck[] = [
   {
     check_id: 'UAE-UC1-CHK-034',
     check_name: 'Line Net Amount Formula',
-    description: 'Validates line net = (qty x price) - allowances + charges (IBT-131)',
+    description: 'Validates rounded line net = qty x (net price / base quantity) + charges - allowances (IBT-131)',
     scope: 'Lines',
     rule_type: 'Math',
     severity: 'High',
     use_case: 'UC1 Standard Tax Invoice',
     pint_reference_terms: ['IBT-129', 'IBT-131', 'IBT-146', 'IBT-148', 'IBT-149'],
-    mof_rule_reference: 'BR-CO-04',
-    pass_condition: 'Line net amount = (Quantity x Unit Price) - Discount',
+    mof_rule_reference: 'IBR-147-AE',
+    pass_condition: 'Line net amount equals quantity x (net price / base quantity) + charges - allowances after rounding to cents',
     fail_condition: 'Line net calculation is incorrect',
     owner_team_default: 'Client Finance',
-    suggested_fix: 'Verify line calculation: Net = (Qty x Price) - Discount',
+    suggested_fix: 'Verify base quantity, net unit price, line charges and line allowances; line_discount is a legacy allowance alias',
     evidence_required: 'Line item calculation breakdown',
     is_enabled: true,
-    parameters: { tolerance: 0.01 },
+    parameters: {},
+  },
+  {
+    check_id: 'UAE-UC1-CHK-035',
+    check_name: 'Amount Due Reconciliation',
+    description: 'Validates amount due = total including VAT - paid amount + rounding amount',
+    scope: 'Header', rule_type: 'Math', severity: 'Critical',
+    use_case: 'UC1 Standard Tax Invoice',
+    pint_reference_terms: ['IBT-112', 'IBT-113', 'IBT-114', 'IBT-115'],
+    mof_rule_reference: 'IBR-CO-16',
+    pass_condition: 'Payable amount reconciles to gross less paid amount plus rounding',
+    fail_condition: 'Amount due does not reconcile',
+    owner_team_default: 'Client Finance',
+    suggested_fix: 'Check paid amount, rounding amount and amount due',
+    evidence_required: 'Payment and invoice totals',
+    is_enabled: true, parameters: {},
   },
 ];
 

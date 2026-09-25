@@ -1,11 +1,12 @@
-﻿import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useRef } from 'react';
 import { ArrowRight, FileSpreadsheet, AlertCircle, CheckCircle2, Link2, ArrowRightCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useCompliance } from '@/context/ComplianceContext';
-import { parseBuyersFile, parseHeadersFile, parseLinesFile, parseCSV } from '@/lib/csvParser';
+import { parsePartiesFile, parseHeadersFile, parseLinesFile, parseCSV } from '@/lib/csvParser';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { FileDropZone, FileSummaryCard, analyzeFile, FileStats } from '@/components/upload/FileAnalysis';
@@ -48,6 +49,16 @@ export default function UploadPage() {
   }>({ buyers: null, headers: null, lines: null });
   const [sampleScenario, setSampleScenario] = useState<SampleScenario>('positive');
   const [datasetType, setDatasetType] = useState<DatasetType>('AR');
+  const selectionVersions = useRef({ buyers: 0, headers: 0, lines: 0 });
+
+  const changeDatasetType = (next: DatasetType) => {
+    if (next === datasetType) return;
+    for (const type of ['buyers', 'headers', 'lines'] as const) selectionVersions.current[type]++;
+    setFiles({ buyers: null, headers: null, lines: null });
+    setStats({ buyers: null, headers: null, lines: null });
+    setParsedRows({ buyers: null, headers: null, lines: null });
+    setDatasetType(next);
+  };
 
   const allFilesSelected = files.buyers && files.headers && files.lines;
   const allStats = stats.buyers && stats.headers && stats.lines;
@@ -68,7 +79,7 @@ export default function UploadPage() {
   const hasStructuralErrors = [stats.buyers, stats.headers, stats.lines].some(
     (s) => s && s.requiredMissing.length > 0
   );
-  const canProceed = allFilesSelected && !hasStructuralErrors;
+  const canProceed = allFilesSelected && allStats && !hasStructuralErrors;
 
   // Determine current step
   let currentStep: StepKey = 'upload';
@@ -78,7 +89,10 @@ export default function UploadPage() {
 
   // Analyze file on upload
   const handleFileSelect = useCallback(async (type: 'buyers' | 'headers' | 'lines', file: File | null) => {
+    const version = ++selectionVersions.current[type];
     setFiles((prev) => ({ ...prev, [type]: file }));
+    setStats((prev) => ({ ...prev, [type]: null }));
+    setParsedRows((prev) => ({ ...prev, [type]: null }));
     if (!file) {
       setStats((prev) => ({ ...prev, [type]: null }));
       setParsedRows((prev) => ({ ...prev, [type]: null }));
@@ -87,24 +101,27 @@ export default function UploadPage() {
     try {
       const text = await file.text();
       const rows = parseCSV(text);
-      const analysis = analyzeFile(rows, file, type, text);
+      const analysis = analyzeFile(rows, file, type, datasetType, text);
+      if (selectionVersions.current[type] !== version) return;
       setStats((prev) => ({ ...prev, [type]: analysis }));
       setParsedRows((prev) => ({ ...prev, [type]: rows }));
-    } catch {
-      toast({ title: 'Error reading file', description: 'Could not parse the CSV file.', variant: 'destructive' });
+    } catch (error) {
+      if (selectionVersions.current[type] !== version) return;
+      toast({ title: 'Error reading file', description: error instanceof Error ? error.message : 'Could not parse the CSV file.', variant: 'destructive' });
     }
-  }, [toast]);
+  }, [toast, datasetType]);
 
   // Relational integrity checks
   useEffect(() => {
     const checks: RelationalCheck[] = [];
     if (parsedRows.headers && parsedRows.buyers) {
-      const buyerIds = new Set(parsedRows.buyers.map((r) => r.buyer_id));
-      const headerBuyerIds = parsedRows.headers.map((r) => r.buyer_id).filter(Boolean);
+      const partyKey = datasetType === 'AP' ? 'supplier_id' : 'buyer_id';
+      const buyerIds = new Set(parsedRows.buyers.map((r) => r[partyKey]));
+      const headerBuyerIds = parsedRows.headers.map((r) => r[partyKey]).filter(Boolean);
       const matched = headerBuyerIds.filter((id) => buyerIds.has(id));
       const unmatched = headerBuyerIds.length - matched.length;
       checks.push({
-        label: 'headers.buyer_id -> buyers.buyer_id',
+        label: `headers.${partyKey} -> buyers.${partyKey}`,
         matchPct: headerBuyerIds.length > 0 ? (matched.length / headerBuyerIds.length) * 100 : 100,
         unmatchedCount: unmatched,
         total: headerBuyerIds.length,
@@ -123,16 +140,16 @@ export default function UploadPage() {
       });
     }
     setRelationalChecks(checks);
-  }, [parsedRows]);
+  }, [parsedRows, datasetType]);
 
   const handleLoadData = async () => {
     if (!canProceed) return;
     setIsLoading(true);
     try {
       const [buyers, headers, lines] = await Promise.all([
-        parseBuyersFile(files.buyers!),
-        parseHeadersFile(files.headers!),
-        parseLinesFile(files.lines!),
+        parsePartiesFile(files.buyers!, { direction: datasetType }),
+        parseHeadersFile(files.headers!, { direction: datasetType }),
+        parseLinesFile(files.lines!, { direction: datasetType }),
       ]);
       setData({ buyers, headers, lines }, datasetType);
 
@@ -185,14 +202,15 @@ export default function UploadPage() {
         description: `${datasetType === 'AR' ? 'AR' : 'AP'}: ${buyers.length} buyers, ${headers.length} invoices, ${lines.length} line items`,
       });
       navigate('/run');
-    } catch {
-      toast({ title: 'Error loading data', description: 'Please check your CSV files and try again.', variant: 'destructive' });
+    } catch (error) {
+      toast({ title: 'Error loading data', description: error instanceof Error ? error.message : 'Please check your CSV files and try again.', variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleClearAll = () => {
+    for (const type of ['buyers', 'headers', 'lines'] as const) selectionVersions.current[type]++;
     setFiles({ buyers: null, headers: null, lines: null });
     setStats({ buyers: null, headers: null, lines: null });
     setParsedRows({ buyers: null, headers: null, lines: null });
@@ -244,7 +262,7 @@ export default function UploadPage() {
                 <Button
                   size="sm"
                   variant={datasetType === 'AR' ? 'default' : 'outline'}
-                  onClick={() => setDatasetType('AR')}
+                  onClick={() => changeDatasetType('AR')}
                   role="radio"
                   aria-checked={datasetType === 'AR'}
                 >
@@ -253,7 +271,7 @@ export default function UploadPage() {
                 <Button
                   size="sm"
                   variant={datasetType === 'AP' ? 'default' : 'outline'}
-                  onClick={() => setDatasetType('AP')}
+                  onClick={() => changeDatasetType('AP')}
                   role="radio"
                   aria-checked={datasetType === 'AP'}
                 >
@@ -297,27 +315,27 @@ export default function UploadPage() {
             <div className="grid gap-6">
               {/* Buyers */}
               {stats.buyers ? (
-                <FileSummaryCard stats={stats.buyers} type="buyers" onRemove={() => handleFileSelect('buyers', null)} />
+                <FileSummaryCard stats={stats.buyers} type="buyers" direction={datasetType} onRemove={() => handleFileSelect('buyers', null)} />
               ) : (
-                <FileDropZone label="Buyers File" description="buyer_id, buyer_name, buyer_trn, buyer_address, buyer_country" sampleType="buyers" sampleScenario={sampleScenario} onFileSelect={(f) => handleFileSelect('buyers', f)} />
+                <FileDropZone label="Buyers File" description="buyer_id, buyer_name, buyer_trn, buyer_address, buyer_country" sampleType="buyers" sampleScenario={sampleScenario} direction={datasetType} onFileSelect={(f) => handleFileSelect('buyers', f)} />
               )}
 
               <div className="border-t" />
 
               {/* Headers */}
               {stats.headers ? (
-                <FileSummaryCard stats={stats.headers} type="headers" onRemove={() => handleFileSelect('headers', null)} />
+                <FileSummaryCard stats={stats.headers} type="headers" direction={datasetType} onRemove={() => handleFileSelect('headers', null)} />
               ) : (
-                <FileDropZone label="Invoice Headers File" description="invoice_id, invoice_number, issue_date, seller_trn, buyer_id, currency, ... (technical fields like business_process/spec_id can be system-derived)" sampleType="headers" sampleScenario={sampleScenario} onFileSelect={(f) => handleFileSelect('headers', f)} />
+                <FileDropZone label="Invoice Headers File" description="invoice_id, invoice_number, issue_date, seller_trn, buyer_id, currency, ... (technical fields like business_process/spec_id can be system-derived)" sampleType="headers" sampleScenario={sampleScenario} direction={datasetType} onFileSelect={(f) => handleFileSelect('headers', f)} />
               )}
 
               <div className="border-t" />
 
               {/* Lines */}
               {stats.lines ? (
-                <FileSummaryCard stats={stats.lines} type="lines" onRemove={() => handleFileSelect('lines', null)} />
+                <FileSummaryCard stats={stats.lines} type="lines" direction={datasetType} onRemove={() => handleFileSelect('lines', null)} />
               ) : (
-                <FileDropZone label="Invoice Lines File" description="line_id, invoice_id, line_number, quantity, unit_price, vat_rate, ..." sampleType="lines" sampleScenario={sampleScenario} onFileSelect={(f) => handleFileSelect('lines', f)} />
+                <FileDropZone label="Invoice Lines File" description="line_id, invoice_id, line_number, quantity, unit_price, vat_rate, ..." sampleType="lines" sampleScenario={sampleScenario} direction={datasetType} onFileSelect={(f) => handleFileSelect('lines', f)} />
               )}
             </div>
           </div>

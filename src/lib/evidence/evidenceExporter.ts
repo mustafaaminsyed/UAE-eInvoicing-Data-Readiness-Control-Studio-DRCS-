@@ -35,6 +35,12 @@ function workbookToBuffer(wb: XLSX.WorkBook): Uint8Array {
 
 export async function generateEvidencePackZip(data: EvidencePackData): Promise<Blob> {
   const zip = new JSZip();
+  zip.file('07_execution_ledger.json', JSON.stringify({
+    ledgerVersion: 1,
+    runId: data.overview.assessmentRunId,
+    timestamp: data.overview.executionTimestamp,
+    executions: data.executionRecords,
+  }, null, 2));
 
   // 01_scope_summary.xlsx
   const scopeRows = [
@@ -84,6 +90,13 @@ export async function generateEvidencePackZip(data: EvidencePackData): Promise<B
     'Execution Count': r.execution_count,
     'Failure Count': r.failure_count,
     'Execution Count Source': r.execution_source,
+    'Status': r.status,
+    'Passed Records': r.pass_count,
+    'Not Applicable': r.not_applicable_count,
+    'Not Evaluated': r.not_evaluated_count,
+    'Errors': r.error_count,
+    'Exception Findings': r.exception_count,
+    'Reason': r.reason,
   }));
   zip.file('03_rule_execution.xlsx', workbookToBuffer(createWorkbook(ruleRows, 'Rule Execution')));
 
@@ -225,19 +238,23 @@ export async function generateEvidencePackPdf(data: EvidencePackData): Promise<B
   sectionTitle('Rules and Exceptions', 50);
   autoTable(doc, {
     startY: 62,
-    head: [['Rule ID', 'Rule Name', 'Severity', 'Executions', 'Failures']],
+    head: [['Rule ID', 'Rule Name', 'Status', 'Evaluated', 'Failed', 'N/A', 'Not evaluated', 'Errors', 'Source']],
     body: data.ruleExecution.map((r) => [
       r.rule_id,
       r.rule_name,
-      r.severity,
+      r.status,
       String(r.execution_count),
       String(r.failure_count),
+      String(r.not_applicable_count),
+      String(r.not_evaluated_count),
+      String(r.error_count),
+      r.execution_source,
     ]),
     theme: 'striped',
     styles: { fontSize: 8, cellPadding: 4, overflow: 'linebreak' },
     headStyles: { fillColor: [236, 243, 252], textColor: [24, 40, 72] },
     margin: { left: marginX, right: marginX },
-    columnStyles: { 1: { cellWidth: 220 } },
+    columnStyles: { 1: { cellWidth: 100 } },
   });
 
   const afterRulesY = (doc as any).lastAutoTable.finalY + 16;

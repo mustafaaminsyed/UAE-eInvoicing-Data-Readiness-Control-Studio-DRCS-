@@ -53,9 +53,15 @@ const DR_TO_COLUMN_MAP: Record<string, { dataset: 'buyers' | 'headers' | 'lines'
   'IBT-109': { dataset: 'headers', columns: ['total_excl_vat'] },
   'IBT-110': { dataset: 'headers', columns: ['vat_total'] },
   'IBT-112': { dataset: 'headers', columns: ['total_incl_vat'] },
+  'IBT-107': { dataset: 'headers', columns: ['document_level_allowance_total', 'document_allowances'] },
+  'IBT-108': { dataset: 'headers', columns: ['document_level_charge_total', 'document_charges'] },
+  'IBT-113': { dataset: 'headers', columns: ['paid_amount'] },
+  'IBT-114': { dataset: 'headers', columns: ['rounding_amount'] },
+  'IBT-116': { dataset: 'headers', columns: ['tax_breakdowns', 'total_excl_vat'] },
+  'IBT-117': { dataset: 'headers', columns: ['tax_breakdowns', 'vat_total'] },
   'IBT-115': { dataset: 'headers', columns: ['amount_due'] },
-  'IBT-118': { dataset: 'headers', columns: ['tax_category_code'] },
-  'IBT-119': { dataset: 'headers', columns: ['tax_category_rate'] },
+  'IBT-118': { dataset: 'headers', columns: ['tax_breakdowns', 'tax_category_code'] },
+  'IBT-119': { dataset: 'headers', columns: ['tax_breakdowns', 'tax_category_rate'] },
   'BTUAE-02': { dataset: 'headers', columns: ['transaction_type_code'] },
   'BTUAE-15': { dataset: 'headers', columns: ['seller_legal_reg_id_type'] },
 
@@ -65,6 +71,7 @@ const DR_TO_COLUMN_MAP: Record<string, { dataset: 'buyers' | 'headers' | 'lines'
   'IBT-130': { dataset: 'lines', columns: ['unit_of_measure'] },
   'IBT-131': { dataset: 'lines', columns: ['line_total_excl_vat'] },
   'IBT-146': { dataset: 'lines', columns: ['unit_price'] },
+  'IBT-149': { dataset: 'lines', columns: ['price_base_quantity'] },
   'IBT-148': { dataset: 'lines', columns: ['unit_price'] }, // gross price maps to same input
   'IBT-151': { dataset: 'lines', columns: ['tax_category_code'] },
   'IBT-152': { dataset: 'lines', columns: ['vat_rate'] },
@@ -74,8 +81,6 @@ const DR_TO_COLUMN_MAP: Record<string, { dataset: 'buyers' | 'headers' | 'lines'
 
   // Derived/calculated fields (no user input column — derived from inputs)
   'IBT-106': { dataset: 'headers', columns: ['total_excl_vat'] },
-  'IBT-116': { dataset: 'headers', columns: ['total_excl_vat'] },
-  'IBT-117': { dataset: 'headers', columns: ['vat_total'] },
 
   // ASP-owned fields — not in templates
   'IBT-023': { dataset: 'headers', columns: [] },
@@ -84,7 +89,6 @@ const DR_TO_COLUMN_MAP: Record<string, { dataset: 'buyers' | 'headers' | 'lines'
   'IBT-034-1': { dataset: 'headers', columns: [] },
   'IBT-048-1': { dataset: 'buyers', columns: [] },
   'IBT-049-1': { dataset: 'buyers', columns: [] },
-  'IBT-149': { dataset: 'lines', columns: [] },
 };
 
 function extractCodeListRef(field: SpecRegistryField): string | null {
@@ -147,12 +151,13 @@ export const PARSER_KNOWN_COLUMNS: Record<'buyers' | 'headers' | 'lines', Set<st
     'tax_category_rate', 'note', 'supply_date', 'tax_currency',
     'document_level_allowance_total', 'document_level_charge_total',
     'rounding_amount', 'spec_id', 'business_process',
+    'paid_amount', 'tax_breakdowns', 'document_allowances', 'document_charges',
   ]),
   lines: new Set([
     'line_id', 'invoice_id', 'line_number', 'description', 'quantity',
     'unit_price', 'line_discount', 'line_total_excl_vat', 'vat_rate', 'vat_amount',
     'unit_of_measure', 'tax_category_code', 'item_name',
-    'line_allowance_amount', 'line_charge_amount',
+    'line_allowance_amount', 'line_charge_amount', 'price_base_quantity',
   ]),
 };
 

@@ -67,7 +67,7 @@ export interface ConformanceResult {
 
 export function computeTraceabilityMatrix(
   populations: DatasetPopulation[],
-  exceptionCountsByDR?: Map<string, { pass: number; fail: number }>
+  exceptionCountsByDR?: Map<string, { pass: number; fail: number; exceptions?: number }>
 ): ConformanceResult {
   const registry = getDRRegistry();
 
@@ -103,8 +103,8 @@ export function computeTraceabilityMatrix(
       const counts = exceptionCountsByDR.get(entry.dr_id);
       if (counts) {
         const total = counts.pass + counts.fail;
-        lastRunPassRate = total > 0 ? (counts.pass / total) * 100 : 100;
-        exceptionCount = counts.fail;
+        lastRunPassRate = total > 0 ? (counts.pass / total) * 100 : null;
+        exceptionCount = counts.exceptions ?? counts.fail;
       }
     }
 

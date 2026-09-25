@@ -30,6 +30,7 @@ import { buildOrganizationProfileExceptions, getRulesetForDirection, RULESET_VER
 import { resolveDirection } from '@/lib/direction/directionUtils';
 import { DatasetType } from '@/types/datasets';
 import { InvestigationFlag } from '@/types/customChecks';
+import { ExecutionSnapshot, RuleExecution } from '@/types/executionLedger';
 
 interface ComplianceContextType {
   direction: Direction;
@@ -50,6 +51,7 @@ interface ComplianceContextType {
   investigationFlags: InvestigationFlag[];
   pintAEExceptions: PintAEException[];
   runSummary: RunSummary | null;
+  executionSnapshot: ExecutionSnapshot | null;
   lastChecksRunAt: string | null;
   lastChecksRunDatasetType: DatasetType | null;
   isDataLoaded: boolean;
@@ -120,6 +122,9 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
   const [investigationFlags] = useState<InvestigationFlag[]>([]);
   const [pintAEExceptions, setPintAEExceptions] = useState<PintAEException[]>([]);
   const [runSummary, setRunSummary] = useState<RunSummary | null>(null);
+  const [executionSnapshot, setExecutionSnapshot] = useState<ExecutionSnapshot | null>(null);
+  const datasetRevision = React.useRef(0);
+  const runGeneration = React.useRef(0);
   const [lastChecksRunAt, setLastChecksRunAt] = useState<string | null>(null);
   const [lastChecksRunDatasetType, setLastChecksRunDatasetType] = useState<DatasetType | null>(null);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
@@ -177,6 +182,17 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
   };
 
   const applyDatasetToVisibleState = (datasetType: DatasetType) => {
+    if (datasetType !== direction) {
+      datasetRevision.current++;
+      setExecutionSnapshot(null);
+      setIsChecksRun(false);
+      setCheckResults([]);
+      setExceptions([]);
+      setPintAEExceptions([]);
+      setRunSummary(null);
+      setLastChecksRunAt(null);
+      setLastChecksRunDatasetType(null);
+    }
     const target = getDataForDataset(datasetType);
     setDirectionState(datasetType);
     setBuyers(target.buyers);
@@ -232,6 +248,8 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
     setHeaders(normalizedData.headers);
     setLines(normalizedData.lines);
     setIsDataLoaded(true);
+    datasetRevision.current++;
+    setExecutionSnapshot(null);
     setIsChecksRun(false);
     setCheckResults([]);
     setExceptions([]);
@@ -242,7 +260,24 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
   };
 
   const runChecks = async (options?: { mappingProfileId?: string; mappingVersion?: number }) => {
+    const revision = datasetRevision.current;
+    const generation = ++runGeneration.current;
+    const ensureCurrentAssessment = () => {
+      if (revision !== datasetRevision.current || generation !== runGeneration.current) {
+        throw new Error('The dataset or assessment changed during validation. Run checks again.');
+      }
+    };
+    setExecutionSnapshot(null);
     setIsRunning(true);
+    // Invalidate the previous result before attempting a fresh assessment.
+    setIsChecksRun(false);
+    setCheckResults([]);
+    setExceptions([]);
+    setPintAEExceptions([]);
+    setRunSummary(null);
+    setLastChecksRunAt(null);
+    setLastChecksRunDatasetType(null);
+    try {
     
     const buyerMap = new Map(buyers.map(b => [b.buyer_id, b]));
     const headerMap = new Map(headers.map(h => [h.invoice_id, h]));
@@ -266,8 +301,13 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
     await seedUC1CheckPack(false);
 
     // Fetch and run PINT-AE checks
-    const pintAEChecks = await fetchEnabledPintAEChecks();
-    const pintExceptions = runAllPintAEChecks(pintAEChecks, dataContext);
+    const pintAEChecks = await fetchEnabledPintAEChecks({ forExecution: true });
+    ensureCurrentAssessment();
+    const executions: RuleExecution[] = [];
+    const pintExceptions = runAllPintAEChecks(pintAEChecks, dataContext, { datasetType: direction, onExecution: execution => executions.push(execution) });
+    const assessmentTimestamp = new Date().toISOString();
+    const snapshot: ExecutionSnapshot = { runId: `assessment-${crypto.randomUUID()}`, timestamp: assessmentTimestamp, datasetType: direction, executions };
+    setExecutionSnapshot(snapshot);
     
     // Convert PINT-AE exceptions to legacy format for backward compatibility
     const legacyExceptions: Exception[] = pintExceptions.map(e => ({
@@ -311,13 +351,13 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
     setExceptions(allExceptions);
     setPintAEExceptions(pintExceptions);
     setIsChecksRun(true);
-    setLastChecksRunAt(new Date().toISOString());
+    setLastChecksRunAt(assessmentTimestamp);
     setLastChecksRunDatasetType(direction);
 
     // Calculate and save scores
     const stats = calculateStats(allExceptions, headers.length);
     const runId = await saveCheckRun({
-      run_date: new Date().toISOString(),
+      run_date: assessmentTimestamp,
       total_invoices: headers.length,
       total_exceptions: allExceptions.length,
       critical_count: stats.exceptionsBySeverity.Critical,
@@ -327,6 +367,8 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
       pass_rate: stats.passRate,
       results_summary: {
         checkCount: builtInResults.length + pintAEChecks.length,
+        executionLedgerVersion: 1,
+        pintAEExecutions: executions,
         direction,
         ruleset: activeRuleset,
         rulesetVersion: RULESET_VERSION,
@@ -338,8 +380,11 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
     });
 
     if (runId) {
+      ensureCurrentAssessment();
+      setExecutionSnapshot({ ...snapshot, runId });
       // Save PINT-AE exceptions
       await saveExceptions(runId, pintExceptions);
+      ensureCurrentAssessment();
       setExceptions((prev) => prev.map((exception) => ({ ...exception, validationRunId: runId })));
       
       // Calculate and save client risk scores
@@ -349,6 +394,7 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
       // Generate and save run summary
       const summary = generateRunSummary(runId, headers.length, pintExceptions, clientScores);
       await saveRunSummary(summary);
+      ensureCurrentAssessment();
       setRunSummary(summary);
       
       // Calculate entity scores
@@ -360,7 +406,9 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
       ]);
     }
 
-    setIsRunning(false);
+    } finally {
+      if (generation === runGeneration.current) setIsRunning(false);
+    }
   };
 
   const calculateStats = (excs: Exception[], totalInvoices: number): DashboardStats => {
@@ -406,6 +454,8 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
   };
 
   const clearData = () => {
+    datasetRevision.current++;
+    setExecutionSnapshot(null);
     setDataByDirection({
       AR: { buyers: [], headers: [], lines: [], direction: 'AR' },
       AP: { buyers: [], headers: [], lines: [], direction: 'AP' },
@@ -475,7 +525,7 @@ export function ComplianceProvider({ children }: { children: ReactNode }) {
       activeMappingProfileByDirection,
       setActiveMappingProfileForDirection,
       buyers, headers, lines, checkResults, exceptions, investigationFlags, pintAEExceptions, runSummary, lastChecksRunAt, lastChecksRunDatasetType,
-      isDataLoaded, isChecksRun, isRunning,
+      isDataLoaded, isChecksRun, isRunning, executionSnapshot,
       uploadLogs,
       setData, runChecks, clearData,
       getDataForDataset, hasDatasetLoaded,

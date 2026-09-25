@@ -84,7 +84,7 @@ const CONTROLS_DEFINITION: Omit<ControlEntry, 'covered_dr_ids'>[] = [
     control_name: 'Invoice Totals Reconciliation',
     control_type: 'detective',
     description: 'Detects mismatches between line sums and header totals',
-    covered_rule_ids: ['UAE-UC1-CHK-021', 'UAE-UC1-CHK-025', 'UAE-UC1-CHK-029'],
+    covered_rule_ids: ['UAE-UC1-CHK-021', 'UAE-UC1-CHK-025', 'UAE-UC1-CHK-029', 'UAE-UC1-CHK-035'],
   },
   {
     control_id: 'CTRL-010',

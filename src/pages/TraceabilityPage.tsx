@@ -11,6 +11,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useCompliance } from '@/context/ComplianceContext';
+import { recordedCountsByDR } from '@/lib/coverage/executionCoverage';
 import { computeTraceabilityMatrix, TraceabilityRow, GapsSummary, CoverageStatus } from '@/lib/coverage/conformanceEngine';
 import { computeAllDatasetPopulations } from '@/lib/coverage/populationCoverage';
 import { CONFORMANCE_CONFIG } from '@/config/conformance';
@@ -251,7 +252,7 @@ function DatasetBadge({ dataset }: { dataset: string | null }) {
 }
 
 export default function TraceabilityPage() {
-  const { buyers, headers, lines, isDataLoaded, pintAEExceptions } = useCompliance();
+  const { buyers, headers, lines, isDataLoaded, pintAEExceptions, executionSnapshot, direction } = useCompliance();
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
@@ -310,16 +311,8 @@ export default function TraceabilityPage() {
   }, [isDataLoaded, buyers, headers, lines]);
 
   const exceptionCountsByDR = useMemo(() => {
-    const map = new Map<string, { pass: number; fail: number }>();
-    for (const exc of pintAEExceptions) {
-      const drIds = exc.pint_reference_terms ?? [];
-      for (const drId of drIds) {
-        if (!map.has(drId)) map.set(drId, { pass: 0, fail: 0 });
-        map.get(drId)!.fail++;
-      }
-    }
-    return map;
-  }, [pintAEExceptions]);
+    return recordedCountsByDR(executionSnapshot?.datasetType === direction ? executionSnapshot.executions : []);
+  }, [executionSnapshot, direction]);
 
   const { rows, gaps, specVersion } = useMemo(
     () => computeTraceabilityMatrix(populations, exceptionCountsByDR),

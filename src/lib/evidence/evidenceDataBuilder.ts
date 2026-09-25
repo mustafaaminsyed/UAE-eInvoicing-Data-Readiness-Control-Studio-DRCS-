@@ -11,6 +11,8 @@ import { DatasetPopulation } from '@/lib/coverage/populationCoverage';
 import { CONFORMANCE_CONFIG } from '@/config/conformance';
 import { PintAEException } from '@/types/pintAE';
 import { Buyer, InvoiceHeader, InvoiceLine } from '@/types/compliance';
+import { ExecutionStatus, RuleExecution } from '@/types/executionLedger';
+import { recordedCountsByDR } from '@/lib/coverage/executionCoverage';
 
 // ── Tab A: Overview ──────────────────────────────────────────────────
 export interface EvidenceOverview {
@@ -56,7 +58,14 @@ export interface RuleExecutionRow {
   linked_dr_ids: string;
   execution_count: number;
   failure_count: number;
-  execution_source: 'estimated';
+  execution_source: 'recorded' | 'unavailable';
+  status: ExecutionStatus;
+  pass_count: number;
+  not_applicable_count: number;
+  not_evaluated_count: number;
+  exception_count: number;
+  error_count: number;
+  reason: string;
 }
 
 // ── Tab D: Exceptions & Cases ────────────────────────────────────────
@@ -94,6 +103,7 @@ export interface PopulationQualityRow {
 
 // ── Full Evidence Pack ───────────────────────────────────────────────
 export interface EvidencePackData {
+  executionRecords: RuleExecution[];
   overview: EvidenceOverview;
   drCoverage: DRCoverageRow[];
   ruleExecution: RuleExecutionRow[];
@@ -111,21 +121,20 @@ export function buildEvidencePackData(
   lines: InvoiceLine[],
   pintAEExceptions: PintAEException[],
   populations: DatasetPopulation[],
+  executions: RuleExecution[] = [],
 ): EvidencePackData {
   const registry = getDRRegistry();
-  const rules = getRuleTraceability();
+  const rules = [...getRuleTraceability()];
+  for (const execution of executions) {
+    const check = execution.check;
+    const entry = { rule_id: check.check_id, rule_name: check.check_name, affected_dr_ids: check.pint_reference_terms, severity: check.severity, scope: check.scope };
+    const index = rules.findIndex(rule => rule.rule_id === check.check_id);
+    if (index >= 0) rules[index] = entry;
+    else rules.push(entry);
+  }
   const controls = getControlsRegistry();
 
-  // Build exception counts by DR for the conformance engine
-  const exceptionCountsByDR = new Map<string, { pass: number; fail: number }>();
-  for (const exc of pintAEExceptions) {
-    const drIds = exc.pint_reference_terms ?? [];
-    for (const drId of drIds) {
-      const existing = exceptionCountsByDR.get(drId) ?? { pass: 0, fail: 0 };
-      existing.fail++;
-      exceptionCountsByDR.set(drId, existing);
-    }
-  }
+  const exceptionCountsByDR = recordedCountsByDR(executions);
 
   const { rows: traceRows, gaps } = computeTraceabilityMatrix(populations, exceptionCountsByDR);
 
@@ -169,35 +178,22 @@ export function buildEvidencePackData(
   });
 
   // ── Tab C ──
-  const ruleExecMap = new Map<string, { executions: number; failures: number }>();
-  for (const rule of rules) {
-    ruleExecMap.set(rule.rule_id, { executions: 0, failures: 0 });
-  }
-  for (const exc of pintAEExceptions) {
-    const existing = ruleExecMap.get(exc.check_id);
-    if (existing) {
-      existing.failures++;
-    }
-  }
-  // Count executions as total invoices tested per rule scope
-  for (const rule of rules) {
-    const counts = ruleExecMap.get(rule.rule_id)!;
-    if (rule.scope === 'Header' || rule.scope === 'Party' || rule.scope === 'Cross') {
-      counts.executions = headers.length;
-    } else if (rule.scope === 'Lines') {
-      counts.executions = lines.length;
-    }
-  }
-
-  const ruleExecution: RuleExecutionRow[] = rules.map(r => ({
-    rule_id: r.rule_id,
-    rule_name: r.rule_name,
-    severity: r.severity,
-    linked_dr_ids: r.affected_dr_ids.join('; '),
-    execution_count: ruleExecMap.get(r.rule_id)?.executions ?? 0,
-    failure_count: ruleExecMap.get(r.rule_id)?.failures ?? 0,
-    execution_source: 'estimated',
-  }));
+  const ruleExecution: RuleExecutionRow[] = rules.map(r => {
+    const recorded = executions.filter(execution => execution.check.check_id === r.rule_id);
+    const sum = (key: 'passed' | 'failed' | 'notApplicable' | 'notEvaluated' | 'errors' | 'exceptionCount') => recorded.reduce((total, row) => total + row[key], 0);
+    const passed = sum('passed'), failed = sum('failed'), skipped = sum('notEvaluated'), errors = sum('errors');
+    const status: ExecutionStatus = errors ? 'error' : failed ? 'fail'
+      : !recorded.length || skipped || recorded.some(row => row.status === 'not_evaluated') ? 'not_evaluated'
+      : passed ? 'pass' : 'not_applicable';
+    return {
+      rule_id: r.rule_id, rule_name: r.rule_name, severity: r.severity, linked_dr_ids: r.affected_dr_ids.join('; '),
+      execution_count: passed + failed, failure_count: failed, pass_count: passed,
+      not_applicable_count: sum('notApplicable'), not_evaluated_count: skipped, error_count: errors,
+      exception_count: sum('exceptionCount'), status,
+      execution_source: recorded.length ? 'recorded' : 'unavailable',
+      reason: recorded.length ? [...new Set(recorded.map(row => row.reason).filter(Boolean))].join('; ') : 'No execution record for this rule',
+    };
+  });
 
   // ── Tab D ──
   const exceptions: ExceptionRow[] = pintAEExceptions.map(e => ({
@@ -255,6 +251,7 @@ export function buildEvidencePackData(
   });
 
   return {
+    executionRecords: executions,
     overview,
     drCoverage,
     ruleExecution,

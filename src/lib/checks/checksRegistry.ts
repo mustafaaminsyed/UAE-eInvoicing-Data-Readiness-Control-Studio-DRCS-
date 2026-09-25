@@ -1,4 +1,6 @@
 import { ComplianceCheck, DataContext, Exception, CheckResult, InvoiceHeader } from '@/types/compliance';
+import { evaluateLineAmount } from './lineAmounts';
+import { evaluateInvoiceGross, evaluateVatBreakdowns } from './invoiceAmounts';
 
 const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
@@ -108,9 +110,8 @@ export const checksRegistry: ComplianceCheck[] = [
         if (header.total_incl_vat !== undefined && 
             header.total_excl_vat !== undefined && 
             header.vat_total !== undefined) {
-          const expected = header.total_excl_vat + header.vat_total;
-          const diff = Math.abs(header.total_incl_vat - expected);
-          if (diff > 0.01) {
+          const result = evaluateInvoiceGross(header);
+          if (!result.matches && !result.unevaluated) {
             exceptions.push({
               id: generateId(),
               checkId: 'header_totals_mismatch',
@@ -122,7 +123,7 @@ export const checksRegistry: ComplianceCheck[] = [
               sellerTrn: header.seller_trn,
               buyerId: header.buyer_id,
               field: 'total_incl_vat',
-              expectedValue: expected,
+              expectedValue: result.expected,
               actualValue: header.total_incl_vat,
             });
           }
@@ -134,23 +135,21 @@ export const checksRegistry: ComplianceCheck[] = [
   {
     id: 'line_totals_mismatch',
     name: 'Line Totals Mismatch',
-    description: 'Validates line_total_excl_vat = (quantity * unit_price) - line_discount',
+    description: 'Validates rounded line net = quantity * (net price / base quantity) + charges - allowances',
     severity: 'High',
     category: 'line',
     run: (data: DataContext): Exception[] => {
       const exceptions: Exception[] = [];
       data.lines.forEach(line => {
-        const discount = line.line_discount || 0;
-        const expected = (line.quantity * line.unit_price) - discount;
-        const diff = Math.abs(line.line_total_excl_vat - expected);
-        if (diff > 0.01) {
+        const calculation = evaluateLineAmount(line);
+        if (!calculation.matches) {
           const header = data.headerMap.get(line.invoice_id);
           exceptions.push({
             id: generateId(),
             checkId: 'line_totals_mismatch',
             checkName: 'Line Totals Mismatch',
             severity: 'High',
-            message: `Line ${line.line_number}: line_total_excl_vat (${line.line_total_excl_vat}) != (${line.quantity} * ${line.unit_price}) - ${discount}`,
+            message: `Line ${line.line_number}: ${calculation.reason ?? `Line net amount differs from calculated amount ${calculation.expected!.toFixed(2)}`}`,
             invoiceId: line.invoice_id,
             invoiceNumber: header?.invoice_number,
             sellerTrn: header?.seller_trn,
@@ -158,7 +157,7 @@ export const checksRegistry: ComplianceCheck[] = [
             lineId: line.line_id,
             lineNumber: line.line_number,
             field: 'line_total_excl_vat',
-            expectedValue: expected,
+            expectedValue: calculation.reason ?? calculation.expected,
             actualValue: line.line_total_excl_vat,
           });
         }
@@ -168,32 +167,22 @@ export const checksRegistry: ComplianceCheck[] = [
   },
   {
     id: 'vat_calc_mismatch',
-    name: 'VAT Calculation Mismatch',
-    description: 'Validates vat_amount = line_total_excl_vat * vat_rate',
+    name: 'VAT Breakdown Calculation Mismatch',
+    description: 'Reconciles supplied invoice VAT category bases and tax amounts',
     severity: 'High',
-    category: 'line',
+    category: 'header',
     run: (data: DataContext): Exception[] => {
       const exceptions: Exception[] = [];
-      data.lines.forEach(line => {
-        const expected = line.line_total_excl_vat * (line.vat_rate / 100);
-        const diff = Math.abs(line.vat_amount - expected);
-        if (diff > 0.01) {
-          const header = data.headerMap.get(line.invoice_id);
+      data.headers.forEach(header => {
+        const result = evaluateVatBreakdowns(header, data.linesByInvoice.get(header.invoice_id) || []);
+        if (!result.matches && !result.unevaluated) {
           exceptions.push({
-            id: generateId(),
-            checkId: 'vat_calc_mismatch',
-            checkName: 'VAT Calculation Mismatch',
-            severity: 'High',
-            message: `Line ${line.line_number}: vat_amount (${line.vat_amount}) != line_total_excl_vat (${line.line_total_excl_vat}) * vat_rate/100 (${line.vat_rate}/100)`,
-            invoiceId: line.invoice_id,
-            invoiceNumber: header?.invoice_number,
-            sellerTrn: header?.seller_trn,
-            buyerId: header?.buyer_id,
-            lineId: line.line_id,
-            lineNumber: line.line_number,
-            field: 'vat_amount',
-            expectedValue: expected.toFixed(2),
-            actualValue: line.vat_amount,
+            id: generateId(), checkId: 'vat_calc_mismatch',
+            checkName: 'VAT Breakdown Calculation Mismatch', severity: 'High',
+            message: `Invoice ${header.invoice_number}: ${result.reason}`,
+            invoiceId: header.invoice_id, invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn, buyerId: header.buyer_id,
+            field: 'tax_breakdowns', expectedValue: result.reason,
           });
         }
       });
@@ -353,13 +342,24 @@ export function runAllChecks(data: DataContext): CheckResult[] {
       : check.category === 'line' 
         ? data.lines.length 
         : data.headers.length;
+    // One record can produce several findings. Count records, not findings.
+    const failedIds = new Set(exceptions.map(exception =>
+      check.category === 'buyer' ? exception.buyerId
+        : check.category === 'line' ? `${exception.invoiceId}\u0000${exception.lineId}\u0000${exception.lineNumber}`
+          : exception.invoiceId
+    ));
+    const failed = check.category === 'buyer'
+      ? data.buyers.filter(record => failedIds.has(record.buyer_id)).length
+      : check.category === 'line'
+        ? data.lines.filter(record => failedIds.has(`${record.invoice_id}\u0000${record.line_id}\u0000${record.line_number}`)).length
+        : data.headers.filter(record => failedIds.has(record.invoice_id)).length;
     
     return {
       checkId: check.id,
       checkName: check.name,
       severity: check.severity,
-      passed: totalRecords - exceptions.length,
-      failed: exceptions.length,
+      passed: totalRecords - failed,
+      failed,
       exceptions,
     };
   });
