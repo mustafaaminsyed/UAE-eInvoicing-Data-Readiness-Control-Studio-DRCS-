@@ -49,7 +49,7 @@ describe("cutover readiness", () => {
   it("keeps authoritative runtime behavior unchanged in this readiness pass", () => {
     const report = buildCutoverReadinessReport();
 
-    expect(UAE_UC1_CHECK_PACK).toHaveLength(62);
+    expect(UAE_UC1_CHECK_PACK).toHaveLength(63);
     expect(report.cutoverGates.map((gate) => gate.gateId)).toEqual(
       expect.arrayContaining([
         "gate-shadow-regression",
