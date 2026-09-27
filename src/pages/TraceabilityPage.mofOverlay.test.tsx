@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 
@@ -76,18 +76,23 @@ describe('TraceabilityPage MoF overlay', () => {
       expect(screen.getByTestId('mof-overlay-summary')).toHaveTextContent('Commercial rows: 49');
     });
 
+    const tables = screen.getAllByRole('table');
+    const overlayRoot = tables[tables.length - 1].parentElement?.parentElement;
+    expect(overlayRoot).toBeTruthy();
+    const overlay = within(overlayRoot as HTMLElement);
+
     // Collision IDs remain split by document type semantics.
-    expect(screen.getByText('Buyer tax identifier')).toBeInTheDocument();
-    expect(screen.getByText('Buyer legal registration identifier')).toBeInTheDocument();
-    expect(screen.getAllByText('IBT-048').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('IBT-047').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('IBT-048-1').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('BTAE-16').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Runtime semantic split supported: false').length).toBe(4);
-    expect(screen.getByText('VAT line amount in AED')).toBeInTheDocument();
-    expect(screen.getAllByText('Item name').length).toBeGreaterThan(0);
-    expect(screen.getByText('Invoice line amount in AED')).toBeInTheDocument();
-    expect(screen.getAllByText('Item description').length).toBeGreaterThan(0);
+    expect(overlay.getByText('Buyer tax identifier')).toBeInTheDocument();
+    expect(overlay.getByText('Buyer legal registration identifier')).toBeInTheDocument();
+    expect(overlay.getAllByText('IBT-048').length).toBeGreaterThan(0);
+    expect(overlay.getAllByText('IBT-047').length).toBeGreaterThan(0);
+    expect(overlay.getAllByText('IBT-048-1').length).toBeGreaterThan(0);
+    expect(overlay.getAllByText('BTAE-16').length).toBeGreaterThan(0);
+    expect(overlay.getAllByText('Runtime semantic split supported: false').length).toBe(4);
+    expect(overlay.getByText('VAT line amount in AED')).toBeInTheDocument();
+    expect(overlay.getAllByText('Item name').length).toBeGreaterThan(0);
+    expect(overlay.getByText('Invoice line amount in AED')).toBeInTheDocument();
+    expect(overlay.getAllByText('Item description').length).toBeGreaterThan(0);
 
     expect(screen.getByTestId('denominator-policy')).toHaveTextContent(
       'MoF Tax 51 | MoF Commercial 49 | PINT 50 | Ingestion 45'
