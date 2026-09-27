@@ -563,6 +563,22 @@ describe('runPintAECheck executor registry parity', () => {
     expect(descExceptions).toHaveLength(1);
   });
 
+  it.each([
+    [{ item_name: 'Widget', description: 'Widget detail' }, 0, 0],
+    [{ item_name: '', description: 'Widget detail' }, 1, 0],
+    [{ item_name: 'Widget', description: '' }, 0, 1],
+    [{ item_name: '', description: '' }, 1, 1],
+  ])('enforces independent CHK-038/039 fields: %o', (values, nameFailures, descriptionFailures) => {
+    const line = {
+      line_id: 'L-1', invoice_id: 'INV-1', line_number: 1, quantity: 1,
+      unit_price: 100, line_total_excl_vat: 100, vat_rate: 5, vat_amount: 5,
+      ...values,
+    } as InvoiceLine;
+    const data = buildDataContext({}, { lines: [line] });
+    expect(runPintAECheck(getCheck('UAE-UC1-CHK-038'), data)).toHaveLength(nameFailures);
+    expect(runPintAECheck(getCheck('UAE-UC1-CHK-039'), data)).toHaveLength(descriptionFailures);
+  });
+
   it('fails CHK-040 when quantity is non-positive under base-quantity policy', () => {
     const check = getCheck('UAE-UC1-CHK-040');
     const data = buildDataContext(
@@ -851,7 +867,23 @@ describe('runPintAECheck executor registry parity', () => {
     const exceptions = runPintAECheck(check, data);
 
     expect(exceptions).toHaveLength(1);
-    expect(exceptions[0].field_name).toBe('exemption_reason_code|exemption_reason_text');
+    expect(exceptions[0].field_name).toBe('exemption_reason_code');
+  });
+
+  it.each([
+    [{ exemption_reason_code: 'E1', exemption_reason_text: '' }, 0],
+    [{ exemption_reason_code: '', exemption_reason_text: 'Text only' }, 1],
+    [{ exemption_reason_code: '', exemption_reason_text: '' }, 1],
+    [{ tax_category_code: 'S', exemption_reason_code: '', exemption_reason_text: '' }, 0],
+    [{ exemption_reason_code: 'E1', exemption_reason_text: 'Text' }, 0],
+  ])('enforces CHK-049 code-only exemption requirement: %o', (values, failures) => {
+    const line = {
+      line_id: 'L-1', invoice_id: 'INV-1', line_number: 1, quantity: 1,
+      unit_price: 100, line_total_excl_vat: 100, vat_rate: 0, vat_amount: 0,
+      tax_category_code: 'E', exemption_reason_code: '', exemption_reason_text: '', ...values,
+    } as InvoiceLine;
+    const data = buildDataContext({}, { lines: [line] });
+    expect(runPintAECheck(getCheck('UAE-UC1-CHK-049'), data)).toHaveLength(failures);
   });
 
   it('passes CHK-049 and validates CHK-050 against AE exemption codes', () => {
