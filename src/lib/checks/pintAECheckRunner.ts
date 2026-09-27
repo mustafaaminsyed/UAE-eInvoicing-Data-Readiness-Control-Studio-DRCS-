@@ -16,6 +16,17 @@ export interface PintAECheckTelemetry {
 export interface PintAECheckRunResult {
   exceptions: PintAEException[];
   telemetry: PintAECheckTelemetry;
+  executionResults: PintAEExecutionResult[];
+}
+
+export type PintAEExecutionStatus = 'passed' | 'failed' | 'not_applicable' | 'not_evaluated';
+
+export interface PintAEExecutionResult {
+  ruleId: string;
+  invoiceId?: string;
+  invoiceNumber?: string;
+  status: PintAEExecutionStatus;
+  reason?: string;
 }
 
 export type PintAEDocumentFamilyApplicabilityMode = 'legacy' | 'scenario_context';
@@ -519,6 +530,7 @@ export function runPintAECheckWithTelemetry(
   options: RunPintAECheckOptions = {}
 ): PintAECheckRunResult {
   const exceptions: PintAEException[] = [];
+  const executionResults: PintAEExecutionResult[] = [];
   const params = check.parameters || {};
   const timestamp = new Date().toISOString();
   let executionCount = 0;
@@ -1695,7 +1707,10 @@ export function runPintAECheckWithTelemetry(
             scenarioContextCache,
             legacyScenarioClassificationCache
           )
-        ) return;
+        ) {
+          executionResults.push({ ruleId: check.check_id, invoiceId: header.invoice_id, invoiceNumber: header.invoice_number, status: 'not_applicable' });
+          return;
+        }
         executionCount++;
         if (isEmpty(header.principal_id)) {
           exceptions.push(createException({
@@ -1708,6 +1723,9 @@ export function runPintAECheckWithTelemetry(
             expectedValue: 'Principal ID is required for disclosed-agent billing',
             message: `Invoice ${header.invoice_number || header.invoice_id}: Principal ID is required when the disclosed-agent billing transaction flag applies`,
           }));
+          executionResults.push({ ruleId: check.check_id, invoiceId: header.invoice_id, invoiceNumber: header.invoice_number, status: 'failed' });
+        } else {
+          executionResults.push({ ruleId: check.check_id, invoiceId: header.invoice_id, invoiceNumber: header.invoice_number, status: 'passed' });
         }
       });
       break;
@@ -1723,7 +1741,10 @@ export function runPintAECheckWithTelemetry(
             scenarioContextCache,
             legacyScenarioClassificationCache
           )
-        ) return;
+        ) {
+          executionResults.push({ ruleId: check.check_id, invoiceId: header.invoice_id, invoiceNumber: header.invoice_number, status: 'not_applicable' });
+          return;
+        }
         executionCount++;
         if (isEmpty(header.invoicing_period_start_date) && isEmpty(header.invoicing_period_end_date)) {
           exceptions.push(createException({
@@ -1736,6 +1757,9 @@ export function runPintAECheckWithTelemetry(
             expectedValue: 'At least one invoicing period boundary is required',
             message: `Invoice ${header.invoice_number || header.invoice_id}: Invoicing period is required when the summary-invoice transaction flag applies`,
           }));
+          executionResults.push({ ruleId: check.check_id, invoiceId: header.invoice_id, invoiceNumber: header.invoice_number, status: 'failed' });
+        } else {
+          executionResults.push({ ruleId: check.check_id, invoiceId: header.invoice_id, invoiceNumber: header.invoice_number, status: 'passed' });
         }
       });
       break;
@@ -1751,7 +1775,10 @@ export function runPintAECheckWithTelemetry(
             scenarioContextCache,
             legacyScenarioClassificationCache
           )
-        ) return;
+        ) {
+          executionResults.push({ ruleId: check.check_id, invoiceId: header.invoice_id, invoiceNumber: header.invoice_number, status: 'not_applicable' });
+          return;
+        }
         executionCount++;
 
         const missingFields: string[] = [];
@@ -1771,6 +1798,7 @@ export function runPintAECheckWithTelemetry(
             expectedValue: 'Delivery information is required for export overlays',
             message: `Invoice ${header.invoice_number || header.invoice_id}: Delivery information fields are required when the export transaction flag applies`,
           }));
+          executionResults.push({ ruleId: check.check_id, invoiceId: header.invoice_id, invoiceNumber: header.invoice_number, status: 'failed' });
           return;
         }
 
@@ -1785,6 +1813,9 @@ export function runPintAECheckWithTelemetry(
             expectedValue: 'Deliver-to country code must not be AE for export overlays',
             message: `Invoice ${header.invoice_number || header.invoice_id}: Deliver-to country code must not be AE when the export transaction flag applies`,
           }));
+          executionResults.push({ ruleId: check.check_id, invoiceId: header.invoice_id, invoiceNumber: header.invoice_number, status: 'failed' });
+        } else {
+          executionResults.push({ ruleId: check.check_id, invoiceId: header.invoice_id, invoiceNumber: header.invoice_number, status: 'passed' });
         }
       });
       break;
@@ -1973,6 +2004,7 @@ export function runPintAECheckWithTelemetry(
 
   return {
     exceptions,
+    executionResults,
     telemetry: {
       rule_id: check.check_id,
       execution_count: executionCount,
@@ -1993,16 +2025,18 @@ export function runAllPintAEChecks(checks: PintAECheck[], data: DataContext): Pi
 export function runAllPintAEChecksWithTelemetry(
   checks: PintAECheck[],
   data: DataContext
-): { exceptions: PintAEException[]; telemetry: PintAECheckTelemetry[] } {
+): { exceptions: PintAEException[]; telemetry: PintAECheckTelemetry[]; executionResults?: PintAEExecutionResult[] } {
   const enabledChecks = checks.filter(c => c.is_enabled);
   const allExceptions: PintAEException[] = [];
   const telemetry: PintAECheckTelemetry[] = [];
+  const executionResults: PintAEExecutionResult[] = [];
   
   for (const check of enabledChecks) {
     const result = runPintAECheckWithTelemetry(check, data);
     allExceptions.push(...result.exceptions);
     telemetry.push(result.telemetry);
+    executionResults.push(...(result.executionResults ?? []));
   }
   
-  return { exceptions: allExceptions, telemetry };
+  return { exceptions: allExceptions, telemetry, executionResults };
 }
