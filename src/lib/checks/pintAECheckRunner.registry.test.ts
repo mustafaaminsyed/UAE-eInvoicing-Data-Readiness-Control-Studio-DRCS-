@@ -778,6 +778,58 @@ describe('runPintAECheck executor registry parity', () => {
     expect(runPintAECheck(check, validData)).toHaveLength(0);
   });
 
+  it.each([
+    ['defaults IBT-149 to one when absent', 10, 5, undefined, 0, 0, 50],
+    ['uses explicit IBT-149', 100, 10, 100, 0, 0, 10],
+    ['subtracts a line allowance', 10, 5, undefined, 7, 0, 43],
+    ['adds a line charge', 10, 5, undefined, 0, 7, 57],
+    ['applies both line allowance and charge', 10, 5, undefined, 7, 3, 46],
+    ['treats explicit IBT-149 of one like the default', 10, 5, 1, 0, 0, 50],
+  ])('%s', (_name, quantity, price, base, allowance, charge, lineNet) => {
+    const check = getCheck('UAE-UC1-CHK-034');
+    const data = buildDataContext({}, {
+      lines: [{
+        line_id: 'L-1', invoice_id: 'INV-1', line_number: 1,
+        quantity, unit_price: price, price_base_quantity: base,
+        line_allowance_amount: allowance, line_charge_amount: charge,
+        line_total_excl_vat: lineNet, vat_rate: 5, vat_amount: lineNet * 0.05,
+      } as InvoiceLine],
+    });
+
+    expect(runPintAECheck(check, data)).toHaveLength(0);
+  });
+
+  it.each([
+    ['zero', 0],
+    ['negative', -1],
+  ])('does not default an explicit %s IBT-149 value to one', (_label, base) => {
+    const check = getCheck('UAE-UC1-CHK-034');
+    const data = buildDataContext({}, {
+      lines: [{
+        line_id: 'L-1', invoice_id: 'INV-1', line_number: 1,
+        quantity: 10, unit_price: 5, price_base_quantity: base,
+        line_allowance_amount: 0, line_charge_amount: 0,
+        line_total_excl_vat: 50, vat_rate: 5, vat_amount: 2.5,
+      } as InvoiceLine],
+    });
+
+    expect(runPintAECheck(check, data)).toHaveLength(1);
+  });
+
+  it('fails CHK-034 when the supplied line net amount is incorrect', () => {
+    const check = getCheck('UAE-UC1-CHK-034');
+    const data = buildDataContext({}, {
+      lines: [{
+        line_id: 'L-1', invoice_id: 'INV-1', line_number: 1,
+        quantity: 100, unit_price: 10, price_base_quantity: 100,
+        line_allowance_amount: 0, line_charge_amount: 0,
+        line_total_excl_vat: 11, vat_rate: 5, vat_amount: 0.55,
+      } as InvoiceLine],
+    });
+
+    expect(runPintAECheck(check, data)).toHaveLength(1);
+  });
+
   it('validates CHK-048 for UNECERec20 and skips empty values', () => {
     const check = getCheck('UAE-UC1-CHK-048');
     const validCode = getCodelistCodes('UNECERec20')[0];

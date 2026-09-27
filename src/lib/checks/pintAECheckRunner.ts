@@ -1161,11 +1161,22 @@ export function runPintAECheckWithTelemetry(
       data.lines.forEach(line => {
         executionCount++;
         const header = data.headerMap.get(line.invoice_id);
-        const allowance = resolveLineAllowanceAmount(line);
-        const expected = (line.quantity * line.unit_price) - allowance;
+        const explicitBase = line.price_base_quantity;
+        const allowDefaultBase = params.allow_default_base_quantity !== false;
+        const defaultBase = Number(params.default_base_quantity ?? 1);
+        const baseQuantity = explicitBase === undefined
+          ? (allowDefaultBase && Number.isFinite(defaultBase) && defaultBase > 0 ? defaultBase : NaN)
+          : (Number.isFinite(explicitBase) && Number(explicitBase) > 0 ? Number(explicitBase) : NaN);
+        const allowanceValue = getFieldValue(line, String(params.allowance_field || 'line_allowance_amount'));
+        const chargeValue = getFieldValue(line, String(params.charge_field || 'line_charge_amount'));
+        const allowance = Number.isFinite(Number(allowanceValue)) ? Number(allowanceValue) : resolveLineAllowanceAmount(line);
+        const charge = Number.isFinite(Number(chargeValue)) ? Number(chargeValue) : 0;
+        const expected = Number.isFinite(baseQuantity)
+          ? (line.quantity * (line.unit_price / baseQuantity)) + charge - allowance
+          : NaN;
         const diff = Math.abs(line.line_total_excl_vat - expected);
         const tolerance = params.tolerance || 0.01;
-        if (diff > tolerance) {
+        if (!Number.isFinite(expected) || diff > tolerance) {
           exceptions.push(createException({
             invoiceId: line.invoice_id,
             invoiceNumber: header?.invoice_number,
@@ -1174,8 +1185,8 @@ export function runPintAECheckWithTelemetry(
             lineId: line.line_id,
             fieldName: 'line_total_excl_vat',
             observedValue: String(line.line_total_excl_vat),
-            expectedValue: `(${line.quantity} x ${line.unit_price}) - ${allowance} = ${expected.toFixed(2)}`,
-            message: `Invoice ${header?.invoice_number}, Line ${line.line_number}: Net amount (${line.line_total_excl_vat}) != (Qty x Price) - Allowance/Discount (${expected.toFixed(2)})`,
+            expectedValue: `${line.quantity} x (${line.unit_price} / ${Number.isFinite(baseQuantity) ? baseQuantity : '(invalid base quantity)'}) + ${charge} - ${allowance} = ${Number.isFinite(expected) ? expected.toFixed(2) : '(unresolved)'}`,
+            message: `Invoice ${header?.invoice_number}, Line ${line.line_number}: Net amount (${line.line_total_excl_vat}) does not match IBR-147-AE calculation (${Number.isFinite(expected) ? expected.toFixed(2) : 'unresolved'})`,
           }));
         }
       });
