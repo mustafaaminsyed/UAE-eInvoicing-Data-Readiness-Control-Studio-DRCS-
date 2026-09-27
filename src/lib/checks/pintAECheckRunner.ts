@@ -1373,53 +1373,49 @@ export function runPintAECheckWithTelemetry(
       });
       break;
 
-    // Item name presence with description fallback
+    // Item name presence (IBT-153)
     case 'UAE-UC1-CHK-038':
       data.lines.forEach(line => {
         executionCount++;
         const header = data.headerMap.get(line.invoice_id);
         const primaryField = resolveFieldAlias(params.primary_field || 'item_name');
-        const fallbackField = resolveFieldAlias(params.fallback_field || 'description');
         const primaryValue = getFieldValue(line, primaryField);
-        const fallbackValue = getFieldValue(line, fallbackField);
 
-        if (isEmpty(primaryValue) && isEmpty(fallbackValue)) {
+        if (isEmpty(primaryValue)) {
           exceptions.push(createException({
             invoiceId: line.invoice_id,
             invoiceNumber: header?.invoice_number,
             sellerTrn: header?.seller_trn,
             buyerId: header?.buyer_id,
             lineId: line.line_id,
-            fieldName: `${primaryField}|${fallbackField}`,
-            observedValue: '(both empty)',
-            expectedValue: 'Item name or description fallback',
-            message: `Invoice ${header?.invoice_number || line.invoice_id}, Line ${line.line_number}: Missing item name (description fallback also empty)`,
+            fieldName: primaryField,
+            observedValue: '(empty)',
+            expectedValue: 'Item name (IBT-153)',
+            message: `Invoice ${header?.invoice_number || line.invoice_id}, Line ${line.line_number}: Missing item name`,
           }));
         }
       });
       break;
 
-    // Item description presence with item-name fallback
+    // Item description presence (IBT-154)
     case 'UAE-UC1-CHK-039':
       data.lines.forEach(line => {
         executionCount++;
         const header = data.headerMap.get(line.invoice_id);
         const primaryField = resolveFieldAlias(params.primary_field || 'description');
-        const fallbackField = resolveFieldAlias(params.fallback_field || 'item_name');
         const primaryValue = getFieldValue(line, primaryField);
-        const fallbackValue = getFieldValue(line, fallbackField);
 
-        if (isEmpty(primaryValue) && isEmpty(fallbackValue)) {
+        if (isEmpty(primaryValue)) {
           exceptions.push(createException({
             invoiceId: line.invoice_id,
             invoiceNumber: header?.invoice_number,
             sellerTrn: header?.seller_trn,
             buyerId: header?.buyer_id,
             lineId: line.line_id,
-            fieldName: `${primaryField}|${fallbackField}`,
-            observedValue: '(both empty)',
-            expectedValue: 'Item description or item-name fallback',
-            message: `Invoice ${header?.invoice_number || line.invoice_id}, Line ${line.line_number}: Missing item description (item name fallback also empty)`,
+            fieldName: primaryField,
+            observedValue: '(empty)',
+            expectedValue: 'Item description (IBT-154)',
+            message: `Invoice ${header?.invoice_number || line.invoice_id}, Line ${line.line_number}: Missing item description`,
           }));
         }
       });

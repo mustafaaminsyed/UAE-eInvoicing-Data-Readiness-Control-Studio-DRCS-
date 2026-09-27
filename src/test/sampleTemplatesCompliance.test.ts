@@ -79,6 +79,7 @@ async function loadSamples() {
     invoice_id: r.invoice_id,
     line_number: Number(r.line_number),
     description: r.description,
+    item_name: r.item_name,
     quantity: Number(r.quantity),
     unit_of_measure: r.unit_of_measure,
     unit_price: Number(r.unit_price),
