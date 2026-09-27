@@ -14,7 +14,7 @@ export type ScenarioTransactionFlag =
   | "deemed_supply"
   | "margin_scheme"
   | "summary_invoice"
-  | "reserved_policy_flag"
+  | "continuous_supply"
   | "disclosed_agent_billing"
   | "ecommerce_supplies"
   | "exports";

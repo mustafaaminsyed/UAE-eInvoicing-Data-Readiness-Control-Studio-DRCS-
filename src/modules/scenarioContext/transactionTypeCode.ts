@@ -38,9 +38,9 @@ export const TRANSACTION_TYPE_FLAG_DEFINITIONS: readonly TransactionTypeFlagDefi
   {
     bitPosition: 5,
     mask: "XXXX1XXX",
-    flag: "reserved_policy_flag",
-    label: "Reserved policy flag",
-    note: "The repo contains the mask but no named semantic yet, so this remains observable only.",
+    flag: "continuous_supply",
+    label: "Continuous Supply",
+    note: "Position 5 of the UAE transaction type code; the mask is descriptive metadata only.",
   },
   {
     bitPosition: 6,
@@ -66,7 +66,6 @@ export const TRANSACTION_TYPE_FLAG_DEFINITIONS: readonly TransactionTypeFlagDefi
 ] as const;
 
 const BINARY_PATTERN = /^[01]{8}$/;
-const MASK_PATTERN = /^[1X]{8}$/;
 
 export function decodeTransactionTypeCode(raw: unknown): DecodedTransactionTypeCode {
   const normalized = typeof raw === "string" ? raw.trim().toUpperCase() : "";
@@ -98,28 +97,6 @@ export function decodeTransactionTypeCode(raw: unknown): DecodedTransactionTypeC
       activeDefinitions,
       issues: [],
       evidence: buildEvidence("transaction_type_code", raw, normalized, "Decoded binary transaction_type_code."),
-    };
-  }
-
-  if (MASK_PATTERN.test(normalized)) {
-    const activeDefinitions = TRANSACTION_TYPE_FLAG_DEFINITIONS.filter((definition) => {
-      return normalized.charAt(definition.bitPosition - 1) === "1";
-    }).map((definition) => buildDecodedFlag(definition, raw, normalized));
-
-    return {
-      raw: String(raw),
-      normalized,
-      format: "mask",
-      valid: activeDefinitions.length > 0,
-      activeFlags: activeDefinitions.map((definition) => definition.flag),
-      activeDefinitions,
-      issues: activeDefinitions.length > 0 ? [] : ["Mask input did not activate any known transaction flag."],
-      evidence: buildEvidence(
-        "transaction_type_code",
-        raw,
-        normalized,
-        "Decoded mask-style transaction_type_code into observable flags."
-      ),
     };
   }
 

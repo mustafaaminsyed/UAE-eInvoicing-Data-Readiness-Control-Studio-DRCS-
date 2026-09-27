@@ -68,7 +68,6 @@ export function classifyInvoice(input: ScenarioInvoiceInput): ScenarioClassifica
   const continuousSupplySignal = readBooleanSignal(header, [
     "is_continuous_supply",
     "continuous_supply",
-    "billing_frequency",
   ]);
   const summaryInvoiceSignal = readBooleanSignal(header, [
     "is_summary_invoice",

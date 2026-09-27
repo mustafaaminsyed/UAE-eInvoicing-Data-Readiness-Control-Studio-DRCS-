@@ -157,13 +157,13 @@ export function buildScenarioContext(input: ScenarioInvoiceInput): ScenarioConte
     );
   }
 
-  if (readBooleanSignal(header, ["is_continuous_supply", "continuous_supply", "billing_frequency"])) {
+  if (readBooleanSignal(header, ["is_continuous_supply", "continuous_supply"])) {
     overlayState.add(
       "continuous_supply",
       buildEvidence(
         "header",
         "continuous_supply",
-        readKnownValue(header, ["is_continuous_supply", "continuous_supply", "billing_frequency"]),
+        readKnownValue(header, ["is_continuous_supply", "continuous_supply"]),
         "Continuous-supply indicator detected."
       )
     );

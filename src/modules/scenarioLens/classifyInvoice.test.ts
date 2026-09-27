@@ -62,4 +62,9 @@ describe("classifyInvoice", () => {
     expect(result.vatTreatments).toHaveLength(0);
     expect(result.businessScenarios).toEqual(["None"]);
   });
+
+  it("does not classify billing frequency as continuous supply", () => {
+    const result = classifyInvoice({ header: { billing_frequency: "monthly" }, lines: [], buyer: null });
+    expect(result.businessScenarios).toEqual(["None"]);
+  });
 });
