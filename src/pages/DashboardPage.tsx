@@ -127,7 +127,9 @@ interface DashboardSnapshot {
   creditNoteCoverage: number;
   creditNoteCount: number;
   creditNoteReasonCoverage: number;
+  creditNoteReasonTextCoverage?: number;
   creditNoteReferenceCoverage: number;
+  creditNoteIssueDateCoverage?: number;
   headerCompleteness: number;
   buyerCompleteness: number;
   lineCompleteness: number;
@@ -723,7 +725,7 @@ function buildDashboardSnapshot(input: {
   };
 }
 
-function formatPercent(value: number | null, digits = 0) {
+function formatPercent(value: number | null | undefined, digits = 0) {
   if (value === null) return 'N/A';
   return `${value.toFixed(digits)}%`;
 }

@@ -44,6 +44,19 @@ describe("buildScenarioContext", () => {
     );
   });
 
+  it.each([
+    { field: "is_continuous_supply", value: true },
+    { field: "continuous_supply", value: true },
+  ])("uses explicit $field as continuous-supply evidence", ({ field, value }) => {
+    const context = buildScenarioContext({ header: { [field]: value }, lines: [], buyer: null });
+    expect(context.overlays.value).toContain("continuous_supply");
+  });
+
+  it.each([true, "true", "monthly", "annual"])("does not infer continuous supply from billing_frequency=%s", (value) => {
+    const context = buildScenarioContext({ header: { billing_frequency: value }, lines: [], buyer: null });
+    expect(context.overlays.value).not.toContain("continuous_supply");
+  });
+
   it("captures self-billing provenance from profile fields when no boolean is present", () => {
     const context = buildScenarioContext({
       header: {

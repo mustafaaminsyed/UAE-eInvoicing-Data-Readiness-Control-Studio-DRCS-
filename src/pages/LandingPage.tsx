@@ -56,7 +56,7 @@ type WorkflowStageDefinition = {
   outputLabel: string;
   actionLabel: string;
   path: string;
-  icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
+  icon: ComponentType<{ className?: string; "aria-hidden"?: boolean | "true" | "false" }>;
 };
 
 type WorkflowArtifactRow = {
@@ -270,7 +270,7 @@ export default function LandingPage() {
       active: isChecksRun,
     },
   ];
-  const workflowStages = useMemo(
+  const workflowStages = useMemo<WorkflowStage[]>(
     () => [
       {
         ...workflowStageDefinitions[0],
@@ -366,7 +366,13 @@ export default function LandingPage() {
     ]
   );
 
-  const heroPreviewRows = useMemo(() => {
+  const heroPreviewRows = useMemo<Array<{
+    invoiceNumber: string;
+    counterparty: string;
+    amount: string;
+    status: string;
+    tone: "warning" | "success" | "info" | "neutral";
+  }>>(() => {
     const amountFormatter = new Intl.NumberFormat("en-AE", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
@@ -800,7 +806,7 @@ function WorkflowStageCard({
                 {stage.stage}
               </span>
               <div className={cn("inline-flex h-12 w-12 items-center justify-center rounded-[18px] border", accent.iconWrap)}>
-                <Icon className="h-5 w-5" aria-hidden="true" />
+                <Icon className="h-5 w-5" aria-hidden={true} />
               </div>
             </div>
             <span className={cn("inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]", statusTone.badge)}>
@@ -1085,11 +1091,11 @@ function WorkflowArtifactPanel({
 }
 
 function formatWorkflowOutputLabel(label: string) {
-  return label.replaceAll(/[Â]?·/g, " / ");
+  return label.replace(/[Â]?·/g, " / ");
 }
 
 function formatMappingToken(value: string) {
-  return value.replaceAll("_", " ");
+  return value.replace(/_/g, " ");
 }
 
 function SurfaceCapabilityCard({

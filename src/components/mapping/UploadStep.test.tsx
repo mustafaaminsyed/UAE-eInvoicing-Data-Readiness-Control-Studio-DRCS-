@@ -48,7 +48,7 @@ describe('UploadStep', () => {
 
     render(<UploadStep previewData={null} onDataLoaded={onDataLoaded} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /load invoice headers template/i }));
+    fireEvent.click(screen.getAllByRole('button', { name: /load sample data/i })[1]);
 
     expect(onDataLoaded).toHaveBeenCalledTimes(1);
     expect(onDataLoaded).toHaveBeenCalledWith(

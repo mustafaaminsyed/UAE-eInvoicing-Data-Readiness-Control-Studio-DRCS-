@@ -9,6 +9,14 @@ import {
   validateBeforeExport,
 } from './evidenceExporter';
 
+function isBinaryPayload(value: unknown): value is Uint8Array | ArrayBuffer {
+  return value instanceof Uint8Array || value instanceof ArrayBuffer;
+}
+
+function isUint8Array(value: unknown): value is Uint8Array {
+  return value instanceof Uint8Array;
+}
+
 function buildEvidencePackData(): EvidencePackData {
   return {
     overview: {
@@ -131,14 +139,14 @@ describe('generateEvidencePackZip', () => {
       fileSpy.mock.calls.some(
         ([filename, payload]) =>
           filename === '07_traceability_matrix.xlsx' &&
-          (payload instanceof Uint8Array || payload instanceof ArrayBuffer)
+          isBinaryPayload(payload)
       )
     ).toBe(true);
     expect(
       fileSpy.mock.calls.some(
         ([filename, payload]) =>
           filename === '00_executive_verdict.xlsx' &&
-          (payload instanceof Uint8Array || payload instanceof ArrayBuffer)
+          isBinaryPayload(payload)
       )
     ).toBe(true);
   });
@@ -163,10 +171,12 @@ describe('generateEvidencePackZip', () => {
     const scopeWorkbookPayload = fileSpy.mock.calls.find(([filename]) => filename === '01_scope_summary.xlsx')?.[1];
     expect(scopeWorkbookPayload).toBeTruthy();
 
-    const workbookBytes =
-      scopeWorkbookPayload instanceof Uint8Array
-        ? scopeWorkbookPayload
-        : new Uint8Array(scopeWorkbookPayload as ArrayBuffer);
+    if (!isBinaryPayload(scopeWorkbookPayload)) {
+      throw new Error('Expected scope summary workbook payload to be binary');
+    }
+    const workbookBytes = isUint8Array(scopeWorkbookPayload)
+      ? scopeWorkbookPayload
+      : new Uint8Array(scopeWorkbookPayload);
     const workbook = XLSX.read(workbookBytes, { type: 'array' });
     const sheet = workbook.Sheets['Scope Summary'];
     const rows = XLSX.utils.sheet_to_json<{ field: string; value: string }>(sheet);

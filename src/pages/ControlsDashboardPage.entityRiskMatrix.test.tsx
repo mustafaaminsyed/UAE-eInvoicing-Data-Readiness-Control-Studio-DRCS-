@@ -1,4 +1,5 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import ControlsDashboardPage from '@/pages/ControlsDashboardPage';
 
@@ -159,7 +160,11 @@ vi.mock('@/context/ComplianceContext', () => ({
 
 describe('ControlsDashboardPage entity risk matrix drill-down', () => {
   it('routes heatmap clicks into Exceptions with seller and dimension context', async () => {
-    render(<ControlsDashboardPage />);
+    render(
+      <MemoryRouter>
+        <ControlsDashboardPage />
+      </MemoryRouter>
+    );
 
     await waitFor(() => {
       expect(screen.getByText('Heatmap Stub')).toBeInTheDocument();

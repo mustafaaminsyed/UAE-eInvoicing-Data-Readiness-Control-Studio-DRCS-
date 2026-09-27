@@ -341,6 +341,8 @@ export default function TraceabilityPage() {
   }, []);
 
   const mofOverlayRows = useMemo<MofOverlayRow[]>(() => {
+    if (viewMode !== 'mof') return [];
+
     const byInternal = new Map<string, TraceabilityRow[]>();
     rows.forEach((row) => {
       row.internal_columns.forEach((col) => {
@@ -392,7 +394,7 @@ export default function TraceabilityPage() {
         }
         return a.fieldNumber - b.fieldNumber;
       });
-  }, [mofFields, rows]);
+  }, [mofFields, rows, viewMode]);
 
   const rowNumberByDrId = useMemo(() => {
     const map = new Map<string, number>();

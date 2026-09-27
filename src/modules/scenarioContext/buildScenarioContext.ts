@@ -15,9 +15,9 @@ import type {
 const AE_COUNTRY = "AE";
 
 export function buildScenarioContext(input: ScenarioInvoiceInput): ScenarioContext {
-  const header = input.header ?? {};
-  const lines = input.lines ?? [];
-  const buyer = input.buyer ?? {};
+  const header: object = { ...(input.header ?? {}) };
+  const lines: Array<object> = (input.lines ?? []).map((line) => ({ ...line }));
+  const buyer: object = { ...(input.buyer ?? {}) };
   const transactionTypeCode = decodeTransactionTypeCode(
     readFirstText(header, ["transaction_type_code", "transactionTypeCode"])
   );
@@ -157,13 +157,13 @@ export function buildScenarioContext(input: ScenarioInvoiceInput): ScenarioConte
     );
   }
 
-  if (readBooleanSignal(header, ["is_continuous_supply", "continuous_supply", "billing_frequency"])) {
+  if (readBooleanSignal(header, ["is_continuous_supply", "continuous_supply"])) {
     overlayState.add(
       "continuous_supply",
       buildEvidence(
         "header",
         "continuous_supply",
-        readKnownValue(header, ["is_continuous_supply", "continuous_supply", "billing_frequency"]),
+        readKnownValue(header, ["is_continuous_supply", "continuous_supply"]),
         "Continuous-supply indicator detected."
       )
     );
@@ -387,8 +387,8 @@ function evidenceFromDecodedFlag(
 }
 
 function collectTaxSignals(
-  header: Record<string, unknown>,
-  lines: Array<Record<string, unknown>>
+  header: object,
+  lines: Array<object>
 ): { codes: string[]; rates: number[] } {
   const codes: string[] = [];
   const rates: number[] = [];
@@ -446,9 +446,9 @@ function isReverseChargeCode(code: string): boolean {
   return includesAny(code, ["ae", "rc", "rcm", "reverse"]);
 }
 
-function readFirstText(source: Record<string, unknown>, keys: string[]): string {
+function readFirstText(source: object, keys: string[]): string {
   for (const key of keys) {
-    const value = source[key];
+    const value = (Object.entries(source).find(([name]) => name === key)?.[1]);
     if (typeof value === "string" && value.trim().length > 0) {
       return value.trim();
     }
@@ -456,9 +456,9 @@ function readFirstText(source: Record<string, unknown>, keys: string[]): string 
   return "";
 }
 
-function readKnownValue(source: Record<string, unknown>, keys: string[]): string | number | boolean | null {
+function readKnownValue(source: object, keys: string[]): string | number | boolean | null {
   for (const key of keys) {
-    const value = source[key];
+    const value = (Object.entries(source).find(([name]) => name === key)?.[1]);
     if (typeof value === "string" && value.trim().length > 0) return value.trim();
     if (typeof value === "number" && Number.isFinite(value)) return value;
     if (typeof value === "boolean") return value;
@@ -466,9 +466,9 @@ function readKnownValue(source: Record<string, unknown>, keys: string[]): string
   return null;
 }
 
-function readBooleanSignal(source: Record<string, unknown>, keys: string[]): boolean {
+function readBooleanSignal(source: object, keys: string[]): boolean {
   for (const key of keys) {
-    const value = source[key];
+    const value = (Object.entries(source).find(([name]) => name === key)?.[1]);
     if (typeof value === "boolean") return value;
     if (typeof value === "number") return value === 1;
     if (typeof value === "string") {
@@ -479,9 +479,9 @@ function readBooleanSignal(source: Record<string, unknown>, keys: string[]): boo
   return false;
 }
 
-function readNumber(source: Record<string, unknown>, keys: string[]): number | null {
+function readNumber(source: object, keys: string[]): number | null {
   for (const key of keys) {
-    const value = source[key];
+    const value = (Object.entries(source).find(([name]) => name === key)?.[1]);
     if (typeof value === "number" && Number.isFinite(value)) return value;
     if (typeof value === "string" && value.trim().length > 0) {
       const parsed = Number(value);
@@ -544,3 +544,4 @@ function createCollectionState<T extends string>() {
     },
   };
 }
+

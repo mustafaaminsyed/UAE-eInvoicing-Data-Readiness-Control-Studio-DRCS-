@@ -15,27 +15,27 @@ describe("decodeTransactionTypeCode", () => {
     expect(decoded.activeFlags).toEqual(["summary_invoice", "disclosed_agent_billing", "exports"]);
   });
 
-  it("decodes mask-style inputs into observable single-flag outputs", () => {
-    const decoded = decodeTransactionTypeCode("XXXXX1XX");
-
-    expect(decoded.valid).toBe(true);
-    expect(decoded.format).toBe("mask");
-    expect(decoded.activeFlags).toEqual(["disclosed_agent_billing"]);
+  it("accepts all-binary values including no special transaction type", () => {
+    for (const value of ["00000000", "00000001", "00000010", "00000100", "00001000", "00010000", "00100000", "01000000", "10000000", "11111111"]) {
+      expect(decodeTransactionTypeCode(value).valid).toBe(true);
+    }
+    expect(decodeTransactionTypeCode("00000000").activeFlags).toEqual([]);
   });
 
-  it("keeps the unnamed fifth mask observable without inventing semantics", () => {
+  it("decodes position five as continuous supply", () => {
     const decoded = decodeTransactionTypeCode("00001000");
 
-    expect(decoded.activeFlags).toEqual(["reserved_policy_flag"]);
-    expect(getTransactionTypeFlagDefinition("reserved_policy_flag")?.mask).toBe("XXXX1XXX");
+    expect(decoded.activeFlags).toEqual(["continuous_supply"]);
+    expect(getTransactionTypeFlagDefinition("continuous_supply")?.mask).toBe("XXXX1XXX");
   });
 
   it("rejects unsupported transaction_type_code formats", () => {
-    const decoded = decodeTransactionTypeCode("EXPORT");
-
-    expect(decoded.valid).toBe(false);
-    expect(decoded.format).toBe("invalid");
-    expect(decoded.issues[0]).toContain("8-character");
+    for (const value of ["XXXXXXX1", "XXXXX1XX", "XXXX1XXX", "XXXXXXXX", "0000000", "000000000", "0000000X", "ABC00000", ""]) {
+      const decoded = decodeTransactionTypeCode(value);
+      expect(decoded.valid).toBe(false);
+      expect(decoded.format).not.toBe("binary");
+    }
+    expect(decodeTransactionTypeCode("EXPORT").issues[0]).toContain("8-character");
   });
 
   it("keeps the bitmask contract explicit and complete", () => {

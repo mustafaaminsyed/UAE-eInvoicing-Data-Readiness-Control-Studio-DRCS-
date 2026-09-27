@@ -102,15 +102,15 @@ function buildDeliveryInformation(
   };
 }
 
-export async function parseBuyersFile(file: File): Promise<Buyer[]> {
-  return parsePartiesFile(file, { direction: 'AR' });
-}
-
 type ParseOptions = {
   direction?: Direction;
   uploadSessionId?: string;
   uploadManifestId?: string;
 };
+
+export async function parseBuyersFile(file: File, options: ParseOptions = {}): Promise<Buyer[]> {
+  return parsePartiesFile(file, options);
+}
 
 function getValue(record: Record<string, string>, keys: string[]): string | undefined {
   for (const key of keys) {

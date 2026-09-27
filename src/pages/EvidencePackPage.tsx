@@ -36,6 +36,8 @@ import {
 import { fetchCheckRuns } from '@/lib/api/checksApi';
 import { fetchExceptionsByRun } from '@/lib/api/pintAEApi';
 import { CheckRun } from '@/types/customChecks';
+import { CheckRunResultsSummary } from '@/types/evidence';
+import { RunSummary } from '@/types/pintAE';
 import { CONFORMANCE_CONFIG } from '@/config/conformance';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -85,12 +87,32 @@ function formatFailureClassLabel(value: string): string {
   return failureClassDisplayLabels[value] ?? value.replace(/_/g, ' ');
 }
 
+interface EvidenceRunMetadata {
+  run_mode?: RunSummary['run_mode'];
+  readiness_qualification?: RunSummary['readiness_qualification'];
+  mapping_coverage_percent?: RunSummary['mapping_coverage_percent'];
+}
+
+function normalizeCurrentRunMetadata(runSummary: RunSummary | null): EvidenceRunMetadata | null {
+  if (!runSummary) return null;
+  return {
+    run_mode: runSummary.run_mode,
+    readiness_qualification: runSummary.readiness_qualification,
+    mapping_coverage_percent: runSummary.mapping_coverage_percent,
+  };
+}
+
+function normalizePersistedRunMetadata(summary: CheckRunResultsSummary | null): EvidenceRunMetadata | null {
+  if (!summary) return null;
+  return {
+    run_mode: summary.runMode,
+    readiness_qualification: summary.readinessQualification,
+    mapping_coverage_percent: summary.mappingCoveragePercent,
+  };
+}
+
 function getRunContextSummary(
-  runSummary: {
-    run_mode?: string;
-    readiness_qualification?: string;
-    mapping_coverage_percent?: number | null;
-  } | null,
+  runSummary: EvidenceRunMetadata | null,
 ) {
   if (!runSummary?.run_mode) return null;
 
@@ -125,7 +147,7 @@ function getRunContextSummary(
   }
 
   return {
-      statusLabel: runSummary.readiness_qualification === 'diagnostic_only' ? 'Diagnostic assessment' : 'Decision-ready assessment',
+    statusLabel: runSummary.readiness_qualification === 'diagnostic_only' ? 'Diagnostic assessment' : 'Decision-ready assessment',
     statusClass:
       runSummary.readiness_qualification === 'diagnostic_only'
         ? 'border-amber-500/30 bg-amber-500/10 text-amber-700'
@@ -206,10 +228,9 @@ export default function EvidencePackPage() {
   const canBuildEvidence = (isChecksRun && isCurrentContextRun) || canUseHistoricalSnapshot;
   const showLegacyRunSummary = false;
   const selectedRunSummary = useMemo(
-    () =>
-      (isCurrentContextRun
-        ? runSummary
-        : (selectedRun?.results_summary as typeof runSummary | null) ?? null),
+    () => (isCurrentContextRun
+      ? normalizeCurrentRunMetadata(runSummary)
+      : normalizePersistedRunMetadata(selectedRun?.results_summary ?? null)),
     [isCurrentContextRun, runSummary, selectedRun],
   );
   const selectedRunContext = getRunContextSummary(selectedRunSummary);

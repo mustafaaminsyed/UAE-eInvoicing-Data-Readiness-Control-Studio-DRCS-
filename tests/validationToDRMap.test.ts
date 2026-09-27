@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { getRulesForDR } from '@/lib/rules/ruleTraceability';
 import { getDRCoverageMaturity, getValidationDRTargets } from '@/lib/registry/validationToDRMap';
+import { BTUAE_02_ENFORCEMENT_SCOPE } from '@/lib/coverage/enforcementScope';
 
 describe('validation-to-DR mapping model', () => {
   it('derives invoice type coverage from explicit mappings only', () => {
@@ -9,11 +10,13 @@ describe('validation-to-DR mapping model', () => {
     );
   });
 
-  it('does not treat reference-only DR links as runtime-enforced coverage', () => {
+  it('keeps exact runtime mapping distinct from semantic enforcement completeness', () => {
     expect(getValidationDRTargets('UAE-UC1-CHK-004', { includeReferenceOnly: true })).toEqual([
       expect.objectContaining({ dr_id: 'IBT-003', mapping_type: 'exact' }),
     ]);
-    expect(getDRCoverageMaturity('BTUAE-02')).toBe('unmapped');
+    expect(getDRCoverageMaturity('BTUAE-02')).toBe('runtime_enforced');
+    expect(BTUAE_02_ENFORCEMENT_SCOPE.dimensions.dependency.status).toBe('partial');
+    expect(BTUAE_02_ENFORCEMENT_SCOPE.dimensions.semantic_consistency.status).toBe('not_evaluated');
   });
 
   it('keeps scheme identifier DRs out of executable coverage until a dedicated validator exists', () => {

@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
 import EvidencePackPage from '@/pages/EvidencePackPage';
@@ -32,13 +33,16 @@ vi.mock('@/lib/api/checksApi', () => ({
       low_count: 0,
       pass_rate: 90,
       results_summary: {
-        run_mode: 'diagnostic_mapping',
-        readiness_qualification: 'diagnostic_only',
-        mapping_coverage_percent: 82,
+        runMode: 'diagnostic_mapping',
+        readinessQualification: 'diagnostic_only',
+        mappingCoveragePercent: 82,
         evidenceSnapshot: {
           version: 1,
           captured_at: '2026-03-14T10:00:00.000Z',
           dataset_name: 'Historical Seller',
+          entity_scope_status: 'single_entity',
+          legal_entity_count: 1,
+          legal_entity_labels: ['Historical Seller'],
           counts: {
             totalInvoices: 10,
             totalBuyers: 4,
@@ -93,24 +97,29 @@ vi.mock('@/lib/api/pintAEApi', () => ({
 
 describe('EvidencePackPage historical runs', () => {
   it('renders from the persisted evidence snapshot instead of requiring an in-memory run', async () => {
-    render(<EvidencePackPage />);
+    render(
+      <MemoryRouter initialEntries={['/evidence-pack']}>
+        <EvidencePackPage />
+      </MemoryRouter>
+    );
 
     await waitFor(() => {
       expect(
-        screen.getByText(/persisted snapshot captured for the selected run/i)
+        screen.getByText(/saved assessment snapshot captured for the selected run/i)
       ).toBeInTheDocument();
     });
 
     expect(
-      screen.getByText(/persisted evidence snapshot and archived exception context/i)
+      screen.getByText(/selected run uses persisted evidence snapshot and archived exception context/i)
     ).toBeInTheDocument();
-    expect(screen.getByText(/Source: Persisted snapshot/i)).toBeInTheDocument();
-    expect(screen.getByText(/Diagnostic only/i)).toBeInTheDocument();
-    expect(screen.getByText(/Diagnostic mapping run/i)).toBeInTheDocument();
+    expect(screen.getByText(/Evidence source: Saved assessment snapshot/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/historic-run/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Diagnostic assessment/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Diagnostic mapping run/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/Mapping coverage 82%/i)).toBeInTheDocument();
     expect(screen.getByText(/Entity scope: Single entity/i)).toBeInTheDocument();
     expect(screen.getByText(/Legal entities: 1/i)).toBeInTheDocument();
-    expect(screen.getByText(/Executive decision/i)).toBeInTheDocument();
+    expect(screen.getByText(/Executive verdict/i)).toBeInTheDocument();
     expect(screen.getByText(/Exceptions and mitigations/i)).toBeInTheDocument();
     expect(screen.getByText(/Domain readiness/i)).toBeInTheDocument();
     expect(screen.getByText(/Appendix detail/i)).toBeInTheDocument();

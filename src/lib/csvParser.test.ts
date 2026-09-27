@@ -1,9 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import { analyzeFile } from '@/components/upload/FileAnalysis';
-import { parseCSV, parseHeadersFile, parseLinesFile } from '@/lib/csvParser';
+import { parseBuyersFile, parseCSV, parseHeadersFile, parseLinesFile } from '@/lib/csvParser';
 import { headersNegativeSample } from '@/lib/sampleData';
 
 describe('negative headers template upload path', () => {
+  it('maps AP supplier aliases when the AP direction is supplied', async () => {
+    const csv = [
+      'supplier_id,supplier_name,supplier_trn',
+      'SUP-001,Example Supplier,100000000000003',
+    ].join('\n');
+
+    const file = { text: async () => csv } as File;
+    const [buyer] = await parseBuyersFile(file, { direction: 'AP' });
+
+    expect(buyer.buyer_id).toBe('SUP-001');
+    expect(buyer.buyer_name).toBe('Example Supplier');
+    expect(buyer.buyer_trn).toBe('100000000000003');
+  });
+
   it('parses rows and columns for the downloadable negative headers template', () => {
     const rows = parseCSV(headersNegativeSample);
     const file = new File([headersNegativeSample], 'invoice_headers_template_negative.csv', { type: 'text/csv' });

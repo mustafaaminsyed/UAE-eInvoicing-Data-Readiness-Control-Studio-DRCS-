@@ -78,6 +78,53 @@ function normalizeExceptions(exceptions: PintAEException[]) {
 }
 
 describe('runPintAECheck executor registry parity', () => {
+  it.each([
+    ['IBR-137-AE', { transaction_type_code: '00000100', principal_id: 'P-1' }],
+    ['IBR-138-AE', { transaction_type_code: '00010000', invoicing_period_start_date: '2026-01-01' }],
+    ['IBR-152-AE', {
+      transaction_type_code: '00000001',
+      deliver_to_address_line_1: '1 Main St',
+      deliver_to_city: 'Dubai',
+      deliver_to_country_subdivision: 'DU',
+      deliver_to_country_code: 'US',
+    }],
+  ])('records passed provenance for %s', (checkId, header) => {
+    const result = runPintAECheckWithTelemetry(getOverlayCheck(checkId), buildDataContext(header), {
+      overlayApplicabilityMode: 'scenario_context',
+    });
+    expect(result.exceptions).toEqual([]);
+    expect(result.executionResults).toEqual([
+      expect.objectContaining({ ruleId: checkId, invoiceId: 'INV-1', status: 'passed' }),
+    ]);
+  });
+
+  it.each([
+    ['IBR-137-AE', { transaction_type_code: '00000100' }],
+    ['IBR-138-AE', { transaction_type_code: '00010000' }],
+    ['IBR-152-AE', { transaction_type_code: '00000001' }],
+  ])('records failed provenance for %s without changing exceptions', (checkId, header) => {
+    const result = runPintAECheckWithTelemetry(getOverlayCheck(checkId), buildDataContext(header), {
+      overlayApplicabilityMode: 'scenario_context',
+    });
+    expect(result.exceptions).toHaveLength(1);
+    expect(result.exceptions[0].check_id).toBe(checkId);
+    expect(result.telemetry).toMatchObject({ execution_count: 1, failure_count: 1 });
+    expect(result.executionResults).toEqual([
+      expect.objectContaining({ ruleId: checkId, invoiceId: 'INV-1', status: 'failed' }),
+    ]);
+  });
+
+  it.each(['IBR-137-AE', 'IBR-138-AE', 'IBR-152-AE'])('records not_applicable provenance for inactive %s', (checkId) => {
+    const result = runPintAECheckWithTelemetry(getOverlayCheck(checkId), buildDataContext({ transaction_type_code: '00000000' }), {
+      overlayApplicabilityMode: 'scenario_context',
+    });
+    expect(result.exceptions).toEqual([]);
+    expect(result.telemetry).toMatchObject({ execution_count: 0, failure_count: 0 });
+    expect(result.executionResults).toEqual([
+      expect.objectContaining({ ruleId: checkId, invoiceId: 'INV-1', status: 'not_applicable' }),
+    ]);
+  });
+
   it('keeps CHK-032/033 references aligned to quantity/UOM semantics only', () => {
     expect(getCheck('UAE-UC1-CHK-032').pint_reference_terms).toEqual(['IBT-129']);
     expect(getCheck('UAE-UC1-CHK-033').pint_reference_terms).toEqual(['IBT-130']);
@@ -221,7 +268,7 @@ describe('runPintAECheck executor registry parity', () => {
     const check = getCheck('UAE-UC1-CHK-060');
 
     expect(runPintAECheck(check, buildDataContext({ transaction_type_code: '00010101' }))).toHaveLength(0);
-    expect(runPintAECheck(check, buildDataContext({ transaction_type_code: 'XXXXX1XX' }))).toHaveLength(0);
+    expect(runPintAECheck(check, buildDataContext({ transaction_type_code: '00000100' }))).toHaveLength(0);
     expect(runPintAECheck(check, buildDataContext({ transaction_type_code: '' }))).toHaveLength(0);
 
     const invalidText = runPintAECheck(check, buildDataContext({ transaction_type_code: 'EXPORT' }));
@@ -229,7 +276,7 @@ describe('runPintAECheck executor registry parity', () => {
     expect(invalidText[0].field_name).toBe('transaction_type_code');
     expect(invalidText[0].message).toContain('8-character');
 
-    const invalidMask = runPintAECheck(check, buildDataContext({ transaction_type_code: 'XXXXXXXX' }));
+    const invalidMask = runPintAECheck(check, buildDataContext({ transaction_type_code: 'XXXXXXX1' }));
     expect(invalidMask).toHaveLength(1);
     expect(invalidMask[0].field_name).toBe('transaction_type_code');
   });
@@ -299,17 +346,24 @@ describe('runPintAECheck executor registry parity', () => {
     };
     const data = buildDataContext(
       {
+        invoice_id: 'INV-037',
+        invoice_number: 'INV-037',
+        issue_date: '2026-03-29',
+        seller_trn: '123456789012345',
+        buyer_id: 'B-1',
+        currency: 'AED',
         invoice_type: '388',
-        buyer_legal_reg_id_type: 'XYZ',
-      } as InvoiceHeader,
+      },
       {
-        buyers: [
-          {
+        buyers: (() => {
+          const buyer = {
             buyer_id: 'B-1',
             buyer_name: 'Buyer LLC',
             buyer_trn: '123456789012345',
-          },
-        ],
+            buyer_legal_reg_id_type: 'XYZ',
+          };
+          return [buyer];
+        })(),
       }
     );
 

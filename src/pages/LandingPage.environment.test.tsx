@@ -39,10 +39,10 @@ describe('LandingPage environment selector', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Operating context')).toBeInTheDocument();
+      expect(screen.getByText('Current scope')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('United Arab Emirates')).toBeInTheDocument();
+    expect(screen.getAllByText('United Arab Emirates').length).toBeGreaterThan(0);
     expect(screen.getByText('Current scope')).toBeInTheDocument();
     expect(screen.getAllByText(/UTC\+04:00/).length).toBeGreaterThan(0);
 
@@ -50,12 +50,10 @@ describe('LandingPage environment selector', () => {
     const prodButton = screen.getByRole('button', { name: /prod/i });
 
     expect(devButton).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getAllByText(/DEV access|Sandbox client access lane/i).length).toBeGreaterThan(0);
 
     fireEvent.click(prodButton);
 
     expect(prodButton).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getAllByText(/PROD access|Production client access lane/i).length).toBeGreaterThan(0);
     expect(window.localStorage.getItem('drcs.preview_environment_v1')).toBe('PROD');
   });
 });

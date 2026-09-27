@@ -549,12 +549,12 @@ function getLegacyApplicabilityCandidates(
   input: ScenarioInvoiceInput
 ): Array<Record<string, unknown>> {
   if (check.scope === "Lines") {
-    return input.lines.length > 0 ? input.lines : [];
+    return input.lines.length > 0 ? input.lines.map((line) => ({ ...line })) : [];
   }
   if (check.scope === "Party") {
-    return input.buyer ? [input.buyer] : [];
+    return input.buyer ? [{ ...input.buyer }] : [];
   }
-  return [input.header];
+  return [{ ...input.header }];
 }
 
 function conditionMatches(
@@ -726,9 +726,9 @@ function collectScenarioEvidence(
   return dedupeBy(evidence, (item) => `${item.source}|${item.field}|${String(item.value)}|${item.note}`);
 }
 
-function readNumber(source: Record<string, unknown>, keys: string[]): number | null {
+function readNumber(source: object, keys: string[]): number | null {
   for (const key of keys) {
-    const value = source[key];
+    const value = (Object.entries(source).find(([name]) => name === key)?.[1]);
     if (typeof value === "number" && Number.isFinite(value)) return value;
     if (typeof value === "string" && value.trim().length > 0) {
       const parsed = Number(value);
@@ -769,3 +769,4 @@ function dedupeBy<T>(values: T[], keySelector: (value: T) => string): T[] {
   });
   return result;
 }
+
