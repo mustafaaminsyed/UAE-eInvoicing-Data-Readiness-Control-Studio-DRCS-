@@ -161,8 +161,8 @@ export function classifyInvoice(input: ScenarioInvoiceInput): ScenarioClassifica
 }
 
 function collectTaxSignals(
-  header: Record<string, unknown>,
-  lines: Array<Record<string, unknown>>
+  header: object,
+  lines: Array<object>
 ): { codes: string[]; rates: number[] } {
   const codes: string[] = [];
   const rates: number[] = [];
@@ -187,7 +187,7 @@ function isCreditIndicator(value: string): boolean {
   return includesAny(value, ["credit note", "credit_note", "381", "cn"]);
 }
 
-function hasNegativeAmount(header: Record<string, unknown>): boolean {
+function hasNegativeAmount(header: object): boolean {
   const candidates = [
     readNumber(header, ["total_incl_vat", "totalInclVat"]),
     readNumber(header, ["total_excl_vat", "totalExclVat"]),
@@ -213,9 +213,9 @@ function isExemptCode(code: string): boolean {
   return includesAny(code, ["e", "exempt"]);
 }
 
-function readFirstText(source: Record<string, unknown>, keys: string[]): string {
+function readFirstText(source: object, keys: string[]): string {
   for (const key of keys) {
-    const value = source[key];
+    const value = (Object.entries(source).find(([name]) => name === key)?.[1]);
     if (typeof value === "string" && value.trim().length > 0) {
       return value.trim();
     }
@@ -223,9 +223,9 @@ function readFirstText(source: Record<string, unknown>, keys: string[]): string 
   return "";
 }
 
-function readBooleanSignal(source: Record<string, unknown>, keys: string[]): boolean {
+function readBooleanSignal(source: object, keys: string[]): boolean {
   for (const key of keys) {
-    const value = source[key];
+    const value = (Object.entries(source).find(([name]) => name === key)?.[1]);
     if (typeof value === "boolean") return value;
     if (typeof value === "number") return value === 1;
     if (typeof value === "string") {
@@ -236,9 +236,9 @@ function readBooleanSignal(source: Record<string, unknown>, keys: string[]): boo
   return false;
 }
 
-function readNumber(source: Record<string, unknown>, keys: string[]): number | null {
+function readNumber(source: object, keys: string[]): number | null {
   for (const key of keys) {
-    const value = source[key];
+    const value = (Object.entries(source).find(([name]) => name === key)?.[1]);
     if (typeof value === "number" && Number.isFinite(value)) return value;
     if (typeof value === "string" && value.trim().length > 0) {
       const parsed = Number(value);
@@ -288,3 +288,4 @@ function computeConfidenceScore(signals: {
   if (score === 0) return undefined;
   return Math.min(score, 100);
 }
+

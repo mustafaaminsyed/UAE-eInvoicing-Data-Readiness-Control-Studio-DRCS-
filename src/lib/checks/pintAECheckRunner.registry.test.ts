@@ -299,17 +299,24 @@ describe('runPintAECheck executor registry parity', () => {
     };
     const data = buildDataContext(
       {
+        invoice_id: 'INV-037',
+        invoice_number: 'INV-037',
+        issue_date: '2026-03-29',
+        seller_trn: '123456789012345',
+        buyer_id: 'B-1',
+        currency: 'AED',
         invoice_type: '388',
-        buyer_legal_reg_id_type: 'XYZ',
-      } as InvoiceHeader,
+      },
       {
-        buyers: [
-          {
+        buyers: (() => {
+          const buyer = {
             buyer_id: 'B-1',
             buyer_name: 'Buyer LLC',
             buyer_trn: '123456789012345',
-          },
-        ],
+            buyer_legal_reg_id_type: 'XYZ',
+          };
+          return [buyer];
+        })(),
       }
     );
 

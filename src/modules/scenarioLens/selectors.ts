@@ -28,9 +28,9 @@ export function buildScenarioLensInvoices(
     const invoiceLines = linesByInvoice.get(header.invoice_id) ?? [];
     const buyer = buyerMap.get(header.buyer_id);
     const classification = classifyInvoice({
-      header: header as unknown as Record<string, unknown>,
-      lines: invoiceLines as unknown as Array<Record<string, unknown>>,
-      buyer: (buyer ?? null) as unknown as Record<string, unknown> | null,
+      header,
+      lines: invoiceLines,
+      buyer: buyer ?? null,
     });
 
     return {
@@ -42,8 +42,8 @@ export function buildScenarioLensInvoices(
       sellerCountry: header.seller_country,
       buyerCountry: buyer?.buyer_country,
       currency: header.currency,
-      header: header as unknown as Partial<InvoiceHeader> & Record<string, unknown>,
-      lines: invoiceLines as unknown as Array<Partial<InvoiceLine> & Record<string, unknown>>,
+      header,
+      lines: invoiceLines,
       classification,
     };
   });

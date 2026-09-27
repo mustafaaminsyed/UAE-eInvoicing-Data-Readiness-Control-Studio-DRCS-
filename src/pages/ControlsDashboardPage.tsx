@@ -28,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { StatsCard } from '@/components/StatsCard';
+import { StatsCard, type StatsCardProps } from '@/components/StatsCard';
 import ComplianceRadar from '@/components/dashboard/ComplianceRadar';
 import EntityRiskMatrixHeatmap from '@/components/dashboard/EntityRiskMatrixHeatmap';
 import {
@@ -323,9 +323,9 @@ export default function ControlsDashboardPage() {
     : failedOutcomes > NON_BLOCKING_FAILURE_THRESHOLD
     ? 'DEGRADED'
     : 'READY';
-  const controlStudioStatusVariant =
+  const controlStudioStatusVariant: 'default' | 'success' | 'warning' | 'danger' =
     controlStudioStatus === 'AT RISK' ? 'danger' : controlStudioStatus === 'DEGRADED' ? 'warning' : 'success';
-  const controlStudioMetrics = [
+  const controlStudioMetrics: StatsCardProps[] = [
     {
       title: 'Readiness Status Score',
       value: `${currentReadinessScore.toFixed(1)}%`,

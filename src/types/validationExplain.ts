@@ -33,7 +33,7 @@ export interface ExplanationEvidenceSnapshot {
   expected?: string | number;
   actual?: string | number;
   delta?: number | string;
-  mapping?: Record<string, unknown>;
+  mapping?: MappingContext;
   rawMessage?: string;
   [key: string]: unknown;
 }

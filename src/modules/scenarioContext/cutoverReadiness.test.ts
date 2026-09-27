@@ -14,7 +14,7 @@ describe("cutover readiness", () => {
     expect(report.corpus.length).toBeGreaterThan(10);
     expect(families.get("document_family")?.counts.expected_improvement).toBeGreaterThanOrEqual(1);
     expect(families.get("transaction_flag")?.counts.policy_decision_needed).toBeGreaterThanOrEqual(1);
-    expect(families.get("credit_note_specialized")?.counts.blocked_by_ingestion_gap).toBeGreaterThanOrEqual(1);
+    expect(families.get("credit_note_specialized")?.counts.blocked_by_ingestion_gap).toBe(0);
   });
 
   it("identifies generated-rule targets blocked by registry or ingestibility gaps", () => {
@@ -49,7 +49,7 @@ describe("cutover readiness", () => {
   it("keeps authoritative runtime behavior unchanged in this readiness pass", () => {
     const report = buildCutoverReadinessReport();
 
-    expect(UAE_UC1_CHECK_PACK).toHaveLength(59);
+    expect(UAE_UC1_CHECK_PACK).toHaveLength(62);
     expect(report.cutoverGates.map((gate) => gate.gateId)).toEqual(
       expect.arrayContaining([
         "gate-shadow-regression",

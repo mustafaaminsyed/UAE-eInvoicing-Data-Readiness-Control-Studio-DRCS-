@@ -50,6 +50,59 @@ export interface ScenarioLensFilters {
   confidence: ScenarioConfidenceFilter;
 }
 
+export interface ScenarioHeaderExtensions {
+  transactionTypeCode?: string;
+  invoiceType?: string;
+  document_type?: string;
+  documentType?: string;
+  mof_document_type?: string;
+  mofDocumentType?: string;
+  profile_id?: string;
+  profileId?: string;
+  is_credit_note?: boolean | string;
+  credit_note?: boolean | string;
+  creditNote?: boolean | string;
+  self_billing?: boolean | string;
+  is_self_billing?: boolean | string;
+  selfBilling?: boolean | string;
+  reverse_charge?: boolean | string;
+  is_reverse_charge?: boolean | string;
+  rcm?: boolean | string;
+  is_out_of_scope?: boolean | string;
+  out_of_scope?: boolean | string;
+  commercial_only?: boolean | string;
+  is_export?: boolean | string;
+  export_sale?: boolean | string;
+  is_continuous_supply?: boolean | string;
+  continuous_supply?: boolean | string;
+  billing_frequency?: boolean | string;
+  is_summary_invoice?: boolean | string;
+  summary_invoice?: boolean | string;
+  consolidated_invoice?: boolean | string;
+  is_disclosed_agent?: boolean | string;
+  disclosed_agent?: boolean | string;
+  agent_disclosed?: boolean | string;
+  is_ecommerce?: boolean | string;
+  ecommerce?: boolean | string;
+  is_marketplace?: boolean | string;
+  taxCategoryCode?: string;
+  vat_category?: string;
+  taxCategoryRate?: number | string;
+  vat_rate?: number | string;
+  sellerCountry?: string;
+  buyer_country?: string;
+  buyerCountry?: string;
+  ship_to_country?: string;
+}
+
+export type ScenarioHeaderInput = Partial<InvoiceHeader> & ScenarioHeaderExtensions;
+export type ScenarioBuyerInput = Partial<Buyer> & { buyerCountry?: string };
+export type ScenarioLineInput = Partial<InvoiceLine> & {
+  taxCategoryCode?: string;
+  vat_category?: string;
+  vatRate?: number | string;
+};
+
 export interface ScenarioClassification {
   documentType: ScenarioDocumentType;
   vatTreatments: ScenarioVatTreatment[];
@@ -59,9 +112,9 @@ export interface ScenarioClassification {
 }
 
 export interface ScenarioInvoiceInput {
-  header: Partial<InvoiceHeader> & Record<string, unknown>;
-  lines: Array<Partial<InvoiceLine> & Record<string, unknown>>;
-  buyer?: (Partial<Buyer> & Record<string, unknown>) | null;
+  header: ScenarioHeaderInput;
+  lines: Array<ScenarioLineInput>;
+  buyer?: ScenarioBuyerInput | null;
 }
 
 export interface ScenarioLensInvoice {
@@ -73,8 +126,8 @@ export interface ScenarioLensInvoice {
   sellerCountry?: string;
   buyerCountry?: string;
   currency?: string;
-  header: Partial<InvoiceHeader> & Record<string, unknown>;
-  lines: Array<Partial<InvoiceLine> & Record<string, unknown>>;
+  header: ScenarioHeaderInput;
+  lines: Array<ScenarioLineInput>;
   classification: ScenarioClassification;
 }
 

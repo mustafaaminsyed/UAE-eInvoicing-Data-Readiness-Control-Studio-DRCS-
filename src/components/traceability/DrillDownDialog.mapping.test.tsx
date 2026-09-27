@@ -22,6 +22,8 @@ describe('DrillDownDialog DR exception attribution', () => {
             dataResponsibility: 'Seller',
             ruleIds: ['UAE-UC1-CHK-004'],
             ruleNames: ['Invoice type presence'],
+            indirectRuleIds: [],
+            indirectRuleNames: [],
             controlIds: [],
             controlNames: [],
             vatLawStatus: 'Legacy',
@@ -46,6 +48,10 @@ describe('DrillDownDialog DR exception attribution', () => {
               pint_reference_terms: ['BTUAE-02'],
               message: 'Mapped through rule traceability',
               timestamp: '2026-03-14T10:00:00Z',
+              root_cause_category: 'Unclassified',
+              owner_team: 'Client Finance',
+              sla_target_hours: 24,
+              case_status: 'Open',
             },
             {
               id: 'exc-wrong-ref',
@@ -59,6 +65,10 @@ describe('DrillDownDialog DR exception attribution', () => {
               pint_reference_terms: ['IBT-003'],
               message: 'Metadata reference only',
               timestamp: '2026-03-14T10:00:01Z',
+              root_cause_category: 'Unclassified',
+              owner_team: 'Client Finance',
+              sla_target_hours: 24,
+              case_status: 'Open',
             },
           ]}
         />

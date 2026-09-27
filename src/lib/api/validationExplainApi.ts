@@ -284,7 +284,7 @@ function findPintFieldMetadata(fieldName?: string): Record<string, unknown> | nu
 
   const codelistValues =
     codelistMatch && codelistMatch !== 'inline_allowed_values'
-      ? (PINT_AE_CODELISTS as Record<string, { ids: string[] }>)[codelistMatch]?.ids || []
+      ? PINT_AE_CODELISTS[codelistMatch]?.ids || []
       : field.allowedValues || [];
 
   return {

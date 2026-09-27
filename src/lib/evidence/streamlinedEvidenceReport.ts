@@ -236,7 +236,7 @@ function groupExceptions(data: EvidencePackData): ExceptionGroup[] {
   });
 
   return Array.from(groups.values())
-    .map((group) => {
+    .map((group): ExceptionGroup => {
       const decisionImpact =
         group.severity === 'Critical'
           ? 'Blocks onboarding'
