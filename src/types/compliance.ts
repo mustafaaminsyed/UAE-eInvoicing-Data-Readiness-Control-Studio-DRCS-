@@ -97,6 +97,10 @@ export interface InvoiceLine {
   vat_amount: number;
   // UC1 expansions
   unit_of_measure?: string;
+  /** IBT-149: item price base quantity supplied by the source. */
+  price_base_quantity?: number;
+  /** IBT-150: item price base quantity unit code supplied by the source. */
+  price_base_quantity_uom?: string;
   tax_category_code?: string;
   exemption_reason_code?: string;
   exemption_reason_text?: string;

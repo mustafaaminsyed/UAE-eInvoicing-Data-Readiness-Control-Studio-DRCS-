@@ -841,6 +841,49 @@ describe('runPintAECheck executor registry parity', () => {
     expect(runPintAECheck(check, invalidData)).toHaveLength(1);
   });
 
+  it('validates IBT-150 independently through CHK-048 and keeps it separate from IBR-088', () => {
+    const codelistCheck = getCheck('UAE-UC1-CHK-048');
+    const relationshipCheck = getCheck('UAE-UC1-CHK-061');
+    const validCode = getCodelistCodes('UNECERec20')[0];
+    const data = buildDataContext({}, {
+      lines: [{
+        line_id: 'L-1', invoice_id: 'INV-1', line_number: 1, quantity: 1, unit_price: 100,
+        line_total_excl_vat: 100, vat_rate: 5, vat_amount: 5,
+        unit_of_measure: validCode, price_base_quantity_uom: 'XBG',
+      }],
+    });
+
+    expect(runPintAECheck(codelistCheck, data)).toHaveLength(0);
+    expect(runPintAECheck(relationshipCheck, data)).toHaveLength(1);
+    expect(runPintAECheck(relationshipCheck, data)[0]?.message).toContain('IBT-150');
+    expect(runPintAECheck(relationshipCheck, data)[0]?.observed_value).toContain('IBT-130');
+  });
+
+  it('treats absent IBT-150 as not applicable for IBR-088', () => {
+    const relationshipCheck = getCheck('UAE-UC1-CHK-061');
+    const data = buildDataContext({}, {
+      lines: [{
+        line_id: 'L-1', invoice_id: 'INV-1', line_number: 1, quantity: 1, unit_price: 100,
+        line_total_excl_vat: 100, vat_rate: 5, vat_amount: 5, unit_of_measure: 'EA',
+      }],
+    });
+
+    expect(runPintAECheck(relationshipCheck, data)).toHaveLength(0);
+  });
+
+  it('passes IBR-088 when IBT-150 equals IBT-130 after case/whitespace normalization', () => {
+    const relationshipCheck = getCheck('UAE-UC1-CHK-061');
+    const data = buildDataContext({}, {
+      lines: [{
+        line_id: 'L-1', invoice_id: 'INV-1', line_number: 1, quantity: 1, unit_price: 100,
+        line_total_excl_vat: 100, vat_rate: 5, vat_amount: 5,
+        unit_of_measure: ' ea ', price_base_quantity_uom: 'EA',
+      }],
+    });
+
+    expect(runPintAECheck(relationshipCheck, data)).toHaveLength(0);
+  });
+
   it('fails CHK-049 when exempt VAT lines are missing exemption reason details', () => {
     const check = getCheck('UAE-UC1-CHK-049');
     const data = buildDataContext(

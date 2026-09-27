@@ -279,6 +279,21 @@ export async function parseLinesFile(file: File, options: ParseOptions = {}): Pr
       vat_rate: parseFloat(record.vat_rate) || 0,
       vat_amount: parseFloat(record.vat_amount) || 0,
       unit_of_measure: str(record, 'unit_of_measure', 'unit_code'),
+      price_base_quantity: num(
+        record,
+        'price_base_quantity',
+        'line_base_quantity',
+        'item_price_base_quantity',
+        'base_quantity'
+      ),
+      price_base_quantity_uom: str(
+        record,
+        'price_base_quantity_uom',
+        'line_base_quantity_uom',
+        'item_price_base_quantity_uom',
+        'base_quantity_uom',
+        'base_quantity_unit'
+      ),
       tax_category_code: str(record, 'tax_category_code'),
       exemption_reason_code: str(record, 'exemption_reason_code', 'vat_exemption_reason_code'),
       exemption_reason_text: str(record, 'exemption_reason_text', 'vat_exemption_reason_text'),

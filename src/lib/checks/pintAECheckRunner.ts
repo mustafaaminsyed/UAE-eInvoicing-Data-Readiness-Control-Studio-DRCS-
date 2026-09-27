@@ -1914,10 +1914,37 @@ export function runPintAECheckWithTelemetry(
       });
       break;
 
+    case 'UAE-UC1-CHK-061':
+      data.lines.forEach((line) => {
+        executionCount++;
+        const baseUom = typeof line.price_base_quantity_uom === 'string'
+          ? line.price_base_quantity_uom.trim().toUpperCase()
+          : '';
+        if (!baseUom) return;
+        const quantityUom = typeof line.unit_of_measure === 'string'
+          ? line.unit_of_measure.trim().toUpperCase()
+          : '';
+        if (!quantityUom || baseUom === quantityUom) return;
+        const header = data.headerMap.get(line.invoice_id);
+        exceptions.push(createException({
+          invoiceId: line.invoice_id,
+          invoiceNumber: header?.invoice_number,
+          sellerTrn: header?.seller_trn,
+          buyerId: header?.buyer_id,
+          lineId: line.line_id,
+          fieldName: 'price_base_quantity_uom',
+          observedValue: `IBT-150=${line.price_base_quantity_uom}; IBT-130=${line.unit_of_measure || '(empty)'}`,
+          expectedValue: 'IBT-150 must equal IBT-130 when IBT-150 is supplied',
+          message: 'IBR-088: Item price base quantity UOM (IBT-150) must match invoiced or credited quantity UOM (IBT-130).',
+        }));
+      });
+      break;
+
     // Default: Generic presence check for other checks
     default:
-      if (check.rule_type === 'dynamic_codelist' && params.field && params.codelist) {
-        const field = resolveFieldAlias(params.field);
+      if (check.rule_type === 'dynamic_codelist' && (params.field || Array.isArray(params.fields)) && params.codelist) {
+        const fields = Array.isArray(params.fields) ? params.fields : [params.field];
+        const field = resolveFieldAlias(String(fields[0]));
         const dataset = getDatasetForField(field, check.scope, data);
         const conditions = Array.isArray(params.when) ? (params.when as DependencyCondition[]) : [];
         dataset.forEach((record: any) => {
@@ -1942,20 +1969,23 @@ export function runPintAECheckWithTelemetry(
           ) return;
           if (conditions.length > 0 && !recordMatchesConditions(record, conditions)) return;
           executionCount++;
-          const value = getFieldValue(record, field);
-          if (!isEmpty(value) && !isCodeInCodelist(String(params.codelist), String(value))) {
+          fields.forEach((rawField) => {
+            const currentField = resolveFieldAlias(String(rawField));
+            const value = getFieldValue(record, currentField);
+            if (!isEmpty(value) && !isCodeInCodelist(String(params.codelist), String(value))) {
             const header = record.invoice_id ? data.headerMap.get(record.invoice_id) : undefined;
             exceptions.push(createException({
               invoiceId: record.invoice_id || header?.invoice_id,
               invoiceNumber: record.invoice_number || header?.invoice_number,
               sellerTrn: record.seller_trn || header?.seller_trn,
               buyerId: record.buyer_id || header?.buyer_id,
-              fieldName: field,
+              fieldName: currentField,
               observedValue: String(value),
               expectedValue: `Value from codelist: ${params.codelist}`,
-              message: `Field "${field}" has invalid value "${value}" for codelist ${params.codelist}`,
+              message: `Field "${currentField}" has invalid value "${value}" for codelist ${params.codelist}`,
             }));
-          }
+            }
+          });
         });
       } else if (check.rule_type === 'dependency_rule' && Array.isArray(params.when) && Array.isArray(params.require_any_of)) {
         const dependencyResult = runConditionalFieldRequirement(
