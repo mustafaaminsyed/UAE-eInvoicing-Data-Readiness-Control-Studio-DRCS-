@@ -19,7 +19,7 @@ describe('public template alignment', () => {
     expect(columns).toContain('credit_note_reason_text');
     expect(columns).toContain('preceding_invoice_reference');
     expect(columns).toContain('preceding_invoice_issue_date');
-    expect(columns).toHaveLength(36);
+    expect(columns).toHaveLength(37);
   });
 
   it('keeps the shipped line template aligned with the current conditional line field shape', () => {

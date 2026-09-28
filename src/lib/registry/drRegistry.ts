@@ -83,8 +83,10 @@ const DR_TO_COLUMN_MAP: Record<string, { dataset: 'buyers' | 'headers' | 'lines'
   'IBT-154': { dataset: 'lines', columns: ['item_name'] },
   'BTUAE-08': { dataset: 'lines', columns: ['vat_amount'] },
 
+  // User-supplied mapped aggregate fields
+  'IBT-106': { dataset: 'headers', columns: ['sum_line_net_amount'] },
+
   // Derived/calculated fields (no user input column — derived from inputs)
-  'IBT-106': { dataset: 'headers', columns: ['total_excl_vat'] },
   'IBT-116': { dataset: 'headers', columns: ['total_excl_vat'] },
   'IBT-117': { dataset: 'headers', columns: ['vat_total'] },
 
@@ -150,7 +152,7 @@ export const PARSER_KNOWN_COLUMNS: Record<'buyers' | 'headers' | 'lines', Set<st
   ]),
   headers: new Set([
     'invoice_id', 'invoice_number', 'issue_date', 'seller_trn', 'buyer_id',
-    'currency', 'invoice_type', 'total_excl_vat', 'vat_total', 'total_incl_vat',
+    'currency', 'invoice_type', 'sum_line_net_amount', 'total_excl_vat', 'vat_total', 'total_incl_vat',
     'seller_name', 'seller_address', 'seller_city', 'seller_country',
     'seller_subdivision', 'seller_electronic_address', 'seller_legal_reg_id',
     'seller_legal_reg_id_type', 'transaction_type_code', 'principal_id',

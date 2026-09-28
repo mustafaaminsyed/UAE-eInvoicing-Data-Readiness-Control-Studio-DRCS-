@@ -1031,19 +1031,19 @@ export function runPintAECheckWithTelemetry(
         executionCount++;
         const invoiceLines = data.linesByInvoice.get(header.invoice_id) || [];
         const lineSum = invoiceLines.reduce((sum, l) => sum + (l.line_total_excl_vat || 0), 0);
-        const headerTotal = header.total_excl_vat || 0;
-        const diff = Math.abs(lineSum - headerTotal);
+        const headerTotal = header.sum_line_net_amount;
         const tolerance = params.tolerance || 0.01;
-        if (diff > tolerance) {
+        const diff = headerTotal === undefined ? Infinity : Math.abs(lineSum - headerTotal);
+        if (headerTotal === undefined || diff > tolerance) {
           exceptions.push(createException({
             invoiceId: header.invoice_id,
             invoiceNumber: header.invoice_number,
             sellerTrn: header.seller_trn,
             buyerId: header.buyer_id,
-            fieldName: 'total_excl_vat',
-            observedValue: String(headerTotal),
+            fieldName: 'sum_line_net_amount',
+            observedValue: headerTotal === undefined ? '(empty)' : String(headerTotal),
             expectedValue: `Sum of lines: ${lineSum.toFixed(2)}`,
-            message: `Invoice ${header.invoice_number}: Header total (${headerTotal}) does not match sum of lines (${lineSum.toFixed(2)})`,
+            message: `Invoice ${header.invoice_number}: IBT-106 (${headerTotal === undefined ? '(empty)' : headerTotal}) does not match sum of invoice line net amounts (${lineSum.toFixed(2)})`,
           }));
         }
       });

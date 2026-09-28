@@ -212,6 +212,7 @@ export async function parseHeadersFile(file: File, options: ParseOptions = {}): 
       preceding_invoice_reference: str(record, 'preceding_invoice_reference'),
       preceding_invoice_issue_date: str(record, 'preceding_invoice_issue_date'),
       total_excl_vat: num(record, 'total_excl_vat'),
+      sum_line_net_amount: num(record, 'sum_line_net_amount', 'invoice_line_net_total'),
       vat_total: num(record, 'vat_total'),
       total_incl_vat: num(record, 'total_incl_vat'),
       seller_name: str(record, 'seller_name'),

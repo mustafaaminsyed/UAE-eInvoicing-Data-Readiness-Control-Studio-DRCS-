@@ -66,6 +66,7 @@ async function loadSamples() {
     payment_due_date: r.payment_due_date,
     payment_means_code: r.payment_means_code,
     fx_rate: Number(r.fx_rate),
+    sum_line_net_amount: Number(r.sum_line_net_amount),
     total_excl_vat: Number(r.total_excl_vat),
     vat_total: Number(r.vat_total),
     total_incl_vat: Number(r.total_incl_vat),

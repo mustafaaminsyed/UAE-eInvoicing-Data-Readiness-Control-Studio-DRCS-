@@ -79,6 +79,63 @@ function normalizeExceptions(exceptions: PintAEException[]) {
 
 describe('runPintAECheck executor registry parity', () => {
   it.each([
+    ['single line', [100], 100, 0],
+    ['multiple lines', [100, 200, 50], 350, 0],
+  ])('CHK-021 passes for %s when supplied IBT-106 equals the line sum', (_label, lineTotals, ibt106, expectedFailures) => {
+    const check = getCheck('UAE-UC1-CHK-021');
+    const data = buildDataContext({ sum_line_net_amount: ibt106 }, {
+      lines: lineTotals.map((lineTotal, index) => ({
+        line_id: `L-${index + 1}`, invoice_id: 'INV-1', line_number: index + 1,
+        quantity: 1, unit_price: lineTotal, line_total_excl_vat: lineTotal,
+        vat_rate: 5, vat_amount: lineTotal * 0.05,
+      })),
+    });
+
+    expect(runPintAECheck(check, data)).toHaveLength(expectedFailures);
+  });
+
+  it('CHK-021 fails when IBT-106 does not equal supplied IBT-131 sum', () => {
+    const check = getCheck('UAE-UC1-CHK-021');
+    const data = buildDataContext({ sum_line_net_amount: 340 }, {
+      lines: [100, 200, 50].map((lineTotal, index) => ({
+        line_id: `L-${index + 1}`, invoice_id: 'INV-1', line_number: index + 1,
+        quantity: 1, unit_price: lineTotal, line_total_excl_vat: lineTotal,
+        vat_rate: 5, vat_amount: lineTotal * 0.05,
+      })),
+    });
+
+    const [exception] = runPintAECheck(check, data);
+    expect(exception?.field_name).toBe('sum_line_net_amount');
+    expect(exception?.message).toContain('IBT-106');
+  });
+
+  it('CHK-021 keeps IBT-106 independent from IBT-109 and does not recalculate IBT-131', () => {
+    const check = getCheck('UAE-UC1-CHK-021');
+    const data = buildDataContext({ sum_line_net_amount: 350, total_excl_vat: 330 }, {
+      lines: [100, 200, 50].map((lineTotal, index) => ({
+        line_id: `L-${index + 1}`, invoice_id: 'INV-1', line_number: index + 1,
+        quantity: 999, unit_price: 999, line_total_excl_vat: lineTotal,
+        vat_rate: 5, vat_amount: lineTotal * 0.05,
+      })),
+    });
+
+    expect(runPintAECheck(check, data)).toHaveLength(0);
+  });
+
+  it('CHK-021 fails when mandatory IBT-106 is missing and does not infer it', () => {
+    const check = getCheck('UAE-UC1-CHK-021');
+    const data = buildDataContext({ total_excl_vat: 350 }, {
+      lines: [{
+        line_id: 'L-1', invoice_id: 'INV-1', line_number: 1,
+        quantity: 1, unit_price: 350, line_total_excl_vat: 350,
+        vat_rate: 5, vat_amount: 17.5,
+      }],
+    });
+
+    expect(runPintAECheck(check, data)).toHaveLength(1);
+  });
+
+  it.each([
     ['IBR-137-AE', { transaction_type_code: '00000100', principal_id: 'P-1' }],
     ['IBR-138-AE', { transaction_type_code: '00010000', invoicing_period_start_date: '2026-01-01' }],
     ['IBR-152-AE', {

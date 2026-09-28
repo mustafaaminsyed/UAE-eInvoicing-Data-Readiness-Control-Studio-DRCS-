@@ -240,6 +240,7 @@ export const PINT_AE_UC1_FIELDS: PintAEField[] = [
   
   // Totals Fields
   { id: 'total_excl_vat', name: 'Total Excl VAT', description: 'Invoice total excluding VAT', ibtReference: 'IBT-109', category: 'totals', isMandatory: true, dataType: 'number' },
+  { id: 'sum_line_net_amount', name: 'Sum of Invoice Line Net Amount', description: 'Sum of invoice line net amounts (IBT-106), distinct from invoice total excluding VAT', ibtReference: 'IBT-106', category: 'totals', isMandatory: true, dataType: 'number' },
   { id: 'vat_total', name: 'Total VAT', description: 'Total VAT amount', ibtReference: 'IBT-110', category: 'totals', isMandatory: true, dataType: 'number' },
   { id: 'total_incl_vat', name: 'Total Incl VAT', description: 'Invoice total including VAT', ibtReference: 'IBT-112', category: 'totals', isMandatory: true, dataType: 'number' },
   { id: 'amount_due', name: 'Amount Due', description: 'Amount due for payment', ibtReference: 'IBT-115', category: 'totals', isMandatory: false, dataType: 'number' },

@@ -24,9 +24,9 @@ describe('negative headers template upload path', () => {
     const analysis = analyzeFile(rows, file, 'headers', 'AR', headersNegativeSample);
 
     expect(rows).toHaveLength(3);
-    expect(Object.keys(rows[0] ?? {})).toHaveLength(36);
+    expect(Object.keys(rows[0] ?? {})).toHaveLength(37);
     expect(analysis.rowCount).toBe(3);
-    expect(analysis.columnCount).toBe(36);
+    expect(analysis.columnCount).toBe(37);
     expect(analysis.columns).toContain('invoice_id');
     expect(analysis.columns).toContain('buyer_id');
   });
@@ -46,6 +46,21 @@ describe('negative headers template upload path', () => {
     expect(header.credit_note_reason_text).toBe('Price adjustment');
     expect(header.preceding_invoice_reference).toBe('INV-0001');
     expect(header.preceding_invoice_issue_date).toBe('2026-05-31');
+  });
+
+  it('preserves IBT-106 independently from IBT-109 and leaves missing IBT-106 undefined', async () => {
+    const csv = [
+      'invoice_id,invoice_number,issue_date,invoice_type,seller_trn,buyer_id,currency,sum_line_net_amount,total_excl_vat',
+      'INV-106-001,INV-106-001,2026-06-10,380,100000000000003,BUY-001,AED,350,330',
+      'INV-106-002,INV-106-002,2026-06-10,380,100000000000003,BUY-001,AED,,330',
+    ].join('\n');
+    const file = { text: async () => csv } as File;
+    const headers = await parseHeadersFile(file);
+
+    expect(headers[0].sum_line_net_amount).toBe(350);
+    expect(headers[0].total_excl_vat).toBe(330);
+    expect(headers[1].sum_line_net_amount).toBeUndefined();
+    expect(headers[1].total_excl_vat).toBe(330);
   });
 
   it('maps credit note reason text aliases when description is used as the header name', async () => {
