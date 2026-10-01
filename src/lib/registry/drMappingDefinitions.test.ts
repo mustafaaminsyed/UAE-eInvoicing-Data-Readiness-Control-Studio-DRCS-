@@ -23,4 +23,17 @@ describe('DR mapping definitions', () => {
       expect.objectContaining({ dr_id: 'IBT-151', validated_fields: ['tax_category_code'] }),
     ]));
   });
+
+  it('classifies IBT-106 as derived from IBT-131 and exposes conditional IBT-149 source input', () => {
+    expect(PINT_AE_UC1_FIELDS.some((entry) => entry.id === 'sum_line_net_amount')).toBe(false);
+    expect(PINT_AE_UC1_FIELDS.find((entry) => entry.id === 'price_base_quantity')).toMatchObject({
+      ibtReference: 'IBT-149',
+      isMandatory: false,
+    });
+
+    const mapping = VALIDATION_TO_DR_MAP.find((entry) => entry.validation_id === 'UAE-UC1-CHK-021');
+    expect(mapping?.dr_targets).toEqual(expect.arrayContaining([
+      expect.objectContaining({ dr_id: 'IBT-106', validated_fields: ['line_total_excl_vat'] }),
+    ]));
+  });
 });

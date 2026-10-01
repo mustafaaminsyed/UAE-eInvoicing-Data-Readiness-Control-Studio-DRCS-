@@ -24,9 +24,9 @@ describe('negative headers template upload path', () => {
     const analysis = analyzeFile(rows, file, 'headers', 'AR', headersNegativeSample);
 
     expect(rows).toHaveLength(3);
-    expect(Object.keys(rows[0] ?? {})).toHaveLength(37);
+    expect(Object.keys(rows[0] ?? {})).toHaveLength(36);
     expect(analysis.rowCount).toBe(3);
-    expect(analysis.columnCount).toBe(37);
+    expect(analysis.columnCount).toBe(36);
     expect(analysis.columns).toContain('invoice_id');
     expect(analysis.columns).toContain('buyer_id');
   });

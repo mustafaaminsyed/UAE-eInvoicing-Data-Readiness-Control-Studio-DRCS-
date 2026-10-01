@@ -122,7 +122,7 @@ describe('runPintAECheck executor registry parity', () => {
     expect(runPintAECheck(check, data)).toHaveLength(0);
   });
 
-  it('CHK-021 fails when mandatory IBT-106 is missing and does not infer it', () => {
+  it('CHK-021 derives IBT-106 when the legacy header aggregate is absent', () => {
     const check = getCheck('UAE-UC1-CHK-021');
     const data = buildDataContext({ total_excl_vat: 350 }, {
       lines: [{
@@ -132,7 +132,7 @@ describe('runPintAECheck executor registry parity', () => {
       }],
     });
 
-    expect(runPintAECheck(check, data)).toHaveLength(1);
+    expect(runPintAECheck(check, data)).toHaveLength(0);
   });
 
   it.each([

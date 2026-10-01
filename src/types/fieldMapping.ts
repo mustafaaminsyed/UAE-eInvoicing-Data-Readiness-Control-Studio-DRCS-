@@ -224,6 +224,7 @@ export const PINT_AE_UC1_FIELDS: PintAEField[] = [
   { id: 'quantity', name: 'Quantity', description: 'Invoiced quantity', ibtReference: 'IBT-129', category: 'line', isMandatory: true, dataType: 'number' },
   { id: 'unit_of_measure', name: 'Unit of Measure', description: 'UNECE Rec 20 unit code', ibtReference: 'IBT-130', category: 'line', isMandatory: false, dataType: 'string' },
   { id: 'unit_price', name: 'Unit Price', description: 'Item net price', ibtReference: 'IBT-146', category: 'line', isMandatory: true, dataType: 'number' },
+  { id: 'price_base_quantity', name: 'Price Base Quantity', description: 'Number of item units to which the item net price applies; defaults to 1 when omitted', ibtReference: 'IBT-149', category: 'line', isMandatory: false, dataType: 'number' },
   { id: 'line_discount', name: 'Line Discount (Legacy)', description: 'Backward-compatible DRCS helper field for line discounts; use line_allowance_amount where possible', ibtReference: 'SYS-LINE-DISCOUNT', category: 'line', isMandatory: false, dataType: 'number' },
   { id: 'line_total_excl_vat', name: 'Line Net Amount', description: 'Line total excl VAT', ibtReference: 'IBT-131', category: 'line', isMandatory: true, dataType: 'number' },
   { id: 'description', name: 'Item Description', description: 'Item name/description', ibtReference: 'IBT-153', category: 'line', isMandatory: true, dataType: 'string' },
@@ -240,7 +241,6 @@ export const PINT_AE_UC1_FIELDS: PintAEField[] = [
   
   // Totals Fields
   { id: 'total_excl_vat', name: 'Total Excl VAT', description: 'Invoice total excluding VAT', ibtReference: 'IBT-109', category: 'totals', isMandatory: true, dataType: 'number' },
-  { id: 'sum_line_net_amount', name: 'Sum of Invoice Line Net Amount', description: 'Sum of invoice line net amounts (IBT-106), distinct from invoice total excluding VAT', ibtReference: 'IBT-106', category: 'totals', isMandatory: true, dataType: 'number' },
   { id: 'vat_total', name: 'Total VAT', description: 'Total VAT amount', ibtReference: 'IBT-110', category: 'totals', isMandatory: true, dataType: 'number' },
   { id: 'total_incl_vat', name: 'Total Incl VAT', description: 'Invoice total including VAT', ibtReference: 'IBT-112', category: 'totals', isMandatory: true, dataType: 'number' },
   { id: 'amount_due', name: 'Amount Due', description: 'Amount due for payment', ibtReference: 'IBT-115', category: 'totals', isMandatory: false, dataType: 'number' },

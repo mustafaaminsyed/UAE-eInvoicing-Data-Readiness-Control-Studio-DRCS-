@@ -59,17 +59,16 @@ Fields derived by the ASP (Corner 2) — such as Specification ID (IBT-024), Bus
 | 24 | `payment_due_date` | IBT-009 | Conditional | Date | YYYY-MM-DD | Due date | ERP |
 | 25 | `payment_means_code` | IBT-081 | Conditional | Code | UNTDID 4461 | Payment means | ERP |
 | 26 | `fx_rate` | BTAE-04 | Conditional | Number | Decimal (6dp) | Invoice-currency-to-AED rate; required for non-AED invoices | ERP |
-| 27 | `sum_line_net_amount` | IBT-106 | Yes | Number | Decimal (2dp) | Supplied sum of invoice line net amounts | ERP |
-| 28 | `total_excl_vat` | IBT-109 | Yes | Number | Decimal (2dp) | Total excl. tax | ERP |
-| 29 | `vat_total` | IBT-110 | Yes | Number | Decimal (2dp) | Total tax | ERP |
-| 30 | `total_incl_vat` | IBT-112 | Yes | Number | Decimal (2dp) | Total incl. tax | ERP |
-| 31 | `amount_due` | IBT-115 | Conditional | Number | Decimal (2dp) | Amount due | ERP |
-| 32 | `tax_category_code` | IBT-118 | Yes | Code | S/Z/E/RC | Tax category | ERP |
-| 33 | `tax_category_rate` | IBT-119 | Yes | Number | Percentage | Tax rate | ERP |
-| 34 | `credit_note_reason_code` | BTAE-03 | Conditional | Code | Credit note reason code | Required when `invoice_type = 381` | ERP |
-| 35 | `credit_note_reason_text` | SYS-CN-REASON-TEXT | Conditional | String | Free text | Credit note reason narrative, when captured by source | ERP |
-| 36 | `preceding_invoice_reference` | IBT-025 | Conditional | String | Original invoice identifier | Required for credit notes unless `credit_note_reason_code = VD` | ERP |
-| 37 | `preceding_invoice_issue_date` | IBT-026 | Optional | Date | YYYY-MM-DD | Original invoice issue date, if available | ERP |
+| 27 | `total_excl_vat` | IBT-109 | Yes | Number | Decimal (2dp) | Total excl. tax | ERP |
+| 28 | `vat_total` | IBT-110 | Yes | Number | Decimal (2dp) | Total tax | ERP |
+| 29 | `total_incl_vat` | IBT-112 | Yes | Number | Decimal (2dp) | Total incl. tax | ERP |
+| 30 | `amount_due` | IBT-115 | Conditional | Number | Decimal (2dp) | Amount due | ERP |
+| 31 | `tax_category_code` | IBT-118 | Yes | Code | S/Z/E/RC | Tax category | ERP |
+| 32 | `tax_category_rate` | IBT-119 | Yes | Number | Percentage | Tax rate | ERP |
+| 33 | `credit_note_reason_code` | BTAE-03 | Conditional | Code | Credit note reason code | Required when `invoice_type = 381` | ERP |
+| 34 | `credit_note_reason_text` | SYS-CN-REASON-TEXT | Conditional | String | Free text | Credit note reason narrative, when captured by source | ERP |
+| 35 | `preceding_invoice_reference` | IBT-025 | Conditional | String | Original invoice identifier | Required for credit notes unless `credit_note_reason_code = VD` | ERP |
+| 36 | `preceding_invoice_issue_date` | IBT-026 | Optional | Date | YYYY-MM-DD | Original invoice issue date, if available | ERP |
 
 ---
 
@@ -85,16 +84,17 @@ Fields derived by the ASP (Corner 2) — such as Specification ID (IBT-024), Bus
 | 6 | `quantity` | IBT-129 | Yes | Number | Decimal | Invoiced quantity | ERP |
 | 7 | `unit_of_measure` | IBT-130 | Yes | Code | UN/ECE Rec 20 | UOM code | ERP |
 | 8 | `unit_price` | IBT-146 | Yes | Number | Decimal | Item net price | ERP |
-| 9 | `line_discount` | SYS-LINE-DISCOUNT | No | Number | Decimal (2dp) | Simplified DRCS line discount input | ERP |
-| 10 | `line_total_excl_vat` | IBT-131 | Yes | Number | Decimal (2dp) | Line net amount | ERP |
-| 11 | `vat_rate` | IBT-152 | Yes | Number | Percentage | VAT rate | ERP |
-| 12 | `vat_amount` | BTUAE-08 | Yes (UC1) | Number | Decimal (2dp) | VAT line amount | ERP |
-| 13 | `tax_category_code` | IBT-151 | Yes | Code | S/Z/E/RC | Item tax category | ERP |
-| 14 | `exemption_reason_code` | IBT-151 | Conditional | Code | UAE exemption code | Exemption reason code when applicable | ERP |
-| 15 | `exemption_reason_text` | IBT-151 | Conditional | String | Free text | Exemption reason text when applicable | ERP |
-| 16 | `goods_service_type` | IBT-151 | Conditional | Code | Goods/services classification | Reverse-charge goods/services type when applicable | ERP |
-| 17 | `line_allowance_amount` | IBT-136 | No | Number | Decimal (2dp) | Standards-aligned line allowance amount | ERP |
-| 18 | `line_charge_amount` | IBT-141 | No | Number | Decimal (2dp) | Standards-aligned line charge amount | ERP |
+| 9 | `price_base_quantity` | IBT-149 | Conditional | Number | Positive decimal; blank defaults to 1 | Units to which `unit_price` applies; supply for per-pack/per-100/etc. pricing | ERP / DRCS default |
+| 10 | `line_discount` | SYS-LINE-DISCOUNT | No | Number | Decimal (2dp) | Simplified DRCS line discount input | ERP |
+| 11 | `line_total_excl_vat` | IBT-131 | Yes | Number | Decimal (2dp) | Line net amount | ERP |
+| 12 | `vat_rate` | IBT-152 | Yes | Number | Percentage | VAT rate | ERP |
+| 13 | `vat_amount` | BTUAE-08 | Yes (UC1) | Number | Decimal (2dp) | VAT line amount | ERP |
+| 14 | `tax_category_code` | IBT-151 | Yes | Code | S/Z/E/RC | Item tax category | ERP |
+| 15 | `exemption_reason_code` | IBT-151 | Conditional | Code | UAE exemption code | Exemption reason code when applicable | ERP |
+| 16 | `exemption_reason_text` | IBT-151 | Conditional | String | Free text | Exemption reason text when applicable | ERP |
+| 17 | `goods_service_type` | IBT-151 | Conditional | Code | Goods/services classification | Reverse-charge goods/services type when applicable | ERP |
+| 18 | `line_allowance_amount` | IBT-136 | No | Number | Decimal (2dp) | Standards-aligned line allowance amount | ERP |
+| 19 | `line_charge_amount` | IBT-141 | No | Number | Decimal (2dp) | Standards-aligned line charge amount | ERP |
 
 ---
 
@@ -125,3 +125,5 @@ Fields derived by the ASP (Corner 2) — such as Specification ID (IBT-024), Bus
 7. All dates in YYYY-MM-DD format
 8. Currency codes are ISO 4217 alpha-3
 9. BTAE-10 and applicable BTAE-08 AED line values are derived internally from the source line amounts and BTAE-04 rate; no separate `*_aed` source columns are required
+10. IBT-106 is derived as the sum of IBT-131 line net amounts; it is not a duplicate taxpayer header input and remains distinct from IBT-109
+11. `price_base_quantity` defaults to 1 only when `unit_price` is a per-one-unit price; supply the actual positive basis for per-pack, per-100, or similar pricing

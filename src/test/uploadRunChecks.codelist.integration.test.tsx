@@ -30,7 +30,7 @@ describe('CSV ingestion to orchestrator codelist integration', () => {
   it('runs codelist checks against parsed upload data', async () => {
     const headersWithCodelistViolations = headersSample
       .replace(',Abu Dhabi,AE,AE-AZ,', ',Abu Dhabi,ZZ,AE-AZ,')
-      .replace(',2025-02-14,30,1.000000,1000.00,1000.00,50.00,1050.00,1050.00,S,5.00', ',2025-02-14,XXX,1.000000,1000.00,1000.00,50.00,1050.00,1050.00,S,5.00');
+      .replace(',2025-02-14,30,,1000.00,50.00,1050.00,1050.00,S,5.00', ',2025-02-14,XXX,,1000.00,50.00,1050.00,1050.00,S,5.00');
     const linesWithCodelistViolations = linesSample.replace(',10,EA,100.00,', ',10,BAD,100.00,');
 
     const buyers = await parseBuyersFile(buildFile(buyersSample, 'buyers.csv'));

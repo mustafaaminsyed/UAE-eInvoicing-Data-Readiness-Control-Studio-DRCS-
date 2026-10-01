@@ -73,7 +73,7 @@ export const VALIDATION_TO_DR_MAP: ValidationDRMapEntry[] = [
       exact('IBT-055', 'buyer_country'),
     ],
   },
-  { validation_id: 'UAE-UC1-CHK-021', dr_targets: [exact('IBT-106', 'sum_line_net_amount'), partial('IBT-131', 'line_total_excl_vat')] },
+  { validation_id: 'UAE-UC1-CHK-021', dr_targets: [partial('IBT-106', 'line_total_excl_vat'), exact('IBT-131', 'line_total_excl_vat')] },
   { validation_id: 'UAE-UC1-CHK-022', dr_targets: [exact('IBT-109', 'total_excl_vat')] },
   { validation_id: 'UAE-UC1-CHK-023', dr_targets: [exact('IBT-110', 'vat_total')] },
   { validation_id: 'UAE-UC1-CHK-024', dr_targets: [exact('IBT-112', 'total_incl_vat')] },

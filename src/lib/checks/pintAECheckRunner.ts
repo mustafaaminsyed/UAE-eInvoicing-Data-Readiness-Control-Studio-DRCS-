@@ -1079,7 +1079,7 @@ export function runPintAECheckWithTelemetry(
       });
       break;
 
-    // Sum of Line Net Amounts Matches Header
+    // IBT-106 is derived from IBT-131; reconcile a legacy supplied aggregate when present.
     case 'UAE-UC1-CHK-021':
       data.headers.forEach(header => {
         executionCount++;
@@ -1087,17 +1087,17 @@ export function runPintAECheckWithTelemetry(
         const lineSum = invoiceLines.reduce((sum, l) => sum + (l.line_total_excl_vat || 0), 0);
         const headerTotal = header.sum_line_net_amount;
         const tolerance = params.tolerance || 0.01;
-        const diff = headerTotal === undefined ? Infinity : Math.abs(lineSum - headerTotal);
-        if (headerTotal === undefined || diff > tolerance) {
+        const diff = headerTotal === undefined ? 0 : Math.abs(lineSum - headerTotal);
+        if (headerTotal !== undefined && diff > tolerance) {
           exceptions.push(createException({
             invoiceId: header.invoice_id,
             invoiceNumber: header.invoice_number,
             sellerTrn: header.seller_trn,
             buyerId: header.buyer_id,
             fieldName: 'sum_line_net_amount',
-            observedValue: headerTotal === undefined ? '(empty)' : String(headerTotal),
+            observedValue: String(headerTotal),
             expectedValue: `Sum of lines: ${lineSum.toFixed(2)}`,
-            message: `Invoice ${header.invoice_number}: IBT-106 (${headerTotal === undefined ? '(empty)' : headerTotal}) does not match sum of invoice line net amounts (${lineSum.toFixed(2)})`,
+            message: `Invoice ${header.invoice_number}: Supplied legacy IBT-106 (${headerTotal}) does not match the derived sum of invoice line net amounts (${lineSum.toFixed(2)})`,
           }));
         }
       });

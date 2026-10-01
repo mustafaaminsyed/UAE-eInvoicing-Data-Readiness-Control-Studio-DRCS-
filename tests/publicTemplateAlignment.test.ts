@@ -19,7 +19,8 @@ describe('public template alignment', () => {
     expect(columns).toContain('credit_note_reason_text');
     expect(columns).toContain('preceding_invoice_reference');
     expect(columns).toContain('preceding_invoice_issue_date');
-    expect(columns).toHaveLength(37);
+    expect(columns).not.toContain('sum_line_net_amount');
+    expect(columns).toHaveLength(36);
   });
 
   it('keeps the shipped line template aligned with the current conditional line field shape', () => {
@@ -32,7 +33,9 @@ describe('public template alignment', () => {
     expect(columns).toContain('goods_service_type');
     expect(columns).toContain('line_allowance_amount');
     expect(columns).toContain('line_charge_amount');
-    expect(columns).toHaveLength(18);
+    expect(columns).toContain('price_base_quantity');
+    expect(columns).not.toContain('price_base_quantity_uom');
+    expect(columns).toHaveLength(19);
   });
 
   it('matches the in-app template manifest column counts', () => {

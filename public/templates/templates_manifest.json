@@ -71,7 +71,7 @@
       "file": "invoice_lines_template.csv",
       "dataset": "Invoice Lines",
       "description": "Invoice line item facts",
-      "column_count": 18,
+      "column_count": 19,
       "join_keys": ["line_id", "invoice_id"],
       "columns": [
         { "name": "line_id", "dr_ids": ["IBT-126"], "mandatory": true, "asp_derived": false, "type": "String", "format": "Unique sequential identifier", "description": "Line identifier", "responsibility": "ERP (Corner 1)" },
@@ -82,6 +82,7 @@
         { "name": "quantity", "dr_ids": ["IBT-129"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Decimal", "description": "Invoiced quantity", "responsibility": "ERP (Corner 1)" },
         { "name": "unit_of_measure", "dr_ids": ["IBT-130"], "mandatory": true, "asp_derived": false, "type": "Code", "format": "UN/ECE Rec 20 (EA, KGM, MTR…)", "description": "Unit of measure code", "responsibility": "ERP (Corner 1)" },
         { "name": "unit_price", "dr_ids": ["IBT-146"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Decimal", "description": "Item net price", "responsibility": "ERP (Corner 1)" },
+        { "name": "price_base_quantity", "dr_ids": ["IBT-149"], "mandatory": false, "asp_derived": false, "type": "Number", "format": "Positive decimal; defaults to 1 when blank", "description": "Number of item units to which unit_price applies; supply when price is quoted for more than one unit", "responsibility": "ERP (Corner 1) / DRCS default" },
         { "name": "line_discount", "dr_ids": [], "mandatory": false, "asp_derived": false, "type": "Number", "format": "Decimal (2dp)", "description": "Simplified line discount input used by current DRCS line-math checks", "responsibility": "ERP (Corner 1)" },
         { "name": "line_total_excl_vat", "dr_ids": ["IBT-131"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Decimal (2dp)", "description": "Line net amount", "responsibility": "ERP (Corner 1)" },
         { "name": "vat_rate", "dr_ids": ["IBT-152"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Percentage (e.g. 5.00)", "description": "VAT rate", "responsibility": "ERP (Corner 1)" },
@@ -101,8 +102,7 @@
     { "dr_id": "IBT-031-1", "business_term": "Seller tax scheme code", "default_value": "VAT", "asp_derived": true },
     { "dr_id": "IBT-034-1", "business_term": "Seller electronic address scheme", "default_value": "0235", "asp_derived": true },
     { "dr_id": "IBT-048-1", "business_term": "Buyer tax scheme code", "default_value": "VAT", "asp_derived": true },
-    { "dr_id": "IBT-049-1", "business_term": "Buyer electronic address scheme", "default_value": "0235", "asp_derived": true },
-    { "dr_id": "IBT-149", "business_term": "Price base quantity", "default_value": "1", "asp_derived": true }
+    { "dr_id": "IBT-049-1", "business_term": "Buyer electronic address scheme", "default_value": "0235", "asp_derived": true }
   ],
   "data_relationships": [
     { "from": "invoice_headers.buyer_id", "to": "buyers.buyer_id", "type": "Many-to-One", "description": "Each invoice header references exactly one buyer" },

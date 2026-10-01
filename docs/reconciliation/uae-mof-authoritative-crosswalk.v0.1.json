@@ -408,14 +408,14 @@
       "document_type": "tax",
       "mof_field_id": 30,
       "mof_business_term": "Sum of invoice line net amount",
-      "source_template": "invoice_headers_template.csv|invoice_lines_template.csv",
-      "source_column": "total_excl_vat|line_total_excl_vat",
-      "internal_field_key": "total_excl_vat|line_total_excl_vat",
+      "source_template": "invoice_lines_template.csv",
+      "source_column": "line_total_excl_vat",
+      "internal_field_key": "derived_sum_line_net_amount",
       "dr_id": "IBT-106",
       "classification": "aggregated",
-      "transformation_rule": "Compute sum(lines.line_total_excl_vat) and reconcile with headers.total_excl_vat",
+      "transformation_rule": "Derive IBT-106 as the sum of IBT-131 line net amounts under IBR-CO-10",
       "status": "covered",
-      "notes": ""
+      "notes": "Derived from taxpayer line data; distinct from IBT-109 and not a separate header source field."
     },
     {
       "document_type": "tax",
@@ -604,13 +604,13 @@
       "mof_field_id": 45,
       "mof_business_term": "Item price base quantity",
       "source_template": "invoice_lines_template.csv",
-      "source_column": "",
-      "internal_field_key": "line_base_quantity",
+      "source_column": "price_base_quantity",
+      "internal_field_key": "price_base_quantity",
       "dr_id": "IBT-149",
-      "classification": "generated",
-      "transformation_rule": "Generate price base quantity (typically 1) when not supplied",
-      "status": "missing",
-      "notes": "No explicit source column or transformation contract is implemented."
+      "classification": "direct_or_defaulted",
+      "transformation_rule": "Read the positive source price basis when supplied; otherwise default to 1 only for per-one-unit pricing",
+      "status": "covered",
+      "notes": "Conditional taxpayer source required for per-pack/per-100 or similar pricing."
     },
     {
       "document_type": "tax",
@@ -1071,14 +1071,14 @@
       "document_type": "commercial",
       "mof_field_id": 30,
       "mof_business_term": "Sum of invoice line net amount",
-      "source_template": "invoice_headers_template.csv|invoice_lines_template.csv",
-      "source_column": "total_excl_vat|line_total_excl_vat",
-      "internal_field_key": "total_excl_vat|line_total_excl_vat",
+      "source_template": "invoice_lines_template.csv",
+      "source_column": "line_total_excl_vat",
+      "internal_field_key": "derived_sum_line_net_amount",
       "dr_id": "IBT-106",
       "classification": "aggregated",
-      "transformation_rule": "Compute sum(lines.line_total_excl_vat) and reconcile with headers.total_excl_vat",
+      "transformation_rule": "Derive IBT-106 as the sum of IBT-131 line net amounts under IBR-CO-10",
       "status": "covered",
-      "notes": ""
+      "notes": "Derived from taxpayer line data; distinct from IBT-109 and not a separate header source field."
     },
     {
       "document_type": "commercial",
@@ -1267,13 +1267,13 @@
       "mof_field_id": 45,
       "mof_business_term": "Item price base quantity",
       "source_template": "invoice_lines_template.csv",
-      "source_column": "",
-      "internal_field_key": "line_base_quantity",
+      "source_column": "price_base_quantity",
+      "internal_field_key": "price_base_quantity",
       "dr_id": "IBT-149",
-      "classification": "generated",
-      "transformation_rule": "Generate price base quantity (typically 1) when not supplied",
-      "status": "missing",
-      "notes": "No explicit source column or transformation contract is implemented."
+      "classification": "direct_or_defaulted",
+      "transformation_rule": "Read the positive source price basis when supplied; otherwise default to 1 only for per-one-unit pricing",
+      "status": "covered",
+      "notes": "Conditional taxpayer source required for per-pack/per-100 or similar pricing."
     },
     {
       "document_type": "commercial",
