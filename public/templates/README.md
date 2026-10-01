@@ -58,17 +58,18 @@ Fields derived by the ASP (Corner 2) — such as Specification ID (IBT-024), Bus
 | 23 | `deliver_to_country_code` | IBG-13 / IBT-080 | Conditional | Code | ISO 3166-1 α-2 | Deliver-to country | ERP |
 | 24 | `payment_due_date` | IBT-009 | Conditional | Date | YYYY-MM-DD | Due date | ERP |
 | 25 | `payment_means_code` | IBT-081 | Conditional | Code | UNTDID 4461 | Payment means | ERP |
-| 26 | `fx_rate` | IBT-007 | Conditional | Number | Decimal (6dp) | FX rate to AED | ERP |
-| 27 | `total_excl_vat` | IBT-109 | Yes | Number | Decimal (2dp) | Total excl. tax | ERP |
-| 28 | `vat_total` | IBT-110 | Yes | Number | Decimal (2dp) | Total tax | ERP |
-| 29 | `total_incl_vat` | IBT-112 | Yes | Number | Decimal (2dp) | Total incl. tax | ERP |
-| 30 | `amount_due` | IBT-115 | Conditional | Number | Decimal (2dp) | Amount due | ERP |
-| 31 | `tax_category_code` | IBT-118 | Yes | Code | S/Z/E/RC | Tax category | ERP |
-| 32 | `tax_category_rate` | IBT-119 | Yes | Number | Percentage | Tax rate | ERP |
-| 33 | `credit_note_reason_code` | BTAE-03 | Conditional | Code | Credit note reason code | Required when `invoice_type = 381` | ERP |
-| 34 | `credit_note_reason_text` | SYS-CN-REASON-TEXT | Conditional | String | Free text | Credit note reason narrative, when captured by source | ERP |
-| 35 | `preceding_invoice_reference` | IBT-025 | Conditional | String | Original invoice identifier | Required for credit notes unless `credit_note_reason_code = VD` | ERP |
-| 36 | `preceding_invoice_issue_date` | IBT-026 | Optional | Date | YYYY-MM-DD | Original invoice issue date, if available | ERP |
+| 26 | `fx_rate` | BTAE-04 | Conditional | Number | Decimal (6dp) | Invoice-currency-to-AED rate; required for non-AED invoices | ERP |
+| 27 | `sum_line_net_amount` | IBT-106 | Yes | Number | Decimal (2dp) | Supplied sum of invoice line net amounts | ERP |
+| 28 | `total_excl_vat` | IBT-109 | Yes | Number | Decimal (2dp) | Total excl. tax | ERP |
+| 29 | `vat_total` | IBT-110 | Yes | Number | Decimal (2dp) | Total tax | ERP |
+| 30 | `total_incl_vat` | IBT-112 | Yes | Number | Decimal (2dp) | Total incl. tax | ERP |
+| 31 | `amount_due` | IBT-115 | Conditional | Number | Decimal (2dp) | Amount due | ERP |
+| 32 | `tax_category_code` | IBT-118 | Yes | Code | S/Z/E/RC | Tax category | ERP |
+| 33 | `tax_category_rate` | IBT-119 | Yes | Number | Percentage | Tax rate | ERP |
+| 34 | `credit_note_reason_code` | BTAE-03 | Conditional | Code | Credit note reason code | Required when `invoice_type = 381` | ERP |
+| 35 | `credit_note_reason_text` | SYS-CN-REASON-TEXT | Conditional | String | Free text | Credit note reason narrative, when captured by source | ERP |
+| 36 | `preceding_invoice_reference` | IBT-025 | Conditional | String | Original invoice identifier | Required for credit notes unless `credit_note_reason_code = VD` | ERP |
+| 37 | `preceding_invoice_issue_date` | IBT-026 | Optional | Date | YYYY-MM-DD | Original invoice issue date, if available | ERP |
 
 ---
 
@@ -118,8 +119,9 @@ Fields derived by the ASP (Corner 2) — such as Specification ID (IBT-024), Bus
 1. All `buyer_id` values in headers exist in buyers
 2. All `invoice_id` values in lines exist in headers
 3. `total_incl_vat = total_excl_vat + vat_total` (within ±0.01)
-4. `line_total_excl_vat = quantity × unit_price - line_allowance_amount` (or `line_discount` when using the legacy helper field)
+4. `line_total_excl_vat = quantity × (unit_price / price_base_quantity) + line_charge_amount - line_allowance_amount` (IBR-147-AE; price base quantity defaults to 1 when absent)
 5. `vat_amount = line_total_excl_vat × (vat_rate / 100)`
 6. All TRNs are 15-digit strings (not scientific notation)
 7. All dates in YYYY-MM-DD format
 8. Currency codes are ISO 4217 alpha-3
+9. BTAE-10 and applicable BTAE-08 AED line values are derived internally from the source line amounts and BTAE-04 rate; no separate `*_aed` source columns are required

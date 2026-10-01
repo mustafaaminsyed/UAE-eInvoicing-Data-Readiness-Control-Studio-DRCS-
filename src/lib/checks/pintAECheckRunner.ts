@@ -17,6 +17,17 @@ export interface PintAECheckRunResult {
   exceptions: PintAEException[];
   telemetry: PintAECheckTelemetry;
   executionResults: PintAEExecutionResult[];
+  derivedAedLineValues: DerivedAedLineValue[];
+}
+
+export interface DerivedAedLineValue {
+  invoiceId: string;
+  lineId: string;
+  sourceCurrency: string;
+  conversionRateToAed: number;
+  btae10InvoiceLineAmountAed: number;
+  btae08VatLineAmountAed?: number;
+  roundingScale: 2;
 }
 
 export type PintAEExecutionStatus = 'passed' | 'failed' | 'not_applicable' | 'not_evaluated';
@@ -92,6 +103,59 @@ function countDecimals(num: number): number {
   const str = String(num);
   if (str.indexOf('.') === -1) return 0;
   return str.split('.')[1]?.length || 0;
+}
+
+interface DecimalValue {
+  coefficient: bigint;
+  scale: number;
+}
+
+function parseDecimal(value: number): DecimalValue {
+  const match = String(value).match(/^(-?)(\d+)(?:\.(\d+))?(?:e([+-]?\d+))?$/i);
+  if (!match) throw new Error(`Invalid decimal value: ${value}`);
+
+  const fraction = match[3] ?? '';
+  const exponent = Number(match[4] ?? 0);
+  let coefficient = BigInt(`${match[1]}${match[2]}${fraction}`);
+  let scale = fraction.length - exponent;
+  if (scale < 0) {
+    coefficient *= 10n ** BigInt(-scale);
+    scale = 0;
+  }
+  return { coefficient, scale };
+}
+
+function addDecimals(left: DecimalValue, right: DecimalValue): DecimalValue {
+  const scale = Math.max(left.scale, right.scale);
+  return {
+    coefficient:
+      left.coefficient * 10n ** BigInt(scale - left.scale) +
+      right.coefficient * 10n ** BigInt(scale - right.scale),
+    scale,
+  };
+}
+
+function multiplyDecimals(left: DecimalValue, right: DecimalValue): DecimalValue {
+  return {
+    coefficient: left.coefficient * right.coefficient,
+    scale: left.scale + right.scale,
+  };
+}
+
+/** Round an exact decimal calculation to a PINT monetary amount (two fraction digits), half away from zero. */
+function roundPintMonetary(value: DecimalValue): number {
+  const targetScale = 2;
+  if (value.scale <= targetScale) {
+    return Number(value.coefficient * 10n ** BigInt(targetScale - value.scale)) / 100;
+  }
+
+  const divisor = 10n ** BigInt(value.scale - targetScale);
+  let rounded = value.coefficient / divisor;
+  const remainder = value.coefficient % divisor;
+  if ((remainder < 0n ? -remainder : remainder) * 2n >= divisor) {
+    rounded += value.coefficient < 0n ? -1n : 1n;
+  }
+  return Number(rounded) / 100;
 }
 
 function isEmpty(value: any): boolean {
@@ -531,6 +595,7 @@ export function runPintAECheckWithTelemetry(
 ): PintAECheckRunResult {
   const exceptions: PintAEException[] = [];
   const executionResults: PintAEExecutionResult[] = [];
+  const derivedAedLineValues: DerivedAedLineValue[] = [];
   const params = check.parameters || {};
   const timestamp = new Date().toISOString();
   let executionCount = 0;
@@ -694,7 +759,7 @@ export function runPintAECheckWithTelemetry(
       });
       break;
 
-    // Tax accounting currency must be AED
+    // UAE tax accounting currency is controlled as AED; reject only an explicit conflict.
     case 'UAE-UC1-CHK-007':
       data.headers.forEach(header => {
         executionCount++;
@@ -702,18 +767,7 @@ export function runPintAECheckWithTelemetry(
         const invoiceCurrency = String(header.currency || '').toUpperCase();
         const taxCurrency = String(header.tax_currency || '').toUpperCase();
 
-        if (invoiceCurrency !== baseCurrency && isEmpty(taxCurrency)) {
-          exceptions.push(createException({
-            invoiceId: header.invoice_id,
-            invoiceNumber: header.invoice_number,
-            sellerTrn: header.seller_trn,
-            buyerId: header.buyer_id,
-            fieldName: 'tax_currency',
-            observedValue: '(empty)',
-            expectedValue: baseCurrency,
-            message: `Invoice ${header.invoice_number}: Tax accounting currency must be ${baseCurrency} when invoice currency is ${invoiceCurrency}`,
-          }));
-        } else if (!isEmpty(taxCurrency) && taxCurrency !== baseCurrency) {
+        if (!isEmpty(taxCurrency) && taxCurrency !== baseCurrency) {
           exceptions.push(createException({
             invoiceId: header.invoice_id,
             invoiceNumber: header.invoice_number,
@@ -1202,12 +1256,18 @@ export function runPintAECheckWithTelemetry(
         const currencyField = resolveFieldAlias(params.currency_field || 'currency');
         const fxField = resolveFieldAlias(params.fx_field || 'fx_rate');
         const amountField = resolveFieldAlias(params.amount_field || 'line_total_excl_vat');
+        const taxAmountField = resolveFieldAlias(params.tax_amount_field || 'vat_amount');
         const baseCurrency = normalizeToken(params.base_currency || 'AED');
         const requireNonNegative = params.require_non_negative !== false;
 
         const currency = normalizeToken(getFieldValue(header, currencyField));
         const amountRaw = getFieldValue(line, amountField);
         const amount = Number(amountRaw);
+        const taxAmountRaw = getFieldValue(line, taxAmountField);
+        const taxAmount = Number(taxAmountRaw);
+        const category = normalizeToken(line.tax_category_code);
+        const vatAmountNotApplicable = getStringArray(params.vat_amount_not_applicable_categories)
+          .some((candidate) => normalizeToken(candidate) === category);
 
         if (!Number.isFinite(amount)) {
           exceptions.push(createException({
@@ -1239,26 +1299,24 @@ export function runPintAECheckWithTelemetry(
           return;
         }
 
-        if (currency === baseCurrency) {
-          if (requireNonNegative && amount < 0) {
-            exceptions.push(createException({
-              invoiceId: line.invoice_id,
-              invoiceNumber: header.invoice_number,
-              sellerTrn: header.seller_trn,
-              buyerId: header.buyer_id,
-              lineId: line.line_id,
-              fieldName: amountField,
-              observedValue: String(amount),
-              expectedValue: 'Non-negative AED line amount',
-              message: `Invoice ${header.invoice_number}, Line ${line.line_number}: AED line amount cannot be negative under current policy`,
-            }));
-          }
+        if (!vatAmountNotApplicable && !Number.isFinite(taxAmount)) {
+          exceptions.push(createException({
+            invoiceId: line.invoice_id,
+            invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn,
+            buyerId: header.buyer_id,
+            lineId: line.line_id,
+            fieldName: taxAmountField,
+            observedValue: String(taxAmountRaw ?? '(empty)'),
+            expectedValue: 'Numeric line VAT amount when BTAE-08 applies',
+            message: `Invoice ${header.invoice_number}, Line ${line.line_number}: VAT line amount is missing or invalid so BTAE-08 and BTAE-10 cannot be derived`,
+          }));
           return;
         }
 
-        const fxRaw = getFieldValue(header, fxField);
-        const fx = Number(fxRaw);
-        if (!Number.isFinite(fx) || fx <= 0) {
+        const conversionRate = currency === baseCurrency ? 1 : Number(getFieldValue(header, fxField));
+        if (currency !== baseCurrency && (!Number.isFinite(conversionRate) || conversionRate <= 0)) {
+          const fxRaw = getFieldValue(header, fxField);
           exceptions.push(createException({
             invoiceId: line.invoice_id,
             invoiceNumber: header.invoice_number,
@@ -1267,14 +1325,43 @@ export function runPintAECheckWithTelemetry(
             lineId: line.line_id,
             fieldName: fxField,
             observedValue: String(fxRaw ?? '(empty)'),
-            expectedValue: `Positive FX rate to ${baseCurrency}`,
-            message: `Invoice ${header.invoice_number}, Line ${line.line_number}: Positive FX rate is required to derive AED line amount from ${currency}`,
+            expectedValue: `Positive BTAE-04 exchange rate to ${baseCurrency}`,
+            message: `Invoice ${header.invoice_number}, Line ${line.line_number}: Positive BTAE-04 exchange rate is required by IBR-159-AE to derive AED line amounts from ${currency}`,
           }));
           return;
         }
 
-        const amountInAed = amount * fx;
-        if (!Number.isFinite(amountInAed) || (requireNonNegative && amountInAed < 0)) {
+        const amountDecimal = parseDecimal(amount);
+        const taxAmountDecimal = parseDecimal(vatAmountNotApplicable ? 0 : taxAmount);
+        const conversionRateDecimal = parseDecimal(conversionRate);
+        const payableAmount = addDecimals(amountDecimal, taxAmountDecimal);
+        const btae10Amount = roundPintMonetary(multiplyDecimals(payableAmount, conversionRateDecimal));
+        const btae08Amount = vatAmountNotApplicable
+          ? undefined
+          : roundPintMonetary(multiplyDecimals(taxAmountDecimal, conversionRateDecimal));
+
+        const zeroVatRequired = getStringArray(params.zero_vat_amount_categories)
+          .some((candidate) => normalizeToken(candidate) === category);
+        if (zeroVatRequired && taxAmount !== 0) {
+          exceptions.push(createException({
+            invoiceId: line.invoice_id,
+            invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn,
+            buyerId: header.buyer_id,
+            lineId: line.line_id,
+            fieldName: taxAmountField,
+            observedValue: String(taxAmountRaw),
+            expectedValue: `Zero VAT line amount for ${category} under ${category === 'AE' ? 'IBR-162-AE' : 'IBR-165-AE'}`,
+            message: `Invoice ${header.invoice_number}, Line ${line.line_number}: VAT line amount must be zero for ${category} tax category`,
+          }));
+          return;
+        }
+
+        if (
+          !Number.isFinite(btae10Amount) ||
+          (btae08Amount !== undefined && !Number.isFinite(btae08Amount)) ||
+          (requireNonNegative && (btae10Amount < 0 || (btae08Amount !== undefined && btae08Amount < 0)))
+        ) {
           exceptions.push(createException({
             invoiceId: line.invoice_id,
             invoiceNumber: header.invoice_number,
@@ -1282,11 +1369,23 @@ export function runPintAECheckWithTelemetry(
             buyerId: header.buyer_id,
             lineId: line.line_id,
             fieldName: amountField,
-            observedValue: `${amount} @ FX ${fx}`,
-            expectedValue: `Derivable non-negative ${baseCurrency} line amount`,
-            message: `Invoice ${header.invoice_number}, Line ${line.line_number}: AED line amount derivation is invalid under current currency policy`,
+            observedValue: `${amount} + ${vatAmountNotApplicable ? 0 : taxAmount} @ BTAE-04 ${conversionRate}`,
+            expectedValue: `Derivable non-negative BTAE-10${vatAmountNotApplicable ? '' : ' and BTAE-08'} amounts in ${baseCurrency}`,
+            message: `Invoice ${header.invoice_number}, Line ${line.line_number}: AED line amount derivation is invalid under the PINT-AE currency policy`,
           }));
+          return;
         }
+
+        derivedAedLineValues.push({
+          invoiceId: line.invoice_id,
+          lineId: line.line_id,
+          sourceCurrency: currency,
+          conversionRateToAed: conversionRate,
+          btae10InvoiceLineAmountAed: btae10Amount,
+          btae08VatLineAmountAed: btae08Amount,
+          roundingScale: 2,
+        });
+
       });
       break;
 
@@ -2042,6 +2141,7 @@ export function runPintAECheckWithTelemetry(
   return {
     exceptions,
     executionResults,
+    derivedAedLineValues,
     telemetry: {
       rule_id: check.check_id,
       execution_count: executionCount,
@@ -2062,18 +2162,20 @@ export function runAllPintAEChecks(checks: PintAECheck[], data: DataContext): Pi
 export function runAllPintAEChecksWithTelemetry(
   checks: PintAECheck[],
   data: DataContext
-): { exceptions: PintAEException[]; telemetry: PintAECheckTelemetry[]; executionResults?: PintAEExecutionResult[] } {
+): { exceptions: PintAEException[]; telemetry: PintAECheckTelemetry[]; executionResults?: PintAEExecutionResult[]; derivedAedLineValues: DerivedAedLineValue[] } {
   const enabledChecks = checks.filter(c => c.is_enabled);
   const allExceptions: PintAEException[] = [];
   const telemetry: PintAECheckTelemetry[] = [];
   const executionResults: PintAEExecutionResult[] = [];
+  const derivedAedLineValues: DerivedAedLineValue[] = [];
   
   for (const check of enabledChecks) {
     const result = runPintAECheckWithTelemetry(check, data);
     allExceptions.push(...result.exceptions);
     telemetry.push(result.telemetry);
     executionResults.push(...(result.executionResults ?? []));
+    derivedAedLineValues.push(...result.derivedAedLineValues);
   }
   
-  return { exceptions: allExceptions, telemetry, executionResults };
+  return { exceptions: allExceptions, telemetry, executionResults, derivedAedLineValues };
 }

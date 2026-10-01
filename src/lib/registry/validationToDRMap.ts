@@ -117,6 +117,8 @@ export const VALIDATION_TO_DR_MAP: ValidationDRMapEntry[] = [
     dr_targets: [
       partial('IBT-131', 'line_total_excl_vat'),
       partial('IBT-005', 'currency'),
+      partial('BTUAE-08', 'vat_amount'),
+      partial('IBT-151', 'tax_category_code'),
     ],
   },
   { validation_id: 'UAE-UC1-CHK-036', dr_targets: [partial('IBT-048', 'buyer_legal_reg_id', 'buyer_trn')] },

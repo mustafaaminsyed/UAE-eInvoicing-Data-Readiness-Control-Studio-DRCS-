@@ -643,13 +643,13 @@
       "mof_field_id": 48,
       "mof_business_term": "VAT line amount in AED",
       "source_template": "invoice_lines_template.csv|invoice_headers_template.csv",
-      "source_column": "vat_amount|fx_rate|currency",
-      "internal_field_key": "vat_amount|fx_rate|currency",
-      "dr_id": "BTUAE-08",
+      "source_column": "vat_amount|tax_category_code|fx_rate|currency",
+      "internal_field_key": "derived_aed_line_values.btae08VatLineAmountAed",
+      "dr_id": "BTAE-08",
       "classification": "derived",
-      "transformation_rule": "Use line VAT amount directly when currency is AED; otherwise derive AED amount using fx_rate",
-      "status": "partially_covered",
-      "notes": "Collision risk with commercial field 48 if keyed by field_id only."
+      "transformation_rule": "Apply IBR-162-AE/IBR-163-AE/IBR-165-AE category treatment; otherwise convert VAT using BTAE-04 and round the result to two decimals",
+      "status": "covered",
+      "notes": "Derived runtime evidence under current PDK rules; no separate taxpayer source column."
     },
     {
       "document_type": "tax",
@@ -657,12 +657,12 @@
       "mof_business_term": "Invoice line amount in AED",
       "source_template": "invoice_lines_template.csv|invoice_headers_template.csv",
       "source_column": "line_total_excl_vat|vat_amount|fx_rate|currency",
-      "internal_field_key": "line_total_excl_vat|vat_amount|fx_rate|currency",
-      "dr_id": "",
+      "internal_field_key": "derived_aed_line_values.btae10InvoiceLineAmountAed",
+      "dr_id": "BTAE-10",
       "classification": "derived",
-      "transformation_rule": "Derive invoice line amount in AED from line totals and currency conversion policy",
-      "status": "missing",
-      "notes": "Priority gap: no explicit transform contract in current runtime mapping."
+      "transformation_rule": "Derive line payable amount in AED from line net plus applicable VAT; multiply by BTAE-04 for non-AED and round to two decimals",
+      "status": "covered",
+      "notes": "Derived runtime evidence; no separate taxpayer source column."
     },
     {
       "document_type": "tax",

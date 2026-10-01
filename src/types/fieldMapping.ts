@@ -176,8 +176,8 @@ export const PINT_AE_UC1_FIELDS: PintAEField[] = [
   { id: 'credit_note_reason_code', name: 'Credit Note Reason Code', description: 'Reason code required for credit note documents', ibtReference: 'BTAE-03', category: 'header', isMandatory: false, dataType: 'string' },
   { id: 'credit_note_reason_text', name: 'Credit Note Reason Text', description: 'Free-text narrative describing the credit note reason when captured by the source system', ibtReference: 'SYS-CN-REASON-TEXT', category: 'header', isMandatory: false, dataType: 'string' },
   { id: 'currency', name: 'Document Currency', description: 'ISO 4217 currency code', ibtReference: 'IBT-005', category: 'header', isMandatory: true, dataType: 'string', format: '^[A-Z]{3}$' },
-  { id: 'tax_currency', name: 'Tax Accounting Currency', description: 'Must be AED for UAE', ibtReference: 'IBT-006', category: 'header', isMandatory: false, dataType: 'string' },
-  { id: 'fx_rate', name: 'Exchange Rate', description: 'FX rate to AED (required if non-AED)', ibtReference: 'BTUAE-002', category: 'header', isMandatory: false, dataType: 'number' },
+  { id: 'tax_currency', name: 'Tax Accounting Currency', description: 'Controlled as AED by DRCS for UAE; source override is optional', ibtReference: 'IBT-006', category: 'header', isMandatory: false, dataType: 'string' },
+  { id: 'fx_rate', name: 'Exchange Rate', description: 'BTAE-04 exchange rate to AED (required if non-AED)', ibtReference: 'BTAE-04', category: 'header', isMandatory: false, dataType: 'number' },
   { id: 'payment_due_date', name: 'Payment Due Date', description: 'Payment due date', ibtReference: 'IBT-009', category: 'header', isMandatory: false, dataType: 'date' },
   { id: 'buyer_reference', name: 'Buyer Reference', description: 'Buyer reference/PO number', ibtReference: 'IBT-010', category: 'header', isMandatory: false, dataType: 'string' },
   { id: 'spec_id', name: 'Specification Identifier', description: 'PINT-AE specification ID', ibtReference: 'IBT-024', category: 'header', isMandatory: true, dataType: 'string' },
@@ -254,7 +254,7 @@ export const CONDITIONAL_QUESTIONS: ConditionalQuestion[] = [
   {
     id: 'foreign_currency',
     question: 'Do you issue invoices in currencies other than AED?',
-    fieldIds: ['fx_rate', 'tax_currency'],
+    fieldIds: ['fx_rate'],
   },
   {
     id: 'payment_terms',

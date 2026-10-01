@@ -76,6 +76,10 @@ function num(record: Record<string, string>, ...keys: string[]): number | undefi
   return undefined;
 }
 
+function requiredNum(record: Record<string, string>, ...keys: string[]): number {
+  return num(record, ...keys) ?? Number.NaN;
+}
+
 function buildInvoicingPeriod(
   startDate?: string,
   endDate?: string
@@ -274,11 +278,11 @@ export async function parseLinesFile(file: File, options: ParseOptions = {}): Pr
       description: str(record, 'description', 'item_name'),
       item_name: str(record, 'item_name', 'description'),
       quantity: parseFloat(record.quantity) || 0,
-      unit_price: parseFloat(record.unit_price) || 0,
+      unit_price: requiredNum(record, 'unit_price'),
       line_discount: lineDiscount,
-      line_total_excl_vat: num(record, 'line_total_excl_vat', 'line_net_amount') || 0,
-      vat_rate: parseFloat(record.vat_rate) || 0,
-      vat_amount: parseFloat(record.vat_amount) || 0,
+      line_total_excl_vat: requiredNum(record, 'line_total_excl_vat', 'line_net_amount'),
+      vat_rate: requiredNum(record, 'vat_rate'),
+      vat_amount: requiredNum(record, 'vat_amount'),
       unit_of_measure: str(record, 'unit_of_measure', 'unit_code'),
       price_base_quantity: num(
         record,

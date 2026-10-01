@@ -92,6 +92,23 @@ describe('negative headers template upload path', () => {
     expect(line.line_discount).toBe(10);
   });
 
+  it('keeps blank mandatory monetary values distinct from genuine zero values', async () => {
+    const csv = [
+      'line_id,invoice_id,line_number,quantity,unit_price,line_total_excl_vat,vat_rate,vat_amount',
+      'L-001,INV-001,1,1,,,,',
+      'L-002,INV-001,2,1,0,0,0,0',
+    ].join('\n');
+
+    const file = { text: async () => csv } as File;
+    const lines = await parseLinesFile(file);
+
+    expect(Number.isNaN(lines[0].unit_price)).toBe(true);
+    expect(Number.isNaN(lines[0].line_total_excl_vat)).toBe(true);
+    expect(Number.isNaN(lines[0].vat_rate)).toBe(true);
+    expect(Number.isNaN(lines[0].vat_amount)).toBe(true);
+    expect(lines[1]).toMatchObject({ unit_price: 0, line_total_excl_vat: 0, vat_rate: 0, vat_amount: 0 });
+  });
+
   it('preserves typed IBT-149 and IBT-150 source fields without changing IBT-130', async () => {
     const csv = [
       'line_id,invoice_id,line_number,quantity,unit_price,line_total_excl_vat,vat_rate,vat_amount,unit_of_measure,price_base_quantity,price_base_quantity_uom',
