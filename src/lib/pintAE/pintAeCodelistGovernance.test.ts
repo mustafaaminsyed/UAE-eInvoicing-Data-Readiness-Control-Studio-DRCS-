@@ -41,8 +41,8 @@ describe('PINT-AE codelist governance artifact', () => {
     const governed = new Set(rows.map((row) => row.codelist_name));
     const generated = new Set(Object.keys(PINT_AE_CODELISTS));
 
-    expect(rows).toHaveLength(22);
-    expect(rows.filter((row) => row.source_type === 'packaged_gc')).toHaveLength(21);
+    expect(rows).toHaveLength(20);
+    expect(rows.filter((row) => row.source_type === 'packaged_gc')).toHaveLength(19);
     expect(rows.filter((row) => row.source_type === 'derived_standard')).toHaveLength(1);
 
     generated.forEach((codelist) => {

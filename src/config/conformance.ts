@@ -1,3 +1,5 @@
+import { DRCS_RULESET_LABEL, REGULATORY_BASELINE_LABEL } from './regulatoryBaseline';
+
 // =============================================================================
 // Conformance Configuration
 // Central thresholds for coverage gating, traceability, and validation tolerances
@@ -5,7 +7,11 @@
 
 export const CONFORMANCE_CONFIG = {
   /** Active spec version label shown in UI */
-  specVersionLabel: 'PINT-AE 2025-Q2 - UAE DR v1.0.1',
+  /** External reference baseline; does not assert full executable-rule parity. */
+  specVersionLabel: `Regulatory baseline: ${REGULATORY_BASELINE_LABEL}`,
+
+  /** Independently versioned internal executable catalogue. */
+  rulesetVersionLabel: DRCS_RULESET_LABEL,
 
   /** Default use case for mandatory field resolution */
   defaultUseCase: 'UAE B2B Standard Invoice',

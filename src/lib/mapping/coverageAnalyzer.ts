@@ -131,7 +131,7 @@ export function getRegistryCoverageStats(result: RegistryCoverageResult) {
     overallMapped: result.mappedMandatory.length + result.mappedConditional.length,
     overallTotal: result.totalRegistryFields,
     isReadyForActivation: result.isReadyForActivation,
-    registryVersion: '2025-Q2',
+    registryVersion: 'DRCS registry 2025-Q2',
   };
 }
 

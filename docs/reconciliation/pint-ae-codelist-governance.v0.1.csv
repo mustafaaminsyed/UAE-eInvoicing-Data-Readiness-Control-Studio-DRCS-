@@ -10,12 +10,10 @@ index_no,codelist_name,source_type,document_context,uc1_applicable,runtime_enfor
 9,ISO4217,derived_standard,both,yes,yes,headers.currency,IBT-005,tax#4|commercial#4,UAE-UC1-CHK-006,Active,UC1,Governed coded domain included for currency compliance.
 10,ItemType,packaged_gc,both,no,no,-,-,-,-,Deferred - not in UC1 scope,UC3,Item type codelist requires additional item-identification context.
 11,MimeCode,packaged_gc,both,no,no,-,-,-,-,Deferred - missing source field,future,Attachment MIME metadata is not modeled in UC1 templates.
-12,SEPA,packaged_gc,invoice,conditional,no,-,-,-,-,Deferred - scenario dependent,UC3,SEPA applicability depends on payment scenarios outside current UC1 baseline.
 13,transactiontype,packaged_gc,both,yes,conditional,headers.transaction_type_code,BTUAE-02,tax#5|commercial#5,UAE-UC1-CHK-060,Active,UC1,Runtime enforced through decoder-backed validation that accepts governed 8-character binary and mask tokens.
 14,UNCL1001-cn,packaged_gc,credit_note,conditional,conditional,headers.invoice_type,IBT-003,tax#3|commercial#3,UAE-UC1-CHK-046,Active,UC1,Scenario-gated runtime enforcement for credit note context.
 15,UNCL1001-inv,packaged_gc,invoice,yes,yes,headers.invoice_type,IBT-003,tax#3|commercial#3,UAE-UC1-CHK-045,Active,UC1,First-wave runtime codelist enforcement for invoice context.
 16,UNCL1153,packaged_gc,both,no,no,-,-,-,-,Deferred - missing source field,future,Invoiced object identifier scheme is not captured in UC1 source model.
-17,UNCL2005,packaged_gc,both,no,no,-,-,-,-,Deferred - missing source field,future,Date-period function qualifier fields are not modeled in UC1 ingestion.
 18,UNCL4461,packaged_gc,both,conditional,conditional,headers.payment_means_code,IBT-081,tax#9|commercial#9,UAE-UC1-CHK-047,Active,UC1,Runtime enforced when payment means code is provided.
 19,UNCL5189,packaged_gc,both,conditional,no,lines.line_allowance_reason_code,IBT-148,tax#44|commercial#44,-,Deferred - missing transformation logic,UC2,Allowance reason coding requires explicit transform contract and source field.
 20,UNCL7143,packaged_gc,both,no,no,-,-,-,-,Deferred - missing source field,future,Item identification code-type fields are not in UC1 template set.

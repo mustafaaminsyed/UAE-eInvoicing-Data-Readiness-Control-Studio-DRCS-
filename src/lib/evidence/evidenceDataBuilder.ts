@@ -17,6 +17,8 @@ import { getFailureClassForRule } from '@/lib/validation/pintAERuleMetadata';
 import { EvidenceRuleExecutionTelemetryRow } from '@/types/evidence';
 import { checksRegistry } from '@/lib/checks/checksRegistry';
 import { ValidationExecutionEvidence } from '@/types/validationExecution';
+import { getCurrentRegulatoryBaselineIdentity, UAE_REGULATORY_BASELINE } from '@/config/regulatoryBaseline';
+import { RegulatoryBaselineIdentity } from '@/types/evidence';
 
 export interface EvidencePackBuildOverrides {
   datasetName?: string;
@@ -32,6 +34,7 @@ export interface EvidencePackBuildOverrides {
   entityScopeStatus?: EvidenceEntityScopeStatus;
   legalEntityCount?: number;
   legalEntityLabels?: string[];
+  regulatoryBaseline?: RegulatoryBaselineIdentity | null;
 }
 
 export type EvidenceSourceMode = 'current_in_memory_run' | 'persisted_snapshot';
@@ -49,6 +52,7 @@ export interface EvidenceOverview {
   scope: string;
   specVersion: string;
   drVersion: string;
+  regulatoryBaseline?: RegulatoryBaselineIdentity;
   datasetName: string;
   runMode?: ValidationRunMode;
   readinessQualification?: ReadinessQualification;
@@ -318,12 +322,22 @@ export function buildEvidencePackData(
   const { rows: traceRows, gaps } = computeTraceabilityMatrix(populations, exceptionCountsByDR);
 
   // ── Tab A ──
+  const isHistoricalWithoutVersionIdentity =
+    sourceMode === 'persisted_snapshot' && overrides.regulatoryBaseline === undefined;
+  const regulatoryBaseline = overrides.regulatoryBaseline === undefined
+    ? (isHistoricalWithoutVersionIdentity ? undefined : getCurrentRegulatoryBaselineIdentity())
+    : overrides.regulatoryBaseline ?? undefined;
   const overview: EvidenceOverview = {
     assessmentRunId: runId,
     executionTimestamp: runTimestamp,
     scope: CONFORMANCE_CONFIG.defaultUseCase,
-    specVersion: 'PINT-AE 2025-Q2',
-    drVersion: 'UAE DR v1.0.1',
+    specVersion: regulatoryBaseline
+      ? `PINT AE Billing ${UAE_REGULATORY_BASELINE.pintAEBilling.version}`
+      : 'Legacy run — regulatory baseline not recorded',
+    drVersion: regulatoryBaseline
+      ? `DRCS control catalogue ${UAE_REGULATORY_BASELINE.drcsRuleset.version}`
+      : 'Legacy run — DRCS ruleset identity not recorded',
+    regulatoryBaseline,
     datasetName,
     runMode: overrides.runMode,
     readinessQualification: overrides.readinessQualification,

@@ -1,194 +1,168 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const DEFAULT_SOURCE_DIR = path.resolve("tmp", "pint-ae-resources-dev");
+const DEFAULT_SOURCE_DIR = path.resolve("tmp", "uae-regulatory-resources-1.0.4");
+const BASELINE_PATH = path.resolve("specs", "uae", "regulatory-baseline-1.0.4.json");
 const sourceDir = path.resolve(process.argv[2] || DEFAULT_SOURCE_DIR);
 const outputDir = path.resolve("src", "lib", "pintAE", "generated");
-const relativeSourceDir = path.relative(process.cwd(), sourceDir).replaceAll("\\", "/");
+const baseline = JSON.parse(fs.readFileSync(BASELINE_PATH, "utf8"));
+const resourceSets = [
+  { key: "billing", profile: "billing", specification: baseline.pintAEBilling },
+  { key: "selfBilling", profile: "self-billing", specification: baseline.pintAESelfBilling },
+  { key: "tdd", profile: "tdd", specification: baseline.uaeTDD },
+];
 
-function ensureDir(dir) {
-  fs.mkdirSync(dir, { recursive: true });
-}
-
-function readFile(filePath) {
-  return fs.readFileSync(filePath, "utf8");
-}
-
+function readFile(filePath) { return fs.readFileSync(filePath, "utf8"); }
 function xmlDecode(value) {
-  return value
-    .replaceAll("&quot;", "\"")
-    .replaceAll("&#34;", "\"")
-    .replaceAll("&apos;", "'")
-    .replaceAll("&#39;", "'")
-    .replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    .replaceAll("&amp;", "&")
-    .replaceAll("&#10;", "\n")
-    .replaceAll("&#9;", "\t");
+  return value.replaceAll("&quot;", "\"").replaceAll("&#34;", "\"")
+    .replaceAll("&apos;", "'").replaceAll("&#39;", "'")
+    .replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&amp;", "&")
+    .replaceAll("&#10;", "\n").replaceAll("&#9;", "\t");
 }
-
-function dedupe(arr) {
-  return [...new Set(arr)];
-}
-
+function dedupe(values) { return [...new Set(values)]; }
 function parseReferenceTerms(text) {
-  if (!text) return [];
-  const matches = text.match(/\b(?:IBT-\d+|IBG-\d+|BTAE-\d+|BR-[A-Za-z0-9-]+)\b/g) || [];
-  return dedupe(matches);
+  return text ? dedupe(text.match(/\b(?:IBT-\d+|IBG-\d+|BTAE-\d+|BR-[A-Za-z0-9-]+)\b/g) || []) : [];
+}
+function walk(dir, predicate) {
+  const output = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) output.push(...walk(fullPath, predicate));
+    else if (predicate(fullPath)) output.push(fullPath);
+  }
+  return output;
 }
 
-function parseSchematron(filePath, documentType, packType) {
+function parseSchematron(filePath, resourceRoot, resourceSet) {
   const xml = readFile(filePath);
+  const sourceFile = path.relative(resourceRoot, filePath).replaceAll("\\", "/");
+  const documentFamily = sourceFile.includes("trn-creditnote") ? "credit-note" : sourceFile.includes("trn-tdd") ? "tdd" : "invoice";
+  const packType = sourceFile.includes("jurisdiction-aligned") ? "jurisdiction-aligned" : "ubl-preprocessed";
   const rules = [];
   const ruleRegex = /<rule\s+context="([^"]+)">([\s\S]*?)<\/rule>/g;
   let ruleMatch;
-
   while ((ruleMatch = ruleRegex.exec(xml)) !== null) {
     const context = xmlDecode(ruleMatch[1]);
-    const ruleBody = ruleMatch[2];
     const assertRegex = /<assert\s+id="([^"]+)"\s+flag="([^"]+)"\s+test="([^"]*)">([\s\S]*?)<\/assert>/g;
     let assertMatch;
-
-    while ((assertMatch = assertRegex.exec(ruleBody)) !== null) {
-      const id = xmlDecode(assertMatch[1]).trim();
-      const flag = xmlDecode(assertMatch[2]).trim();
-      const test = xmlDecode(assertMatch[3]).trim();
+    while ((assertMatch = assertRegex.exec(ruleMatch[2])) !== null) {
       const message = xmlDecode(assertMatch[4]).replace(/\s+/g, " ").trim();
       rules.push({
-        id,
-        flag,
-        context,
-        test,
-        message,
-        references: parseReferenceTerms(message),
-        documentType,
-        packType,
+        id: xmlDecode(assertMatch[1]).trim(), flag: xmlDecode(assertMatch[2]).trim(), context,
+        test: xmlDecode(assertMatch[3]).trim(), message, references: parseReferenceTerms(message),
+        profile: resourceSet.profile, sourceSpecification: resourceSet.specification.name,
+        sourceVersion: resourceSet.specification.version,
+        documentType: documentFamily === "credit-note" ? "creditnote" : documentFamily,
+        documentFamily, packType, sourceFile,
       });
     }
   }
-
   return rules;
 }
 
-function parseCodelist(filePath) {
+function parseCodelist(filePath, resourceRoot, resourceSet) {
   const xml = readFile(filePath);
   const shortNameMatch = xml.match(/<gc:ShortName(?:\s+Lang="en")?>([\s\S]*?)<\/gc:ShortName>/);
   const versionMatch = xml.match(/<gc:Version>([\s\S]*?)<\/gc:Version>/);
-  const rows = [];
+  const ids = [];
+  const entries = [];
   const rowRegex = /<gc:Row>([\s\S]*?)<\/gc:Row>/g;
   let rowMatch;
-
   while ((rowMatch = rowRegex.exec(xml)) !== null) {
-    const rowBody = rowMatch[1];
-    const valueRegex =
-      /<gc:Value\s+ColumnRef="([^"]+)">[\s\S]*?<gc:SimpleValue>([\s\S]*?)<\/gc:SimpleValue>[\s\S]*?<\/gc:Value>/g;
+    const entry = {};
+    const valueRegex = /<gc:Value\s+ColumnRef="([^"]+)">[\s\S]*?<gc:SimpleValue>([\s\S]*?)<\/gc:SimpleValue>[\s\S]*?<\/gc:Value>/g;
     let valueMatch;
-    const row = {};
-    while ((valueMatch = valueRegex.exec(rowBody)) !== null) {
-      const key = valueMatch[1].trim();
-      const value = xmlDecode(valueMatch[2]).trim();
-      row[key] = value;
+    while ((valueMatch = valueRegex.exec(rowMatch[1])) !== null) {
+      entry[valueMatch[1].trim()] = xmlDecode(valueMatch[2]).trim();
     }
-    if (row.id) rows.push(row);
+    if (entry.id) {
+      ids.push(entry.id);
+      entries.push(entry);
+    }
   }
-
   const codeListName = path.basename(filePath, ".gc");
+  const names = Object.fromEntries(entries.filter((entry) => entry.name).map((entry) => [entry.id, entry.name]));
   return {
-    fileName: path.basename(filePath),
-    codeListName,
+    codeListName, fileName: path.basename(filePath),
     shortName: shortNameMatch ? xmlDecode(shortNameMatch[1]).trim() : codeListName,
-    version: versionMatch ? xmlDecode(versionMatch[1]).trim() : "",
-    ids: rows.map((r) => r.id),
+    version: versionMatch ? xmlDecode(versionMatch[1]).trim() : "", ids: dedupe(ids),
+    ...(codeListName === "ISO3166" ? { names } : {}),
+    profile: resourceSet.profile, sourceSpecification: resourceSet.specification.name,
+    sourceVersion: resourceSet.specification.version,
+    sourceFile: path.relative(resourceRoot, filePath).replaceAll("\\", "/"),
   };
 }
 
-function walk(dir, predicate) {
-  const out = [];
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      out.push(...walk(full, predicate));
-      continue;
-    }
-    if (predicate(full)) out.push(full);
-  }
-  return out;
-}
-
-function relativePath(p) {
-  return path.relative(sourceDir, p).replaceAll("\\", "/");
-}
-
-function writeTs(filePath, banner, constName, data) {
-  const content = `${banner}
-export const ${constName} = ${JSON.stringify(data, null, 2)} as const;
-`;
-  fs.writeFileSync(filePath, content, "utf8");
+function writeTs(fileName, declarations, aliases = []) {
+  const body = declarations.map(({ name, value }) => `export const ${name} = ${JSON.stringify(value, null, 2)} as const;`).join("\n\n");
+  const aliasBody = aliases.map(({ name, target }) => `export const ${name} = ${target};`).join("\n");
+  const aliasSection = aliasBody ? `\n\n${aliasBody}` : "";
+  fs.writeFileSync(path.join(outputDir, fileName), `// Auto-generated by scripts/import-pint-ae-resources.mjs\n${body}${aliasSection}\n`, "utf8");
 }
 
 if (!fs.existsSync(sourceDir)) {
   console.error(`[import-pint-ae-resources] Source directory not found: ${sourceDir}`);
   process.exit(1);
 }
+fs.mkdirSync(outputDir, { recursive: true });
+const rulesBySet = {};
+const codelistsBySet = {};
+const inventory = {};
 
-ensureDir(outputDir);
-
-const schematronFiles = walk(sourceDir, (p) => p.endsWith(".sch") && p.includes(`${path.sep}schematron${path.sep}`));
-const codelistFiles = walk(sourceDir, (p) => p.endsWith(".gc") && p.includes(`${path.sep}codelist${path.sep}`));
-
-const schematronRules = [];
-for (const file of schematronFiles) {
-  const rel = relativePath(file);
-  const documentType = rel.includes("creditnote") ? "creditnote" : "invoice";
-  const packType = rel.includes("jurisdiction-aligned") ? "jurisdiction-aligned" : "ubl-preprocessed";
-  const parsed = parseSchematron(file, documentType, packType).map((r) => ({
-    ...r,
-    sourceFile: rel,
-  }));
-  schematronRules.push(...parsed);
-}
-
-const codelists = {};
-for (const file of codelistFiles) {
-  const parsed = parseCodelist(file);
-  codelists[parsed.codeListName] = {
-    fileName: parsed.fileName,
-    shortName: parsed.shortName,
-    version: parsed.version,
-    ids: dedupe(parsed.ids),
+for (const resourceSet of resourceSets) {
+  const resourceRoot = path.join(sourceDir, resourceSet.specification.resourceDirectory);
+  if (!fs.existsSync(resourceRoot)) throw new Error(`Missing official resource directory: ${resourceRoot}`);
+  const schematronFiles = walk(resourceRoot, (file) => file.endsWith(".sch") && file.includes(`${path.sep}schematron${path.sep}`));
+  const codelistFiles = walk(resourceRoot, (file) => file.endsWith(".gc") && file.includes(`${path.sep}codelist${path.sep}`));
+  rulesBySet[resourceSet.key] = schematronFiles.flatMap((file) => parseSchematron(file, resourceRoot, resourceSet));
+  codelistsBySet[resourceSet.key] = {};
+  for (const file of codelistFiles) {
+    const parsed = parseCodelist(file, resourceRoot, resourceSet);
+    const existing = codelistsBySet[resourceSet.key][parsed.codeListName];
+    if (existing && JSON.stringify(existing.ids) !== JSON.stringify(parsed.ids)) {
+      throw new Error(`Codelist ${parsed.codeListName} differs by document family in ${resourceSet.key}`);
+    }
+    codelistsBySet[resourceSet.key][parsed.codeListName] ??= parsed;
+  }
+  inventory[resourceSet.key] = {
+    profile: resourceSet.profile, specification: resourceSet.specification.name,
+    version: resourceSet.specification.version, pdkVersion: resourceSet.specification.pdkVersion,
+    officialSourceUrl: resourceSet.specification.officialSourceUrl,
+    artifactUrl: resourceSet.specification.artifactUrl,
+    artifactIdentity: resourceSet.specification.artifactIdentity,
+    artifactHash: resourceSet.specification.artifactHash,
+    hashAuthority: resourceSet.specification.hashAuthority,
+    schematronFiles: schematronFiles.length, schematronRules: rulesBySet[resourceSet.key].length,
+    codelists: Object.keys(codelistsBySet[resourceSet.key]).length,
   };
 }
 
 const metadata = {
-  generatedAt: new Date().toISOString(),
-  sourceDir: relativeSourceDir || ".",
-  schematronFiles: schematronFiles.length,
-  schematronRules: schematronRules.length,
-  codelists: Object.keys(codelists).length,
+  baselineId: baseline.baselineId, baselineStatus: baseline.status,
+  generatedAt: new Date().toISOString(), retrievedAt: baseline.retrievedAt,
+  importProcess: baseline.importProcess, pintGeneralVersion: baseline.pintGeneral.version,
+  resourceSets: inventory,
+  schematronRules: Object.values(rulesBySet).reduce((sum, rules) => sum + rules.length, 0),
+  codelists: Object.values(codelistsBySet).reduce((sum, lists) => sum + Object.keys(lists).length, 0),
 };
 
-writeTs(
-  path.join(outputDir, "metadata.ts"),
-  "// Auto-generated by scripts/import-pint-ae-resources.mjs",
-  "PINT_AE_SPEC_METADATA",
-  metadata
-);
-
-writeTs(
-  path.join(outputDir, "schematronRules.ts"),
-  "// Auto-generated by scripts/import-pint-ae-resources.mjs",
-  "PINT_AE_SCHEMATRON_RULES",
-  schematronRules
-);
-
-writeTs(
-  path.join(outputDir, "codelists.ts"),
-  "// Auto-generated by scripts/import-pint-ae-resources.mjs",
-  "PINT_AE_CODELISTS",
-  codelists
-);
-
-console.log(
-  `[import-pint-ae-resources] Generated ${schematronRules.length} schematron rules and ${Object.keys(codelists).length} codelists into ${outputDir}`
-);
+writeTs("metadata.ts", [{ name: "PINT_AE_SPEC_METADATA", value: metadata }]);
+writeTs("schematronRules.ts", [
+  { name: "PINT_AE_BILLING_SCHEMATRON_RULES", value: rulesBySet.billing },
+], [{ name: "PINT_AE_SCHEMATRON_RULES", target: "PINT_AE_BILLING_SCHEMATRON_RULES" }]);
+writeTs("selfBillingSchematronRules.ts", [
+  { name: "PINT_AE_SELF_BILLING_SCHEMATRON_RULES", value: rulesBySet.selfBilling },
+]);
+writeTs("tddSchematronRules.ts", [
+  { name: "UAE_TDD_SCHEMATRON_RULES", value: rulesBySet.tdd },
+]);
+writeTs("codelists.ts", [
+  { name: "PINT_AE_BILLING_CODELISTS", value: codelistsBySet.billing },
+], [{ name: "PINT_AE_CODELISTS", target: "PINT_AE_BILLING_CODELISTS" }]);
+writeTs("selfBillingCodelists.ts", [
+  { name: "PINT_AE_SELF_BILLING_CODELISTS", value: codelistsBySet.selfBilling },
+]);
+writeTs("tddCodelists.ts", [
+  { name: "UAE_TDD_CODELISTS", value: codelistsBySet.tdd },
+]);
+console.log(`[import-pint-ae-resources] Generated Billing ${rulesBySet.billing.length}, Self-Billing ${rulesBySet.selfBilling.length}, and TDD ${rulesBySet.tdd.length} rules from official 1.0.4 resources`);

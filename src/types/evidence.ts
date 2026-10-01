@@ -10,6 +10,21 @@ export interface EvidenceRunDatasetPopulation {
   columns: EvidenceRunColumnPopulation[];
 }
 
+export interface RegulatoryBaselineIdentity {
+  baselineId: string;
+  pintAEBillingVersion: string;
+  pintAESelfBillingVersion: string;
+  uaeTddVersion: string;
+  pintGeneralVersion: string;
+  pdkVersion: string;
+  drcsRulesetVersion: string;
+  crosswalkVersion: string;
+  billingResourceHash: string;
+  selfBillingResourceHash: string;
+  tddResourceHash: string;
+  executableParityStatus: 'outstanding' | 'verified';
+}
+
 export interface EvidenceRunSnapshot {
   version: 1;
   captured_at: string;
@@ -57,6 +72,7 @@ export interface CheckRunResultsSummary {
   evidenceRuleExecutionTelemetry?: EvidenceRuleExecutionTelemetryRow[];
   validationExecutionEvidence?: ValidationExecutionEvidence[];
   metricSemanticsVersion?: 2;
+  regulatoryBaseline?: RegulatoryBaselineIdentity;
   [key: string]: unknown;
 }
 import type { Direction } from './direction';

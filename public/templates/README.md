@@ -1,8 +1,14 @@
 # UAE PINT-AE Input Templates — Data Dictionary
 
-**Spec Version:** PINT-AE 2025-Q2 · UAE DR v1.0.1
+**Regulatory reference baseline:** PINT AE Billing 1.0.4 (PDK 1.4.4; PINT General 1.1.3)
+
+**DRCS executable control catalogue:** v1.0.0
 **Use Case:** UAE B2B Standard Invoice (UC1)
 **Generated:** 2025-06-01
+
+This identifies the current external reference baseline. It does not claim that every
+DRCS executable control has completed 1.0.4 parity verification; outstanding deltas
+are tracked in `docs/reconciliation/pint-ae-1.0.4-functional-delta-register.md`.
 
 ---
 

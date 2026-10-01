@@ -350,8 +350,23 @@ function appendEvidencePackFiles(zip: JSZip, data: EvidencePackData, prefix = ''
           : 'Current assessment run',
     },
     { field: 'Scope', value: data.overview.scope },
-    { field: 'PINT-AE Version', value: data.overview.specVersion },
-    { field: 'UAE DR Version', value: data.overview.drVersion },
+    { field: 'Regulatory reference baseline', value: data.overview.specVersion },
+    { field: 'DRCS control catalogue', value: data.overview.drVersion },
+    ...(data.overview.regulatoryBaseline
+      ? [
+          { field: 'Regulatory baseline ID', value: data.overview.regulatoryBaseline.baselineId },
+          { field: 'PINT AE Billing version', value: data.overview.regulatoryBaseline.pintAEBillingVersion },
+          { field: 'PINT AE Self-Billing version', value: data.overview.regulatoryBaseline.pintAESelfBillingVersion },
+          { field: 'UAE TDD version', value: data.overview.regulatoryBaseline.uaeTddVersion },
+          { field: 'PINT General version', value: data.overview.regulatoryBaseline.pintGeneralVersion },
+          { field: 'PDK version', value: data.overview.regulatoryBaseline.pdkVersion },
+          { field: 'Crosswalk version', value: data.overview.regulatoryBaseline.crosswalkVersion },
+          { field: 'Billing resource hash', value: data.overview.regulatoryBaseline.billingResourceHash },
+          { field: 'Self-Billing resource hash', value: data.overview.regulatoryBaseline.selfBillingResourceHash },
+          { field: 'TDD resource hash', value: data.overview.regulatoryBaseline.tddResourceHash },
+          { field: 'Executable parity status', value: data.overview.regulatoryBaseline.executableParityStatus },
+        ]
+      : []),
     { field: 'Dataset / Client', value: data.overview.datasetName },
     {
       field: 'Entity Scope',
