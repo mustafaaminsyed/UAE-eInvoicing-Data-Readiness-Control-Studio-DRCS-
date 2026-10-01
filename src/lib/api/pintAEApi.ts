@@ -10,6 +10,7 @@ import {
   calculateHealthScore 
 } from '@/types/pintAE';
 import { Severity } from '@/types/compliance';
+import { Direction } from '@/types/direction';
 import { RAW_UAE_UC1_CHECK_PACK, UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
 import { getSupabaseEnvStatus, isLocalDevFallbackEnabled, shouldUseLocalDevFallback } from '@/lib/api/supabaseEnv';
 import { getFailureClassForRule } from '@/lib/validation/pintAERuleMetadata';
@@ -44,6 +45,9 @@ function mapPintAECheckRow(row: any): PintAECheck {
     evidence_required: row.evidence_required || undefined,
     is_enabled: row.is_enabled,
     parameters: (row.parameters as Record<string, any>) || {},
+    // Regulatory identity/applicability is source controlled. Supabase retains
+    // enablement and operational overrides, but cannot silently broaden UC1 to AP.
+    applicability: normalized?.applicability ?? { directions: ['AR'] },
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -365,13 +369,18 @@ export async function seedUC1CheckPack(forceUpsert = false): Promise<{ success: 
 
 // ============ Exceptions CRUD ============
 
-export async function saveExceptions(runId: string, exceptions: PintAEException[]): Promise<boolean> {
+export async function saveExceptions(runId: string, exceptions: PintAEException[], direction?: Direction): Promise<boolean> {
   if (exceptions.length === 0) return true;
+
+  if (exceptions.some((exception) => !exception.dataset_type && !direction)) {
+    console.error('Cannot persist PINT-AE exceptions without an explicit dataset direction.');
+    return false;
+  }
 
   const exceptionsToInsert = exceptions.map(e => ({
     run_id: runId,
     timestamp: e.timestamp,
-    dataset_type: e.dataset_type || 'AR',
+    dataset_type: e.dataset_type || direction!,
     check_id: e.check_id,
     check_name: e.check_name,
     severity: e.severity,

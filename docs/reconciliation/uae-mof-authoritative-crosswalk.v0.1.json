@@ -669,26 +669,26 @@
       "mof_field_id": 50,
       "mof_business_term": "Item name",
       "source_template": "invoice_lines_template.csv",
-      "source_column": "item_name|description",
-      "internal_field_key": "item_name|description",
-      "dr_id": "IBT-154",
-      "classification": "derived",
-      "transformation_rule": "Use lines.item_name when present; fallback to lines.description alias",
-      "status": "partially_covered",
-      "notes": "Priority alignment: current overlay mapping swaps 50/51."
+      "source_column": "item_name",
+      "internal_field_key": "item_name",
+      "dr_id": "IBT-153",
+      "classification": "direct",
+      "transformation_rule": "Read item name from lines.item_name",
+      "status": "covered",
+      "notes": ""
     },
     {
       "document_type": "tax",
       "mof_field_id": 51,
       "mof_business_term": "Item description",
       "source_template": "invoice_lines_template.csv",
-      "source_column": "description|item_name",
-      "internal_field_key": "description|item_name",
-      "dr_id": "IBT-153",
-      "classification": "repeated",
-      "transformation_rule": "Use lines.description as item description; fallback from item_name alias when needed",
-      "status": "partially_covered",
-      "notes": "Priority alignment: current overlay mapping swaps 50/51."
+      "source_column": "description",
+      "internal_field_key": "description",
+      "dr_id": "IBT-154",
+      "classification": "direct",
+      "transformation_rule": "Read item description from lines.description",
+      "status": "covered",
+      "notes": ""
     },
     {
       "document_type": "commercial",
@@ -1306,26 +1306,26 @@
       "mof_field_id": 48,
       "mof_business_term": "Item name",
       "source_template": "invoice_lines_template.csv",
-      "source_column": "item_name|description",
-      "internal_field_key": "item_name|description",
-      "dr_id": "IBT-154",
-      "classification": "derived",
-      "transformation_rule": "Use lines.item_name when present; fallback to lines.description alias",
-      "status": "partially_covered",
-      "notes": "Priority gap: currently conflated with tax field 48 when keyed by numeric ID only."
+      "source_column": "item_name",
+      "internal_field_key": "item_name",
+      "dr_id": "IBT-153",
+      "classification": "direct",
+      "transformation_rule": "Read item name from lines.item_name",
+      "status": "covered",
+      "notes": ""
     },
     {
       "document_type": "commercial",
       "mof_field_id": 49,
       "mof_business_term": "Item description",
       "source_template": "invoice_lines_template.csv",
-      "source_column": "description|item_name",
-      "internal_field_key": "description|item_name",
-      "dr_id": "IBT-153",
-      "classification": "repeated",
-      "transformation_rule": "Use lines.description as item description; fallback from item_name alias when needed",
-      "status": "partially_covered",
-      "notes": "Priority gap: commercial field 49 currently not linked correctly in MoF overlay/bridge."
+      "source_column": "description",
+      "internal_field_key": "description",
+      "dr_id": "IBT-154",
+      "classification": "direct",
+      "transformation_rule": "Read item description from lines.description",
+      "status": "covered",
+      "notes": ""
     }
   ]
 }

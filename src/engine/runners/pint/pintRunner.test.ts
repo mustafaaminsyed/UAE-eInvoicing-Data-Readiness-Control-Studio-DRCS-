@@ -49,6 +49,7 @@ describe('defaultPintRunner', () => {
         pint_reference_terms: ['IBT-001'],
         owner_team_default: 'Client Finance' as const,
         is_enabled: true,
+        applicability: { directions: ['AR' as const] },
         parameters: { field: 'invoice_number' },
       },
     ];
@@ -77,14 +78,15 @@ describe('defaultPintRunner', () => {
     ];
 
     vi.mocked(fetchEnabledPintAEChecks).mockResolvedValue(checks);
-    vi.mocked(runAllPintAEChecksWithTelemetry).mockReturnValue({ exceptions, telemetry });
+    const executionEvidence = [];
+    vi.mocked(runAllPintAEChecksWithTelemetry).mockReturnValue({ exceptions, telemetry, executionEvidence });
 
-    const output = await defaultPintRunner.run({ dataContext });
+    const output = await defaultPintRunner.run({ dataContext, direction: 'AR' });
 
     expect(fetchEnabledPintAEChecks).toHaveBeenCalledTimes(1);
     expect(runAllPintAEChecksWithTelemetry).toHaveBeenCalledTimes(1);
-    expect(runAllPintAEChecksWithTelemetry).toHaveBeenCalledWith(checks, dataContext);
-    expect(output).toEqual({ checks, exceptions, telemetry });
+    expect(runAllPintAEChecksWithTelemetry).toHaveBeenCalledWith(checks, dataContext, { direction: 'AR' });
+    expect(output).toEqual({ checks, exceptions, telemetry, executionEvidence });
 
     const fetchOrder = vi.mocked(fetchEnabledPintAEChecks).mock.invocationCallOrder[0];
     const runOrder = vi.mocked(runAllPintAEChecksWithTelemetry).mock.invocationCallOrder[0];

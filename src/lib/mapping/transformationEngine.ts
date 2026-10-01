@@ -231,7 +231,8 @@ export function validateTransformedValue(
  */
 export function transformRow(
   row: Record<string, string>,
-  mappings: { erpColumn: string; targetFieldId: string; transformations: Transformation[] }[]
+  mappings: { erpColumn: string; targetFieldId: string; transformations: Transformation[] }[],
+  options: { itemFieldCompatibility?: 'canonical_independent' | 'legacy_symmetric_fallback' } = {}
 ): Record<string, string> {
   const result: Record<string, string> = {};
 
@@ -246,6 +247,11 @@ export function transformRow(
     } catch (err) {
       result[mapping.targetFieldId] = originalValue;
     }
+  }
+
+  if (options.itemFieldCompatibility === 'legacy_symmetric_fallback') {
+    if (!result.item_name && result.description) result.item_name = result.description;
+    if (!result.description && result.item_name) result.description = result.item_name;
   }
 
   return result;

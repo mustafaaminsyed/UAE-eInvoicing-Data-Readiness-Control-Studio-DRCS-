@@ -11,6 +11,7 @@ import { EvidenceRuleExecutionTelemetryRow } from '@/types/evidence';
 import { fetchCustomChecks } from '@/lib/api/checksApi';
 import { runCustomCheck, runSearchCheck } from '@/lib/checks/customCheckRunner';
 import { InvestigationFlag } from '@/types/customChecks';
+import { ValidationExecutionEvidence } from '@/types/validationExecution';
 
 type OrchestratorOptions = {
   direction: Direction;
@@ -39,6 +40,7 @@ export interface RunChecksOrchestrationResult {
   customChecksExecuted: number;
   allExceptions: Exception[];
   runArtifact: RunArtifact;
+  validationExecutions: ValidationExecutionEvidence[];
 }
 
 function getCustomScopePopulation(
@@ -144,13 +146,15 @@ export async function runChecksOrchestrator(
   const {
     checkResults: builtInResults,
     telemetry: coreTelemetry,
-  } = defaultCoreRunner.run({ dataContext });
+    executionEvidence: coreExecutionEvidence = [],
+  } = defaultCoreRunner.run({ dataContext, direction: options.direction });
   await defaultPintRunner.seedCheckPack(false);
   const {
     checks: pintAEChecks,
     exceptions: pintExceptions,
     telemetry: pintTelemetry,
-  } = await defaultPintRunner.run({ dataContext });
+    executionEvidence: pintExecutionEvidence = [],
+  } = await defaultPintRunner.run({ dataContext, direction: options.direction });
   const legacyPintExceptions = mapPintExceptionsToLegacyExceptions(pintExceptions);
   const { exceptions: orgProfileExceptions, telemetry: orgProfileTelemetry } = defaultOrgProfileRunner.run({
     organizationProfile: options.organizationProfile,
@@ -184,6 +188,56 @@ export async function runChecksOrchestrator(
     };
   });
   const customValidationExceptions = customValidationResults.flatMap((result) => result.exceptions);
+  const customExecutionEvidence: ValidationExecutionEvidence[] = customValidationResults.map((result) => {
+    const evaluatedCount = result.passed + result.failed;
+    return {
+      ruleId: result.checkId,
+      ruleName: result.checkName,
+      controlClass: 'custom',
+      layer: 'custom',
+      direction: options.direction,
+      registered: true,
+      candidateCount: evaluatedCount,
+      applicableCount: evaluatedCount,
+      notApplicableCount: 0,
+      evaluatedCount,
+      passedCount: result.passed,
+      failedCount: result.failed,
+      notEvaluatedCount: 0,
+      applicability: evaluatedCount > 0 ? 'applicable' : 'undetermined',
+      evaluation: evaluatedCount > 0 ? 'evaluated' : 'not_evaluated',
+      outcome: result.failed > 0 ? 'fail' : evaluatedCount > 0 ? 'pass' : 'not_evaluated',
+      executionSource: 'legacy_adapter',
+    };
+  });
+  const orgProfileExecutionEvidence: ValidationExecutionEvidence[] = orgProfileTelemetry.map((row) => {
+    const passedCount = Math.max(row.execution_count - row.failure_count, 0);
+    return {
+      ruleId: row.rule_id,
+      ruleName: 'Our-side TRN Alignment',
+      controlClass: 'organization_profile',
+      layer: 'org_profile',
+      direction: options.direction,
+      registered: true,
+      candidateCount: row.execution_count,
+      applicableCount: row.execution_count,
+      notApplicableCount: 0,
+      evaluatedCount: row.execution_count,
+      passedCount,
+      failedCount: row.failure_count,
+      notEvaluatedCount: 0,
+      applicability: row.execution_count > 0 ? 'applicable' : 'undetermined',
+      evaluation: row.execution_count > 0 ? 'evaluated' : 'not_evaluated',
+      outcome: row.failure_count > 0 ? 'fail' : row.execution_count > 0 ? 'pass' : 'not_evaluated',
+      executionSource: 'runtime',
+    };
+  });
+  const validationExecutions = [
+    ...pintExecutionEvidence,
+    ...coreExecutionEvidence,
+    ...customExecutionEvidence,
+    ...orgProfileExecutionEvidence,
+  ];
   const investigationFlags =
     options.direction === 'AP'
       ? searchChecks.flatMap((check) => runSearchCheck(check, dataContext, options.direction))
@@ -243,6 +297,7 @@ export async function runChecksOrchestrator(
       investigationFlags: investigationFlags.length,
       customChecksExecuted,
       allExceptions: allExceptions.length,
+      validationExecutions,
     },
   };
 
@@ -261,5 +316,6 @@ export async function runChecksOrchestrator(
     customChecksExecuted,
     allExceptions,
     runArtifact,
+    validationExecutions,
   };
 }

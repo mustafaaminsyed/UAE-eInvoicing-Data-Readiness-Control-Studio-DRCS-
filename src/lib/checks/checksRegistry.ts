@@ -1,5 +1,7 @@
 import { ComplianceCheck, DataContext, Exception, CheckResult, InvoiceHeader } from '@/types/compliance';
 import { EvidenceRuleExecutionTelemetryRow } from '@/types/evidence';
+import { Direction } from '@/types/direction';
+import { ValidationExecutionEvidence } from '@/types/validationExecution';
 
 const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
@@ -10,23 +12,35 @@ function resolveLineAllowance(dataLine: DataContext['lines'][number]): number {
   return dataLine.line_allowance_amount ?? dataLine.line_discount ?? 0;
 }
 
+function getReverseChargeBuyerIds(data: DataContext): Set<string> {
+  const ids = new Set<string>();
+  data.lines.forEach((line) => {
+    const category = String(line.tax_category_code || '').trim().toUpperCase();
+    if (!['AE', 'RC', 'REVERSE_CHARGE'].includes(category)) return;
+    const buyerId = data.headerMap.get(line.invoice_id)?.buyer_id;
+    if (buyerId) ids.add(buyerId);
+  });
+  return ids;
+}
+
 export const checksRegistry: ComplianceCheck[] = [
   {
     id: 'buyer_trn_missing',
     name: 'Buyer TRN Missing',
-    description: 'Checks if buyer TRN is present in the buyers file',
+    description: 'Requires Buyer TRN only when a deterministic source-data condition establishes applicability',
     severity: 'Critical',
     category: 'buyer',
     run: (data: DataContext): Exception[] => {
       const exceptions: Exception[] = [];
+      const requiredBuyerIds = getReverseChargeBuyerIds(data);
       data.buyers.forEach(buyer => {
-        if (!buyer.buyer_trn || buyer.buyer_trn.trim() === '') {
+        if (requiredBuyerIds.has(buyer.buyer_id) && (!buyer.buyer_trn || buyer.buyer_trn.trim() === '')) {
           exceptions.push({
             id: generateId(),
             checkId: 'buyer_trn_missing',
             checkName: 'Buyer TRN Missing',
             severity: 'Critical',
-            message: `Buyer "${buyer.buyer_name}" (ID: ${buyer.buyer_id}) is missing TRN`,
+            message: `Buyer "${buyer.buyer_name}" (ID: ${buyer.buyer_id}) is missing the TRN required for reverse-charge treatment (IBR-103-AE)`,
             buyerId: buyer.buyer_id,
             field: 'buyer_trn',
             actualValue: buyer.buyer_trn || '(empty)',
@@ -353,7 +367,9 @@ export const checksRegistry: ComplianceCheck[] = [
 export function runAllChecks(data: DataContext): CheckResult[] {
   return checksRegistry.map(check => {
     const exceptions = check.run(data);
-    const totalRecords = check.category === 'buyer' 
+    const totalRecords = check.id === 'buyer_trn_missing'
+      ? data.buyers.filter((buyer) => Boolean(buyer.buyer_trn?.trim()) || getReverseChargeBuyerIds(data).has(buyer.buyer_id)).length
+      : check.category === 'buyer'
       ? data.buyers.length 
       : check.category === 'line' 
         ? data.lines.length 
@@ -371,25 +387,70 @@ export function runAllChecks(data: DataContext): CheckResult[] {
 }
 
 export function runAllChecksWithTelemetry(
-  data: DataContext
-): { checkResults: CheckResult[]; telemetry: EvidenceRuleExecutionTelemetryRow[] } {
+  data: DataContext,
+  direction: Direction = 'AR'
+): { checkResults: CheckResult[]; telemetry: EvidenceRuleExecutionTelemetryRow[]; executionEvidence: ValidationExecutionEvidence[] } {
   const checkResults = runAllChecks(data);
+  const reverseChargeBuyerIds = getReverseChargeBuyerIds(data);
   const telemetry = checksRegistry.map((check) => {
     const result = checkResults.find((entry) => entry.checkId === check.id);
-    const executionCount =
-      check.category === 'buyer'
+    const candidateCount = check.category === 'buyer'
         ? data.buyers.length
         : check.category === 'line'
           ? data.lines.length
           : data.headers.length;
+    const executionCount = check.id === 'buyer_trn_missing'
+      ? data.buyers.filter((buyer) => Boolean(buyer.buyer_trn?.trim()) || reverseChargeBuyerIds.has(buyer.buyer_id)).length
+      : candidateCount;
+    const notEvaluatedCount = check.id === 'buyer_trn_missing'
+      ? Math.max(candidateCount - executionCount, 0)
+      : 0;
 
     return {
       rule_id: check.id,
       execution_count: executionCount,
       failure_count: result?.failed ?? 0,
       execution_source: 'runtime' as const,
+      direction,
+      control_class: 'supplementary_data_readiness' as const,
+      layer: 'core' as const,
+      candidate_count: candidateCount,
+      applicable_count: executionCount + notEvaluatedCount,
+      passed_count: Math.max(executionCount - (result?.failed ?? 0), 0),
+      not_applicable_count: 0,
+      not_evaluated_count: notEvaluatedCount,
+      applicability_reason: check.id === 'buyer_trn_missing' && notEvaluatedCount > 0
+        ? 'Buyer VAT-registration applicability cannot be established from the supplied source data'
+        : undefined,
     };
   });
 
-  return { checkResults, telemetry };
+  const executionEvidence: ValidationExecutionEvidence[] = telemetry.map((row) => {
+    const check = checksRegistry.find((item) => item.id === row.rule_id)!;
+    const applicableCount = row.applicable_count ?? row.execution_count;
+    const notEvaluatedCount = row.not_evaluated_count ?? 0;
+    const passedCount = row.passed_count ?? Math.max(row.execution_count - row.failure_count, 0);
+    return {
+      ruleId: row.rule_id,
+      ruleName: check.name,
+      controlClass: 'supplementary_data_readiness',
+      layer: 'core',
+      direction,
+      registered: true,
+      candidateCount: row.candidate_count ?? applicableCount,
+      applicableCount,
+      notApplicableCount: row.not_applicable_count ?? 0,
+      evaluatedCount: row.execution_count,
+      passedCount,
+      failedCount: row.failure_count,
+      notEvaluatedCount,
+      applicability: applicableCount > 0 ? 'applicable' : 'undetermined',
+      evaluation: row.execution_count > 0 ? 'evaluated' : 'not_evaluated',
+      outcome: row.failure_count > 0 ? 'fail' : notEvaluatedCount > 0 ? 'not_evaluated' : 'pass',
+      applicabilityReason: row.applicability_reason,
+      executionSource: 'runtime',
+    };
+  });
+
+  return { checkResults, telemetry, executionEvidence };
 }

@@ -3,14 +3,17 @@ import { MoFCoverageResult, MoFMappedColumnsInput } from '@/lib/coverage/mofCove
 import { PintAECheck, PintAEException } from '@/types/pintAE';
 import { Direction, OrganizationProfile } from '@/types/direction';
 import { EvidenceRuleExecutionTelemetryRow } from '@/types/evidence';
+import { ValidationExecutionEvidence } from '@/types/validationExecution';
 
 export interface CoreRunnerInput {
   dataContext: DataContext;
+  direction: Direction;
 }
 
 export interface CoreRunnerOutput {
   checkResults: CheckResult[];
   telemetry: EvidenceRuleExecutionTelemetryRow[];
+  executionEvidence: ValidationExecutionEvidence[];
 }
 
 export interface CoreRunner {
@@ -19,12 +22,14 @@ export interface CoreRunner {
 
 export interface PintRunnerInput {
   dataContext: DataContext;
+  direction: Direction;
 }
 
 export interface PintRunnerOutput {
   checks: PintAECheck[];
   exceptions: PintAEException[];
   telemetry: EvidenceRuleExecutionTelemetryRow[];
+  executionEvidence: ValidationExecutionEvidence[];
 }
 
 export interface PintRunner {

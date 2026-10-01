@@ -16,6 +16,7 @@ import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
 import { getFailureClassForRule } from '@/lib/validation/pintAERuleMetadata';
 import { EvidenceRuleExecutionTelemetryRow } from '@/types/evidence';
 import { checksRegistry } from '@/lib/checks/checksRegistry';
+import { ValidationExecutionEvidence } from '@/types/validationExecution';
 
 export interface EvidencePackBuildOverrides {
   datasetName?: string;
@@ -26,6 +27,7 @@ export interface EvidencePackBuildOverrides {
   readinessQualification?: ReadinessQualification;
   mappingCoveragePercent?: number | null;
   executionTelemetry?: EvidenceRuleExecutionTelemetryRow[];
+  executionEvidence?: ValidationExecutionEvidence[];
   sourceMode?: EvidenceSourceMode;
   entityScopeStatus?: EvidenceEntityScopeStatus;
   legalEntityCount?: number;
@@ -95,6 +97,10 @@ export interface RuleExecutionRow {
   execution_count: number;
   failure_count: number;
   execution_source: 'estimated' | 'runtime';
+  applicability_status?: string;
+  outcome_status?: string;
+  not_applicable_count?: number;
+  not_evaluated_count?: number;
 }
 
 function deriveEntityScope(
@@ -289,6 +295,9 @@ export function buildEvidencePackData(
   const telemetryByRule = new Map(
     (overrides.executionTelemetry ?? []).map((row) => [row.rule_id, row])
   );
+  const executionEvidenceByRule = new Map(
+    (overrides.executionEvidence ?? []).map((row) => [row.ruleId, row])
+  );
   const supplementalRuleCatalog = buildSupplementalRuleCatalog();
   const datasetName =
     overrides.datasetName ?? (headers.length > 0 ? (headers[0].seller_name ?? headers[0].seller_trn) : 'Unknown');
@@ -379,6 +388,7 @@ export function buildEvidencePackData(
 
   const ruleExecution: RuleExecutionRow[] = rules.map((r) => {
     const telemetry = telemetryByRule.get(r.rule_id);
+    const normalized = executionEvidenceByRule.get(r.rule_id);
     return {
       rule_id: r.rule_id,
       rule_name: r.rule_name,
@@ -390,6 +400,10 @@ export function buildEvidencePackData(
       execution_count: telemetry?.execution_count ?? ruleExecMap.get(r.rule_id)?.executions ?? 0,
       failure_count: telemetry?.failure_count ?? ruleExecMap.get(r.rule_id)?.failures ?? 0,
       execution_source: telemetry?.execution_source ?? (hasRuntimeTelemetry ? 'runtime' : 'estimated'),
+      applicability_status: normalized?.applicability,
+      outcome_status: normalized?.outcome,
+      not_applicable_count: normalized?.notApplicableCount,
+      not_evaluated_count: normalized?.notEvaluatedCount,
     };
   });
 

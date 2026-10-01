@@ -37,13 +37,15 @@ describe('defaultCoreRunner', () => {
       },
     ];
 
-    vi.mocked(runAllChecksWithTelemetry).mockReturnValue({ checkResults: expected, telemetry });
+    const executionEvidence = [];
+    vi.mocked(runAllChecksWithTelemetry).mockReturnValue({ checkResults: expected, telemetry, executionEvidence });
 
-    const output = defaultCoreRunner.run({ dataContext });
+    const output = defaultCoreRunner.run({ dataContext, direction: 'AR' });
 
     expect(runAllChecksWithTelemetry).toHaveBeenCalledTimes(1);
-    expect(runAllChecksWithTelemetry).toHaveBeenCalledWith(dataContext);
+    expect(runAllChecksWithTelemetry).toHaveBeenCalledWith(dataContext, 'AR');
     expect(output.checkResults).toEqual(expected);
     expect(output.telemetry).toEqual(telemetry);
+    expect(output.executionEvidence).toEqual(executionEvidence);
   });
 });

@@ -7,9 +7,9 @@ export const defaultPintRunner: PintRunner = {
     return seedUC1CheckPack(forceUpsert);
   },
 
-  async run({ dataContext }) {
+  async run({ dataContext, direction }) {
     const checks = await fetchEnabledPintAEChecks();
-    const { exceptions, telemetry } = runAllPintAEChecksWithTelemetry(checks, dataContext);
-    return { checks, exceptions, telemetry };
+    const { exceptions, telemetry, executionEvidence } = runAllPintAEChecksWithTelemetry(checks, dataContext, { direction });
+    return { checks, exceptions, telemetry, executionEvidence };
   },
 };

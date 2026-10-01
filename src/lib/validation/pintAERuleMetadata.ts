@@ -22,9 +22,10 @@ export const ALLOWED_EXECUTION_LAYERS: ExecutionLayer[] = [
   'semantic_rule',
 ];
 
-export type RawPintAECheck = Omit<PintAECheck, 'rule_type' | 'execution_layer'> & {
+export type RawPintAECheck = Omit<PintAECheck, 'rule_type' | 'execution_layer' | 'applicability'> & {
   rule_type?: LegacyRuleType | RuleType;
   execution_layer?: ExecutionLayer;
+  applicability?: PintAECheck['applicability'];
 };
 
 type RuleMetadata = {
@@ -112,6 +113,9 @@ export function normalizePintAECheck(check: RawPintAECheck): PintAECheck {
     ...check,
     rule_type: metadata.rule_type,
     execution_layer: metadata.execution_layer,
+    // The current catalogue is the outbound UC1 pack. AP regulatory rules will
+    // be added as a separate, explicitly governed ruleset in a future phase.
+    applicability: check.applicability ?? { directions: ['AR'] },
   };
 }
 

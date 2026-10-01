@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 
 import type { CheckResult, Exception } from '@/types/compliance';
+import type { ValidationExecutionEvidence, ValidationMetricSummary } from '@/types/validationExecution';
+import { summarizeValidationExecutions } from '@/types/validationExecution';
 
 type DashboardMetricCheckResult = Pick<CheckResult, 'passed' | 'failed' | 'severity'> & {
   exceptions?: Array<Pick<Exception, 'invoiceId' | 'severity'> | undefined> | undefined;
@@ -15,6 +17,7 @@ export interface DashboardMetricsInput {
   totalInvoicesInScope: number;
   checkResults: DashboardMetricCheckResult[];
   exceptions?: DashboardMetricException[];
+  validationExecutions?: ValidationExecutionEvidence[];
 }
 
 /**
@@ -35,7 +38,7 @@ export interface DashboardMetrics {
    * Share of executed rule outcomes that passed in the active scope.
    * This is a rule-outcome metric and can diverge from submissionReadyRate when one document fails any rule.
    */
-  rulePassRate: number;
+  rulePassRate: number | null;
   /**
    * Total number of executed rule outcomes in the active scope.
    * Formula: sum of passed and failed outcomes across all executed checks.
@@ -56,6 +59,9 @@ export interface DashboardMetrics {
    * Formula: criticalBlockerOutcomes / criticalBlockerDocumentCount, rounded to 1 decimal place.
    */
   avgCriticalBlockersPerDocument: number;
+  evaluationCoverage: number | null;
+  regulatory: ValidationMetricSummary;
+  supplementary: ValidationMetricSummary;
 }
 
 function collectFailedInvoiceIds(
@@ -118,8 +124,17 @@ function collectCriticalBlockerDocumentIds(
  * Computes the dashboard's document-level readiness and rule-level conformance metrics.
  */
 export function computeDashboardMetrics(input: DashboardMetricsInput): DashboardMetrics {
-  const totalRuleOutcomes = input.checkResults.reduce((sum, result) => sum + result.passed + result.failed, 0);
-  const passedRuleOutcomes = input.checkResults.reduce((sum, result) => sum + result.passed, 0);
+  const regulatory = summarizeValidationExecutions(
+    (input.validationExecutions ?? []).filter((item) => item.controlClass === 'regulatory')
+  );
+  const supplementary = summarizeValidationExecutions(
+    (input.validationExecutions ?? []).filter((item) => item.controlClass === 'supplementary_data_readiness')
+  );
+  const hasNormalizedEvidence = input.validationExecutions !== undefined;
+  const legacyTotalRuleOutcomes = input.checkResults.reduce((sum, result) => sum + result.passed + result.failed, 0);
+  const legacyPassedRuleOutcomes = input.checkResults.reduce((sum, result) => sum + result.passed, 0);
+  const totalRuleOutcomes = hasNormalizedEvidence ? regulatory.evaluatedOutcomes : legacyTotalRuleOutcomes;
+  const passedRuleOutcomes = hasNormalizedEvidence ? regulatory.passedOutcomes : legacyPassedRuleOutcomes;
   const criticalOutcomeCountFromChecks = input.checkResults.reduce(
     (sum, result) => sum + (result.severity === 'Critical' ? result.failed : 0),
     0
@@ -138,7 +153,7 @@ export function computeDashboardMetrics(input: DashboardMetricsInput): Dashboard
     submissionReadyCount,
     submissionReadyRate:
       input.totalInvoicesInScope > 0 ? (submissionReadyCount / input.totalInvoicesInScope) * 100 : 0,
-    rulePassRate: totalRuleOutcomes > 0 ? (passedRuleOutcomes / totalRuleOutcomes) * 100 : 0,
+    rulePassRate: totalRuleOutcomes > 0 ? (passedRuleOutcomes / totalRuleOutcomes) * 100 : null,
     totalRuleOutcomes,
     criticalBlockerOutcomes,
     criticalBlockerDocumentCount,
@@ -146,6 +161,9 @@ export function computeDashboardMetrics(input: DashboardMetricsInput): Dashboard
       criticalBlockerDocumentCount > 0
         ? Number((criticalBlockerOutcomes / criticalBlockerDocumentCount).toFixed(1))
         : 0,
+    evaluationCoverage: hasNormalizedEvidence ? regulatory.evaluationCoverage : null,
+    regulatory,
+    supplementary,
   };
 }
 
@@ -153,10 +171,10 @@ export function computeDashboardMetrics(input: DashboardMetricsInput): Dashboard
  * Memoized hook wrapper around computeDashboardMetrics for dashboard consumers.
  */
 export function useDashboardMetrics(input: DashboardMetricsInput) {
-  const { checkResults, exceptions, totalInvoicesInScope } = input;
+  const { checkResults, exceptions, totalInvoicesInScope, validationExecutions } = input;
 
   return useMemo(
-    () => computeDashboardMetrics({ checkResults, exceptions, totalInvoicesInScope }),
-    [checkResults, exceptions, totalInvoicesInScope]
+    () => computeDashboardMetrics({ checkResults, exceptions, totalInvoicesInScope, validationExecutions }),
+    [checkResults, exceptions, totalInvoicesInScope, validationExecutions]
   );
 }

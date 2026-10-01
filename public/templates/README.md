@@ -79,8 +79,8 @@ Fields derived by the ASP (Corner 2) — such as Specification ID (IBT-024), Bus
 | 1 | `line_id` | IBT-126 | Yes | String | Unique ID | Line identifier (PK) | ERP |
 | 2 | `invoice_id` | — | Yes | String | FK → headers | Join key | ERP |
 | 3 | `line_number` | IBT-126 | Yes | Integer | Sequential | Line sequence | ERP |
-| 4 | `description` | IBT-153 | Yes | String | Free text | Item description | ERP |
-| 5 | `item_name` | IBT-154 | No | String | Free text | Item name when separate from description | ERP |
+| 4 | `description` | IBT-154 | No | String | Free text | Optional item description | ERP |
+| 5 | `item_name` | IBT-153 | Yes | String | Free text | Item name | ERP |
 | 6 | `quantity` | IBT-129 | Yes | Number | Decimal | Invoiced quantity | ERP |
 | 7 | `unit_of_measure` | IBT-130 | Yes | Code | UN/ECE Rec 20 | UOM code | ERP |
 | 8 | `unit_price` | IBT-146 | Yes | Number | Decimal | Item net price | ERP |

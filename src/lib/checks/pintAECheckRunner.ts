@@ -5,12 +5,23 @@ import { getFailureClassForRule } from '@/lib/validation/pintAERuleMetadata';
 import { buildScenarioContext } from '@/modules/scenarioContext/buildScenarioContext';
 import { classifyInvoice } from '@/modules/scenarioLens/classifyInvoice';
 import { decodeTransactionTypeCode } from '@/modules/scenarioContext/transactionTypeCode';
+import { Direction } from '@/types/direction';
+import { ValidationExecutionEvidence } from '@/types/validationExecution';
 
 export interface PintAECheckTelemetry {
   rule_id: string;
   execution_count: number;
   failure_count: number;
   execution_source: 'runtime';
+  direction?: Direction;
+  control_class?: 'regulatory';
+  layer?: 'pint_ae';
+  candidate_count?: number;
+  applicable_count?: number;
+  passed_count?: number;
+  not_applicable_count?: number;
+  not_evaluated_count?: number;
+  applicability_reason?: string;
 }
 
 export interface PintAECheckRunResult {
@@ -45,9 +56,16 @@ export type PintAEVatTreatmentApplicabilityMode = 'legacy' | 'scenario_context';
 export type PintAEOverlayApplicabilityMode = 'legacy' | 'scenario_context';
 
 export interface RunPintAECheckOptions {
+  direction?: Direction;
   documentFamilyApplicabilityMode?: PintAEDocumentFamilyApplicabilityMode;
   vatTreatmentApplicabilityMode?: PintAEVatTreatmentApplicabilityMode;
   overlayApplicabilityMode?: PintAEOverlayApplicabilityMode;
+}
+
+function getCandidateCount(check: PintAECheck, data: DataContext): number {
+  if (check.scope === 'Lines') return data.lines.length;
+  if (check.scope === 'Party') return data.buyers.length;
+  return data.headers.length;
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
@@ -599,6 +617,8 @@ export function runPintAECheckWithTelemetry(
   const params = check.parameters || {};
   const timestamp = new Date().toISOString();
   let executionCount = 0;
+  const direction = options.direction ?? 'AR';
+  const candidateCount = getCandidateCount(check, data);
   const documentFamilyApplicabilityMode = options.documentFamilyApplicabilityMode ?? DOCUMENT_FAMILY_APPLICABILITY_MODE;
   const vatTreatmentApplicabilityMode = options.vatTreatmentApplicabilityMode ?? VAT_TREATMENT_APPLICABILITY_MODE;
   const overlayApplicabilityMode = options.overlayApplicabilityMode ?? OVERLAY_APPLICABILITY_MODE;
@@ -618,6 +638,7 @@ export function runPintAECheckWithTelemetry(
   }): PintAEException => ({
     id: generateId(),
     timestamp,
+    dataset_type: direction,
     check_id: check.check_id,
     check_name: check.check_name,
     severity: check.severity,
@@ -642,6 +663,30 @@ export function runPintAECheckWithTelemetry(
     sla_target_hours: SLA_HOURS_BY_SEVERITY[check.severity],
     case_status: 'Open',
   });
+
+  const applicableDirections = check.applicability?.directions ?? ['AR'];
+  if (!applicableDirections.includes(direction)) {
+    return {
+      exceptions,
+      executionResults,
+      derivedAedLineValues,
+      telemetry: {
+        rule_id: check.check_id,
+        execution_count: 0,
+        failure_count: 0,
+        execution_source: 'runtime',
+        direction,
+        control_class: 'regulatory',
+        layer: 'pint_ae',
+        candidate_count: candidateCount,
+        applicable_count: 0,
+        passed_count: 0,
+        not_applicable_count: candidateCount,
+        not_evaluated_count: 0,
+        applicability_reason: `Rule is scoped to ${applicableDirections.join('/')} and is not applicable to ${direction}`,
+      },
+    };
+  }
 
   // Handle based on check_id for specific logic
   switch (check.check_id) {
@@ -2147,6 +2192,14 @@ export function runPintAECheckWithTelemetry(
       execution_count: executionCount,
       failure_count: exceptions.length,
       execution_source: 'runtime',
+      direction,
+      control_class: 'regulatory',
+      layer: 'pint_ae',
+      candidate_count: candidateCount,
+      applicable_count: executionCount,
+      passed_count: Math.max(executionCount - exceptions.length, 0),
+      not_applicable_count: Math.max(candidateCount - executionCount, 0),
+      not_evaluated_count: 0,
     },
   };
 }
@@ -2161,21 +2214,57 @@ export function runAllPintAEChecks(checks: PintAECheck[], data: DataContext): Pi
 
 export function runAllPintAEChecksWithTelemetry(
   checks: PintAECheck[],
-  data: DataContext
-): { exceptions: PintAEException[]; telemetry: PintAECheckTelemetry[]; executionResults?: PintAEExecutionResult[]; derivedAedLineValues: DerivedAedLineValue[] } {
+  data: DataContext,
+  options: RunPintAECheckOptions = {}
+): { exceptions: PintAEException[]; telemetry: PintAECheckTelemetry[]; executionResults?: PintAEExecutionResult[]; derivedAedLineValues: DerivedAedLineValue[]; executionEvidence: ValidationExecutionEvidence[] } {
   const enabledChecks = checks.filter(c => c.is_enabled);
   const allExceptions: PintAEException[] = [];
   const telemetry: PintAECheckTelemetry[] = [];
   const executionResults: PintAEExecutionResult[] = [];
   const derivedAedLineValues: DerivedAedLineValue[] = [];
+  const executionEvidence: ValidationExecutionEvidence[] = [];
   
   for (const check of enabledChecks) {
-    const result = runPintAECheckWithTelemetry(check, data);
+    const result = runPintAECheckWithTelemetry(check, data, options);
     allExceptions.push(...result.exceptions);
     telemetry.push(result.telemetry);
     executionResults.push(...(result.executionResults ?? []));
     derivedAedLineValues.push(...result.derivedAedLineValues);
+    const row = result.telemetry;
+    const applicableCount = row.applicable_count ?? row.execution_count;
+    const evaluatedCount = row.execution_count;
+    const failedCount = row.failure_count;
+    const passedCount = row.passed_count ?? Math.max(evaluatedCount - failedCount, 0);
+    const notApplicableCount = row.not_applicable_count ?? 0;
+    const notEvaluatedCount = row.not_evaluated_count ?? 0;
+    const direction = row.direction ?? options.direction ?? 'AR';
+    executionEvidence.push({
+      ruleId: check.check_id,
+      ruleName: check.check_name,
+      controlClass: 'regulatory',
+      layer: 'pint_ae',
+      direction,
+      registered: true,
+      candidateCount: row.candidate_count ?? applicableCount,
+      applicableCount,
+      notApplicableCount,
+      evaluatedCount,
+      passedCount,
+      failedCount,
+      notEvaluatedCount,
+      applicability: applicableCount > 0 ? 'applicable' : 'not_applicable',
+      evaluation: evaluatedCount > 0 ? 'evaluated' : 'not_evaluated',
+      outcome: failedCount > 0
+        ? 'fail'
+        : notEvaluatedCount > 0
+          ? 'not_evaluated'
+          : applicableCount === 0
+            ? 'not_applicable'
+            : 'pass',
+      applicabilityReason: row.applicability_reason,
+      executionSource: 'runtime',
+    });
   }
   
-  return { exceptions: allExceptions, telemetry, executionResults, derivedAedLineValues };
+  return { exceptions: allExceptions, telemetry, executionResults, derivedAedLineValues, executionEvidence };
 }

@@ -110,6 +110,8 @@ type ParseOptions = {
   direction?: Direction;
   uploadSessionId?: string;
   uploadManifestId?: string;
+  /** Explicit opt-in for previously saved mappings that relied on symmetric item-field fallback. */
+  itemFieldCompatibility?: 'canonical_independent' | 'legacy_symmetric_fallback';
 };
 
 export async function parseBuyersFile(file: File, options: ParseOptions = {}): Promise<Buyer[]> {
@@ -275,8 +277,12 @@ export async function parseLinesFile(file: File, options: ParseOptions = {}): Pr
       line_id: record.line_id || '',
       invoice_id: record.invoice_id || '',
       line_number: parseInt(record.line_number) || 0,
-      description: str(record, 'description', 'item_name'),
-      item_name: str(record, 'item_name', 'description'),
+      description: options.itemFieldCompatibility === 'legacy_symmetric_fallback'
+        ? str(record, 'description', 'item_name')
+        : str(record, 'description'),
+      item_name: options.itemFieldCompatibility === 'legacy_symmetric_fallback'
+        ? str(record, 'item_name', 'description')
+        : str(record, 'item_name'),
       quantity: parseFloat(record.quantity) || 0,
       unit_price: requiredNum(record, 'unit_price'),
       line_discount: lineDiscount,
