@@ -117,6 +117,10 @@ export default function RunChecksPage() {
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
   const [runElapsedSeconds, setRunElapsedSeconds] = useState(0);
   const expectedUC1Count = UAE_UC1_CHECK_PACK.length;
+  const directionApplicablePintCount = useMemo(
+    () => pintAEChecks.filter((check) => (check.applicability?.directions ?? ['AR']).includes(direction)).length,
+    [direction, pintAEChecks]
+  );
 
   const formatSetupError = (errorMessage: string, tableName: string) => {
     if (errorMessage.includes(`Could not find the table 'public.${tableName}'`)) {
@@ -591,7 +595,7 @@ export default function RunChecksPage() {
             <>
               Execute layered UAE eInvoicing controls across your uploaded data: MoF mandatory baseline readiness and
               PINT-AE technical conformance checks. This will validate {headers.length} invoices across{' '}
-              {isLoadingChecks ? '...' : pintAEChecks.length} checks.
+              {isLoadingChecks ? '...' : directionApplicablePintCount} direction-applicable PINT-AE controls ({pintAEChecks.length} registered).
             </>
           }
           icon={<Play className="h-8 w-8" />}
@@ -762,7 +766,7 @@ export default function RunChecksPage() {
 	            <div>
 	              <div className="flex items-center gap-2">
 	                <h2 className="text-lg font-semibold text-foreground">
-	                  Checks Library ({isLoadingChecks ? '...' : pintAEChecks.length} checks)
+                  Checks Library ({isLoadingChecks ? '...' : `${pintAEChecks.length} checks`})
 	                </h2>
 	                {diagnostics?.dataSource === 'supabase' && (
 		                  <Badge variant="outline" className={`gap-1 ${WORKFLOW_UTILITY_BADGE_CLASS}`}>
@@ -1023,7 +1027,7 @@ export default function RunChecksPage() {
             <RefreshCw className="h-4 w-4 animate-spin text-primary" />
             <AlertTitle className="text-primary">Validation run in progress</AlertTitle>
             <AlertDescription className="text-primary/80">
-              Processing {headers.length.toLocaleString()} invoices across {pintAEChecks.length.toLocaleString()} active checks.
+              Processing {headers.length.toLocaleString()} invoices across {directionApplicablePintCount.toLocaleString()} active checks. These are the direction-applicable PINT-AE controls; {pintAEChecks.length.toLocaleString()} UC1 controls remain registered.
               Elapsed time: <strong>{runElapsedLabel}</strong>. Larger datasets may keep the browser busy while core rules execute.
             </AlertDescription>
           </Alert>
@@ -1066,7 +1070,7 @@ export default function RunChecksPage() {
               ) : (
                 <>
                   <Play className="w-5 h-5" />
-                  Run All Checks ({pintAEChecks.length})
+                  Run All Checks ({directionApplicablePintCount})
                 </>
               )}
             </Button>

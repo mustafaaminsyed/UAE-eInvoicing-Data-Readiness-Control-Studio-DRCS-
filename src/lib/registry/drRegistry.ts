@@ -79,8 +79,8 @@ const DR_TO_COLUMN_MAP: Record<string, { dataset: 'buyers' | 'headers' | 'lines'
   'IBT-148': { dataset: 'lines', columns: ['unit_price'] }, // gross price maps to same input
   'IBT-151': { dataset: 'lines', columns: ['tax_category_code'] },
   'IBT-152': { dataset: 'lines', columns: ['vat_rate'] },
-  'IBT-153': { dataset: 'lines', columns: ['description'] },
-  'IBT-154': { dataset: 'lines', columns: ['item_name'] },
+  'IBT-153': { dataset: 'lines', columns: ['item_name'] },
+  'IBT-154': { dataset: 'lines', columns: ['description'] },
   'BTUAE-08': { dataset: 'lines', columns: ['vat_amount'] },
 
   // Derived aggregate mapped to its taxpayer-originated line prerequisites

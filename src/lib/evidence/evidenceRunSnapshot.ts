@@ -6,6 +6,7 @@ import {
   EvidenceRuleExecutionTelemetryRow,
   EvidenceRunSnapshot,
 } from '@/types/evidence';
+import { ValidationExecutionEvidence } from '@/types/validationExecution';
 
 function deriveSnapshotEntityScope(headers: InvoiceHeader[]): Pick<
   EvidenceRunSnapshot,
@@ -125,4 +126,20 @@ export function getEvidenceRuleExecutionTelemetry(
     resultsSummary?.evidenceRuleExecutionTelemetry ||
     (resultsSummary?.evidence_rule_execution_telemetry as EvidenceRuleExecutionTelemetryRow[] | undefined);
   return isEvidenceRuleExecutionTelemetryRowArray(candidate) ? candidate : [];
+}
+
+export function getValidationExecutionEvidence(
+  run: CheckRun | null | undefined
+): ValidationExecutionEvidence[] {
+  const resultsSummary = run?.results_summary as CheckRunResultsSummary | undefined;
+  const candidate = resultsSummary?.validationExecutionEvidence;
+  if (!Array.isArray(candidate)) return [];
+  return candidate.filter(
+    (row): row is ValidationExecutionEvidence =>
+      Boolean(row) &&
+      typeof row.ruleId === 'string' &&
+      typeof row.registered === 'boolean' &&
+      typeof row.evaluatedCount === 'number' &&
+      (row.direction === 'AR' || row.direction === 'AP')
+  );
 }

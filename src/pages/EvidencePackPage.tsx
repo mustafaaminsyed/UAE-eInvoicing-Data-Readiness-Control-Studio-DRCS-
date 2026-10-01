@@ -26,7 +26,7 @@ import {
   downloadBlob,
 } from '@/lib/evidence/evidenceExporter';
 import { buildEvidenceSummary } from '@/lib/evidence/evidenceSummary';
-import { getEvidenceRuleExecutionTelemetry, getEvidenceRunSnapshot } from '@/lib/evidence/evidenceRunSnapshot';
+import { getEvidenceRuleExecutionTelemetry, getEvidenceRunSnapshot, getValidationExecutionEvidence } from '@/lib/evidence/evidenceRunSnapshot';
 import {
   buildStreamlinedEvidenceReport,
   formatVerdictLabel,
@@ -160,7 +160,9 @@ function getRunContextSummary(
 }
 
 export default function EvidencePackPage() {
-  const { buyers, headers, lines, pintAEExceptions, isChecksRun, runSummary, lastPintRuleTelemetry } = useCompliance();
+  const compliance = useCompliance();
+  const { buyers, headers, lines, pintAEExceptions, isChecksRun, runSummary, lastPintRuleTelemetry } = compliance;
+  const validationExecutions = compliance.validationExecutions;
   const { toast } = useToast();
   const [exporting, setExporting] = useState(false);
   const [activeTab, setActiveTab] = useState('exceptions');
@@ -196,6 +198,10 @@ export default function EvidencePackPage() {
   );
   const selectedRunTelemetry = useMemo(
     () => getEvidenceRuleExecutionTelemetry(selectedRun),
+    [selectedRun]
+  );
+  const selectedRunExecutionEvidence = useMemo(
+    () => getValidationExecutionEvidence(selectedRun),
     [selectedRun]
   );
 
@@ -281,6 +287,7 @@ export default function EvidencePackPage() {
             legalEntityCount: selectedRunSnapshot.legal_entity_count,
             legalEntityLabels: selectedRunSnapshot.legal_entity_labels,
             executionTelemetry: canUseHistoricalSnapshot ? selectedRunTelemetry : lastPintRuleTelemetry,
+            executionEvidence: canUseHistoricalSnapshot ? selectedRunExecutionEvidence : validationExecutions,
           }
         : {
             runMode: selectedRunSummary?.run_mode,
@@ -288,6 +295,7 @@ export default function EvidencePackPage() {
             mappingCoveragePercent: selectedRunSummary?.mapping_coverage_percent ?? null,
             sourceMode: canUseHistoricalSnapshot ? 'persisted_snapshot' : 'current_in_memory_run',
             executionTelemetry: lastPintRuleTelemetry,
+            executionEvidence: validationExecutions,
           }
     );
   }, [
@@ -304,6 +312,8 @@ export default function EvidencePackPage() {
     selectedRunSummary,
     selectedRunTelemetry,
     lastPintRuleTelemetry,
+    selectedRunExecutionEvidence,
+    validationExecutions,
   ]);
 
   const streamlinedReport = useMemo(

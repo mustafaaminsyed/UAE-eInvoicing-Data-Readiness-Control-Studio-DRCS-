@@ -162,4 +162,29 @@ describe('negative headers template upload path', () => {
     expect(line.price_base_quantity).toBeUndefined();
     expect(line.price_base_quantity).not.toBe(1);
   });
+
+  it('keeps IBT-153 item name and IBT-154 description independent in canonical mode', async () => {
+    const csv = [
+      'line_id,invoice_id,line_number,item_name,description,quantity,unit_price,line_total_excl_vat,vat_rate,vat_amount',
+      'L-001,INV-001,1,Widget,,1,100,100,5,5',
+    ].join('\n');
+
+    const [line] = await parseLinesFile({ text: async () => csv } as File);
+    expect(line.item_name).toBe('Widget');
+    expect(line.description).toBeUndefined();
+  });
+
+  it('cross-fills item fields only through the explicit legacy compatibility adapter', async () => {
+    const csv = [
+      'line_id,invoice_id,line_number,item_name,quantity,unit_price,line_total_excl_vat,vat_rate,vat_amount',
+      'L-001,INV-001,1,Widget,1,100,100,5,5',
+    ].join('\n');
+
+    const [line] = await parseLinesFile(
+      { text: async () => csv } as File,
+      { itemFieldCompatibility: 'legacy_symmetric_fallback' }
+    );
+    expect(line.item_name).toBe('Widget');
+    expect(line.description).toBe('Widget');
+  });
 });

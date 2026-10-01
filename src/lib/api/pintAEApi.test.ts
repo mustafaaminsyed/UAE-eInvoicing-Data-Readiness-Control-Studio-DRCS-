@@ -123,4 +123,32 @@ describe('pintAEApi legacy schema compatibility', () => {
       enabledChecks: expect.any(Number),
     });
   });
+
+  it('refuses to persist an exception whose direction is not explicit', async () => {
+    const insert = vi.fn();
+    fromMock.mockReturnValue({ insert });
+    const { saveExceptions } = await import('@/lib/api/pintAEApi');
+    const result = await saveExceptions('run-1', [{
+      id: 'exception-1', timestamp: '2026-10-01T00:00:00.000Z', check_id: 'UAE-UC1-CHK-001',
+      check_name: 'Invoice Number Present', severity: 'Critical', pint_reference_terms: ['IBT-001'],
+      message: 'missing', root_cause_category: 'Unclassified', owner_team: 'Client Finance',
+      sla_target_hours: 4, case_status: 'Open',
+    }]);
+    expect(result).toBe(false);
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it('persists AP direction without defaulting it to AR', async () => {
+    const insert = vi.fn().mockResolvedValue({ error: null });
+    fromMock.mockReturnValue({ insert });
+    const { saveExceptions } = await import('@/lib/api/pintAEApi');
+    const result = await saveExceptions('run-1', [{
+      id: 'exception-1', timestamp: '2026-10-01T00:00:00.000Z', check_id: 'AP-CHECK',
+      check_name: 'AP Check', severity: 'High', pint_reference_terms: [], message: 'failure',
+      root_cause_category: 'Unclassified', owner_team: 'Client Finance', sla_target_hours: 24,
+      case_status: 'Open', dataset_type: 'AP',
+    }]);
+    expect(result).toBe(true);
+    expect(insert).toHaveBeenCalledWith([expect.objectContaining({ dataset_type: 'AP' })]);
+  });
 });

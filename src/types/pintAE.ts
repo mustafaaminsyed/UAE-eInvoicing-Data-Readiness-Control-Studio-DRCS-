@@ -1,5 +1,6 @@
 import { Severity } from './compliance';
 import { DatasetType } from './datasets';
+import { Direction } from './direction';
 
 // PINT-AE Check Scope
 export type CheckScope = 'Header' | 'Lines' | 'Party' | 'Cross';
@@ -49,6 +50,14 @@ export type RootCauseCategory =
 export type ValidationRunMode = 'raw_template' | 'governed_mapping' | 'diagnostic_mapping';
 export type ReadinessQualification = 'decision_ready' | 'diagnostic_only';
 
+export interface PintAERuleApplicability {
+  directions: Direction[];
+  document_families?: Array<'invoice' | 'credit_note' | 'commercial_xml'>;
+  tax_treatments?: string[];
+  scenarios?: string[];
+  condition_id?: string;
+}
+
 // PINT-AE Check Definition
 export interface PintAECheck {
   id?: string;
@@ -69,6 +78,7 @@ export interface PintAECheck {
   evidence_required?: string;
   is_enabled: boolean;
   parameters: Record<string, any>;
+  applicability: PintAERuleApplicability;
   created_at?: string;
   updated_at?: string;
 }

@@ -10,6 +10,8 @@ import { analyzeCoverage, getCoverageStats, analyzeRegistryCoverage, getRegistry
 import { getDRRuleTraceability } from '@/lib/registry/specRegistry';
 import { getDREntry } from '@/lib/registry/drRegistry';
 import { getDatasetConditionalFieldIds } from '@/lib/mapping/datasetFieldCatalog';
+import { assessItemFieldCompatibility } from '@/lib/mapping/itemFieldCompatibility';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface MappingCoveragePanelProps {
   mappings: FieldMapping[];
@@ -44,6 +46,10 @@ export function MappingCoveragePanel({
   const confirmedMappings = useMemo(
     () => normalizeFieldMappings(mappings.filter((mapping) => mapping.isConfirmed)),
     [mappings]
+  );
+  const itemCompatibility = useMemo(
+    () => assessItemFieldCompatibility(confirmedMappings),
+    [confirmedMappings]
   );
   const coverage = useMemo(
     () => analyzeCoverage(confirmedMappings, datasetType),
@@ -171,6 +177,12 @@ export function MappingCoveragePanel({
 
   return (
     <div className="min-w-0 space-y-4">
+      {itemCompatibility.requiresLegacyCompatibility && (
+        <Alert className="border-amber-500/40 bg-amber-500/10">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>{itemCompatibility.warning}</AlertDescription>
+        </Alert>
+      )}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Buyer, DataContext, InvoiceHeader, InvoiceLine } from '@/types/compliance';
 import { OVERLAY_RUNTIME_CHECKS } from '@/lib/checks/overlayRuntimeChecks';
-import { runPintAECheck, runPintAECheckWithTelemetry } from '@/lib/checks/pintAECheckRunner';
+import { runAllPintAEChecksWithTelemetry, runPintAECheck, runPintAECheckWithTelemetry } from '@/lib/checks/pintAECheckRunner';
 import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
 import { getCodelistCodes } from '@/lib/pintAE/specCatalog';
 import type { PintAEException } from '@/types/pintAE';
@@ -78,6 +78,22 @@ function normalizeExceptions(exceptions: PintAEException[]) {
 }
 
 describe('runPintAECheck executor registry parity', () => {
+  it('keeps the AR UC1 catalogue operational', () => {
+    const result = runAllPintAEChecksWithTelemetry(UAE_UC1_CHECK_PACK, buildDataContext({}), { direction: 'AR' });
+    expect(result.executionEvidence).toHaveLength(UAE_UC1_CHECK_PACK.length);
+    expect(result.executionEvidence.some((item) => item.evaluatedCount > 0)).toBe(true);
+    expect(result.telemetry.every((item) => item.direction === 'AR')).toBe(true);
+  });
+
+  it('registers but does not execute the AR-scoped UC1 catalogue for AP', () => {
+    const result = runAllPintAEChecksWithTelemetry(UAE_UC1_CHECK_PACK, buildDataContext({}), { direction: 'AP' });
+    expect(result.exceptions).toHaveLength(0);
+    expect(result.executionEvidence).toHaveLength(UAE_UC1_CHECK_PACK.length);
+    expect(result.executionEvidence.every((item) =>
+      item.direction === 'AP' && item.outcome === 'not_applicable' && item.evaluatedCount === 0
+    )).toBe(true);
+  });
+
   it.each([
     ['single line', [100], 100, 0],
     ['multiple lines', [100, 200, 50], 350, 0],

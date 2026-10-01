@@ -134,6 +134,13 @@ interface DashboardSnapshot {
   buyerCompleteness: number;
   lineCompleteness: number;
   executedRuleOutcomes: number;
+  regulatoryRegisteredControls: number;
+  regulatoryApplicableControls: number;
+  regulatoryEvaluatedControls: number;
+  regulatoryNotApplicableControls: number;
+  regulatoryNotEvaluatedControls: number;
+  supplementaryControls: number;
+  evaluationCoverage: number | null;
   exceptionsTotal: number;
   exceptionsBySeverity: Record<Severity, number>;
   blockingIssues: ExceptionBreakdownItem[];
@@ -450,6 +457,13 @@ function buildFallbackSnapshot(dataset: DatasetScope): DashboardSnapshot {
     buyerCompleteness: 92,
     lineCompleteness: 94,
     executedRuleOutcomes: dataset === 'AR' ? 4380 : 3264,
+    regulatoryRegisteredControls: 63,
+    regulatoryApplicableControls: dataset === 'AR' ? 63 : 0,
+    regulatoryEvaluatedControls: dataset === 'AR' ? 63 : 0,
+    regulatoryNotApplicableControls: dataset === 'AP' ? 63 : 0,
+    regulatoryNotEvaluatedControls: 0,
+    supplementaryControls: 10,
+    evaluationCoverage: dataset === 'AR' ? 100 : null,
     exceptionsTotal: dataset === 'AR' ? 46 : 53,
     exceptionsBySeverity: { Critical: dataset === 'AR' ? 7 : 9, High: 19, Medium: 14, Low: 6 },
     blockingIssues: [
@@ -499,8 +513,10 @@ function buildDashboardSnapshot(input: {
   buyers: ReturnType<typeof useCompliance>['buyers'];
   headers: ReturnType<typeof useCompliance>['headers'];
   lines: ReturnType<typeof useCompliance>['lines'];
+  validationExecutions: ReturnType<typeof useCompliance>['validationExecutions'];
 }): DashboardSnapshot {
   const { dataset, isChecksRun, isDataLoaded, stats, checkResults, exceptions, buyers, headers, lines } = input;
+  const validationExecutions = input.validationExecutions ?? [];
 
   const scopedExceptions = (exceptions as DashboardException[]).filter(
     (exception) => (exception.datasetType || exception.direction || dataset) === dataset
@@ -559,6 +575,13 @@ function buildDashboardSnapshot(input: {
       buyerCompleteness: 0,
       lineCompleteness: 0,
       executedRuleOutcomes: 0,
+      regulatoryRegisteredControls: 0,
+      regulatoryApplicableControls: 0,
+      regulatoryEvaluatedControls: 0,
+      regulatoryNotApplicableControls: 0,
+      regulatoryNotEvaluatedControls: 0,
+      supplementaryControls: 0,
+      evaluationCoverage: null,
       exceptionsTotal: 0,
       exceptionsBySeverity: { Critical: 0, High: 0, Medium: 0, Low: 0 },
       blockingIssues: [],
@@ -600,9 +623,9 @@ function buildDashboardSnapshot(input: {
     totalInvoicesInScope: totalInvoices,
     checkResults: scopedCheckResults,
     exceptions: scopedExceptions,
+    validationExecutions: validationExecutions.filter((item) => item.direction === dataset),
   });
-  const pintRuleCoverage =
-    dashboardMetrics.totalRuleOutcomes > 0 ? dashboardMetrics.rulePassRate : Math.max(0, stats.passRate || 0);
+  const pintRuleCoverage = dashboardMetrics.rulePassRate ?? 0;
   const acceptedInvoices = dashboardMetrics.submissionReadyCount;
   const successRate = dashboardMetrics.submissionReadyRate;
   const criticalIssues =
@@ -713,6 +736,13 @@ function buildDashboardSnapshot(input: {
     buyerCompleteness,
     lineCompleteness,
     executedRuleOutcomes: dashboardMetrics.totalRuleOutcomes,
+    regulatoryRegisteredControls: dashboardMetrics.regulatory.registeredControls,
+    regulatoryApplicableControls: dashboardMetrics.regulatory.applicableControls,
+    regulatoryEvaluatedControls: dashboardMetrics.regulatory.evaluatedControls,
+    regulatoryNotApplicableControls: dashboardMetrics.regulatory.notApplicableControls,
+    regulatoryNotEvaluatedControls: dashboardMetrics.regulatory.notEvaluatedControls,
+    supplementaryControls: dashboardMetrics.supplementary.registeredControls,
+    evaluationCoverage: dashboardMetrics.evaluationCoverage,
     exceptionsTotal: scopedExceptions.length,
     exceptionsBySeverity: {
       Critical: scopedExceptions.filter((exception) => exception.severity === 'Critical').length,
@@ -813,6 +843,7 @@ export default function DashboardPage() {
     buyers,
     headers,
     lines,
+    validationExecutions,
   } = useCompliance();
 
   const stats = getDashboardStats();
@@ -829,8 +860,9 @@ export default function DashboardPage() {
         buyers,
         headers,
         lines,
+        validationExecutions,
       }),
-    [activeDatasetType, buyers, checkResults, exceptions, headers, isChecksRun, isDataLoaded, lines, stats]
+    [activeDatasetType, buyers, checkResults, exceptions, headers, isChecksRun, isDataLoaded, lines, stats, validationExecutions]
   );
 
   const readinessInputs = useMemo<ScoreInput[]>(() => {
@@ -942,8 +974,8 @@ export default function DashboardPage() {
       value: formatPercent(snapshot.pintRuleCoverage),
       subtitle:
         snapshot.executedRuleOutcomes > 0
-          ? `Rule outcomes resulting in pass across ${formatNumber(snapshot.executedRuleOutcomes)} executed checks`
-          : 'Awaiting executed validation outcomes',
+          ? `${formatNumber(snapshot.executedRuleOutcomes)} evaluated regulatory outcomes · ${formatPercent(snapshot.evaluationCoverage ?? 0)} evaluation coverage`
+          : `${formatNumber(snapshot.regulatoryRegisteredControls)} registered regulatory controls · none evaluated`,
       icon: <FileCheck2 className="h-5 w-5" />,
       variant: progressTone(snapshot.pintRuleCoverage),
       helpContent: (
@@ -951,7 +983,7 @@ export default function DashboardPage() {
           summary={EXECUTIVE_KPI_LABELS.rulePassRate.helpSummary}
           formula="Passed rule outcomes divided by all executed rule outcomes."
           threshold="Target 98%+ before treating the portfolio as regulator-ready."
-          sourceFields="Validation engine results filtered to the active dataset direction."
+          sourceFields={`PINT-AE regulatory execution evidence only. ${snapshot.supplementaryControls} supplementary controls are reported separately.`}
         />
       ),
     },

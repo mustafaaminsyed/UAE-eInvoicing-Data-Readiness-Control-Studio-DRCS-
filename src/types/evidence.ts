@@ -30,6 +30,15 @@ export interface EvidenceRuleExecutionTelemetryRow {
   execution_count: number;
   failure_count: number;
   execution_source: 'runtime';
+  direction?: Direction;
+  control_class?: ValidationControlClass;
+  layer?: ValidationLayer;
+  candidate_count?: number;
+  applicable_count?: number;
+  passed_count?: number;
+  not_applicable_count?: number;
+  not_evaluated_count?: number;
+  applicability_reason?: string;
 }
 
 export interface CheckRunResultsSummary {
@@ -46,5 +55,9 @@ export interface CheckRunResultsSummary {
   mappingVersion?: number | null;
   evidenceSnapshot?: EvidenceRunSnapshot;
   evidenceRuleExecutionTelemetry?: EvidenceRuleExecutionTelemetryRow[];
+  validationExecutionEvidence?: ValidationExecutionEvidence[];
+  metricSemanticsVersion?: 2;
   [key: string]: unknown;
 }
+import type { Direction } from './direction';
+import type { ValidationControlClass, ValidationExecutionEvidence, ValidationLayer } from './validationExecution';
