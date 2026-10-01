@@ -31,7 +31,7 @@ import { EvidenceRuleExecutionTelemetryRow } from '@/types/evidence';
 import { WorkspaceProvider, useWorkspace } from '@/context/WorkspaceContext';
 import { UploadLogProvider, useUploadLogs } from '@/context/UploadLogContext';
 import { toast } from 'sonner';
-import { ValidationExecutionEvidence } from '@/types/validationExecution';
+import { summarizeValidationExecutions, ValidationExecutionEvidence } from '@/types/validationExecution';
 
 interface ComplianceContextType {
   direction: Direction;
@@ -255,6 +255,69 @@ function ComplianceStateProvider({ children }: { children: ReactNode }) {
         validationExecutions: runValidationExecutions,
       } = orchestrationResult;
       const combinedTelemetry = [...coreTelemetry, ...pintTelemetry, ...orgProfileTelemetry];
+      const diagnosticTimestamp = new Date().toISOString();
+      const regulatoryEvidence = (runValidationExecutions ?? []).filter(
+        (item) => item.controlClass === 'regulatory' && item.direction === direction
+      );
+      const regulatorySummary = summarizeValidationExecutions(regulatoryEvidence);
+      const pintTelemetryRows = pintTelemetry.map((row) => ({
+        rule_id: row.rule_id,
+        candidate_count: row.candidate_count ?? null,
+        applicable_count: row.applicable_count ?? row.execution_count,
+        execution_count: row.execution_count,
+        passed_count: row.passed_count ?? Math.max(row.execution_count - row.failure_count, 0),
+        failure_count: row.failure_count,
+        not_applicable_count: row.not_applicable_count ?? 0,
+        not_evaluated_count: row.not_evaluated_count ?? 0,
+        applicability_reason: row.applicability_reason ?? '',
+      }));
+      const pintApplicableControls = pintTelemetryRows.filter((row) => row.applicable_count > 0).length;
+      const pintEvaluatedControls = pintTelemetryRows.filter((row) => row.execution_count > 0).length;
+
+      console.groupCollapsed(`[DRCS P0 DIAGNOSTIC — EXECUTION] ${direction} ${diagnosticTimestamp}`);
+      console.log('INPUT', {
+        direction,
+        buyers: buyers.length,
+        headers: headers.length,
+        lines: lines.length,
+        invoiceDocumentCount: headers.length,
+        runMode,
+        mappingProfileId: mappingProfileId ? 'present' : 'absent',
+        mappingVersion: options?.mappingVersion ?? activeMappingProfile?.version ?? null,
+      });
+      console.log('EFFECTIVE PINT POPULATION', {
+        fetched: pintAEChecks.length,
+        enabled: pintAEChecks.filter((check) => check.is_enabled).length,
+        checkIds: pintAEChecks.map((check) => check.check_id).sort(),
+      });
+      console.table(pintTelemetryRows);
+      console.log('PINT AGGREGATES', {
+        registeredControls: pintAEChecks.length,
+        applicableControls: pintApplicableControls,
+        notApplicableControls: pintTelemetryRows.filter((row) => row.applicable_count === 0).length,
+        evaluatedControls: pintEvaluatedControls,
+        notEvaluatedControls: pintTelemetryRows.filter((row) => row.not_evaluated_count > 0).length,
+        evaluatedOutcomes: pintTelemetryRows.reduce((sum, row) => sum + row.execution_count, 0),
+        passOutcomes: pintTelemetryRows.reduce((sum, row) => sum + row.passed_count, 0),
+        failOutcomes: pintTelemetryRows.reduce((sum, row) => sum + row.failure_count, 0),
+      });
+      console.log('NORMALIZED REGULATORY EVIDENCE', {
+        evidenceRecordCount: regulatoryEvidence.length,
+        ruleIds: regulatoryEvidence.map((item) => item.ruleId).sort(),
+        registeredControls: regulatorySummary.registeredControls,
+        applicableControls: regulatorySummary.applicableControls,
+        notApplicableControls: regulatorySummary.notApplicableControls,
+        evaluatedControls: regulatorySummary.evaluatedControls,
+        notEvaluatedControls: regulatorySummary.notEvaluatedControls,
+        applicableOutcomes: regulatorySummary.applicableOutcomes,
+        evaluatedOutcomes: regulatorySummary.evaluatedOutcomes,
+        passOutcomes: regulatorySummary.passedOutcomes,
+        failOutcomes: regulatorySummary.failedOutcomes,
+        rulePassRate: regulatorySummary.rulePassRate,
+        evaluationCoverage: regulatorySummary.evaluationCoverage,
+      });
+      console.groupEnd();
+
       setCheckResults(
         [...builtInResults, ...customValidationResults].map((result) => ({
           ...result,

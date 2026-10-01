@@ -124,9 +124,10 @@ function collectCriticalBlockerDocumentIds(
  * Computes the dashboard's document-level readiness and rule-level conformance metrics.
  */
 export function computeDashboardMetrics(input: DashboardMetricsInput): DashboardMetrics {
-  const regulatory = summarizeValidationExecutions(
-    (input.validationExecutions ?? []).filter((item) => item.controlClass === 'regulatory')
+  const regulatoryExecutions = (input.validationExecutions ?? []).filter(
+    (item) => item.controlClass === 'regulatory'
   );
+  const regulatory = summarizeValidationExecutions(regulatoryExecutions);
   const supplementary = summarizeValidationExecutions(
     (input.validationExecutions ?? []).filter((item) => item.controlClass === 'supplementary_data_readiness')
   );
@@ -135,6 +136,28 @@ export function computeDashboardMetrics(input: DashboardMetricsInput): Dashboard
   const legacyPassedRuleOutcomes = input.checkResults.reduce((sum, result) => sum + result.passed, 0);
   const totalRuleOutcomes = hasNormalizedEvidence ? regulatory.evaluatedOutcomes : legacyTotalRuleOutcomes;
   const passedRuleOutcomes = hasNormalizedEvidence ? regulatory.passedOutcomes : legacyPassedRuleOutcomes;
+
+  const diagnosticDirection = regulatoryExecutions[0]?.direction ?? 'unknown';
+  console.groupCollapsed(
+    `[DRCS P0 DIAGNOSTIC — DASHBOARD] ${diagnosticDirection} ${new Date().toISOString()}`
+  );
+  console.log({
+    regulatoryEvidenceRecordCount: regulatoryExecutions.length,
+    regulatoryRuleIds: regulatoryExecutions.map((item) => item.ruleId).sort(),
+    registeredControls: regulatory.registeredControls,
+    applicableControls: regulatory.applicableControls,
+    notApplicableControls: regulatory.notApplicableControls,
+    evaluatedControls: regulatory.evaluatedControls,
+    notEvaluatedControls: regulatory.notEvaluatedControls,
+    applicableOutcomes: regulatory.applicableOutcomes,
+    evaluatedOutcomes: regulatory.evaluatedOutcomes,
+    passOutcomes: regulatory.passedOutcomes,
+    failOutcomes: regulatory.failedOutcomes,
+    rulePassRate: regulatory.rulePassRate,
+    evaluationCoverage: regulatory.evaluationCoverage,
+    returnedTotalRuleOutcomes: totalRuleOutcomes,
+  });
+  console.groupEnd();
   const criticalOutcomeCountFromChecks = input.checkResults.reduce(
     (sum, result) => sum + (result.severity === 'Critical' ? result.failed : 0),
     0
