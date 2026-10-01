@@ -79,6 +79,63 @@ function normalizeExceptions(exceptions: PintAEException[]) {
 
 describe('runPintAECheck executor registry parity', () => {
   it.each([
+    ['single line', [100], 100, 0],
+    ['multiple lines', [100, 200, 50], 350, 0],
+  ])('CHK-021 passes for %s when supplied IBT-106 equals the line sum', (_label, lineTotals, ibt106, expectedFailures) => {
+    const check = getCheck('UAE-UC1-CHK-021');
+    const data = buildDataContext({ sum_line_net_amount: ibt106 }, {
+      lines: lineTotals.map((lineTotal, index) => ({
+        line_id: `L-${index + 1}`, invoice_id: 'INV-1', line_number: index + 1,
+        quantity: 1, unit_price: lineTotal, line_total_excl_vat: lineTotal,
+        vat_rate: 5, vat_amount: lineTotal * 0.05,
+      })),
+    });
+
+    expect(runPintAECheck(check, data)).toHaveLength(expectedFailures);
+  });
+
+  it('CHK-021 fails when IBT-106 does not equal supplied IBT-131 sum', () => {
+    const check = getCheck('UAE-UC1-CHK-021');
+    const data = buildDataContext({ sum_line_net_amount: 340 }, {
+      lines: [100, 200, 50].map((lineTotal, index) => ({
+        line_id: `L-${index + 1}`, invoice_id: 'INV-1', line_number: index + 1,
+        quantity: 1, unit_price: lineTotal, line_total_excl_vat: lineTotal,
+        vat_rate: 5, vat_amount: lineTotal * 0.05,
+      })),
+    });
+
+    const [exception] = runPintAECheck(check, data);
+    expect(exception?.field_name).toBe('sum_line_net_amount');
+    expect(exception?.message).toContain('IBT-106');
+  });
+
+  it('CHK-021 keeps IBT-106 independent from IBT-109 and does not recalculate IBT-131', () => {
+    const check = getCheck('UAE-UC1-CHK-021');
+    const data = buildDataContext({ sum_line_net_amount: 350, total_excl_vat: 330 }, {
+      lines: [100, 200, 50].map((lineTotal, index) => ({
+        line_id: `L-${index + 1}`, invoice_id: 'INV-1', line_number: index + 1,
+        quantity: 999, unit_price: 999, line_total_excl_vat: lineTotal,
+        vat_rate: 5, vat_amount: lineTotal * 0.05,
+      })),
+    });
+
+    expect(runPintAECheck(check, data)).toHaveLength(0);
+  });
+
+  it('CHK-021 derives IBT-106 when the legacy header aggregate is absent', () => {
+    const check = getCheck('UAE-UC1-CHK-021');
+    const data = buildDataContext({ total_excl_vat: 350 }, {
+      lines: [{
+        line_id: 'L-1', invoice_id: 'INV-1', line_number: 1,
+        quantity: 1, unit_price: 350, line_total_excl_vat: 350,
+        vat_rate: 5, vat_amount: 17.5,
+      }],
+    });
+
+    expect(runPintAECheck(check, data)).toHaveLength(0);
+  });
+
+  it.each([
     ['IBR-137-AE', { transaction_type_code: '00000100', principal_id: 'P-1' }],
     ['IBR-138-AE', { transaction_type_code: '00010000', invoicing_period_start_date: '2026-01-01' }],
     ['IBR-152-AE', {
@@ -309,6 +366,194 @@ describe('runPintAECheck executor registry parity', () => {
     expect(exceptions).toHaveLength(1);
     expect(exceptions[0].check_id).toBe('UAE-UC1-CHK-035');
     expect(exceptions[0].field_name).toBe('fx_rate');
+  });
+
+  it('CHK-007 defaults missing tax currency to the controlled AED value', () => {
+    expect(runPintAECheck(getCheck('UAE-UC1-CHK-007'), buildDataContext({ currency: 'USD', tax_currency: undefined })))
+      .toHaveLength(0);
+  });
+
+  it('CHK-007 rejects only an explicit non-AED tax-currency override', () => {
+    const [exception] = runPintAECheck(
+      getCheck('UAE-UC1-CHK-007'),
+      buildDataContext({ currency: 'USD', tax_currency: 'USD' })
+    );
+
+    expect(exception?.field_name).toBe('tax_currency');
+    expect(exception?.expected_value_or_rule).toBe('AED');
+  });
+
+  it('CHK-035 preserves rounded BTAE-10 and BTAE-08 evidence for non-AED lines', () => {
+    const result = runPintAECheckWithTelemetry(
+      getCheck('UAE-UC1-CHK-035'),
+      buildDataContext({ currency: 'USD', fx_rate: 3.6725 }, {
+        lines: [{
+          line_id: 'L-1', invoice_id: 'INV-1', line_number: 1,
+          quantity: 1, unit_price: 10.005, line_total_excl_vat: 10.005,
+          vat_rate: 5, vat_amount: 0.50025, tax_category_code: 'S',
+        }],
+      })
+    );
+
+    expect(result.exceptions).toHaveLength(0);
+    expect(result.derivedAedLineValues).toEqual([{
+      invoiceId: 'INV-1',
+      lineId: 'L-1',
+      sourceCurrency: 'USD',
+      conversionRateToAed: 3.6725,
+      btae10InvoiceLineAmountAed: 38.58,
+      btae08VatLineAmountAed: 1.84,
+      roundingScale: 2,
+    }]);
+  });
+
+  it('CHK-035 does not require a duplicate AED source field for AED invoices', () => {
+    const result = runPintAECheckWithTelemetry(
+      getCheck('UAE-UC1-CHK-035'),
+      buildDataContext({ currency: 'AED', fx_rate: undefined }, {
+        lines: [{
+          line_id: 'L-1', invoice_id: 'INV-1', line_number: 1,
+          quantity: 1, unit_price: 100, line_total_excl_vat: 100,
+          vat_rate: 5, vat_amount: 5, tax_category_code: 'S',
+        }],
+      })
+    );
+
+    expect(result.exceptions).toHaveLength(0);
+    expect(result.derivedAedLineValues[0]).toMatchObject({
+      conversionRateToAed: 1,
+      btae10InvoiceLineAmountAed: 105,
+      btae08VatLineAmountAed: 5,
+    });
+  });
+
+  it('CHK-035 applies deterministic two-decimal monetary rounding at half-cent boundaries', () => {
+    const result = runPintAECheckWithTelemetry(
+      getCheck('UAE-UC1-CHK-035'),
+      buildDataContext({ currency: 'AED' }, {
+        lines: [{
+          line_id: 'L-1', invoice_id: 'INV-1', line_number: 1,
+          quantity: 1, unit_price: 1, line_total_excl_vat: 1,
+          vat_rate: 0.5, vat_amount: 0.005, tax_category_code: 'S',
+        }],
+      })
+    );
+
+    expect(result.derivedAedLineValues[0]).toMatchObject({
+      btae10InvoiceLineAmountAed: 1.01,
+      btae08VatLineAmountAed: 0.01,
+      roundingScale: 2,
+    });
+  });
+
+  it('CHK-035 omits BTAE-08 only for an exempt line and derives BTAE-10 from IBT-131', () => {
+    const result = runPintAECheckWithTelemetry(
+      getCheck('UAE-UC1-CHK-035'),
+      buildDataContext({ currency: 'AED' }, {
+        lines: [{
+          line_id: 'L-1', invoice_id: 'INV-1', line_number: 1,
+          quantity: 1, unit_price: 100, line_total_excl_vat: 100,
+          vat_rate: Number.NaN, vat_amount: Number.NaN, tax_category_code: 'E',
+        }],
+      })
+    );
+
+    expect(result.exceptions).toHaveLength(0);
+    expect(result.derivedAedLineValues[0]).toMatchObject({
+      btae10InvoiceLineAmountAed: 100,
+      btae08VatLineAmountAed: undefined,
+    });
+  });
+
+  it.each([
+    ['AE', 'IBR-162-AE'],
+    ['Z', 'IBR-165-AE'],
+  ])('CHK-035 derives zero BTAE-08 for %s and rejects a non-zero VAT source value', (category, ruleId) => {
+    const zeroResult = runPintAECheckWithTelemetry(
+      getCheck('UAE-UC1-CHK-035'),
+      buildDataContext({ currency: 'USD', fx_rate: 3.6725 }, {
+        lines: [{
+          line_id: 'L-1', invoice_id: 'INV-1', line_number: 1,
+          quantity: 1, unit_price: 100, line_total_excl_vat: 100,
+          vat_rate: 0, vat_amount: 0, tax_category_code: category,
+        }],
+      })
+    );
+
+    expect(zeroResult.exceptions).toHaveLength(0);
+    expect(zeroResult.derivedAedLineValues[0]).toMatchObject({
+      btae10InvoiceLineAmountAed: 367.25,
+      btae08VatLineAmountAed: 0,
+    });
+
+    const [exception] = runPintAECheck(
+      getCheck('UAE-UC1-CHK-035'),
+      buildDataContext({ currency: 'AED' }, {
+        lines: [{
+          line_id: 'L-1', invoice_id: 'INV-1', line_number: 1,
+          quantity: 1, unit_price: 100, line_total_excl_vat: 100,
+          vat_rate: 5, vat_amount: 5, tax_category_code: category,
+        }],
+      })
+    );
+
+    expect(exception?.field_name).toBe('vat_amount');
+    expect(exception?.expected_value_or_rule).toContain(ruleId);
+  });
+
+  it('CHK-035 treats BTAE-08 as applicable for not-subject-to-VAT lines under the current PDK', () => {
+    const result = runPintAECheckWithTelemetry(
+      getCheck('UAE-UC1-CHK-035'),
+      buildDataContext({ currency: 'AED' }, {
+        lines: [{
+          line_id: 'L-1', invoice_id: 'INV-1', line_number: 1,
+          quantity: 1, unit_price: 100, line_total_excl_vat: 100,
+          vat_rate: Number.NaN, vat_amount: 0, tax_category_code: 'O',
+        }],
+      })
+    );
+
+    expect(result.exceptions).toHaveLength(0);
+    expect(result.derivedAedLineValues[0]).toMatchObject({
+      btae10InvoiceLineAmountAed: 100,
+      btae08VatLineAmountAed: 0,
+    });
+  });
+
+  it('CHK-035 preserves six-decimal BTAE-04 precision until final monetary rounding', () => {
+    const result = runPintAECheckWithTelemetry(
+      getCheck('UAE-UC1-CHK-035'),
+      buildDataContext({ currency: 'USD', fx_rate: 3.672501 }, {
+        lines: [{
+          line_id: 'L-1', invoice_id: 'INV-1', line_number: 1,
+          quantity: 1, unit_price: 10, line_total_excl_vat: 10,
+          vat_rate: 5, vat_amount: 0.5, tax_category_code: 'S',
+        }],
+      })
+    );
+
+    expect(result.exceptions).toHaveLength(0);
+    expect(result.derivedAedLineValues[0]).toMatchObject({
+      conversionRateToAed: 3.672501,
+      btae10InvoiceLineAmountAed: 38.56,
+      btae08VatLineAmountAed: 1.84,
+    });
+  });
+
+  it('CHK-035 reports the missing VAT prerequisite rather than an AED-column gap', () => {
+    const [exception] = runPintAECheck(
+      getCheck('UAE-UC1-CHK-035'),
+      buildDataContext({ currency: 'AED' }, {
+        lines: [{
+          line_id: 'L-1', invoice_id: 'INV-1', line_number: 1,
+          quantity: 1, unit_price: 100, line_total_excl_vat: 100,
+          vat_rate: 5, vat_amount: Number.NaN, tax_category_code: 'S',
+        }],
+      })
+    );
+
+    expect(exception?.field_name).toBe('vat_amount');
+    expect(exception?.message).toContain('BTAE-08');
   });
 
   it('fails CHK-036 for commercial profile when buyer legal identifier is absent', () => {
@@ -776,6 +1021,58 @@ describe('runPintAECheck executor registry parity', () => {
     );
 
     expect(runPintAECheck(check, validData)).toHaveLength(0);
+  });
+
+  it.each([
+    ['defaults IBT-149 to one when absent', 10, 5, undefined, 0, 0, 50],
+    ['uses explicit IBT-149', 100, 10, 100, 0, 0, 10],
+    ['subtracts a line allowance', 10, 5, undefined, 7, 0, 43],
+    ['adds a line charge', 10, 5, undefined, 0, 7, 57],
+    ['applies both line allowance and charge', 10, 5, undefined, 7, 3, 46],
+    ['treats explicit IBT-149 of one like the default', 10, 5, 1, 0, 0, 50],
+  ])('%s', (_name, quantity, price, base, allowance, charge, lineNet) => {
+    const check = getCheck('UAE-UC1-CHK-034');
+    const data = buildDataContext({}, {
+      lines: [{
+        line_id: 'L-1', invoice_id: 'INV-1', line_number: 1,
+        quantity, unit_price: price, price_base_quantity: base,
+        line_allowance_amount: allowance, line_charge_amount: charge,
+        line_total_excl_vat: lineNet, vat_rate: 5, vat_amount: lineNet * 0.05,
+      } as InvoiceLine],
+    });
+
+    expect(runPintAECheck(check, data)).toHaveLength(0);
+  });
+
+  it.each([
+    ['zero', 0],
+    ['negative', -1],
+  ])('does not default an explicit %s IBT-149 value to one', (_label, base) => {
+    const check = getCheck('UAE-UC1-CHK-034');
+    const data = buildDataContext({}, {
+      lines: [{
+        line_id: 'L-1', invoice_id: 'INV-1', line_number: 1,
+        quantity: 10, unit_price: 5, price_base_quantity: base,
+        line_allowance_amount: 0, line_charge_amount: 0,
+        line_total_excl_vat: 50, vat_rate: 5, vat_amount: 2.5,
+      } as InvoiceLine],
+    });
+
+    expect(runPintAECheck(check, data)).toHaveLength(1);
+  });
+
+  it('fails CHK-034 when the supplied line net amount is incorrect', () => {
+    const check = getCheck('UAE-UC1-CHK-034');
+    const data = buildDataContext({}, {
+      lines: [{
+        line_id: 'L-1', invoice_id: 'INV-1', line_number: 1,
+        quantity: 100, unit_price: 10, price_base_quantity: 100,
+        line_allowance_amount: 0, line_charge_amount: 0,
+        line_total_excl_vat: 11, vat_rate: 5, vat_amount: 0.55,
+      } as InvoiceLine],
+    });
+
+    expect(runPintAECheck(check, data)).toHaveLength(1);
   });
 
   it('validates CHK-048 for UNECERec20 and skips empty values', () => {

@@ -48,6 +48,21 @@ describe('negative headers template upload path', () => {
     expect(header.preceding_invoice_issue_date).toBe('2026-05-31');
   });
 
+  it('preserves IBT-106 independently from IBT-109 and leaves missing IBT-106 undefined', async () => {
+    const csv = [
+      'invoice_id,invoice_number,issue_date,invoice_type,seller_trn,buyer_id,currency,sum_line_net_amount,total_excl_vat',
+      'INV-106-001,INV-106-001,2026-06-10,380,100000000000003,BUY-001,AED,350,330',
+      'INV-106-002,INV-106-002,2026-06-10,380,100000000000003,BUY-001,AED,,330',
+    ].join('\n');
+    const file = { text: async () => csv } as File;
+    const headers = await parseHeadersFile(file);
+
+    expect(headers[0].sum_line_net_amount).toBe(350);
+    expect(headers[0].total_excl_vat).toBe(330);
+    expect(headers[1].sum_line_net_amount).toBeUndefined();
+    expect(headers[1].total_excl_vat).toBe(330);
+  });
+
   it('maps credit note reason text aliases when description is used as the header name', async () => {
     const csv = [
       'invoice_id,invoice_number,issue_date,invoice_type,seller_trn,buyer_id,currency,credit_note_reason_code,credit_note_reason_description',
@@ -75,6 +90,23 @@ describe('negative headers template upload path', () => {
 
     expect(line.line_allowance_amount).toBe(10);
     expect(line.line_discount).toBe(10);
+  });
+
+  it('keeps blank mandatory monetary values distinct from genuine zero values', async () => {
+    const csv = [
+      'line_id,invoice_id,line_number,quantity,unit_price,line_total_excl_vat,vat_rate,vat_amount',
+      'L-001,INV-001,1,1,,,,',
+      'L-002,INV-001,2,1,0,0,0,0',
+    ].join('\n');
+
+    const file = { text: async () => csv } as File;
+    const lines = await parseLinesFile(file);
+
+    expect(Number.isNaN(lines[0].unit_price)).toBe(true);
+    expect(Number.isNaN(lines[0].line_total_excl_vat)).toBe(true);
+    expect(Number.isNaN(lines[0].vat_rate)).toBe(true);
+    expect(Number.isNaN(lines[0].vat_amount)).toBe(true);
+    expect(lines[1]).toMatchObject({ unit_price: 0, line_total_excl_vat: 0, vat_rate: 0, vat_amount: 0 });
   });
 
   it('preserves typed IBT-149 and IBT-150 source fields without changing IBT-130', async () => {

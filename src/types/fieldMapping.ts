@@ -176,8 +176,8 @@ export const PINT_AE_UC1_FIELDS: PintAEField[] = [
   { id: 'credit_note_reason_code', name: 'Credit Note Reason Code', description: 'Reason code required for credit note documents', ibtReference: 'BTAE-03', category: 'header', isMandatory: false, dataType: 'string' },
   { id: 'credit_note_reason_text', name: 'Credit Note Reason Text', description: 'Free-text narrative describing the credit note reason when captured by the source system', ibtReference: 'SYS-CN-REASON-TEXT', category: 'header', isMandatory: false, dataType: 'string' },
   { id: 'currency', name: 'Document Currency', description: 'ISO 4217 currency code', ibtReference: 'IBT-005', category: 'header', isMandatory: true, dataType: 'string', format: '^[A-Z]{3}$' },
-  { id: 'tax_currency', name: 'Tax Accounting Currency', description: 'Must be AED for UAE', ibtReference: 'IBT-006', category: 'header', isMandatory: false, dataType: 'string' },
-  { id: 'fx_rate', name: 'Exchange Rate', description: 'FX rate to AED (required if non-AED)', ibtReference: 'BTUAE-002', category: 'header', isMandatory: false, dataType: 'number' },
+  { id: 'tax_currency', name: 'Tax Accounting Currency', description: 'Controlled as AED by DRCS for UAE; source override is optional', ibtReference: 'IBT-006', category: 'header', isMandatory: false, dataType: 'string' },
+  { id: 'fx_rate', name: 'Exchange Rate', description: 'BTAE-04 exchange rate to AED (required if non-AED)', ibtReference: 'BTAE-04', category: 'header', isMandatory: false, dataType: 'number' },
   { id: 'payment_due_date', name: 'Payment Due Date', description: 'Payment due date', ibtReference: 'IBT-009', category: 'header', isMandatory: false, dataType: 'date' },
   { id: 'buyer_reference', name: 'Buyer Reference', description: 'Buyer reference/PO number', ibtReference: 'IBT-010', category: 'header', isMandatory: false, dataType: 'string' },
   { id: 'spec_id', name: 'Specification Identifier', description: 'PINT-AE specification ID', ibtReference: 'IBT-024', category: 'header', isMandatory: true, dataType: 'string' },
@@ -224,6 +224,7 @@ export const PINT_AE_UC1_FIELDS: PintAEField[] = [
   { id: 'quantity', name: 'Quantity', description: 'Invoiced quantity', ibtReference: 'IBT-129', category: 'line', isMandatory: true, dataType: 'number' },
   { id: 'unit_of_measure', name: 'Unit of Measure', description: 'UNECE Rec 20 unit code', ibtReference: 'IBT-130', category: 'line', isMandatory: false, dataType: 'string' },
   { id: 'unit_price', name: 'Unit Price', description: 'Item net price', ibtReference: 'IBT-146', category: 'line', isMandatory: true, dataType: 'number' },
+  { id: 'price_base_quantity', name: 'Price Base Quantity', description: 'Number of item units to which the item net price applies; defaults to 1 when omitted', ibtReference: 'IBT-149', category: 'line', isMandatory: false, dataType: 'number' },
   { id: 'line_discount', name: 'Line Discount (Legacy)', description: 'Backward-compatible DRCS helper field for line discounts; use line_allowance_amount where possible', ibtReference: 'SYS-LINE-DISCOUNT', category: 'line', isMandatory: false, dataType: 'number' },
   { id: 'line_total_excl_vat', name: 'Line Net Amount', description: 'Line total excl VAT', ibtReference: 'IBT-131', category: 'line', isMandatory: true, dataType: 'number' },
   { id: 'description', name: 'Item Description', description: 'Item name/description', ibtReference: 'IBT-153', category: 'line', isMandatory: true, dataType: 'string' },
@@ -253,7 +254,7 @@ export const CONDITIONAL_QUESTIONS: ConditionalQuestion[] = [
   {
     id: 'foreign_currency',
     question: 'Do you issue invoices in currencies other than AED?',
-    fieldIds: ['fx_rate', 'tax_currency'],
+    fieldIds: ['fx_rate'],
   },
   {
     id: 'payment_terms',

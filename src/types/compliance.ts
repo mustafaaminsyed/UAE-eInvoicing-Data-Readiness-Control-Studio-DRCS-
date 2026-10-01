@@ -44,6 +44,8 @@ export interface InvoiceHeader {
   preceding_invoice_reference?: string;
   preceding_invoice_issue_date?: string;
   total_excl_vat?: number;
+  /** IBT-106: sum of invoice line net amounts, distinct from IBT-109. */
+  sum_line_net_amount?: number;
   vat_total?: number;
   total_incl_vat?: number;
   // UC1 expansions

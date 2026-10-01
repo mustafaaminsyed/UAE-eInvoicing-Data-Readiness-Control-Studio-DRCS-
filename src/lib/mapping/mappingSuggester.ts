@@ -33,6 +33,7 @@ const COLUMN_PATTERNS: Record<string, string[]> = {
   line_id: ['line_id', 'line_number', 'line_no', 'item_id', 'seq', 'line_num', 'row_number'],
   quantity: ['quantity', 'qty', 'line_qty', 'units', 'amount', 'line_quantity'],
   unit_price: ['unit_price', 'price', 'rate', 'item_price', 'unit_rate', 'net_price'],
+  price_base_quantity: ['price_base_quantity', 'item_price_base_quantity', 'line_base_quantity', 'base_quantity'],
   line_total_excl_vat: ['line_total_excl_vat', 'line_total', 'line_amount', 'net_amount', 'line_net', 'extended_amount', 'line_value'],
   description: ['description', 'item_description', 'product_name', 'item_name', 'line_desc', 'product', 'item'],
   vat_rate: ['vat_rate', 'tax_rate', 'tax_percent', 'tax_pct', 'vat_percent', 'tax_%'],
