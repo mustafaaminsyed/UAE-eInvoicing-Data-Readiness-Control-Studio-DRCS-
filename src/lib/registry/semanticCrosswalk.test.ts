@@ -41,14 +41,14 @@ describe('semanticCrosswalk', () => {
       tax_invoice: 'IBT-048',
       commercial_xml: 'IBT-047',
     });
-    expect(buyerIdentifierRow?.currentStateTraceability).toBe('MAPPING_INCONSISTENT');
-    expect(buyerIdentifierRow?.runtimeAlignmentStatus).toBe('NOT_ALIGNED');
+    expect(buyerIdentifierRow?.currentStateTraceability).toBe('CONDITIONAL_LOGIC_REQUIRED');
+    expect(buyerIdentifierRow?.runtimeAlignmentStatus).toBe('ALIGNED');
 
     expect(buyerSchemeRow?.semanticIdByDocumentType).toEqual({
       tax_invoice: 'IBT-048-1',
       commercial_xml: 'BTAE-16',
     });
-    expect(buyerSchemeRow?.runtimeAlignmentStatus).toBe('NOT_ALIGNED');
+    expect(buyerSchemeRow?.runtimeAlignmentStatus).toBe('ALIGNED');
   });
 
   it('makes current runtime drift explicit for missing-rule and reference-style rows', () => {

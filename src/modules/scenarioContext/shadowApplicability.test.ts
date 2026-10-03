@@ -24,20 +24,10 @@ describe("shadow rule applicability", () => {
     expect(fixture).toBeDefined();
 
     const report = buildRuleApplicabilityComparison(fixture!);
-    const commercialPresence = report.rows.find((row) => row.ruleId === "UAE-UC1-CHK-036");
     const invoiceContext = report.rows.find((row) => row.ruleId === "UAE-UC1-CHK-045");
     const exportShadowRule = report.rows.find((row) => row.ruleId === "IBR-152-AE");
     const commercialGeneratedRule = report.rows.find((row) => row.ruleId === "IBR-151-AE");
 
-    expect(commercialPresence).toEqual(
-      expect.objectContaining({
-        legacyApplicability: "applicable",
-        shadowApplicability: "applicable",
-        differenceStatus: "aligned",
-        reviewCategory: "none",
-        legacyPathType: "explicit",
-      })
-    );
     expect(invoiceContext).toEqual(
       expect.objectContaining({
         legacyApplicability: "applicable",

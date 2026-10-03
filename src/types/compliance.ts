@@ -5,6 +5,10 @@ export interface Buyer {
   buyer_id: string;
   buyer_name: string;
   buyer_trn?: string;
+  /** IBT-047: buyer legal registration identifier. Never substitute the VAT/TRN. */
+  buyer_legal_reg_id?: string;
+  /** BTAE-16: type of buyer_legal_reg_id (for example TL, CL, EID, PAS, CD). */
+  buyer_legal_reg_id_type?: string;
   buyer_address?: string;
   buyer_country?: string;
   // UC1 expansions

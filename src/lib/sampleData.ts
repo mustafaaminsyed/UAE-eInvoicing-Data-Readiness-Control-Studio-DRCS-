@@ -15,10 +15,10 @@ export interface BlankTemplateExport {
   columns: string[];
 }
 
-export const buyersSample = `buyer_id,buyer_name,buyer_trn,buyer_address,buyer_country,buyer_city,buyer_subdivision,buyer_electronic_address
-B001,Acme Corporation LLC,100000000000003,Office 42 Business Bay Tower,AE,Dubai,AE-DU,acme@peppol.ae
-B002,Global Traders FZ-LLC,200000000000003,Unit 7 JAFZA South,AE,Dubai,AE-DU,global.traders@peppol.ae
-B003,Tech Solutions DMCC,300000000000003,Floor 12 Almas Tower JLT,AE,Dubai,AE-DU,tech.solutions@peppol.ae`;
+export const buyersSample = `buyer_id,buyer_name,buyer_trn,buyer_legal_reg_id,buyer_legal_reg_id_type,buyer_address,buyer_country,buyer_city,buyer_subdivision,buyer_electronic_address
+B001,Acme Corporation LLC,100000000000003,,,Office 42 Business Bay Tower,AE,Dubai,AE-DU,acme@peppol.ae
+B002,Global Traders FZ-LLC,200000000000003,,,Unit 7 JAFZA South,AE,Dubai,AE-DU,global.traders@peppol.ae
+B003,Tech Solutions DMCC,300000000000003,,,Floor 12 Almas Tower JLT,AE,Dubai,AE-DU,tech.solutions@peppol.ae`;
 
 export const headersSample = `invoice_id,invoice_number,issue_date,invoice_type,seller_trn,seller_name,seller_address,seller_city,seller_country,seller_subdivision,seller_electronic_address,seller_legal_reg_id,seller_legal_reg_id_type,buyer_id,currency,transaction_type_code,principal_id,invoicing_period_start_date,invoicing_period_end_date,deliver_to_address_line_1,deliver_to_city,deliver_to_country_subdivision,deliver_to_country_code,payment_due_date,payment_means_code,fx_rate,total_excl_vat,vat_total,total_incl_vat,amount_due,tax_category_code,tax_category_rate,credit_note_reason_code,credit_note_reason_text,preceding_invoice_reference,preceding_invoice_issue_date
 INV001,UAE-2025-0001,2025-01-15,380,100000000000001,Dariba Tax Technologies LLC,Al Sila Tower ADGM,Abu Dhabi,AE,AE-AZ,dariba@peppol.ae,TL-123456,TL,B001,AED,01000000,,,,,,,,2025-02-14,30,,1000.00,50.00,1050.00,1050.00,S,5.00,,,,
@@ -30,10 +30,10 @@ L001,INV001,1,Consulting Services - Tax Advisory,Tax Advisory Services,10,EA,100
 L002,INV002,1,E-Invoicing Integration Package,Integration Package,1,EA,2000.00,,,2000.00,5.00,100.00,S,,,,0.00,
 L003,INV003,1,Compliance Readiness Assessment,Readiness Assessment,5,EA,100.00,,,500.00,5.00,25.00,S,,,,0.00,`;
 
-export const buyersNegativeSample = `buyer_id,buyer_name,buyer_trn,buyer_address,buyer_country,buyer_city,buyer_subdivision,buyer_electronic_address
-B001,Acme Corporation LLC,100000000000003,Office 42 Business Bay Tower,AE,Dubai,AE-DU,acme@peppol.ae
-B002,Global Traders FZ-LLC,INVALIDTRN,Unit 7 JAFZA South,AE,Dubai,AE-DU,global.traders@peppol.ae
-B003,Tech Solutions DMCC,300000000000003,Floor 12 Almas Tower JLT,AE,Dubai,AE-DU,`;
+export const buyersNegativeSample = `buyer_id,buyer_name,buyer_trn,buyer_legal_reg_id,buyer_legal_reg_id_type,buyer_address,buyer_country,buyer_city,buyer_subdivision,buyer_electronic_address
+B001,Acme Corporation LLC,100000000000003,,,Office 42 Business Bay Tower,AE,Dubai,AE-DU,acme@peppol.ae
+B002,Global Traders FZ-LLC,INVALIDTRN,,,Unit 7 JAFZA South,AE,Dubai,AE-DU,global.traders@peppol.ae
+B003,Tech Solutions DMCC,300000000000003,,,Floor 12 Almas Tower JLT,AE,Dubai,AE-DU,`;
 
 export const headersNegativeSample = `invoice_id,invoice_number,issue_date,invoice_type,seller_trn,seller_name,seller_address,seller_city,seller_country,seller_subdivision,seller_electronic_address,seller_legal_reg_id,seller_legal_reg_id_type,buyer_id,currency,transaction_type_code,principal_id,invoicing_period_start_date,invoicing_period_end_date,deliver_to_address_line_1,deliver_to_city,deliver_to_country_subdivision,deliver_to_country_code,payment_due_date,payment_means_code,fx_rate,total_excl_vat,vat_total,total_incl_vat,amount_due,tax_category_code,tax_category_rate,credit_note_reason_code,credit_note_reason_text,preceding_invoice_reference,preceding_invoice_issue_date
 INV001,UAE-2025-0001,2025-01-15,380,100000000000001,Dariba Tax Technologies LLC,Al Sila Tower ADGM,Abu Dhabi,AE,AE-AZ,dariba@peppol.ae,TL-123456,TL,B001,AED,01000000,,,,,,,,2025-02-14,30,,1000.00,50.00,1050.00,1050.00,S,5.00,,,,
@@ -49,6 +49,8 @@ const apPartiesSample = buyersSample
   .replace(/buyer_id/g, 'supplier_id')
   .replace(/buyer_name/g, 'supplier_name')
   .replace(/buyer_trn/g, 'supplier_trn')
+  .replace(/buyer_legal_reg_id_type/g, 'supplier_legal_reg_id_type')
+  .replace(/buyer_legal_reg_id/g, 'supplier_legal_reg_id')
   .replace(/buyer_address/g, 'supplier_address')
   .replace(/buyer_country/g, 'supplier_country')
   .replace(/buyer_city/g, 'supplier_city')
@@ -62,6 +64,8 @@ const apPartiesNegativeSample = buyersNegativeSample
   .replace(/buyer_id/g, 'supplier_id')
   .replace(/buyer_name/g, 'supplier_name')
   .replace(/buyer_trn/g, 'supplier_trn')
+  .replace(/buyer_legal_reg_id_type/g, 'supplier_legal_reg_id_type')
+  .replace(/buyer_legal_reg_id/g, 'supplier_legal_reg_id')
   .replace(/buyer_address/g, 'supplier_address')
   .replace(/buyer_country/g, 'supplier_country')
   .replace(/buyer_city/g, 'supplier_city')
@@ -214,7 +218,7 @@ export const TEMPLATE_MANIFEST = {
   generated_timestamp: '2025-06-01T00:00:00Z',
   schema_hash: 'sha256:b3f8c2a1d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9',
   templates: [
-    { file: 'buyers_template.csv', dataset: 'Buyers', columns: 8 },
+    { file: 'buyers_template.csv', dataset: 'Buyers', columns: 10 },
     { file: 'invoice_headers_template.csv', dataset: 'Invoice Headers', columns: 36 },
     { file: 'invoice_lines_template.csv', dataset: 'Invoice Lines', columns: 19 },
   ],

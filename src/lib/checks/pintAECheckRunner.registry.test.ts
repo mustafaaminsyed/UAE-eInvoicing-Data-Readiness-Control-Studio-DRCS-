@@ -572,18 +572,18 @@ describe('runPintAECheck executor registry parity', () => {
     expect(exception?.message).toContain('BTAE-08');
   });
 
-  it('fails CHK-036 for commercial profile when buyer legal identifier is absent', () => {
+  it('fails CHK-036 under IBR-136-AE when buyer legal identifier is absent, even if a Buyer TRN is present', () => {
     const check = getCheck('UAE-UC1-CHK-036');
     const data = buildDataContext(
       {
-        invoice_type: '388',
+        invoice_type: '480',
       },
       {
         buyers: [
           {
             buyer_id: 'B-1',
             buyer_name: 'Buyer LLC',
-            buyer_trn: '',
+            buyer_trn: '123456789012345',
           },
         ],
       }
@@ -596,15 +596,8 @@ describe('runPintAECheck executor registry parity', () => {
     expect(exceptions[0].message).toContain('Buyer legal registration identifier is missing');
   });
 
-  it('fails CHK-037 when identifier type policy resolves to disallowed value', () => {
+  it('fails CHK-037 when the supplied legal identifier type is not a PINT AE 1.0.4 value', () => {
     const check = getCheck('UAE-UC1-CHK-037');
-    const strictCheck = {
-      ...check,
-      parameters: {
-        ...check.parameters,
-        allow_default_identifier_type: false,
-      },
-    };
     const data = buildDataContext(
       {
         invoice_id: 'INV-037',
@@ -613,7 +606,7 @@ describe('runPintAECheck executor registry parity', () => {
         seller_trn: '123456789012345',
         buyer_id: 'B-1',
         currency: 'AED',
-        invoice_type: '388',
+        invoice_type: '380',
       },
       {
         buyers: (() => {
@@ -621,6 +614,7 @@ describe('runPintAECheck executor registry parity', () => {
             buyer_id: 'B-1',
             buyer_name: 'Buyer LLC',
             buyer_trn: '123456789012345',
+            buyer_legal_reg_id: 'LEGAL-001',
             buyer_legal_reg_id_type: 'XYZ',
           };
           return [buyer];
@@ -628,11 +622,47 @@ describe('runPintAECheck executor registry parity', () => {
       }
     );
 
-    const exceptions = runPintAECheck(strictCheck, data);
+    const exceptions = runPintAECheck(check, data);
 
     expect(exceptions).toHaveLength(1);
     expect(exceptions[0].check_id).toBe('UAE-UC1-CHK-037');
     expect(exceptions[0].message).toContain('not allowed');
+  });
+
+  it.each(['TL', 'CL', 'EID', 'PAS', 'CD'])('accepts %s as BTAE-16 under current IBR-183-AE', (identifierType) => {
+    const exceptions = runPintAECheck(
+      getCheck('UAE-UC1-CHK-037'),
+      buildDataContext({}, {
+        buyers: [{
+          buyer_id: 'B-1', buyer_name: 'Buyer LLC', buyer_trn: '123456789012345',
+          buyer_legal_reg_id: 'LEGAL-001', buyer_legal_reg_id_type: identifierType,
+          buyer_electronic_address: 'buyer@example.ae',
+        }],
+      })
+    );
+    expect(exceptions).toHaveLength(0);
+  });
+
+  it.each(['TRN', 'TIN', 'VAT'])('rejects %s as BTAE-16', (identifierType) => {
+    const exceptions = runPintAECheck(
+      getCheck('UAE-UC1-CHK-037'),
+      buildDataContext({}, {
+        buyers: [{
+          buyer_id: 'B-1', buyer_name: 'Buyer LLC', buyer_legal_reg_id: 'LEGAL-001',
+          buyer_legal_reg_id_type: identifierType, buyer_electronic_address: 'buyer@example.ae',
+        }],
+      })
+    );
+    expect(exceptions).toHaveLength(1);
+  });
+
+  it('does not evaluate CHK-036 for a non-IBR-136 invoice type', () => {
+    const result = runPintAECheckWithTelemetry(
+      getCheck('UAE-UC1-CHK-036'),
+      buildDataContext({ invoice_type: '380' }, { buyers: [{ buyer_id: 'B-1', buyer_name: 'Buyer LLC', buyer_trn: '123456789012345' }] })
+    );
+    expect(result.exceptions).toHaveLength(0);
+    expect(result.telemetry.execution_count).toBe(0);
   });
 
   it('keeps default document-family runtime behavior pinned to legacy mode', () => {

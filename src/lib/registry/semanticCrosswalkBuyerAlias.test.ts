@@ -27,13 +27,13 @@ describe('semanticCrosswalkBuyerAlias', () => {
     });
   });
 
-  it('resolves field 25 semantics by document type without changing runtime fallback behavior', () => {
+  it('resolves field 25 semantics by document type with the distinct Buyer legal-ID type source', () => {
     expect(getBuyerSemanticAliasByMoFFieldNumber(25, 'tax_invoice')).toEqual({
       crosswalkRowKey: 'CW-025',
       documentType: 'tax_invoice',
       effectiveSemanticId: 'IBT-048-1',
       effectiveCanonicalField: 'buyer_tax_scheme_code',
-      currentRuntimeFallbackFields: ['buyer_legal_reg_id_type', 'buyer_reg_id_type'],
+      currentRuntimeFallbackFields: ['buyer_legal_reg_id_type'],
       runtimeSemanticSplitSupported: false,
     });
 
@@ -42,7 +42,7 @@ describe('semanticCrosswalkBuyerAlias', () => {
       documentType: 'commercial_xml',
       effectiveSemanticId: 'BTAE-16',
       effectiveCanonicalField: 'buyer_legal_reg_id_type',
-      currentRuntimeFallbackFields: ['buyer_legal_reg_id_type', 'buyer_reg_id_type'],
+      currentRuntimeFallbackFields: ['buyer_legal_reg_id_type'],
       runtimeSemanticSplitSupported: false,
     });
   });

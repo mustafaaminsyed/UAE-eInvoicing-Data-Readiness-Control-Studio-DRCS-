@@ -322,6 +322,24 @@ function isCommercialScopeApplicable(
   return commercialInvoiceTypes.includes(normalizeToken(header?.invoice_type));
 }
 
+function isBuyerLegalRegistrationRequiredByIbr136(header: any, params: Record<string, any>): boolean {
+  const invoiceType = normalizeToken(header?.invoice_type);
+  return [
+    ...getStringArray(params.invoice_type_codes),
+    ...getStringArray(params.credit_note_type_codes),
+  ].map(normalizeToken).includes(invoiceType);
+}
+
+function hasBuyerLegalRegistrationEndpointScheme(params: Record<string, any>): boolean {
+  const endpointScheme = normalizeToken(params.endpoint_scheme || '0235');
+  return endpointScheme === '0235';
+}
+
+function isBuyerLegalRegistrationTypeCodeApplicable(buyer: any): boolean {
+  const endpoint = String(buyer?.buyer_electronic_address || '').trim();
+  return !/^[19]/.test(endpoint);
+}
+
 function normalizeDocumentFamilyApplicabilityMode(
   value: unknown
 ): PintAEDocumentFamilyApplicabilityMode {
@@ -1437,21 +1455,11 @@ export function runPintAECheckWithTelemetry(
     // Commercial buyer legal registration identifier presence
     case 'UAE-UC1-CHK-036':
       data.headers.forEach(header => {
-        if (
-          !isCommercialScopeApplicable(
-            header,
-            params,
-            check.check_id,
-            data,
-            documentFamilyApplicabilityMode,
-            scenarioContextCache
-          )
-        ) return;
-        executionCount++;
-        const buyer = data.buyerMap.get(header.buyer_id);
-        const identifierFields = getStringArray(params.buyer_identifier_fields);
-        const fieldsToUse = identifierFields.length > 0 ? identifierFields : ['buyer_legal_reg_id', 'buyer_trn'];
-        const identifier = pickFirstNonEmptyField([buyer, header], fieldsToUse);
+          if (!isBuyerLegalRegistrationRequiredByIbr136(header, params)) return;
+          executionCount++;
+          const buyer = data.buyerMap.get(header.buyer_id);
+          const identifierField = String(params.buyer_identifier_field || 'buyer_legal_reg_id');
+          const identifier = pickFirstNonEmptyField([buyer], [identifierField]);
 
         if (isEmpty(identifier.value)) {
           exceptions.push(createException({
@@ -1459,7 +1467,7 @@ export function runPintAECheckWithTelemetry(
             invoiceNumber: header.invoice_number,
             sellerTrn: header.seller_trn,
             buyerId: header.buyer_id,
-            fieldName: fieldsToUse.join('|'),
+              fieldName: identifierField,
             observedValue: '(empty)',
             expectedValue: 'Buyer legal registration identifier for commercial invoice',
             message: `Invoice ${header.invoice_number}: Buyer legal registration identifier is missing for commercial invoice profile`,
@@ -1471,32 +1479,15 @@ export function runPintAECheckWithTelemetry(
     // Commercial buyer legal registration identifier type policy
     case 'UAE-UC1-CHK-037':
       data.headers.forEach(header => {
-        if (
-          !isCommercialScopeApplicable(
-            header,
-            params,
-            check.check_id,
-            data,
-            documentFamilyApplicabilityMode,
-            scenarioContextCache
-          )
-        ) return;
-        executionCount++;
         const buyer = data.buyerMap.get(header.buyer_id);
+        const identifierField = String(params.legal_identifier_field || 'buyer_legal_reg_id');
+        const identifier = pickFirstNonEmptyField([buyer], [identifierField]);
+        if (isEmpty(identifier.value) || !hasBuyerLegalRegistrationEndpointScheme(params)) return;
+        executionCount++;
 
-        const identifierFields = getStringArray(params.buyer_identifier_fields);
-        const fieldsToUse = identifierFields.length > 0 ? identifierFields : ['buyer_legal_reg_id', 'buyer_trn'];
-        const identifier = pickFirstNonEmptyField([buyer, header], fieldsToUse);
-        if (isEmpty(identifier.value)) return; // Presence handled by CHK-036
-
-        const typeFields = getStringArray(params.type_fields);
-        const typeFieldList = typeFields.length > 0 ? typeFields : ['buyer_legal_reg_id_type', 'buyer_reg_id_type'];
-        const explicitType = pickFirstNonEmptyField([buyer, header], typeFieldList);
-        const allowDefault = params.allow_default_identifier_type !== false;
-        const defaultType = String(params.default_identifier_type || '').trim();
-        const resolvedType = !isEmpty(explicitType.value)
-          ? String(explicitType.value).trim()
-          : (allowDefault ? defaultType : '');
+        const typeField = String(params.type_field || 'buyer_legal_reg_id_type');
+        const explicitType = pickFirstNonEmptyField([buyer], [typeField]);
+        const resolvedType = String(explicitType.value || '').trim();
 
         if (isEmpty(resolvedType)) {
           exceptions.push(createException({
@@ -1504,7 +1495,7 @@ export function runPintAECheckWithTelemetry(
             invoiceNumber: header.invoice_number,
             sellerTrn: header.seller_trn,
             buyerId: header.buyer_id,
-            fieldName: typeFieldList.join('|'),
+            fieldName: typeField,
             observedValue: '(empty)',
             expectedValue: 'Buyer legal registration identifier type',
             message: `Invoice ${header.invoice_number}: Buyer legal registration identifier type is missing for commercial invoice profile`,
@@ -1513,13 +1504,13 @@ export function runPintAECheckWithTelemetry(
         }
 
         const allowedTypes = getStringArray(params.allowed_identifier_types).map(normalizeToken);
-        if (allowedTypes.length > 0 && !allowedTypes.includes(normalizeToken(resolvedType))) {
+        if (isBuyerLegalRegistrationTypeCodeApplicable(buyer) && allowedTypes.length > 0 && !allowedTypes.includes(normalizeToken(resolvedType))) {
           exceptions.push(createException({
             invoiceId: header.invoice_id,
             invoiceNumber: header.invoice_number,
             sellerTrn: header.seller_trn,
             buyerId: header.buyer_id,
-            fieldName: typeFieldList.join('|'),
+            fieldName: typeField,
             observedValue: resolvedType,
             expectedValue: allowedTypes.join(', '),
             message: `Invoice ${header.invoice_number}: Buyer legal registration identifier type "${resolvedType}" is not allowed for commercial invoice profile`,

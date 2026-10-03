@@ -27,7 +27,9 @@ export interface DRRegistryEntry {
 const DR_TO_COLUMN_MAP: Record<string, { dataset: 'buyers' | 'headers' | 'lines'; columns: string[] }> = {
   // Buyer fields
   'IBT-044': { dataset: 'buyers', columns: ['buyer_name'] },
+  'IBT-047': { dataset: 'buyers', columns: ['buyer_legal_reg_id'] },
   'IBT-048': { dataset: 'buyers', columns: ['buyer_trn'] },
+  'BTAE-16': { dataset: 'buyers', columns: ['buyer_legal_reg_id_type'] },
   'IBT-049': { dataset: 'buyers', columns: ['buyer_electronic_address'] },
   'IBT-050': { dataset: 'buyers', columns: ['buyer_address'] },
   'IBT-052': { dataset: 'buyers', columns: ['buyer_city'] },
@@ -147,7 +149,7 @@ export function buildDRRegistry(): DRRegistryEntry[] {
 // Any DR column NOT in this set is "not ingestible" (template-only / future).
 export const PARSER_KNOWN_COLUMNS: Record<'buyers' | 'headers' | 'lines', Set<string>> = {
   buyers: new Set([
-    'buyer_id', 'buyer_name', 'buyer_trn', 'buyer_address', 'buyer_country',
+    'buyer_id', 'buyer_name', 'buyer_trn', 'buyer_legal_reg_id', 'buyer_legal_reg_id_type', 'buyer_address', 'buyer_country',
     'buyer_city', 'buyer_postcode', 'buyer_subdivision', 'buyer_electronic_address',
   ]),
   headers: new Set([

@@ -24,14 +24,8 @@ describe('document-family authoritative cutover packet', () => {
     const packet = buildDocumentFamilyCutoverPacket();
     const coverageByRule = new Map(packet.drCoverageImpact.map((item) => [item.ruleId, item.linkedDrCoverage]));
 
-    expect(coverageByRule.get('UAE-UC1-CHK-036')).toEqual([
-      expect.objectContaining({
-        dr_id: 'IBT-048',
-        mapping_type: 'partial',
-        coverageMaturity: 'runtime_enforced',
-      }),
-    ]);
-    expect(coverageByRule.get('UAE-UC1-CHK-037')).toEqual([]);
+    expect(coverageByRule.has('UAE-UC1-CHK-036')).toBe(false);
+    expect(coverageByRule.has('UAE-UC1-CHK-037')).toBe(false);
     expect(coverageByRule.get('UAE-UC1-CHK-045')).toEqual([
       expect.objectContaining({
         dr_id: 'IBT-003',
