@@ -7,6 +7,7 @@ import { classifyInvoice } from '@/modules/scenarioLens/classifyInvoice';
 import { decodeTransactionTypeCode } from '@/modules/scenarioContext/transactionTypeCode';
 import { Direction } from '@/types/direction';
 import { ValidationExecutionEvidence } from '@/types/validationExecution';
+import { DerivedVatBreakdown, deriveVatBreakdowns, sumVatBreakdownTax } from '@/lib/tax/vatBreakdownDerivation';
 
 export interface PintAECheckTelemetry {
   rule_id: string;
@@ -29,6 +30,7 @@ export interface PintAECheckRunResult {
   telemetry: PintAECheckTelemetry;
   executionResults: PintAEExecutionResult[];
   derivedAedLineValues: DerivedAedLineValue[];
+  derivedVatBreakdowns?: Array<DerivedVatBreakdown & { invoiceId: string }>;
 }
 
 export interface DerivedAedLineValue {
@@ -632,9 +634,11 @@ export function runPintAECheckWithTelemetry(
   const exceptions: PintAEException[] = [];
   const executionResults: PintAEExecutionResult[] = [];
   const derivedAedLineValues: DerivedAedLineValue[] = [];
+  const derivedVatBreakdowns: Array<DerivedVatBreakdown & { invoiceId: string }> = [];
   const params = check.parameters || {};
   const timestamp = new Date().toISOString();
   let executionCount = 0;
+  let notEvaluatedCount = 0;
   const direction = options.direction ?? 'AR';
   const candidateCount = getCandidateCount(check, data);
   const documentFamilyApplicabilityMode = options.documentFamilyApplicabilityMode ?? DOCUMENT_FAMILY_APPLICABILITY_MODE;
@@ -688,6 +692,7 @@ export function runPintAECheckWithTelemetry(
       exceptions,
       executionResults,
       derivedAedLineValues,
+      derivedVatBreakdowns,
       telemetry: {
         rule_id: check.check_id,
         execution_count: 0,
@@ -1169,9 +1174,28 @@ export function runPintAECheckWithTelemetry(
     // Tax Total = Sum of Tax Breakdown Amounts
     case 'UAE-UC1-CHK-029':
       data.headers.forEach(header => {
+        const result = deriveVatBreakdowns(header, data.linesByInvoice.get(header.invoice_id) || []);
+        if (result.status === 'not_evaluated') {
+          notEvaluatedCount++;
+          executionResults.push({ ruleId: check.check_id, invoiceId: header.invoice_id, invoiceNumber: header.invoice_number, status: 'not_evaluated', reason: result.dependencyReason });
+          return;
+        }
         executionCount++;
-        const invoiceLines = data.linesByInvoice.get(header.invoice_id) || [];
-        const taxSum = invoiceLines.reduce((sum, l) => sum + (l.vat_amount || 0), 0);
+        if (result.status === 'failed') {
+          exceptions.push(createException({
+            invoiceId: header.invoice_id,
+            invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn,
+            buyerId: header.buyer_id,
+            fieldName: 'tax_breakdown',
+            observedValue: result.failureReason,
+            expectedValue: 'Evaluable VAT breakdown inputs',
+            message: `Invoice ${header.invoice_number}: ${result.failureReason}`,
+          }));
+          executionResults.push({ ruleId: check.check_id, invoiceId: header.invoice_id, invoiceNumber: header.invoice_number, status: 'failed', reason: result.failureReason });
+          return;
+        }
+        const taxSum = sumVatBreakdownTax(result.breakdowns);
         const headerTax = header.vat_total || 0;
         const diff = Math.abs(taxSum - headerTax);
         const tolerance = params.tolerance || 0.01;
@@ -1183,9 +1207,12 @@ export function runPintAECheckWithTelemetry(
             buyerId: header.buyer_id,
             fieldName: 'vat_total',
             observedValue: String(headerTax),
-            expectedValue: `Sum of line VAT: ${taxSum.toFixed(2)}`,
-            message: `Invoice ${header.invoice_number}: VAT total (${headerTax}) does not match sum of line VAT amounts (${taxSum.toFixed(2)})`,
+            expectedValue: `Rounded sum of derived IBT-117 breakdowns: ${taxSum.toFixed(2)}`,
+            message: `Invoice ${header.invoice_number}: IBT-110 (${headerTax}) does not match the rounded sum of derived IBT-117 breakdowns (${taxSum.toFixed(2)})`,
           }));
+          executionResults.push({ ruleId: check.check_id, invoiceId: header.invoice_id, invoiceNumber: header.invoice_number, status: 'failed' });
+        } else {
+          executionResults.push({ ruleId: check.check_id, invoiceId: header.invoice_id, invoiceNumber: header.invoice_number, status: 'passed' });
         }
       });
       break;
@@ -1659,52 +1686,61 @@ export function runPintAECheckWithTelemetry(
       }
       break;
 
-    // Tax breakdown must exist when taxable amounts are present
+    // Derive the repeatable IBG-23 structure. Document adjustments must be
+    // positively absent until P1.7 supplies their category/rate allocation.
     case 'UAE-UC1-CHK-027':
       data.headers.forEach(header => {
-        executionCount++;
         const invoiceLines = data.linesByInvoice.get(header.invoice_id) || [];
-        const hasHeaderBreakdown =
-          !isEmpty(header.tax_category_code) &&
-          header.tax_category_rate !== undefined &&
-          header.tax_category_rate !== null;
-        const hasLineBreakdown = invoiceLines.some((line) => !isEmpty(line.tax_category_code) && line.vat_rate !== undefined && line.vat_rate !== null);
-        const hasTaxableAmount = (header.total_excl_vat || 0) > 0 || invoiceLines.some((line) => (line.line_total_excl_vat || 0) > 0);
-        if (hasTaxableAmount && !hasHeaderBreakdown && !hasLineBreakdown) {
+        const result = deriveVatBreakdowns(header, invoiceLines);
+        if (result.status === 'not_evaluated') {
+          notEvaluatedCount++;
+          executionResults.push({ ruleId: check.check_id, invoiceId: header.invoice_id, invoiceNumber: header.invoice_number, status: 'not_evaluated', reason: result.dependencyReason });
+          return;
+        }
+        executionCount++;
+        if (result.status === 'failed' || result.breakdowns.length === 0) {
           exceptions.push(createException({
             invoiceId: header.invoice_id,
             invoiceNumber: header.invoice_number,
             sellerTrn: header.seller_trn,
             buyerId: header.buyer_id,
             fieldName: 'tax_breakdown',
-            observedValue: 'missing',
-            expectedValue: 'At least one tax category breakdown',
-            message: `Invoice ${header.invoice_number}: Missing tax breakdown details (category/rate)`,
+            observedValue: result.failureReason ?? 'no derived breakdown',
+            expectedValue: 'At least one evaluable derived IBG-23 VAT breakdown',
+            message: `Invoice ${header.invoice_number}: ${result.failureReason ?? 'No VAT breakdown can be derived from its lines'}`,
           }));
+          executionResults.push({ ruleId: check.check_id, invoiceId: header.invoice_id, invoiceNumber: header.invoice_number, status: 'failed', reason: result.failureReason });
+        } else {
+          derivedVatBreakdowns.push(...result.breakdowns.map((breakdown) => ({ ...breakdown, invoiceId: header.invoice_id })));
+          executionResults.push({ ruleId: check.check_id, invoiceId: header.invoice_id, invoiceNumber: header.invoice_number, status: 'passed' });
         }
       });
       break;
 
-    // VAT Calculation Check
+    // Derive IBT-117 from invoice-currency IBT-116 and category treatment.
     case 'UAE-UC1-CHK-028':
-      data.lines.forEach(line => {
+      data.headers.forEach(header => {
+        const result = deriveVatBreakdowns(header, data.linesByInvoice.get(header.invoice_id) || []);
+        if (result.status === 'not_evaluated') {
+          notEvaluatedCount++;
+          executionResults.push({ ruleId: check.check_id, invoiceId: header.invoice_id, invoiceNumber: header.invoice_number, status: 'not_evaluated', reason: result.dependencyReason });
+          return;
+        }
         executionCount++;
-        const header = data.headerMap.get(line.invoice_id);
-        const expected = line.line_total_excl_vat * (line.vat_rate / 100);
-        const diff = Math.abs(line.vat_amount - expected);
-        const tolerance = params.tolerance || 0.01;
-        if (diff > tolerance) {
+        if (result.status === 'failed') {
           exceptions.push(createException({
-            invoiceId: line.invoice_id,
-            invoiceNumber: header?.invoice_number,
-            sellerTrn: header?.seller_trn,
-            buyerId: header?.buyer_id,
-            lineId: line.line_id,
-            fieldName: 'vat_amount',
-            observedValue: String(line.vat_amount),
-            expectedValue: `${line.line_total_excl_vat} x (${line.vat_rate}/100) = ${expected.toFixed(2)}`,
-            message: `Invoice ${header?.invoice_number}, Line ${line.line_number}: VAT amount (${line.vat_amount}) != Base x Rate/100 (${expected.toFixed(2)})`,
+            invoiceId: header.invoice_id,
+            invoiceNumber: header.invoice_number,
+            sellerTrn: header.seller_trn,
+            buyerId: header.buyer_id,
+            fieldName: 'tax_breakdown',
+            observedValue: result.failureReason,
+            expectedValue: 'Valid category/rate inputs for IBT-116 and IBT-117 derivation',
+            message: `Invoice ${header.invoice_number}: ${result.failureReason}`,
           }));
+          executionResults.push({ ruleId: check.check_id, invoiceId: header.invoice_id, invoiceNumber: header.invoice_number, status: 'failed', reason: result.failureReason });
+        } else {
+          executionResults.push({ ruleId: check.check_id, invoiceId: header.invoice_id, invoiceNumber: header.invoice_number, status: 'passed' });
         }
       });
       break;
@@ -1769,70 +1805,28 @@ export function runPintAECheckWithTelemetry(
     }
 
     case 'UAE-UC1-CHK-054': {
-      const tolerance = Number(params.tolerance ?? 0.01);
-      const reverseChargeCategories = getStringArray(params.reverse_charge_categories);
-      const zeroRateCategories = getStringArray(params.zero_rate_categories);
-
       data.headers.forEach(header => {
+        const result = deriveVatBreakdowns(header, data.linesByInvoice.get(header.invoice_id) || []);
+        if (result.status === 'not_evaluated') {
+          notEvaluatedCount++;
+          executionResults.push({ ruleId: check.check_id, invoiceId: header.invoice_id, invoiceNumber: header.invoice_number, status: 'not_evaluated', reason: result.dependencyReason });
+          return;
+        }
         executionCount++;
-        const invoiceLines = data.linesByInvoice.get(header.invoice_id) || [];
-        const headerCategory = normalizeToken(header.tax_category_code);
-        const headerRate = Number(header.tax_category_rate);
-        const headerTaxAmount = Number(header.vat_total);
-        const hasReverseChargeLine = invoiceLines.some((line) =>
-          isCategoryMatch(line.tax_category_code, reverseChargeCategories)
-        );
-
-        if (hasReverseChargeLine && !isCategoryMatch(headerCategory, reverseChargeCategories)) {
+        if (result.status === 'failed') {
           exceptions.push(createException({
             invoiceId: header.invoice_id,
             invoiceNumber: header.invoice_number,
             sellerTrn: header.seller_trn,
             buyerId: header.buyer_id,
-            fieldName: 'tax_category_code',
-            observedValue: String(header.tax_category_code ?? '(empty)'),
-            expectedValue: 'Reverse-charge VAT breakdown category when reverse-charge lines exist',
-            message: `Invoice ${header.invoice_number}: VAT breakdown must include a reverse-charge category when reverse-charge lines are present`,
+            fieldName: 'tax_breakdown',
+            observedValue: result.failureReason,
+            expectedValue: 'Semantically valid VAT breakdown grouping inputs',
+            message: `Invoice ${header.invoice_number}: ${result.failureReason}`,
           }));
-        }
-
-        if (isCategoryMatch(headerCategory, reverseChargeCategories) && !isZeroWithinTolerance(headerTaxAmount, tolerance)) {
-          exceptions.push(createException({
-            invoiceId: header.invoice_id,
-            invoiceNumber: header.invoice_number,
-            sellerTrn: header.seller_trn,
-            buyerId: header.buyer_id,
-            fieldName: 'vat_total',
-            observedValue: String(header.vat_total),
-            expectedValue: 'VAT breakdown tax amount of 0 for reverse-charge treatment',
-            message: `Invoice ${header.invoice_number}: Reverse-charge VAT breakdown must carry zero VAT tax amount`,
-          }));
-        }
-
-        if (isCategoryMatch(headerCategory, zeroRateCategories) && !isZeroWithinTolerance(headerRate, tolerance)) {
-          exceptions.push(createException({
-            invoiceId: header.invoice_id,
-            invoiceNumber: header.invoice_number,
-            sellerTrn: header.seller_trn,
-            buyerId: header.buyer_id,
-            fieldName: 'tax_category_rate',
-            observedValue: String(header.tax_category_rate ?? '(empty)'),
-            expectedValue: 'VAT breakdown rate of 0 for zero-rated or exempt treatment',
-            message: `Invoice ${header.invoice_number}: VAT breakdown category "${header.tax_category_code}" requires a zero VAT rate`,
-          }));
-        }
-
-        if (isCategoryMatch(headerCategory, zeroRateCategories) && !isZeroWithinTolerance(headerTaxAmount, tolerance)) {
-          exceptions.push(createException({
-            invoiceId: header.invoice_id,
-            invoiceNumber: header.invoice_number,
-            sellerTrn: header.seller_trn,
-            buyerId: header.buyer_id,
-            fieldName: 'vat_total',
-            observedValue: String(header.vat_total),
-            expectedValue: 'VAT breakdown tax amount of 0 for zero-rated or exempt treatment',
-            message: `Invoice ${header.invoice_number}: VAT breakdown category "${header.tax_category_code}" requires a zero VAT tax amount`,
-          }));
+          executionResults.push({ ruleId: check.check_id, invoiceId: header.invoice_id, invoiceNumber: header.invoice_number, status: 'failed', reason: result.failureReason });
+        } else {
+          executionResults.push({ ruleId: check.check_id, invoiceId: header.invoice_id, invoiceNumber: header.invoice_number, status: 'passed' });
         }
       });
       break;
@@ -2178,6 +2172,7 @@ export function runPintAECheckWithTelemetry(
     exceptions,
     executionResults,
     derivedAedLineValues,
+    derivedVatBreakdowns,
     telemetry: {
       rule_id: check.check_id,
       execution_count: executionCount,
@@ -2187,10 +2182,10 @@ export function runPintAECheckWithTelemetry(
       control_class: 'regulatory',
       layer: 'pint_ae',
       candidate_count: candidateCount,
-      applicable_count: executionCount,
+      applicable_count: executionCount + notEvaluatedCount,
       passed_count: Math.max(executionCount - exceptions.length, 0),
-      not_applicable_count: Math.max(candidateCount - executionCount, 0),
-      not_evaluated_count: 0,
+      not_applicable_count: Math.max(candidateCount - executionCount - notEvaluatedCount, 0),
+      not_evaluated_count: notEvaluatedCount,
     },
   };
 }
@@ -2207,12 +2202,13 @@ export function runAllPintAEChecksWithTelemetry(
   checks: PintAECheck[],
   data: DataContext,
   options: RunPintAECheckOptions = {}
-): { exceptions: PintAEException[]; telemetry: PintAECheckTelemetry[]; executionResults?: PintAEExecutionResult[]; derivedAedLineValues: DerivedAedLineValue[]; executionEvidence: ValidationExecutionEvidence[] } {
+): { exceptions: PintAEException[]; telemetry: PintAECheckTelemetry[]; executionResults?: PintAEExecutionResult[]; derivedAedLineValues: DerivedAedLineValue[]; derivedVatBreakdowns?: Array<DerivedVatBreakdown & { invoiceId: string }>; executionEvidence: ValidationExecutionEvidence[] } {
   const enabledChecks = checks.filter(c => c.is_enabled);
   const allExceptions: PintAEException[] = [];
   const telemetry: PintAECheckTelemetry[] = [];
   const executionResults: PintAEExecutionResult[] = [];
   const derivedAedLineValues: DerivedAedLineValue[] = [];
+  const derivedVatBreakdowns: Array<DerivedVatBreakdown & { invoiceId: string }> = [];
   const executionEvidence: ValidationExecutionEvidence[] = [];
   
   for (const check of enabledChecks) {
@@ -2221,6 +2217,7 @@ export function runAllPintAEChecksWithTelemetry(
     telemetry.push(result.telemetry);
     executionResults.push(...(result.executionResults ?? []));
     derivedAedLineValues.push(...result.derivedAedLineValues);
+    derivedVatBreakdowns.push(...(result.derivedVatBreakdowns ?? []));
     const row = result.telemetry;
     const applicableCount = row.applicable_count ?? row.execution_count;
     const evaluatedCount = row.execution_count;
@@ -2257,5 +2254,5 @@ export function runAllPintAEChecksWithTelemetry(
     });
   }
   
-  return { exceptions: allExceptions, telemetry, executionResults, derivedAedLineValues, executionEvidence };
+  return { exceptions: allExceptions, telemetry, executionResults, derivedAedLineValues, derivedVatBreakdowns, executionEvidence };
 }

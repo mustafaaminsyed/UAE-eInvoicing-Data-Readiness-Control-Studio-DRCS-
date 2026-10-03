@@ -12,8 +12,8 @@ official resources does not make DRCS fully PINT AE 1.0.4 compliant.
 | IBR-SR-63 CustomizationID wildcard prohibition | Present in the 1.0.4 reference resources; no equivalent DRCS runtime control verified | Open | Add/verify runtime parity in a controlled rules task | No; system-generated value |
 | Commercial buyer identity separation (IBT-047 / IBT-048) | Completed in P1.3: `buyer_legal_reg_id` maps to IBT-047 and `buyer_trn` remains independently mapped to IBT-048; the canonical Buyers / Headers / Lines model is 10 / 36 / 19 | Complete | Preserve distinct legal-registration and VAT/tax identifier semantics | Implemented; Buyer schema expanded conditionally |
 | Buyer legal registration identifier type (BTAE-16) | Completed in P1.3: `buyer_legal_reg_id_type` maps to BTAE-16 with current PINT applicability and code-list semantics | Complete | Preserve BTAE-16 as an explicit Buyer-master field without a tax-identifier default | Implemented; optional at ingestion and conditionally required |
-| VAT category taxable amount (IBT-116) | No verified category-level aggregation | Open | Add deterministic per-category derivation and validation | No; derived |
-| VAT category tax amount (IBT-117) | No verified category-level aggregation | Open | Add deterministic per-category derivation and validation | No; derived |
+| VAT category taxable amount (IBT-116) | P1.4 foundation derives repeatable invoice-currency breakdowns from IBT-131 grouped by normalized category and applicable significant rate when document adjustments are positively absent; otherwise returns `not_evaluated` | Partial — P1.7 dependency | Add categorized document-level allowances/charges under P1.7; do not treat IBT-116 as taxpayer-source missing | No P1.4 source-schema change; derived |
+| VAT category tax amount (IBT-117) | P1.4 foundation derives standard tax from IBT-116 × IBT-119 and applies pinned zero-tax category treatment; IBT-110 reconciliation uses derived breakdowns rather than AED-oriented line VAT | Partial — P1.7 dependency | Complete P1.7 inputs and broader P1.9 executable parity before claiming full coverage | No P1.4 source-schema change; derived |
 | IBT-119 / IBT-152 current category-rate rules | Basic rates are represented; current multi-category and category-specific regressions are incomplete | Open | Add current-rule regression coverage | No |
 | Item gross price (IBT-148) | Net and gross price semantics are not independently represented | Open | Reconcile IBT-146/147/148 pricing model | To be assessed; conditional source possible |
 | Invoice note and frequency (IBT-022 / BTAE-06) | Conditional OTH note dependency is not modeled | Open | Implement conditional rule and source responsibility assessment | To be assessed; conditional |
@@ -25,6 +25,14 @@ official resources does not make DRCS fully PINT AE 1.0.4 compliant.
 | Dashboard false readiness dependencies | Some UI readiness requirements overstate source obligations | Open | Remove false dependencies in a dedicated UI/readiness task | No |
 | BTUAE/BTAE terminology | Legacy BTUAE identifiers remain in mappings and UI | Open | Controlled terminology/compatibility migration | No |
 
-This register is intentionally non-executable and does not alter the 8/36/19 taxpayer
+P1.4 uses the normalized grouping key `category|significant-rate`; rate-inapplicable E/O
+groups use no invented rate. RC is accepted only as an ingestion alias and is recorded as
+normalized to official AE. Line allowance/charge values are not added again because they
+are already included in IBT-131. Monetary results round half away from zero at the group
+result to two decimals. The pinned standard-rate formula permits scoped `0.02` slack; P1.4
+does not change unrelated global tolerances. Derived evidence records contributing line IDs,
+currency, normalization, formula, rounding, rule/version, and dependency state.
+
+This register does not claim full PINT-AE 1.0.4 executable parity and does not alter the 10/36/19 taxpayer
 ingestion contract, validation applicability, Credit Note behavior, reverse-charge
 behavior, or TDD processing.
