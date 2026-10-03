@@ -1,5 +1,5 @@
-// PINT-AE Spec Registry Loader
-// Loads the authoritative 2025-Q2 registry and provides query helpers
+// Legacy DRCS readiness registry loader.
+// Loads the internal 2025-Q2 registry; this is not the external PINT AE version identity.
 // for coverage computation, mandatory gating, and DR→rule traceability.
 
 import registryData from '../../../specs/uae/pint-ae/2025-q2.json';

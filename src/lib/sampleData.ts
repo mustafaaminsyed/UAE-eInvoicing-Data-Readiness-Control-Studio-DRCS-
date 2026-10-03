@@ -208,8 +208,8 @@ export function downloadAllTemplatesAsZip(scenario: SampleScenario = 'positive',
 }
 
 export const TEMPLATE_MANIFEST = {
-  spec_version: 'PINT-AE 2025-Q2',
-  dr_version: 'UAE DR v1.0.1',
+  spec_version: 'PINT AE Billing 1.0.4 reference baseline',
+  dr_version: 'DRCS executable ruleset v1.0.0',
   use_case: 'UAE B2B Standard Invoice (UC1)',
   generated_timestamp: '2025-06-01T00:00:00Z',
   schema_hash: 'sha256:b3f8c2a1d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9',

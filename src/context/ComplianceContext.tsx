@@ -32,6 +32,7 @@ import { WorkspaceProvider, useWorkspace } from '@/context/WorkspaceContext';
 import { UploadLogProvider, useUploadLogs } from '@/context/UploadLogContext';
 import { toast } from 'sonner';
 import { summarizeValidationExecutions, ValidationExecutionEvidence } from '@/types/validationExecution';
+import { getCurrentRegulatoryBaselineIdentity } from '@/config/regulatoryBaseline';
 
 interface ComplianceContextType {
   direction: Direction;
@@ -362,6 +363,7 @@ function ComplianceStateProvider({ children }: { children: ReactNode }) {
           evidenceRuleExecutionTelemetry: combinedTelemetry,
           validationExecutionEvidence: runValidationExecutions,
           metricSemanticsVersion: 2,
+          regulatoryBaseline: getCurrentRegulatoryBaselineIdentity(),
         },
       });
 

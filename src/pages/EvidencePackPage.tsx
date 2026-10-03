@@ -288,6 +288,9 @@ export default function EvidencePackPage() {
             legalEntityLabels: selectedRunSnapshot.legal_entity_labels,
             executionTelemetry: canUseHistoricalSnapshot ? selectedRunTelemetry : lastPintRuleTelemetry,
             executionEvidence: canUseHistoricalSnapshot ? selectedRunExecutionEvidence : validationExecutions,
+            regulatoryBaseline: canUseHistoricalSnapshot
+              ? selectedRun?.results_summary?.regulatoryBaseline
+              : undefined,
           }
         : {
             runMode: selectedRunSummary?.run_mode,
@@ -313,6 +316,7 @@ export default function EvidencePackPage() {
     selectedRunTelemetry,
     lastPintRuleTelemetry,
     selectedRunExecutionEvidence,
+    selectedRun?.results_summary?.regulatoryBaseline,
     validationExecutions,
   ]);
 
