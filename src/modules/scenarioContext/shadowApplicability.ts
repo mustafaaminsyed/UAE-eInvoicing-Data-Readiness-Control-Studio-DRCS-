@@ -98,16 +98,6 @@ export interface RuleApplicabilityComparisonReport {
 const CHECKS_BY_ID = new Map(UAE_UC1_CHECK_PACK.map((check) => [check.check_id, check]));
 
 const SHADOW_APPLICABILITY_DEFINITIONS: ShadowApplicabilityDefinition[] = [
-  createRuntimeDefinition("UAE-UC1-CHK-036", "document_family", ["documentClass"], (context) => {
-    return context.documentClass.value === "commercial_invoice"
-      ? applicable("ScenarioContext classified the invoice as commercial.", ["documentClass"])
-      : notApplicable("ScenarioContext did not classify the invoice as commercial.", ["documentClass"]);
-  }),
-  createRuntimeDefinition("UAE-UC1-CHK-037", "document_family", ["documentClass"], (context) => {
-    return context.documentClass.value === "commercial_invoice"
-      ? applicable("ScenarioContext classified the invoice as commercial.", ["documentClass"])
-      : notApplicable("ScenarioContext did not classify the invoice as commercial.", ["documentClass"]);
-  }),
   createRuntimeDefinition("UAE-UC1-CHK-045", "document_family", ["documentVariant"], (context) => {
     return isCreditNoteVariant(context.documentVariant.value)
       ? notApplicable("ScenarioContext classified the invoice as a credit-note variant.", ["documentVariant"])

@@ -18,6 +18,17 @@ describe('negative headers template upload path', () => {
     expect(buyer.buyer_trn).toBe('100000000000003');
   });
 
+  it('preserves the new optional buyer legal-registration fields while accepting legacy eight-column buyer files', async () => {
+    const legacy = { text: async () => 'buyer_id,buyer_name,buyer_trn,buyer_address,buyer_country,buyer_city,buyer_subdivision,buyer_electronic_address\nB-1,Buyer,100000000000003,Street,AE,Dubai,AE-DU,buyer@example.ae' } as File;
+    const current = { text: async () => 'buyer_id,buyer_name,buyer_trn,buyer_legal_reg_id,buyer_legal_reg_id_type,buyer_address,buyer_country,buyer_city,buyer_subdivision,buyer_electronic_address\nB-2,Buyer,100000000000003,LIC-1,CL,Street,AE,Dubai,AE-DU,buyer@example.ae' } as File;
+
+    const [legacyBuyer] = await parseBuyersFile(legacy);
+    const [currentBuyer] = await parseBuyersFile(current);
+    expect(legacyBuyer.buyer_legal_reg_id).toBeUndefined();
+    expect(legacyBuyer.buyer_legal_reg_id_type).toBeUndefined();
+    expect(currentBuyer).toMatchObject({ buyer_legal_reg_id: 'LIC-1', buyer_legal_reg_id_type: 'CL' });
+  });
+
   it('parses rows and columns for the downloadable negative headers template', () => {
     const rows = parseCSV(headersNegativeSample);
     const file = new File([headersNegativeSample], 'invoice_headers_template_negative.csv', { type: 'text/csv' });

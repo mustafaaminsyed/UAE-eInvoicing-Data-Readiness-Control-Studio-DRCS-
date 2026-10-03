@@ -26,6 +26,8 @@ const COLUMN_PATTERNS: Record<string, string[]> = {
   
   buyer_name: ['buyer_name', 'customer_name', 'client_name', 'cust_name', 'buyer', 'customer', 'client', 'bill_to_name'],
   buyer_trn: ['buyer_trn', 'customer_trn', 'client_trn', 'customer_tax_id', 'buyer_vat', 'cust_trn'],
+  buyer_legal_reg_id: ['buyer_legal_reg_id', 'customer_legal_reg_id', 'buyer_trade_license', 'buyer_commercial_license'],
+  buyer_legal_reg_id_type: ['buyer_legal_reg_id_type', 'customer_legal_reg_id_type', 'buyer_registration_type'],
   buyer_address: ['buyer_address', 'customer_address', 'client_address', 'bill_to_address', 'ship_to_address'],
   buyer_country: ['buyer_country', 'customer_country', 'client_country', 'bill_to_country'],
   buyer_electronic_address: ['buyer_electronic_address', 'buyer_endpoint', 'customer_endpoint', 'client_endpoint', 'buyer_peppol_id'],

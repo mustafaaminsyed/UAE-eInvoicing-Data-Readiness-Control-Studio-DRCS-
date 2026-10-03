@@ -27,11 +27,13 @@ Fields derived by the ASP (Corner 2) — such as Specification ID (IBT-024), Bus
 | 1 | `buyer_id` | — | Yes | String | Free text | System join key (PK) | ERP |
 | 2 | `buyer_name` | IBT-044 | Yes | String | Free text | Buyer legal name | ERP |
 | 3 | `buyer_trn` | IBT-048 | Conditional (B2B) | String | 15-digit, starts with 1 | Buyer TRN | ERP |
-| 4 | `buyer_address` | IBT-050 | Yes | String | Free text | Buyer street address | ERP |
-| 5 | `buyer_country` | IBT-055 | Yes | Code | ISO 3166-1 α-2 | Country code | ERP |
-| 6 | `buyer_city` | IBT-052 | Yes | String | Free text | City name | ERP |
-| 7 | `buyer_subdivision` | IBT-054 | Conditional | Code | AE-AZ, AE-DU, etc. | UAE emirate code | ERP |
-| 8 | `buyer_electronic_address` | IBT-049 | Yes | String | Endpoint ID | PEPPOL or email | ERP |
+| 4 | `buyer_legal_reg_id` | IBT-047 | Conditional | String | Official legal-registration identifier | Buyer legal registration identifier; never substitute Buyer TRN | ERP |
+| 5 | `buyer_legal_reg_id_type` | BTAE-16 | Conditional | Code | TL / CL / EID / PAS / CD | Type of the buyer legal registration identifier | ERP |
+| 6 | `buyer_address` | IBT-050 | Yes | String | Free text | Buyer street address | ERP |
+| 7 | `buyer_country` | IBT-055 | Yes | Code | ISO 3166-1 α-2 | Country code | ERP |
+| 8 | `buyer_city` | IBT-052 | Yes | String | Free text | City name | ERP |
+| 9 | `buyer_subdivision` | IBT-054 | Conditional | Code | AE-AZ, AE-DU, etc. | UAE emirate code | ERP |
+| 10 | `buyer_electronic_address` | IBT-049 | Yes | String | Endpoint ID | PEPPOL or email | ERP |
 
 ---
 

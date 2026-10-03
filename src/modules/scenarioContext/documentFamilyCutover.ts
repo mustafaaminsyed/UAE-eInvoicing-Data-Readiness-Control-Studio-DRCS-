@@ -17,8 +17,6 @@ import type { Buyer, DataContext, InvoiceHeader, InvoiceLine } from '@/types/com
 import type { PintAECheck, PintAEException } from '@/types/pintAE';
 
 export const DOCUMENT_FAMILY_CUTOVER_RULE_IDS = [
-  'UAE-UC1-CHK-036',
-  'UAE-UC1-CHK-037',
   'UAE-UC1-CHK-045',
   'UAE-UC1-CHK-046',
 ] as const;

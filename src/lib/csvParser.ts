@@ -134,6 +134,12 @@ export async function parsePartiesFile(file: File, options: ParseOptions = {}): 
   const idKeys = direction === 'AP' ? ['supplier_id', 'vendor_id', 'buyer_id'] : ['buyer_id', 'customer_id', 'party_id'];
   const nameKeys = direction === 'AP' ? ['supplier_name', 'vendor_name', 'buyer_name'] : ['buyer_name', 'customer_name', 'party_name'];
   const trnKeys = direction === 'AP' ? ['supplier_trn', 'vendor_trn', 'buyer_trn'] : ['buyer_trn', 'customer_trn', 'party_trn'];
+  const legalRegistrationIdKeys = direction === 'AP'
+    ? ['supplier_legal_reg_id', 'vendor_legal_reg_id', 'buyer_legal_reg_id']
+    : ['buyer_legal_reg_id', 'customer_legal_reg_id', 'party_legal_reg_id'];
+  const legalRegistrationTypeKeys = direction === 'AP'
+    ? ['supplier_legal_reg_id_type', 'vendor_legal_reg_id_type', 'buyer_legal_reg_id_type']
+    : ['buyer_legal_reg_id_type', 'customer_legal_reg_id_type', 'party_legal_reg_id_type'];
   const addressKeys = direction === 'AP' ? ['supplier_address', 'vendor_address', 'buyer_address'] : ['buyer_address', 'customer_address', 'party_address'];
   const countryKeys = direction === 'AP' ? ['supplier_country', 'vendor_country', 'buyer_country'] : ['buyer_country', 'customer_country', 'party_country'];
   const cityKeys = direction === 'AP' ? ['supplier_city', 'vendor_city', 'buyer_city'] : ['buyer_city', 'customer_city', 'party_city'];
@@ -147,6 +153,8 @@ export async function parsePartiesFile(file: File, options: ParseOptions = {}): 
     buyer_id: getValue(record, idKeys) || '',
     buyer_name: getValue(record, nameKeys) || '',
     buyer_trn: getValue(record, trnKeys),
+    buyer_legal_reg_id: getValue(record, legalRegistrationIdKeys),
+    buyer_legal_reg_id_type: getValue(record, legalRegistrationTypeKeys),
     buyer_address: getValue(record, addressKeys),
     buyer_country: getValue(record, countryKeys),
     buyer_city: getValue(record, cityKeys),

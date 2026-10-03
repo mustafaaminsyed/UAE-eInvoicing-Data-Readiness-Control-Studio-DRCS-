@@ -211,6 +211,8 @@ export const PINT_AE_UC1_FIELDS: PintAEField[] = [
   // Buyer Fields
   { id: 'buyer_name', name: 'Buyer Name', description: 'Buyer legal/trading name', ibtReference: 'IBT-044', category: 'buyer', isMandatory: true, dataType: 'string' },
   { id: 'buyer_trn', name: 'Buyer TRN', description: 'Buyer Tax Registration Number', ibtReference: 'IBT-048', category: 'buyer', isMandatory: false, dataType: 'string', format: '^\\d{15}$' },
+  { id: 'buyer_legal_reg_id', name: 'Buyer Legal Registration ID', description: 'Buyer legal registration identifier; distinct from Buyer TRN', ibtReference: 'IBT-047', category: 'buyer', isMandatory: false, dataType: 'string' },
+  { id: 'buyer_legal_reg_id_type', name: 'Buyer Legal Registration Type', description: 'Buyer legal registration identifier type', ibtReference: 'BTAE-16', category: 'buyer', isMandatory: false, dataType: 'string', allowedValues: ['TL', 'CL', 'EID', 'PAS', 'CD'] },
   { id: 'buyer_electronic_address', name: 'Buyer Electronic Address', description: 'Buyer PEPPOL ID or email', ibtReference: 'IBT-049', category: 'buyer', isMandatory: true, dataType: 'string' },
   { id: 'buyer_address', name: 'Buyer Address', description: 'Buyer street address', ibtReference: 'IBT-050', category: 'buyer', isMandatory: true, dataType: 'string' },
   { id: 'buyer_city', name: 'Buyer City', description: 'Buyer city name', ibtReference: 'IBT-052', category: 'buyer', isMandatory: false, dataType: 'string' },
