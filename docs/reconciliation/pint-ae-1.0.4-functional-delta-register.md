@@ -10,8 +10,8 @@ official resources does not make DRCS fully PINT AE 1.0.4 compliant.
 | External requirement / area | Current DRCS treatment | Status | Future remediation | Source-schema change expected |
 |---|---|---|---|---|
 | IBR-SR-63 CustomizationID wildcard prohibition | Present in the 1.0.4 reference resources; no equivalent DRCS runtime control verified | Open | Add/verify runtime parity in a controlled rules task | No; system-generated value |
-| Commercial buyer legal identifier (IBT-047) | `buyer_trn` is the only canonical buyer identifier | Open | Separate tax and legal identifier semantics | Likely yes, conditional |
-| Buyer legal registration identifier type (BTAE-16) | Current buyer type coverage is incomplete/inconsistent | Open | Model permitted TL/EID/PAS/CD semantics | Likely yes, conditional |
+| Commercial buyer identity separation (IBT-047 / IBT-048) | Completed in P1.3: `buyer_legal_reg_id` maps to IBT-047 and `buyer_trn` remains independently mapped to IBT-048; the canonical Buyers / Headers / Lines model is 10 / 36 / 19 | Complete | Preserve distinct legal-registration and VAT/tax identifier semantics | Implemented; Buyer schema expanded conditionally |
+| Buyer legal registration identifier type (BTAE-16) | Completed in P1.3: `buyer_legal_reg_id_type` maps to BTAE-16 with current PINT applicability and code-list semantics | Complete | Preserve BTAE-16 as an explicit Buyer-master field without a tax-identifier default | Implemented; optional at ingestion and conditionally required |
 | VAT category taxable amount (IBT-116) | No verified category-level aggregation | Open | Add deterministic per-category derivation and validation | No; derived |
 | VAT category tax amount (IBT-117) | No verified category-level aggregation | Open | Add deterministic per-category derivation and validation | No; derived |
 | IBT-119 / IBT-152 current category-rate rules | Basic rates are represented; current multi-category and category-specific regressions are incomplete | Open | Add current-rule regression coverage | No |

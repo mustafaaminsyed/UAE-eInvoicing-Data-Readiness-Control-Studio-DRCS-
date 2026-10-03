@@ -11,6 +11,17 @@ function readTemplate(fileName: string) {
 }
 
 describe('public template alignment', () => {
+  it('keeps every shipped buyer row aligned with the 10-column header', () => {
+    const template = readTemplate('buyers_template.csv').replace(/\r\n?/g, '\n').trim();
+    const physicalDataRows = template.split('\n').slice(1);
+    const rows = parseCSV(template);
+
+    expect(rows).toHaveLength(physicalDataRows.length);
+    for (const row of rows) {
+      expect(Object.keys(row)).toHaveLength(10);
+    }
+  });
+
   it('keeps the shipped header template aligned with the current credit-note ingestion shape', () => {
     const rows = parseCSV(readTemplate('invoice_headers_template.csv'));
     const columns = Object.keys(rows[0] ?? {});
