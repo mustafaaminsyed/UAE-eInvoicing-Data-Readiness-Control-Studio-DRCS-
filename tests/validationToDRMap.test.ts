@@ -42,4 +42,12 @@ describe('validation-to-DR mapping model', () => {
       ])
     );
   });
+
+  it('does not attribute the legacy header compatibility check to derived IBT-118', () => {
+    expect(getValidationDRTargets('UAE-UC1-CHK-041', { includeReferenceOnly: true })).toEqual([]);
+    expect(getRulesForDR('IBT-118').map((rule) => rule.rule_id)).not.toContain('UAE-UC1-CHK-041');
+    expect(getRulesForDR('IBT-118').map((rule) => rule.rule_id)).toEqual(
+      expect.arrayContaining(['UAE-UC1-CHK-027', 'UAE-UC1-CHK-054'])
+    );
+  });
 });

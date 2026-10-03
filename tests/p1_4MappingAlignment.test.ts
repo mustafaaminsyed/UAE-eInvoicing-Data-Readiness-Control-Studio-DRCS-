@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { getDREntry } from '@/lib/registry/drRegistry';
 import { generateMappingSuggestions } from '@/lib/mapping/mappingSuggester';
+import { PINT_AE_UC1_FIELDS } from '@/types/fieldMapping';
+import { getValidationDRTargets } from '@/lib/registry/validationToDRMap';
+import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
 
 describe('P1.4 derived-field mapping alignment', () => {
   it.each([
@@ -22,5 +25,21 @@ describe('P1.4 derived-field mapping alignment', () => {
     );
     expect(suggestions.map((item) => item.targetField.ibtReference)).toEqual(expect.arrayContaining(['IBT-109', 'IBT-110']));
     expect(suggestions.map((item) => item.targetField.ibtReference)).not.toEqual(expect.arrayContaining(['IBT-116', 'IBT-117']));
+  });
+
+  it('does not expose the single header compatibility rate as authoritative repeatable IBT-119', () => {
+    const field = PINT_AE_UC1_FIELDS.find((item) => item.id === 'tax_category_rate')!;
+    expect(field.ibtReference).toBe('SYS-HEADER-TAX-CATEGORY-RATE');
+    expect(field.description).toContain('compatibility');
+    expect(field.description).toContain('derived from grouped line vat_rate');
+  });
+
+  it('removes stale CHK-041 attribution while retaining its compatibility-field validation purpose', () => {
+    const check = UAE_UC1_CHECK_PACK.find((item) => item.check_id === 'UAE-UC1-CHK-041')!;
+    expect(check.pint_reference_terms).toEqual([]);
+    expect(check.mof_rule_reference).toBeUndefined();
+    expect(check.description).toContain('legacy header');
+    expect(check.description).toContain('IBT-118 is derived');
+    expect(getValidationDRTargets(check.check_id, { includeReferenceOnly: true })).toEqual([]);
   });
 });
