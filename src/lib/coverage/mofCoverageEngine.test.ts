@@ -66,17 +66,17 @@ describe('mofCoverageEngine', () => {
     expect(commercial25?.fieldName).toBe('Buyer legal registration identifier type');
   });
 
-  it('keeps field 38 mapping from crosswalk with explicit source columns', () => {
+  it('keeps field 38 mapped to the line-rate prerequisite rather than the legacy header rate', () => {
     const tax = computeMoFCoverage('tax_invoice');
     const commercial = computeMoFCoverage('commercial_xml');
 
     const tax38 = tax.rows.find((row) => row.fieldId === 38);
     const commercial38 = commercial.rows.find((row) => row.fieldId === 38);
 
-    expect(tax38?.columns).toContain('tax_category_rate');
-    expect(tax38?.columns).toContain('vat_rate');
-    expect(commercial38?.columns).toContain('tax_category_rate');
-    expect(commercial38?.columns).toContain('vat_rate');
+    expect(tax38?.columns).toEqual(['vat_rate']);
+    expect(commercial38?.columns).toEqual(['vat_rate']);
+    expect(tax38?.columns).not.toContain('tax_category_rate');
+    expect(commercial38?.columns).not.toContain('tax_category_rate');
   });
 
   it('maps commercial field 49 as item description instead of dropping bridge linkage', () => {

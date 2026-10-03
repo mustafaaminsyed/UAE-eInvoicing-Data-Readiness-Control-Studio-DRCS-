@@ -1465,7 +1465,7 @@ describe('runPintAECheck executor registry parity', () => {
     expect(runPintAECheck(check, reverseChargeMismatch)).toHaveLength(2);
   });
 
-  it('fails CHK-054 when header VAT breakdown semantics conflict with line treatment', () => {
+  it('does not represent the single header category/total fields as repeatable IBG-23 execution in CHK-054', () => {
     const check = getCheck('UAE-UC1-CHK-054');
     const reverseChargeHeaderMismatch = buildDataContext(
       {
@@ -1515,7 +1515,14 @@ describe('runPintAECheck executor registry parity', () => {
       }
     );
 
-    expect(runPintAECheck(check, reverseChargeHeaderMismatch)).toHaveLength(1);
-    expect(runPintAECheck(check, exemptHeaderMismatch)).toHaveLength(2);
+    for (const data of [reverseChargeHeaderMismatch, exemptHeaderMismatch]) {
+      const result = runPintAECheckWithTelemetry(check, data);
+      expect(result.exceptions).toHaveLength(0);
+      expect(result.telemetry.not_evaluated_count).toBe(1);
+      expect(result.executionResults[0]).toMatchObject({
+        status: 'not_evaluated',
+        reason: expect.stringContaining('P1.7 dependency'),
+      });
+    }
   });
 });

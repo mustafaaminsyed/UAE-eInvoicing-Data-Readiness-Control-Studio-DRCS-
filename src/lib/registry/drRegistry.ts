@@ -58,8 +58,8 @@ const DR_TO_COLUMN_MAP: Record<string, { dataset: 'buyers' | 'headers' | 'lines'
   'IBT-110': { dataset: 'headers', columns: ['vat_total'] },
   'IBT-112': { dataset: 'headers', columns: ['total_incl_vat'] },
   'IBT-115': { dataset: 'headers', columns: ['amount_due'] },
-  'IBT-118': { dataset: 'headers', columns: ['tax_category_code'] },
-  'IBT-119': { dataset: 'headers', columns: ['tax_category_rate'] },
+  'IBT-118': { dataset: 'lines', columns: ['tax_category_code'] },
+  'IBT-119': { dataset: 'lines', columns: ['vat_rate'] },
   'BTUAE-02': { dataset: 'headers', columns: ['transaction_type_code'] },
   'BTAE-03': { dataset: 'headers', columns: ['credit_note_reason_code'] },
   'SYS-CN-REASON-TEXT': { dataset: 'headers', columns: ['credit_note_reason_text'] },
@@ -89,8 +89,8 @@ const DR_TO_COLUMN_MAP: Record<string, { dataset: 'buyers' | 'headers' | 'lines'
   'IBT-106': { dataset: 'lines', columns: ['line_total_excl_vat'] },
 
   // Derived/calculated fields (no user input column — derived from inputs)
-  'IBT-116': { dataset: 'headers', columns: ['total_excl_vat'] },
-  'IBT-117': { dataset: 'headers', columns: ['vat_total'] },
+  'IBT-116': { dataset: 'lines', columns: ['line_total_excl_vat', 'tax_category_code', 'vat_rate'] },
+  'IBT-117': { dataset: 'lines', columns: ['line_total_excl_vat', 'tax_category_code', 'vat_rate'] },
 
   // ASP-owned fields — not in templates
   'IBT-023': { dataset: 'headers', columns: [] },
@@ -120,7 +120,7 @@ function extractCodeListRef(field: SpecRegistryField): string | null {
 export function buildDRRegistry(): DRRegistryEntry[] {
   const fields = getRegistryFields();
   const systemDefaultAllowedIds = new Set(['IBT-023', 'IBT-024']);
-  const aspDerivedIds = new Set(['IBT-031-1', 'IBT-034-1', 'IBT-048-1', 'IBT-049-1']);
+  const aspDerivedIds = new Set(['IBT-031-1', 'IBT-034-1', 'IBT-048-1', 'IBT-049-1', 'IBT-116', 'IBT-117']);
   return fields.map(field => {
     const mapping = DR_TO_COLUMN_MAP[field.dr_id];
     const systemDefaultAllowed = systemDefaultAllowedIds.has(field.dr_id);
