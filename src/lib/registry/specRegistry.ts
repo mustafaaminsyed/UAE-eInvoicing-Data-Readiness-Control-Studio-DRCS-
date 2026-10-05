@@ -37,6 +37,15 @@ const registry: SpecRegistry = registryData as SpecRegistry;
 
 const BRIDGED_OVERLAY_FIELDS: SpecRegistryField[] = [
   {
+    dr_id: 'IBT-147', business_term: 'Item price discount', category: 'Invoice Line',
+    mandatory_flag_by_use_case: 'Optional', pint_ae_cardinality: '0..1', data_type: 'Number',
+    format_pattern: 'Non-negative decimal amount', validation_logic: 'When present, IBT-146 = IBT-148 - IBT-147.',
+    derivation_logic: 'Provided by ERP; never derived from IBT-136 line allowance.',
+    error_message_text: 'Item price discount is invalid or inconsistent with net and gross price.',
+    ubl_xml_path: '/Invoice/cac:InvoiceLine/cac:Price/cac:AllowanceCharge/cbc:Amount',
+    mls_relevance: 'Yes', vat_law_status: 'Old', data_responsibility: 'ERP (Corner 1)',
+  },
+  {
     dr_id: 'BTAE-03',
     business_term: 'Credit note reason code',
     category: 'conditional_header',
@@ -259,7 +268,11 @@ const BRIDGED_OVERLAY_FIELDS: SpecRegistryField[] = [
 ];
 
 function getMergedRegistryFields(): SpecRegistryField[] {
-  const merged = [...registry.fields];
+  const merged = registry.fields.map((field) => {
+    if (field.dr_id === 'IBT-148') return { ...field, mandatory_flag_by_use_case: 'Mandatory for UAE invoice and credit-note lines', pint_ae_cardinality: '1..1', derivation_logic: 'Derived from IBT-146 plus IBT-147, or equal to IBT-146 under governed no-discount state.', data_responsibility: 'DRCS derived from ERP pricing facts' };
+    if (field.dr_id === 'IBT-149') return { ...field, mandatory_flag_by_use_case: 'Mandatory in UAE output; governed default permitted', pint_ae_cardinality: '1..1' };
+    return field;
+  });
   for (const field of BRIDGED_OVERLAY_FIELDS) {
     if (!merged.some((candidate) => candidate.dr_id === field.dr_id)) {
       merged.push(field);

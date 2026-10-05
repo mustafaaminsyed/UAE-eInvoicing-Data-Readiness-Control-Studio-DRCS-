@@ -163,6 +163,13 @@ const CONTROLS_DEFINITION: Omit<ControlEntry, 'covered_dr_ids'>[] = [
     description: 'Requires the UAE transaction type code to be present and decodable before scenario-routing logic and overlay dependencies rely on it',
     covered_rule_ids: ['UAE-UC1-CHK-059', 'UAE-UC1-CHK-060'],
   },
+  {
+    control_id: 'CTRL-021',
+    control_name: 'Item Price Semantic Integrity',
+    control_type: 'detective',
+    description: 'Keeps item net price, price discount, derived gross price, and price base quantity distinct from invoice-line allowances',
+    covered_rule_ids: ['UAE-UC1-CHK-062'],
+  },
 ];
 
 // ── Build registry with derived DR IDs ──────────────────────────────

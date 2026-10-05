@@ -101,6 +101,18 @@ describe('negative headers template upload path', () => {
 
     expect(line.line_allowance_amount).toBe(10);
     expect(line.line_discount).toBe(10);
+    expect(line.item_price_discount).toBeUndefined();
+  });
+
+  it('parses item price discount independently from legacy line allowance inputs', async () => {
+    const csv = [
+      'line_id,invoice_id,line_number,quantity,unit_price,item_price_discount,line_discount,line_allowance_amount,line_total_excl_vat,vat_rate,vat_amount',
+      'L-001,INV-001,1,2,90,10,5,5,175,5,8.75',
+    ].join('\n');
+    const [line] = await parseLinesFile({ text: async () => csv } as File);
+    expect(line.item_price_discount).toBe(10);
+    expect(line.line_discount).toBe(5);
+    expect(line.line_allowance_amount).toBe(5);
   });
 
   it('keeps blank mandatory monetary values distinct from genuine zero values', async () => {

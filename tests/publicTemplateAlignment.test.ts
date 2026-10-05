@@ -45,8 +45,9 @@ describe('public template alignment', () => {
     expect(columns).toContain('line_allowance_amount');
     expect(columns).toContain('line_charge_amount');
     expect(columns).toContain('price_base_quantity');
+    expect(columns).toContain('item_price_discount');
     expect(columns).not.toContain('price_base_quantity_uom');
-    expect(columns).toHaveLength(19);
+    expect(columns).toHaveLength(20);
   });
 
   it('matches the in-app template manifest column counts', () => {

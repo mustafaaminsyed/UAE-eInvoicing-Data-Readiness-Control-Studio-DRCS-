@@ -92,8 +92,9 @@ Fields derived by the ASP (Corner 2) — such as Specification ID (IBT-024), Bus
 | 6 | `quantity` | IBT-129 | Yes | Number | Decimal | Invoiced quantity | ERP |
 | 7 | `unit_of_measure` | IBT-130 | Yes | Code | UN/ECE Rec 20 | UOM code | ERP |
 | 8 | `unit_price` | IBT-146 | Yes | Number | Decimal | Item net price | ERP |
-| 9 | `price_base_quantity` | IBT-149 | Conditional | Number | Positive decimal; blank defaults to 1 | Units to which `unit_price` applies; supply for per-pack/per-100/etc. pricing | ERP / DRCS default |
-| 10 | `line_discount` | SYS-LINE-DISCOUNT | No | Number | Decimal (2dp) | Simplified DRCS line discount input | ERP |
+| 9 | `item_price_discount` | IBT-147 | No | Number | Non-negative decimal amount | Optional item price-level discount; not a line allowance | ERP |
+| 10 | `price_base_quantity` | IBT-149 | Conditional | Number | Positive decimal; blank defaults to 1 | Units to which `unit_price` applies; supply for per-pack/per-100/etc. pricing | ERP / DRCS default |
+| 11 | `line_discount` | SYS-LINE-DISCOUNT | No | Number | Decimal (2dp) | Deprecated compatibility alias for line allowance; never IBT-147 | ERP |
 | 11 | `line_total_excl_vat` | IBT-131 | Yes | Number | Decimal (2dp) | Line net amount | ERP |
 | 12 | `vat_rate` | IBT-152 | Yes | Number | Percentage | VAT rate | ERP |
 | 13 | `vat_amount` | BTUAE-08 | Yes (UC1) | Number | Decimal (2dp) | VAT line amount | ERP |

@@ -16,6 +16,22 @@ function toRawRows(rows: Record<string, unknown>[]): Record<string, string>[] {
 }
 
 describe('buildEvidencePackData telemetry', () => {
+  it('records sourced discount and derived gross-price evidence without using line allowance', () => {
+    const lines: InvoiceLine[] = [{
+      line_id: 'L-PRICE', invoice_id: 'INV-PRICE', line_number: 1, quantity: 1,
+      unit_price: 410, item_price_discount: 40, line_allowance_amount: 5,
+      line_total_excl_vat: 405, vat_rate: 5, vat_amount: 20.25,
+    }];
+    const evidence = buildEvidencePackData('pricing-run', '2026-10-04T00:00:00.000Z', [], [], lines, [], []);
+    expect(evidence.pricingSemantics?.find((row) => row.regulatory_term === 'IBT-147')).toMatchObject({
+      status: 'SOURCE', source_field: 'item_price_discount', resulting_value: 40,
+    });
+    expect(evidence.pricingSemantics?.find((row) => row.regulatory_term === 'IBT-148')).toMatchObject({
+      status: 'DERIVED', resulting_value: 450, derivation: '410 + 40 = 450', validation_result: 'PASS',
+    });
+    expect(evidence.pricingSemantics?.find((row) => row.regulatory_term === 'IBT-148')?.contributing_values).not.toContain('5');
+  });
+
   it('prefers runtime telemetry over estimated execution counts when provided', () => {
     const buyers: Buyer[] = [
       { buyer_id: 'B-1', buyer_name: 'Buyer One' },

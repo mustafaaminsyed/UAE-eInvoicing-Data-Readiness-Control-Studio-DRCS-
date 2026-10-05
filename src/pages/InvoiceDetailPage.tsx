@@ -7,6 +7,7 @@ import { SeverityBadge } from '@/components/SeverityBadge';
 import { fetchLifecycleEvents, fetchCaseByInvoice } from '@/lib/api/casesApi';
 import { InvoiceLifecycleEvent, Case, InvoiceStatus } from '@/types/cases';
 import { cn } from '@/lib/utils';
+import { resolvePricingSemantics } from '@/lib/pricing/pricingSemantics';
 
 const STATUS_COLORS: Record<InvoiceStatus, string> = {
   'Received': 'bg-gray-500',
@@ -320,8 +321,10 @@ export default function InvoiceDetailPage() {
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">#</th>
                   <th className="text-left p-4 text-sm font-medium text-muted-foreground">Description</th>
                   <th className="text-right p-4 text-sm font-medium text-muted-foreground">Qty</th>
-                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">Unit Price</th>
-                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">Discount</th>
+                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">Item Net Price</th>
+                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">Price Discount</th>
+                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">Derived Gross Price</th>
+                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">Line Allowance</th>
                   <th className="text-right p-4 text-sm font-medium text-muted-foreground">Line Total</th>
                   <th className="text-right p-4 text-sm font-medium text-muted-foreground">VAT Rate</th>
                   <th className="text-right p-4 text-sm font-medium text-muted-foreground">VAT Amount</th>
@@ -332,6 +335,7 @@ export default function InvoiceDetailPage() {
                 {lines.map((line) => {
                   const lineExceptions = exceptions.filter(e => e.lineId === line.line_id);
                   const hasError = lineExceptions.length > 0;
+                  const pricing = resolvePricingSemantics(line);
                   
                   return (
                     <tr 
@@ -342,7 +346,9 @@ export default function InvoiceDetailPage() {
                       <td className="p-4 text-sm text-muted-foreground max-w-[200px] truncate">{line.description || '-'}</td>
                       <td className="p-4 text-right text-sm text-foreground">{line.quantity}</td>
                       <td className="p-4 text-right text-sm text-foreground">{line.unit_price.toFixed(2)}</td>
-                      <td className="p-4 text-right text-sm text-foreground">{(line.line_discount || 0).toFixed(2)}</td>
+                      <td className="p-4 text-right text-sm text-foreground">{line.item_price_discount === undefined ? '—' : line.item_price_discount.toFixed(2)}</td>
+                      <td className="p-4 text-right text-sm text-foreground">{pricing.itemGrossPrice?.toFixed(2) ?? '—'}</td>
+                      <td className="p-4 text-right text-sm text-foreground">{(line.line_allowance_amount ?? line.line_discount ?? 0).toFixed(2)}</td>
                       <td className="p-4 text-right text-sm font-medium text-foreground">{line.line_total_excl_vat.toFixed(2)}</td>
                       <td className="p-4 text-right text-sm text-foreground">{(line.vat_rate * 100).toFixed(0)}%</td>
                       <td className="p-4 text-right text-sm text-foreground">{line.vat_amount.toFixed(2)}</td>

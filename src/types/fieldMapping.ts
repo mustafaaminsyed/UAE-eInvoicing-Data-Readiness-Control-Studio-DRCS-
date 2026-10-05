@@ -226,6 +226,7 @@ export const PINT_AE_UC1_FIELDS: PintAEField[] = [
   { id: 'quantity', name: 'Quantity', description: 'Invoiced quantity', ibtReference: 'IBT-129', category: 'line', isMandatory: true, dataType: 'number' },
   { id: 'unit_of_measure', name: 'Unit of Measure', description: 'UNECE Rec 20 unit code', ibtReference: 'IBT-130', category: 'line', isMandatory: false, dataType: 'string' },
   { id: 'unit_price', name: 'Unit Price', description: 'Item net price', ibtReference: 'IBT-146', category: 'line', isMandatory: true, dataType: 'number' },
+  { id: 'item_price_discount', name: 'Item Price Discount', description: 'Optional price-level discount amount; distinct from an invoice-line allowance', ibtReference: 'IBT-147', category: 'line', isMandatory: false, dataType: 'number' },
   { id: 'price_base_quantity', name: 'Price Base Quantity', description: 'Number of item units to which the item net price applies; defaults to 1 when omitted', ibtReference: 'IBT-149', category: 'line', isMandatory: false, dataType: 'number' },
   { id: 'line_discount', name: 'Line Discount (Legacy)', description: 'Backward-compatible DRCS helper field for line discounts; use line_allowance_amount where possible', ibtReference: 'SYS-LINE-DISCOUNT', category: 'line', isMandatory: false, dataType: 'number' },
   { id: 'line_total_excl_vat', name: 'Line Net Amount', description: 'Line total excl VAT', ibtReference: 'IBT-131', category: 'line', isMandatory: true, dataType: 'number' },

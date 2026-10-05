@@ -108,7 +108,6 @@ export const VALIDATION_TO_DR_MAP: ValidationDRMapEntry[] = [
       partial('IBT-129', 'quantity'),
       exact('IBT-131', 'line_total_excl_vat'),
       partial('IBT-146', 'unit_price'),
-      partial('IBT-148', 'unit_price'),
       partial('IBT-149', 'price_base_quantity', 'line_base_quantity', 'item_price_base_quantity'),
     ],
   },
@@ -126,6 +125,7 @@ export const VALIDATION_TO_DR_MAP: ValidationDRMapEntry[] = [
   { validation_id: 'UAE-UC1-CHK-038', dr_targets: [exact('IBT-153', 'item_name')] },
   { validation_id: 'UAE-UC1-CHK-039', dr_targets: [exact('IBT-154', 'description')] },
   { validation_id: 'UAE-UC1-CHK-040', dr_targets: [partial('IBT-149', 'price_base_quantity', 'line_base_quantity', 'item_price_base_quantity'), partial('IBT-129', 'quantity'), partial('IBT-146', 'unit_price')] },
+  { validation_id: 'UAE-UC1-CHK-062', dr_targets: [exact('IBT-146', 'unit_price'), exact('IBT-147', 'item_price_discount'), partial('IBT-148', 'unit_price', 'item_price_discount')] },
   // Legacy header compatibility validation; repeatable IBT-118 is evidenced by CHK-027/054 derivation.
   { validation_id: 'UAE-UC1-CHK-041', dr_targets: [] },
   { validation_id: 'UAE-UC1-CHK-042', dr_targets: [exact('IBT-151', 'tax_category_code')] },

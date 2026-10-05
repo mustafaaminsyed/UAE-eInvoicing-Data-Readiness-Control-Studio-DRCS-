@@ -20,6 +20,7 @@ export interface DRRegistryEntry {
   pint_ae_reference: string; // UBL XML path or PINT-AE reference
   asp_derived: boolean;
   system_default_allowed: boolean;
+  readiness_treatment?: 'SOURCE' | 'CONDITIONAL_SOURCE' | 'DERIVED' | 'SOURCE_OR_DEFAULT';
 }
 
 // Map from DR ID to internal column names and dataset file
@@ -78,7 +79,8 @@ const DR_TO_COLUMN_MAP: Record<string, { dataset: 'buyers' | 'headers' | 'lines'
   'IBT-130': { dataset: 'lines', columns: ['unit_of_measure'] },
   'IBT-131': { dataset: 'lines', columns: ['line_total_excl_vat'] },
   'IBT-146': { dataset: 'lines', columns: ['unit_price'] },
-  'IBT-148': { dataset: 'lines', columns: ['unit_price'] }, // gross price maps to same input
+  'IBT-147': { dataset: 'lines', columns: ['item_price_discount'] },
+  'IBT-148': { dataset: 'lines', columns: ['unit_price', 'item_price_discount'] },
   'IBT-151': { dataset: 'lines', columns: ['tax_category_code'] },
   'IBT-152': { dataset: 'lines', columns: ['vat_rate'] },
   'IBT-153': { dataset: 'lines', columns: ['item_name'] },
@@ -120,7 +122,7 @@ function extractCodeListRef(field: SpecRegistryField): string | null {
 export function buildDRRegistry(): DRRegistryEntry[] {
   const fields = getRegistryFields();
   const systemDefaultAllowedIds = new Set(['IBT-023', 'IBT-024']);
-  const aspDerivedIds = new Set(['IBT-031-1', 'IBT-034-1', 'IBT-048-1', 'IBT-049-1', 'IBT-116', 'IBT-117']);
+  const aspDerivedIds = new Set(['IBT-031-1', 'IBT-034-1', 'IBT-048-1', 'IBT-049-1', 'IBT-116', 'IBT-117', 'IBT-148']);
   return fields.map(field => {
     const mapping = DR_TO_COLUMN_MAP[field.dr_id];
     const systemDefaultAllowed = systemDefaultAllowedIds.has(field.dr_id);
@@ -140,6 +142,15 @@ export function buildDRRegistry(): DRRegistryEntry[] {
       pint_ae_reference: field.ubl_xml_path || '',
       asp_derived: aspDerived,
       system_default_allowed: systemDefaultAllowed,
+      readiness_treatment: field.dr_id === 'IBT-147'
+        ? 'CONDITIONAL_SOURCE'
+        : field.dr_id === 'IBT-148'
+          ? 'DERIVED'
+          : field.dr_id === 'IBT-149'
+            ? 'SOURCE_OR_DEFAULT'
+            : field.dr_id === 'IBT-146'
+              ? 'SOURCE'
+              : undefined,
     };
   });
 }
@@ -169,7 +180,7 @@ export const PARSER_KNOWN_COLUMNS: Record<'buyers' | 'headers' | 'lines', Set<st
 	  ]),
   lines: new Set([
     'line_id', 'invoice_id', 'line_number', 'description', 'quantity',
-    'unit_price', 'price_base_quantity', 'line_discount', 'line_total_excl_vat', 'vat_rate', 'vat_amount',
+    'unit_price', 'item_price_discount', 'price_base_quantity', 'line_discount', 'line_total_excl_vat', 'vat_rate', 'vat_amount',
     'unit_of_measure', 'tax_category_code', 'exemption_reason_code',
     'exemption_reason_text', 'goods_service_type', 'item_name',
     'line_allowance_amount', 'line_charge_amount',

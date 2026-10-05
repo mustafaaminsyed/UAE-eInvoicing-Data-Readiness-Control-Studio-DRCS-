@@ -68,7 +68,7 @@ const SEARCH_RULE_TYPES = [
 
 const FIELD_OPTIONS: Record<string, string[]> = {
   header: ['invoice_id', 'invoice_number', 'issue_date', 'seller_trn', 'buyer_id', 'currency', 'invoice_type', 'total_excl_vat', 'vat_total', 'total_incl_vat'],
-  lines: ['line_id', 'invoice_id', 'line_number', 'description', 'quantity', 'unit_price', 'line_discount', 'line_total_excl_vat', 'vat_rate', 'vat_amount'],
+  lines: ['line_id', 'invoice_id', 'line_number', 'description', 'quantity', 'unit_price', 'item_price_discount', 'line_discount', 'line_total_excl_vat', 'vat_rate', 'vat_amount'],
   buyers: ['buyer_id', 'buyer_name', 'buyer_trn', 'buyer_address', 'buyer_country'],
   'cross-file': ['invoice_id', 'invoice_number', 'seller_trn', 'buyer_id'],
 };
