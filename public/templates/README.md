@@ -95,15 +95,15 @@ Fields derived by the ASP (Corner 2) — such as Specification ID (IBT-024), Bus
 | 9 | `item_price_discount` | IBT-147 | No | Number | Non-negative decimal amount | Optional item price-level discount; not a line allowance | ERP |
 | 10 | `price_base_quantity` | IBT-149 | Conditional | Number | Positive decimal; blank defaults to 1 | Units to which `unit_price` applies; supply for per-pack/per-100/etc. pricing | ERP / DRCS default |
 | 11 | `line_discount` | SYS-LINE-DISCOUNT | No | Number | Decimal (2dp) | Deprecated compatibility alias for line allowance; never IBT-147 | ERP |
-| 11 | `line_total_excl_vat` | IBT-131 | Yes | Number | Decimal (2dp) | Line net amount | ERP |
-| 12 | `vat_rate` | IBT-152 | Yes | Number | Percentage | VAT rate | ERP |
-| 13 | `vat_amount` | BTUAE-08 | Yes (UC1) | Number | Decimal (2dp) | VAT line amount | ERP |
-| 14 | `tax_category_code` | IBT-151 | Yes | Code | S/Z/E/RC | Item tax category | ERP |
-| 15 | `exemption_reason_code` | IBT-151 | Conditional | Code | UAE exemption code | Exemption reason code when applicable | ERP |
-| 16 | `exemption_reason_text` | IBT-151 | Conditional | String | Free text | Exemption reason text when applicable | ERP |
-| 17 | `goods_service_type` | IBT-151 | Conditional | Code | Goods/services classification | Reverse-charge goods/services type when applicable | ERP |
-| 18 | `line_allowance_amount` | IBT-136 | No | Number | Decimal (2dp) | Standards-aligned line allowance amount | ERP |
-| 19 | `line_charge_amount` | IBT-141 | No | Number | Decimal (2dp) | Standards-aligned line charge amount | ERP |
+| 12 | `line_total_excl_vat` | IBT-131 | Yes | Number | Decimal (2dp) | Line net amount | ERP |
+| 13 | `vat_rate` | IBT-152 | Yes | Number | Percentage | VAT rate | ERP |
+| 14 | `vat_amount` | BTUAE-08 | Yes (UC1) | Number | Decimal (2dp) | VAT line amount | ERP |
+| 15 | `tax_category_code` | IBT-151 | Yes | Code | S/Z/E/RC | Item tax category | ERP |
+| 16 | `exemption_reason_code` | IBT-151 | Conditional | Code | UAE exemption code | Exemption reason code when applicable | ERP |
+| 17 | `exemption_reason_text` | IBT-151 | Conditional | String | Free text | Exemption reason text when applicable | ERP |
+| 18 | `goods_service_type` | IBT-151 | Conditional | Code | Goods/services classification | Reverse-charge goods/services type when applicable | ERP |
+| 19 | `line_allowance_amount` | IBT-136 | No | Number | Decimal (2dp) | Standards-aligned line allowance amount | ERP |
+| 20 | `line_charge_amount` | IBT-141 | No | Number | Decimal (2dp) | Standards-aligned line charge amount | ERP |
 
 ---
 
