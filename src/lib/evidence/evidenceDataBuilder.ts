@@ -19,6 +19,7 @@ import { checksRegistry } from '@/lib/checks/checksRegistry';
 import { ValidationExecutionEvidence } from '@/types/validationExecution';
 import { getCurrentRegulatoryBaselineIdentity, UAE_REGULATORY_BASELINE } from '@/config/regulatoryBaseline';
 import { RegulatoryBaselineIdentity } from '@/types/evidence';
+import { PricingSemanticStatus, resolvePricingSemantics } from '@/lib/pricing/pricingSemantics';
 
 export interface EvidencePackBuildOverrides {
   datasetName?: string;
@@ -227,6 +228,20 @@ export interface EvidencePackData {
   controlsCoverage: ControlCoverageRow[];
   populationQuality: PopulationQualityRow[];
   traceabilityRows: TraceabilityRow[];
+  pricingSemantics?: PricingSemanticEvidenceRow[];
+}
+
+export interface PricingSemanticEvidenceRow {
+  invoice_id: string;
+  line_id: string;
+  regulatory_term: 'IBT-146' | 'IBT-147' | 'IBT-148' | 'IBT-149';
+  semantic_meaning: string;
+  status: PricingSemanticStatus;
+  source_field?: string;
+  contributing_values: string;
+  resulting_value?: number;
+  derivation?: string;
+  validation_result: 'PASS' | 'FAIL' | 'NOT_APPLICABLE';
 }
 
 type EvidenceRuleCatalogEntry = {
@@ -307,6 +322,16 @@ export function buildEvidencePackData(
     overrides.datasetName ?? (headers.length > 0 ? (headers[0].seller_name ?? headers[0].seller_trn) : 'Unknown');
   const entityScope = deriveEntityScope(headers, pintAEExceptions, overrides);
   const sourceMode = overrides.sourceMode ?? 'current_in_memory_run';
+  const pricingSemantics: PricingSemanticEvidenceRow[] = lines.flatMap((line) => {
+    const pricing = resolvePricingSemantics(line);
+    const common = { invoice_id: line.invoice_id, line_id: line.line_id };
+    return [
+      { ...common, regulatory_term: 'IBT-146' as const, semantic_meaning: 'Item net price', status: pricing.netStatus, source_field: 'unit_price', contributing_values: `unit_price=${line.unit_price}`, resulting_value: pricing.itemNetPrice, validation_result: pricing.netStatus === 'CONTRADICTORY' ? 'FAIL' as const : 'PASS' as const },
+      { ...common, regulatory_term: 'IBT-147' as const, semantic_meaning: 'Item price discount', status: pricing.discountStatus, source_field: pricing.itemPriceDiscount === undefined ? undefined : 'item_price_discount', contributing_values: `item_price_discount=${pricing.itemPriceDiscount ?? '(absent)'}`, resulting_value: pricing.itemPriceDiscount, validation_result: pricing.discountStatus === 'NOT_APPLICABLE' ? 'NOT_APPLICABLE' as const : pricing.discountStatus === 'CONTRADICTORY' ? 'FAIL' as const : 'PASS' as const },
+      { ...common, regulatory_term: 'IBT-148' as const, semantic_meaning: 'Item gross price', status: pricing.grossStatus, contributing_values: `IBT-146=${pricing.itemNetPrice}; IBT-147=${pricing.itemPriceDiscount ?? '(absent)'}`, resulting_value: pricing.itemGrossPrice, derivation: pricing.derivation, validation_result: pricing.valid ? 'PASS' as const : 'FAIL' as const },
+      { ...common, regulatory_term: 'IBT-149' as const, semantic_meaning: 'Item price base quantity', status: pricing.baseQuantityStatus, source_field: line.price_base_quantity === undefined ? undefined : 'price_base_quantity', contributing_values: `price_base_quantity=${pricing.priceBaseQuantity}`, resulting_value: pricing.priceBaseQuantity, validation_result: pricing.baseQuantityStatus === 'CONTRADICTORY' ? 'FAIL' as const : 'PASS' as const },
+    ];
+  });
 
   // Build exception counts by DR for the conformance engine
   const exceptionCountsByDR = new Map<string, { pass: number; fail: number }>();
@@ -519,5 +544,6 @@ export function buildEvidencePackData(
     controlsCoverage,
     populationQuality,
     traceabilityRows: traceRows,
+    pricingSemantics,
   };
 }

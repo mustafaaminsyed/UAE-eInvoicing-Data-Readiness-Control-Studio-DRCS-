@@ -34,7 +34,8 @@ const COLUMN_PATTERNS: Record<string, string[]> = {
   
   line_id: ['line_id', 'line_number', 'line_no', 'item_id', 'seq', 'line_num', 'row_number'],
   quantity: ['quantity', 'qty', 'line_qty', 'units', 'amount', 'line_quantity'],
-  unit_price: ['unit_price', 'price', 'rate', 'item_price', 'unit_rate', 'net_price'],
+  unit_price: ['unit_price', 'net_price', 'item_net_price', 'unit_net_price'],
+  item_price_discount: ['item_price_discount', 'price_discount', 'unit_price_discount'],
   price_base_quantity: ['price_base_quantity', 'item_price_base_quantity', 'line_base_quantity', 'base_quantity'],
   line_total_excl_vat: ['line_total_excl_vat', 'line_total', 'line_amount', 'net_amount', 'line_net', 'extended_amount', 'line_value'],
   item_name: ['item_name', 'product_name', 'product', 'item', 'item_label'],
@@ -137,6 +138,8 @@ export function generateMappingSuggestions(
   for (let colIndex = 0; colIndex < erpColumns.length; colIndex++) {
     const column = erpColumns[colIndex];
     const normalizedColumn = column.toLowerCase().replace(/[_\-\s]/g, '');
+    // IBT-148 is derived in the approved canonical model. Never collapse gross/list price into IBT-146.
+    if (['grossprice', 'itemgrossprice', 'listprice'].includes(normalizedColumn)) continue;
     const sampleValues = sampleData.slice(0, 5).map(row => row[column] || '');
     
     let bestMatch: { fieldId: string; confidence: number; reason: string } | null = null;

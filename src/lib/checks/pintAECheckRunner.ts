@@ -8,6 +8,7 @@ import { decodeTransactionTypeCode } from '@/modules/scenarioContext/transaction
 import { Direction } from '@/types/direction';
 import { ValidationExecutionEvidence } from '@/types/validationExecution';
 import { DerivedVatBreakdown, deriveVatBreakdowns, sumVatBreakdownTax } from '@/lib/tax/vatBreakdownDerivation';
+import { resolvePricingSemantics } from '@/lib/pricing/pricingSemantics';
 
 export interface PintAECheckTelemetry {
   rule_id: string;
@@ -1653,6 +1654,27 @@ export function runPintAECheckWithTelemetry(
             observedValue: String(line.quantity),
             expectedValue: 'Quantity > 0 when base quantity policy applies',
             message: `Invoice ${header?.invoice_number || line.invoice_id}, Line ${line.line_number}: Quantity must be positive for base quantity policy`,
+          }));
+        }
+      });
+      break;
+
+    case 'UAE-UC1-CHK-062':
+      data.lines.forEach(line => {
+        executionCount++;
+        const header = data.headerMap.get(line.invoice_id);
+        const pricing = resolvePricingSemantics(line);
+        if (!pricing.valid) {
+          exceptions.push(createException({
+            invoiceId: line.invoice_id,
+            invoiceNumber: header?.invoice_number,
+            sellerTrn: header?.seller_trn,
+            buyerId: header?.buyer_id,
+            lineId: line.line_id,
+            fieldName: 'unit_price|item_price_discount|price_base_quantity',
+            observedValue: `net=${line.unit_price}; priceDiscount=${line.item_price_discount ?? '(absent)'}; baseQuantity=${line.price_base_quantity ?? '(default 1)'}`,
+            expectedValue: 'Non-negative net/discount, positive base quantity, and gross = net + price discount',
+            message: `Invoice ${header?.invoice_number || line.invoice_id}, Line ${line.line_number}: ${pricing.reason}`,
           }));
         }
       });

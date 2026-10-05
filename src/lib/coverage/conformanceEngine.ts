@@ -94,7 +94,8 @@ export function computeTraceabilityMatrix(
 
     // Population: average across all columns for this DR
     let populationPct: number | null = null;
-    if (inTemplate && entry.dataset_file && populations.length > 0) {
+    // Derived terms are evidenced from their prerequisites, not judged as taxpayer-source columns.
+    if (inTemplate && !entry.asp_derived && entry.dataset_file && populations.length > 0) {
       const pcts = entry.internal_column_names
         .map(col => getColumnPopulationPct(populations, entry.dataset_file!, col))
         .filter((p): p is number => p !== null);

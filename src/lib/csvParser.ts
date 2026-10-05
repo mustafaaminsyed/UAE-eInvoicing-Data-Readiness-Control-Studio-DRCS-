@@ -293,6 +293,7 @@ export async function parseLinesFile(file: File, options: ParseOptions = {}): Pr
         : str(record, 'item_name'),
       quantity: parseFloat(record.quantity) || 0,
       unit_price: requiredNum(record, 'unit_price'),
+      item_price_discount: num(record, 'item_price_discount', 'price_discount', 'unit_price_discount'),
       line_discount: lineDiscount,
       line_total_excl_vat: requiredNum(record, 'line_total_excl_vat', 'line_net_amount'),
       vat_rate: requiredNum(record, 'vat_rate'),

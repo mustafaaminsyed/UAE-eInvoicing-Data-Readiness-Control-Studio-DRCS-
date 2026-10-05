@@ -591,12 +591,12 @@
       "mof_field_id": 44,
       "mof_business_term": "Item gross price",
       "source_template": "invoice_lines_template.csv",
-      "source_column": "unit_price|line_allowance_amount|line_charge_amount",
-      "internal_field_key": "unit_price|line_allowance_amount|line_charge_amount",
+      "source_column": "unit_price|item_price_discount",
+      "internal_field_key": "unit_price|item_price_discount",
       "dr_id": "IBT-148",
       "classification": "derived",
-      "transformation_rule": "Derive gross price from unit price and line-level charges/allowances when available",
-      "status": "partially_covered",
+      "transformation_rule": "Derive gross price as item net price plus optional item price discount; never use line allowance or charge",
+      "status": "covered",
       "notes": ""
     },
     {
@@ -1254,12 +1254,12 @@
       "mof_field_id": 44,
       "mof_business_term": "Item gross price",
       "source_template": "invoice_lines_template.csv",
-      "source_column": "unit_price|line_allowance_amount|line_charge_amount",
-      "internal_field_key": "unit_price|line_allowance_amount|line_charge_amount",
+      "source_column": "unit_price|item_price_discount",
+      "internal_field_key": "unit_price|item_price_discount",
       "dr_id": "IBT-148",
       "classification": "derived",
-      "transformation_rule": "Derive gross price from unit price and line-level charges/allowances when available",
-      "status": "partially_covered",
+      "transformation_rule": "Derive gross price as item net price plus optional item price discount; never use line allowance or charge",
+      "status": "covered",
       "notes": ""
     },
     {

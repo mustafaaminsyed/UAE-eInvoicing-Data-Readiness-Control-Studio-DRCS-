@@ -42,7 +42,7 @@ tax,40,Invoiced quantity,invoice_lines_template.csv,quantity,quantity,IBT-129,di
 tax,41,Unit of measure code,invoice_lines_template.csv,unit_of_measure,unit_of_measure,IBT-130,direct,Read unit of measure code from lines.unit_of_measure,covered,
 tax,42,Invoice line net amount,invoice_lines_template.csv,line_total_excl_vat,line_total_excl_vat,IBT-131,direct,Read invoice line net amount from lines.line_total_excl_vat,covered,
 tax,43,Item net price,invoice_lines_template.csv,unit_price,unit_price,IBT-146,direct,Read item net price from lines.unit_price,covered,
-tax,44,Item gross price,invoice_lines_template.csv,unit_price|line_allowance_amount|line_charge_amount,unit_price|line_allowance_amount|line_charge_amount,IBT-148,derived,Derive gross price from unit price and line-level charges/allowances when available,partially_covered,
+tax,44,Item gross price,invoice_lines_template.csv,unit_price|item_price_discount,unit_price|item_price_discount,IBT-148,derived,Derive gross price as item net price plus optional item price discount; never use line allowance or charge,covered,
 tax,45,Item price base quantity,invoice_lines_template.csv,price_base_quantity,price_base_quantity,IBT-149,direct_or_defaulted,Read the positive source price basis when supplied; otherwise default to 1 only for per-one-unit pricing,covered,Conditional taxpayer source required for per-pack/per-100 or similar pricing.
 tax,46,Invoiced item tax category code,invoice_lines_template.csv,tax_category_code,tax_category_code,IBT-151,direct,Read invoiced item tax category code from lines.tax_category_code,covered,
 tax,47,Invoiced item tax rate,invoice_lines_template.csv,vat_rate,vat_rate,IBT-152,direct,Read invoiced item tax rate from lines.vat_rate,covered,
@@ -93,7 +93,7 @@ commercial,40,Invoiced quantity,invoice_lines_template.csv,quantity,quantity,IBT
 commercial,41,Unit of measure code,invoice_lines_template.csv,unit_of_measure,unit_of_measure,IBT-130,direct,Read unit of measure code from lines.unit_of_measure,covered,
 commercial,42,Invoice line net amount,invoice_lines_template.csv,line_total_excl_vat,line_total_excl_vat,IBT-131,direct,Read invoice line net amount from lines.line_total_excl_vat,covered,
 commercial,43,Item net price,invoice_lines_template.csv,unit_price,unit_price,IBT-146,direct,Read item net price from lines.unit_price,covered,
-commercial,44,Item gross price,invoice_lines_template.csv,unit_price|line_allowance_amount|line_charge_amount,unit_price|line_allowance_amount|line_charge_amount,IBT-148,derived,Derive gross price from unit price and line-level charges/allowances when available,partially_covered,
+commercial,44,Item gross price,invoice_lines_template.csv,unit_price|item_price_discount,unit_price|item_price_discount,IBT-148,derived,Derive gross price as item net price plus optional item price discount; never use line allowance or charge,covered,
 commercial,45,Item price base quantity,invoice_lines_template.csv,price_base_quantity,price_base_quantity,IBT-149,direct_or_defaulted,Read the positive source price basis when supplied; otherwise default to 1 only for per-one-unit pricing,covered,Conditional taxpayer source required for per-pack/per-100 or similar pricing.
 commercial,46,Invoiced item tax category code,invoice_lines_template.csv,tax_category_code,tax_category_code,IBT-151,direct,Read invoiced item tax category code from lines.tax_category_code,covered,
 commercial,47,Invoiced item tax rate,invoice_lines_template.csv,vat_rate,vat_rate,IBT-152,direct,Read invoiced item tax rate from lines.vat_rate,covered,

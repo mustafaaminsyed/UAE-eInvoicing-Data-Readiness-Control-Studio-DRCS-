@@ -97,6 +97,8 @@ export interface InvoiceLine {
   description?: string;
   quantity: number;
   unit_price: number;
+  /** IBT-147: optional price-level discount amount; never a line allowance. */
+  item_price_discount?: number;
   line_discount?: number;
   line_total_excl_vat: number;
   vat_rate: number;

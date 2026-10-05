@@ -83,6 +83,7 @@ async function loadSamples() {
     quantity: Number(r.quantity),
     unit_of_measure: r.unit_of_measure,
     unit_price: Number(r.unit_price),
+    item_price_discount: r.item_price_discount ? Number(r.item_price_discount) : undefined,
     price_base_quantity: r.price_base_quantity ? Number(r.price_base_quantity) : undefined,
     line_discount: Number(r.line_discount),
     line_total_excl_vat: Number(r.line_total_excl_vat),
