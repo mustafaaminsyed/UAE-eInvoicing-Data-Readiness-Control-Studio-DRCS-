@@ -1,6 +1,10 @@
 // Transformation Engine for Field Mapping
 import { Transformation, TransformationType } from '@/types/fieldMapping';
 
+export type TransformationOutcome =
+  | { ok: true; value: string }
+  | { ok: false; value: string; error: string };
+
 /**
  * Apply a series of transformations to a value
  */
@@ -16,6 +20,19 @@ export function applyTransformations(
   }
 
   return result;
+}
+
+/** Execute a transformation chain without hiding failures. */
+export function applyTransformationsStrict(
+  value: string,
+  transformations: Transformation[],
+  rowContext?: Record<string, string>
+): TransformationOutcome {
+  try {
+    return { ok: true, value: applyTransformations(value, transformations, rowContext) };
+  } catch (error) {
+    return { ok: false, value, error: error instanceof Error ? error.message : 'Transformation failed' };
+  }
 }
 
 /**
