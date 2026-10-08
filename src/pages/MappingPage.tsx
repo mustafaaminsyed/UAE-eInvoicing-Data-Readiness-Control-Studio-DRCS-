@@ -14,6 +14,7 @@ import { UploadStep } from '@/components/mapping/UploadStep';
 import { MappingStep } from '@/components/mapping/MappingStep';
 import { AnalysisStep } from '@/components/mapping/AnalysisStep';
 import { SaveStep } from '@/components/mapping/SaveStep';
+import { NativeIngestionPanel } from '@/components/mapping/NativeIngestionPanel';
 import { WorkflowNavigator, buildWorkflowItems } from '@/components/shared/WorkflowNavigator';
 import { WorkflowPageHeader } from '@/components/shared/WorkflowPageHeader';
 import {
@@ -773,12 +774,15 @@ export default function MappingPage() {
               </div>
             )}
             {currentStep === 'analysis' && previewData && (
-              <AnalysisStep 
-                previewData={previewData} 
-                mappings={mappings} 
-                conditionalAnswers={conditionalAnswers}
-                onConditionalAnswersChange={setConditionalAnswers}
-              />
+              <div className="space-y-6">
+                <AnalysisStep
+                  previewData={previewData}
+                  mappings={mappings}
+                  conditionalAnswers={conditionalAnswers}
+                  onConditionalAnswersChange={setConditionalAnswers}
+                />
+                <NativeIngestionPanel previewData={previewData} mappings={mappings} direction={direction} />
+              </div>
             )}
             {currentStep === 'save' && (
                   <SaveStep 
