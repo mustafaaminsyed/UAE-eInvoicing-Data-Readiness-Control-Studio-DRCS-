@@ -129,7 +129,7 @@ const AP_TEMPLATE_COLUMN_ALIASES: Record<string, string> = {
   supplier_electronic_address: 'buyer_electronic_address',
 };
 
-function getTemplateHeaderColumns(dataset: SampleDataset, direction: SampleDirection): string[] {
+export function getTemplateHeaderColumns(dataset: SampleDataset, direction: SampleDirection): string[] {
   const sample = getSampleData(dataset, 'positive', direction);
   return sample.content
     .split(/\r?\n/, 1)[0]
@@ -138,7 +138,7 @@ function getTemplateHeaderColumns(dataset: SampleDataset, direction: SampleDirec
     .filter(Boolean);
 }
 
-function resolveTemplateColumnCanonicalId(column: string, direction: SampleDirection): string {
+export function resolveTemplateColumnCanonicalId(column: string, direction: SampleDirection): string {
   if (direction === 'AP') {
     return AP_TEMPLATE_COLUMN_ALIASES[column] || column;
   }
