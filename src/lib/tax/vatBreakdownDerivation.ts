@@ -1,4 +1,4 @@
-import { InvoiceHeader, InvoiceLine } from '@/types/compliance';
+import { DocumentLevelAdjustment, InvoiceHeader, InvoiceLine } from '@/types/compliance';
 
 export type VatBreakdownEvaluationStatus = 'evaluated' | 'not_evaluated' | 'failed';
 
@@ -18,6 +18,7 @@ export interface DerivedVatBreakdown {
   taxAmount: number;
   currency: string;
   contributingLineIds: string[];
+  contributingAdjustmentIds: string[];
   normalizations: string[];
   status: 'evaluated';
   lineage: VatBreakdownLineage;
@@ -115,15 +116,25 @@ export function normalizeVatCategory(value: unknown): { category: string; normal
   return { category, normalization: category !== source ? `${source}->${category}` : undefined };
 }
 
-function adjustmentsArePositivelyAbsent(header: InvoiceHeader): boolean {
-  return header.document_level_allowance_total === 0 && header.document_level_charge_total === 0;
-}
-
 function rateForLine(line: InvoiceLine, category: string): number | null {
   if (category === 'E' || category === 'O') return null;
   return line.vat_rate === undefined || line.vat_rate === null || !Number.isFinite(Number(line.vat_rate))
     ? null
     : Number(line.vat_rate);
+}
+
+function adjustmentRate(adjustment: DocumentLevelAdjustment, category: string): number | null {
+  if (category === 'E' || category === 'O') return null;
+  return adjustment.vat_rate === undefined || adjustment.vat_rate === null || !Number.isFinite(Number(adjustment.vat_rate))
+    ? null
+    : Number(adjustment.vat_rate);
+}
+
+function sumAdjustments(adjustments: DocumentLevelAdjustment[], kind: DocumentLevelAdjustment['kind']): number {
+  const exact = adjustments
+    .filter((adjustment) => adjustment.kind === kind)
+    .reduce((sum, adjustment) => addDecimal(sum, parseDecimal(Number(adjustment.amount))), { coefficient: 0n, scale: 0 });
+  return roundVatBreakdownMoney(exact);
 }
 
 export function deriveVatBreakdowns(
@@ -132,15 +143,43 @@ export function deriveVatBreakdowns(
 ): VatBreakdownDerivationResult {
   const base = { invoiceId: header.invoice_id, currency: header.currency, breakdowns: [] as DerivedVatBreakdown[] };
 
-  if (!adjustmentsArePositivelyAbsent(header)) {
-    const hasAdjustment = Number(header.document_level_allowance_total ?? 0) !== 0 ||
-      Number(header.document_level_charge_total ?? 0) !== 0;
+  const allowanceTotal = header.document_level_allowance_total;
+  const chargeTotal = header.document_level_charge_total;
+  if (allowanceTotal === undefined || chargeTotal === undefined) {
     return {
       ...base,
       status: 'not_evaluated',
-      dependencyReason: hasAdjustment
-        ? 'P1.7 dependency: document-level adjustments exist but cannot be allocated by VAT category and rate.'
-        : 'P1.7 dependency: absence of document-level adjustments is not positively established.',
+      dependencyReason: 'Document-adjustment dependency: absence of document-level adjustments is not positively established.',
+    };
+  }
+
+  const adjustments = header.document_level_adjustments ?? [];
+  const adjustmentIds = adjustments.map((adjustment) => adjustment.adjustment_id);
+  const hasAdjustmentTotals = Number(allowanceTotal) !== 0 || Number(chargeTotal) !== 0;
+  if (hasAdjustmentTotals && adjustments.length === 0) {
+    return {
+      ...base,
+      status: 'not_evaluated',
+      dependencyReason: 'Document-adjustment dependency: adjustments exist as totals without category/rate allocation details.',
+    };
+  }
+  if (adjustments.some((adjustment) => !adjustment.adjustment_id || !adjustment.kind || !adjustment.tax_category_code ||
+    !Number.isFinite(Number(adjustment.amount)) || Number(adjustment.amount) < 0) ||
+    new Set(adjustmentIds).size !== adjustmentIds.length) {
+    return {
+      ...base,
+      status: 'not_evaluated',
+      dependencyReason: 'Document-adjustment dependency: allocation details are incomplete or invalid.',
+    };
+  }
+  const allocatedAllowanceTotal = sumAdjustments(adjustments, 'allowance');
+  const allocatedChargeTotal = sumAdjustments(adjustments, 'charge');
+  if (allocatedAllowanceTotal !== roundVatBreakdownMoney(parseDecimal(Number(allowanceTotal))) ||
+    allocatedChargeTotal !== roundVatBreakdownMoney(parseDecimal(Number(chargeTotal)))) {
+    return {
+      ...base,
+      status: 'not_evaluated',
+      dependencyReason: `Document-adjustment dependency: allocated adjustments do not reconcile to header totals (allowance ${allocatedAllowanceTotal}/${allowanceTotal}, charge ${allocatedChargeTotal}/${chargeTotal}).`,
     };
   }
 
@@ -149,6 +188,7 @@ export function deriveVatBreakdowns(
     rate: number | null;
     amount: DecimalValue;
     lineIds: string[];
+    adjustmentIds: string[];
     normalizations: Set<string>;
   }>();
 
@@ -183,10 +223,43 @@ export function deriveVatBreakdowns(
       rate,
       amount: { coefficient: 0n, scale: 0 },
       lineIds: [],
+      adjustmentIds: [],
       normalizations: new Set<string>(),
     };
     group.amount = addDecimal(group.amount, parseDecimal(Number(line.line_total_excl_vat)));
     group.lineIds.push(line.line_id);
+    if (normalized.normalization) group.normalizations.add(normalized.normalization);
+    groups.set(groupingKey, group);
+  }
+
+
+  for (const adjustment of adjustments) {
+    const normalized = normalizeVatCategory(adjustment.tax_category_code);
+    const rate = adjustmentRate(adjustment, normalized.category);
+    if (!['S', 'Z', 'E', 'O', 'AE', 'N'].includes(normalized.category) ||
+      (!['E', 'O'].includes(normalized.category) && rate === null) ||
+      ((normalized.category === 'S' || normalized.category === 'AE' || normalized.category === 'N') && Number(rate) <= 0) ||
+      (normalized.category === 'Z' && rate !== 0) ||
+      (['E', 'O'].includes(normalized.category) && Number(adjustment.vat_rate ?? 0) !== 0)) {
+      return {
+        ...base,
+        status: 'not_evaluated',
+        dependencyReason: `Document-adjustment dependency: adjustment ${adjustment.adjustment_id} has an invalid VAT category/rate allocation.`,
+      };
+    }
+    const rateKey = rate === null ? 'NA' : canonicalDecimal(rate);
+    const groupingKey = `${normalized.category}|${rateKey}`;
+    const group = groups.get(groupingKey) ?? {
+      category: normalized.category,
+      rate,
+      amount: { coefficient: 0n, scale: 0 },
+      lineIds: [],
+      adjustmentIds: [],
+      normalizations: new Set<string>(),
+    };
+    const signedAmount = adjustment.kind === 'allowance' ? -Number(adjustment.amount) : Number(adjustment.amount);
+    group.amount = addDecimal(group.amount, parseDecimal(signedAmount));
+    group.adjustmentIds.push(adjustment.adjustment_id);
     if (normalized.normalization) group.normalizations.add(normalized.normalization);
     groups.set(groupingKey, group);
   }
@@ -207,10 +280,13 @@ export function deriveVatBreakdowns(
       taxAmount,
       currency: header.currency,
       contributingLineIds: group.lineIds,
+      contributingAdjustmentIds: group.adjustmentIds,
       normalizations: [...group.normalizations],
       status: 'evaluated',
       lineage: {
-        formula,
+        formula: group.adjustmentIds.length > 0
+          ? formula.replace('sum(IBT-131)', 'sum(IBT-131) - document allowances + document charges')
+          : formula,
         rounding: 'two decimals, half away from zero at the breakdown result',
         comparisonTolerance: group.category === 'S' ? 0.02 : 0,
         rules: group.category === 'S'

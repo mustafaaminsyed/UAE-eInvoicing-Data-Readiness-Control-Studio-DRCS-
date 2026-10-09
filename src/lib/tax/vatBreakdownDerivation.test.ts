@@ -110,11 +110,69 @@ describe('P1.4 VAT breakdown derivation', () => {
     [{ document_level_allowance_total: 10, document_level_charge_total: 0 }, 'adjustments exist'],
     [{ document_level_allowance_total: 0, document_level_charge_total: 10 }, 'adjustments exist'],
     [{ document_level_allowance_total: undefined, document_level_charge_total: undefined }, 'not positively established'],
-  ] as const)('returns the P1.7 dependency instead of a false result for %o', (adjustments, reason) => {
+  ] as const)('returns the document-adjustment dependency instead of a false result for %o', (adjustments, reason) => {
     const result = deriveVatBreakdowns(header(adjustments), [line('L1', 100, 'S', 5)]);
     expect(result).toMatchObject({ status: 'not_evaluated', breakdowns: [] });
     expect(result.dependencyReason).toContain(reason);
     expect(result.dependencyReason).not.toContain('missing IBT-116');
+  });
+
+  it('allocates categorized document allowances and charges into their VAT groups', () => {
+    const result = deriveVatBreakdowns(header({
+      document_level_allowance_total: 20,
+      document_level_charge_total: 10,
+      document_level_adjustments: [
+        { adjustment_id: 'A-1', kind: 'allowance', amount: 20, tax_category_code: 'S', vat_rate: 5 },
+        { adjustment_id: 'C-1', kind: 'charge', amount: 10, tax_category_code: 'Z', vat_rate: 0 },
+      ],
+    }), [line('L1', 100, 'S', 5), line('L2', 40, 'Z', 0)]);
+
+    expect(result.status).toBe('evaluated');
+    expect(result.breakdowns).toMatchObject([
+      { groupingKey: 'S|5', taxableAmount: 80, taxAmount: 4, contributingAdjustmentIds: ['A-1'] },
+      { groupingKey: 'Z|0', taxableAmount: 50, taxAmount: 0, contributingAdjustmentIds: ['C-1'] },
+    ]);
+    expect(result.breakdowns[0].lineage.formula).toContain('document allowances');
+  });
+
+  it('does not evaluate incomplete or unreconciled adjustment allocations', () => {
+    const incomplete = deriveVatBreakdowns(header({
+      document_level_allowance_total: 10,
+      document_level_adjustments: [
+        { adjustment_id: 'A-1', kind: 'allowance', amount: 10, tax_category_code: '', vat_rate: 5 },
+      ],
+    }), [line('L1', 100, 'S', 5)]);
+    expect(incomplete).toMatchObject({ status: 'not_evaluated' });
+    expect(incomplete.dependencyReason).toContain('incomplete');
+
+    const unreconciled = deriveVatBreakdowns(header({
+      document_level_allowance_total: 10,
+      document_level_adjustments: [
+        { adjustment_id: 'A-1', kind: 'allowance', amount: 9, tax_category_code: 'S', vat_rate: 5 },
+      ],
+    }), [line('L1', 100, 'S', 5)]);
+    expect(unreconciled).toMatchObject({ status: 'not_evaluated' });
+    expect(unreconciled.dependencyReason).toContain('do not reconcile');
+  });
+
+  it('does not evaluate duplicate adjustment identifiers or invalid rate/category pairs', () => {
+    const duplicateIds = deriveVatBreakdowns(header({
+      document_level_allowance_total: 10,
+      document_level_adjustments: [
+        { adjustment_id: 'A-1', kind: 'allowance', amount: 5, tax_category_code: 'S', vat_rate: 5 },
+        { adjustment_id: 'A-1', kind: 'allowance', amount: 5, tax_category_code: 'Z', vat_rate: 0 },
+      ],
+    }), [line('L1', 100, 'S', 5)]);
+    expect(duplicateIds).toMatchObject({ status: 'not_evaluated' });
+
+    const exemptWithRate = deriveVatBreakdowns(header({
+      document_level_charge_total: 5,
+      document_level_adjustments: [
+        { adjustment_id: 'C-1', kind: 'charge', amount: 5, tax_category_code: 'E', vat_rate: 5 },
+      ],
+    }), [line('L1', 100, 'S', 5)]);
+    expect(exemptWithRate).toMatchObject({ status: 'not_evaluated' });
+    expect(exemptWithRate.dependencyReason).toContain('invalid VAT category/rate');
   });
 
   it('fails invalid grouping inputs deterministically', () => {
