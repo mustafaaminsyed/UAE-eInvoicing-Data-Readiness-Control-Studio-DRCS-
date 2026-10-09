@@ -4,6 +4,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import UploadPage from '@/pages/UploadPage';
 import { ComplianceProvider } from '@/context/ComplianceContext';
+import { addUploadAuditLog } from '@/lib/uploadAudit';
 
 const navigate = vi.fn();
 
@@ -70,7 +71,9 @@ vi.mock('@/lib/csvParser', () => ({
   parseBuyersFile: vi.fn(() => buyersDeferred.promise),
   parseHeadersFile: vi.fn(() => headersDeferred.promise),
   parseLinesFile: vi.fn(() => linesDeferred.promise),
-  parseDocumentAdjustmentsFile: vi.fn(() => Promise.resolve([])),
+  parseDocumentAdjustmentsFile: vi.fn(() => Promise.resolve([
+    { adjustment_id: 'A1', invoice_id: 'INV1', kind: 'allowance', amount: 10, tax_category_code: 'S' },
+  ])),
   attachDocumentAdjustments: vi.fn((headers) => headers),
 }));
 
@@ -135,5 +138,38 @@ describe('UploadPage processing feedback', () => {
     await waitFor(() => {
       expect(navigate).toHaveBeenCalledWith('/run');
     }, { timeout: 3000 });
+  });
+
+  it('includes an optional adjustments file in the upload audit record', async () => {
+    render(
+      <MemoryRouter>
+        <ComplianceProvider>
+          <UploadPage />
+        </ComplianceProvider>
+      </MemoryRouter>
+    );
+
+    fireEvent.change(screen.getByLabelText('Buyers File CSV upload'), { target: { files: [createCsvFile('buyers.csv', 'buyer_id\nB1')] } });
+    fireEvent.change(screen.getByLabelText('Invoice Headers File CSV upload'), { target: { files: [createCsvFile('headers.csv', 'invoice_id,buyer_id\nINV1,B1')] } });
+    fireEvent.change(screen.getByLabelText('Invoice Lines File CSV upload'), { target: { files: [createCsvFile('lines.csv', 'line_id,invoice_id\nL1,INV1')] } });
+    fireEvent.change(screen.getByLabelText('Document Adjustments File CSV upload'), {
+      target: { files: [createCsvFile('adjustments.csv', 'adjustment_id,invoice_id,kind,amount,tax_category_code\nA1,INV1,allowance,10.00,S')] },
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Load Data & Continue' }));
+    buyersDeferred.resolve([{ buyer_id: 'B1' }]);
+    headersDeferred.resolve([{ invoice_id: 'INV1', buyer_id: 'B1' }]);
+    linesDeferred.resolve([{ line_id: 'L1', invoice_id: 'INV1' }]);
+
+    await waitFor(() => {
+      expect(addUploadAuditLog).toHaveBeenCalledWith(expect.objectContaining({
+        datasets: expect.arrayContaining([
+          expect.objectContaining({ dataset: 'adjustments', ingestionStatus: 'accepted', fileName: 'adjustments.csv', rowCount: 1 }),
+        ]),
+        relationalChecks: expect.arrayContaining([
+          expect.objectContaining({ label: 'adjustments.invoice_id -> headers.invoice_id', matchPct: 100 }),
+        ]),
+      }));
+    });
   });
 });
