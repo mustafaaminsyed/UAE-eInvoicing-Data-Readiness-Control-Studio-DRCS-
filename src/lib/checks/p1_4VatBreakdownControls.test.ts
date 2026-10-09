@@ -41,7 +41,7 @@ describe('P1.4 VAT breakdown controls', () => {
       expect(result.exceptions).toHaveLength(0);
       expect(result.telemetry).toMatchObject({ execution_count: 0, not_evaluated_count: 1, passed_count: 0 });
       expect(result.executionResults[0]).toMatchObject({ status: 'not_evaluated' });
-      expect(result.executionResults[0].reason).toContain('P1.7 dependency');
+      expect(result.executionResults[0].reason).toContain('Document-adjustment dependency');
     }
   );
 });

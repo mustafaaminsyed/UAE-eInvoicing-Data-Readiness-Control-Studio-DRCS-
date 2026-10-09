@@ -1,4 +1,4 @@
-import { Buyer, InvoiceHeader, InvoiceLine } from '@/types/compliance';
+import { Buyer, DocumentLevelAdjustment, InvoiceHeader, InvoiceLine } from '@/types/compliance';
 import { Direction } from '@/types/direction';
 
 export function normalizeCSVText(text: string): string {
@@ -271,6 +271,61 @@ export async function parseHeadersFile(file: File, options: ParseOptions = {}): 
       upload_manifest_id: options.uploadManifestId,
     };
   });
+}
+
+export async function parseDocumentAdjustmentsFile(file: File): Promise<Array<DocumentLevelAdjustment & { invoice_id: string }>> {
+  const records = parseCSV(await file.text());
+  const seenIds = new Set<string>();
+  return records.map((record, index) => {
+    const sourceRow = index + 2;
+    const adjustmentId = str(record, 'adjustment_id');
+    const invoiceId = str(record, 'invoice_id');
+    const kind = str(record, 'kind')?.toLowerCase();
+    const amount = num(record, 'amount');
+    const category = str(record, 'tax_category_code')?.toUpperCase();
+    const rate = num(record, 'vat_rate');
+    const baseAmount = num(record, 'base_amount');
+    const percentage = num(record, 'percentage');
+    const reasonCode = str(record, 'reason_code');
+    const reasonText = str(record, 'reason_text');
+    if (!adjustmentId || !invoiceId || !['allowance', 'charge'].includes(kind ?? '') || amount === undefined || amount < 0 || !category) {
+      throw new Error(`Document adjustment row ${sourceRow} is missing a valid ID, invoice ID, kind, non-negative amount, or VAT category.`);
+    }
+    if (seenIds.has(adjustmentId)) throw new Error(`Document adjustment ID ${adjustmentId} is duplicated at row ${sourceRow}.`);
+    seenIds.add(adjustmentId);
+    if (!reasonCode && !reasonText) throw new Error(`Document adjustment ${adjustmentId} requires a reason code or reason text.`);
+    if ((baseAmount === undefined) !== (percentage === undefined)) throw new Error(`Document adjustment ${adjustmentId} must provide both base_amount and percentage, or neither.`);
+    if (!['E', 'O'].includes(category) && rate === undefined) throw new Error(`Document adjustment ${adjustmentId} requires a VAT rate for category ${category}.`);
+    if (['E', 'O'].includes(category) && rate !== undefined && rate !== 0) throw new Error(`Document adjustment ${adjustmentId} must not provide a non-zero VAT rate for category ${category}.`);
+    return {
+      adjustment_id: adjustmentId,
+      invoice_id: invoiceId,
+      kind: kind as DocumentLevelAdjustment['kind'],
+      amount,
+      tax_category_code: category,
+      vat_rate: rate,
+      base_amount: baseAmount,
+      percentage,
+      reason_code: reasonCode,
+      reason_text: reasonText,
+      exemption_reason_code: str(record, 'exemption_reason_code'),
+      exemption_reason_text: str(record, 'exemption_reason_text'),
+      source_row_number: sourceRow,
+    };
+  });
+}
+
+export function attachDocumentAdjustments(
+  headers: InvoiceHeader[],
+  adjustments: Array<DocumentLevelAdjustment & { invoice_id: string }>,
+): InvoiceHeader[] {
+  const byInvoice = new Map<string, DocumentLevelAdjustment[]>();
+  const headerIds = new Set(headers.map((header) => header.invoice_id));
+  for (const { invoice_id: invoiceId, ...adjustment } of adjustments) {
+    if (!headerIds.has(invoiceId)) throw new Error(`Document adjustment ${adjustment.adjustment_id} references missing invoice ${invoiceId}.`);
+    byInvoice.set(invoiceId, [...(byInvoice.get(invoiceId) ?? []), adjustment]);
+  }
+  return headers.map((header) => ({ ...header, document_level_adjustments: byInvoice.get(header.invoice_id) ?? [] }));
 }
 
 export async function parseLinesFile(file: File, options: ParseOptions = {}): Promise<InvoiceLine[]> {

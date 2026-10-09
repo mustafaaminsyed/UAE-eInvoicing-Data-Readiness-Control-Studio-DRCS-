@@ -3,15 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowRight, FileSpreadsheet, AlertCircle, CheckCircle2, Link2, ArrowRightCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useCompliance } from '@/context/ComplianceContext';
-import { parseBuyersFile, parseHeadersFile, parseLinesFile, parseCSV } from '@/lib/csvParser';
+import { attachDocumentAdjustments, parseBuyersFile, parseDocumentAdjustmentsFile, parseHeadersFile, parseLinesFile, parseCSV } from '@/lib/csvParser';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { WorkflowNavigator, buildWorkflowItems } from '@/components/shared/WorkflowNavigator';
 import { WorkflowPageHeader } from '@/components/shared/WorkflowPageHeader';
 import { FileDropZone, FileSummaryCard, analyzeFile, FileStats } from '@/components/upload/FileAnalysis';
-import { SampleScenario } from '@/lib/sampleData';
+import { documentAdjustmentsSample, downloadSampleCSV, SampleScenario } from '@/lib/sampleData';
 import { addUploadAuditLog } from '@/lib/uploadAudit';
 import { DatasetType } from '@/types/datasets';
 import { formatElapsedTime, yieldToBrowser } from '@/lib/processingFeedback';
@@ -40,6 +41,7 @@ export default function UploadPage() {
   const [files, setFiles] = useState<{ buyers: File | null; headers: File | null; lines: File | null }>({
     buyers: null, headers: null, lines: null,
   });
+  const [adjustmentsFile, setAdjustmentsFile] = useState<File | null>(null);
   const [stats, setStats] = useState<{ buyers: FileStats | null; headers: FileStats | null; lines: FileStats | null }>({
     buyers: null, headers: null, lines: null,
   });
@@ -167,11 +169,13 @@ export default function UploadPage() {
     await yieldToBrowser();
 
     try {
-      const [buyers, headers, lines] = await Promise.all([
+      const [buyers, parsedHeaders, lines, adjustments] = await Promise.all([
         parseBuyersFile(files.buyers!, { direction: datasetType }),
         parseHeadersFile(files.headers!, { direction: datasetType }),
         parseLinesFile(files.lines!, { direction: datasetType }),
+        adjustmentsFile ? parseDocumentAdjustmentsFile(adjustmentsFile) : Promise.resolve([]),
       ]);
+      const headers = attachDocumentAdjustments(parsedHeaders, adjustments);
       setData({ buyers, headers, lines }, datasetType);
 
       if (stats.buyers && stats.headers && stats.lines) {
@@ -236,6 +240,7 @@ export default function UploadPage() {
     setFiles({ buyers: null, headers: null, lines: null });
     setStats({ buyers: null, headers: null, lines: null });
     setParsedRows({ buyers: null, headers: null, lines: null });
+    setAdjustmentsFile(null);
     clearData();
   };
 
@@ -435,6 +440,29 @@ export default function UploadPage() {
               ) : (
                 <FileDropZone label="Invoice Lines File" description="line_id, invoice_id, line_number, quantity, unit_price, vat_rate, ..." sampleType="lines" sampleScenario={sampleScenario} direction={datasetType} onFileSelect={(f) => handleFileSelect('lines', f)} />
               )}
+
+              <div className="border-t" />
+
+              <div className="rounded-xl border bg-muted/20 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold">Document Adjustments <span className="font-normal text-muted-foreground">(optional)</span></p>
+                    <p className="text-xs text-muted-foreground">One row per document-level allowance or charge. Required only when header adjustment totals are non-zero.</p>
+                  </div>
+                  <Button type="button" size="sm" variant="outline" onClick={() => downloadSampleCSV('document_adjustments_template.csv', documentAdjustmentsSample)}>
+                    Download template
+                  </Button>
+                </div>
+                <Label htmlFor="document-adjustments-upload" className="mt-3 block text-xs font-medium">Document Adjustments File CSV upload</Label>
+                <input
+                  id="document-adjustments-upload"
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="mt-2 block w-full text-sm text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-xs file:font-medium file:text-primary-foreground"
+                  onChange={(event) => setAdjustmentsFile(event.target.files?.[0] ?? null)}
+                />
+                {adjustmentsFile && <p className="mt-2 text-xs text-foreground">Selected: {adjustmentsFile.name}</p>}
+              </div>
             </div>
           </div>
 
@@ -528,7 +556,7 @@ export default function UploadPage() {
 
           {/* Actions */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <Button variant="outline" onClick={handleClearAll} disabled={!files.buyers && !files.headers && !files.lines}>
+            <Button variant="outline" onClick={handleClearAll} disabled={!files.buyers && !files.headers && !files.lines && !adjustmentsFile}>
               Clear All
             </Button>
 

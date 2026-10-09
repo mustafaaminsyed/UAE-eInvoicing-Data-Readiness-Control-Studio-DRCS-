@@ -28,7 +28,7 @@
       "file": "invoice_headers_template.csv",
       "dataset": "Invoice Headers",
       "description": "Invoice header facts",
-      "column_count": 36,
+      "column_count": 38,
       "join_keys": ["invoice_id", "buyer_id"],
       "columns": [
         { "name": "invoice_id", "dr_ids": [], "mandatory": true, "asp_derived": false, "type": "String", "format": "Unique identifier", "description": "Internal join key (system primary key)", "responsibility": "ERP (Corner 1)" },
@@ -66,7 +66,30 @@
         { "name": "credit_note_reason_code", "dr_ids": ["BTAE-03"], "mandatory": false, "asp_derived": false, "type": "Code", "format": "Credit note reason code", "description": "Required for credit notes (invoice_type = 381)", "responsibility": "ERP (Corner 1)" },
         { "name": "credit_note_reason_text", "dr_ids": ["SYS-CN-REASON-TEXT"], "mandatory": false, "asp_derived": false, "type": "String", "format": "Free text", "description": "Narrative reason text for credit notes when captured by the source system", "responsibility": "ERP (Corner 1)" },
         { "name": "preceding_invoice_reference", "dr_ids": ["IBT-025"], "mandatory": false, "asp_derived": false, "type": "String", "format": "Original invoice identifier", "description": "Required for credit notes unless credit_note_reason_code = VD", "responsibility": "ERP (Corner 1)" },
-        { "name": "preceding_invoice_issue_date", "dr_ids": ["IBT-026"], "mandatory": false, "asp_derived": false, "type": "Date", "format": "YYYY-MM-DD", "description": "Optional issue date of the original invoice being credited", "responsibility": "ERP (Corner 1)" }
+        { "name": "preceding_invoice_issue_date", "dr_ids": ["IBT-026"], "mandatory": false, "asp_derived": false, "type": "Date", "format": "YYYY-MM-DD", "description": "Optional issue date of the original invoice being credited", "responsibility": "ERP (Corner 1)" },
+        { "name": "document_level_allowance_total", "dr_ids": ["IBT-107"], "mandatory": false, "asp_derived": false, "type": "Number", "format": "Decimal (2dp)", "description": "Sum of document-level allowance rows; use zero to establish absence", "responsibility": "ERP (Corner 1)" },
+        { "name": "document_level_charge_total", "dr_ids": ["IBT-108"], "mandatory": false, "asp_derived": false, "type": "Number", "format": "Decimal (2dp)", "description": "Sum of document-level charge rows; use zero to establish absence", "responsibility": "ERP (Corner 1)" }
+      ]
+    },
+    {
+      "file": "document_adjustments_template.csv",
+      "dataset": "Document Adjustments",
+      "description": "Optional repeatable PINT-AE document-level allowances and charges",
+      "column_count": 12,
+      "join_keys": ["adjustment_id", "invoice_id"],
+      "columns": [
+        { "name": "adjustment_id", "dr_ids": [], "mandatory": true, "asp_derived": false, "type": "String", "format": "Unique identifier", "description": "Internal adjustment key", "responsibility": "ERP (Corner 1)" },
+        { "name": "invoice_id", "dr_ids": [], "mandatory": true, "asp_derived": false, "type": "String", "format": "FK to headers", "description": "Parent invoice key", "responsibility": "ERP (Corner 1)" },
+        { "name": "kind", "dr_ids": ["IBG-20", "IBG-21"], "mandatory": true, "asp_derived": false, "type": "Code", "format": "allowance or charge", "description": "Adjustment kind", "responsibility": "ERP (Corner 1)" },
+        { "name": "amount", "dr_ids": ["IBT-092", "IBT-099"], "mandatory": true, "asp_derived": false, "type": "Number", "format": "Decimal (2dp)", "description": "Adjustment amount without VAT", "responsibility": "ERP (Corner 1)" },
+        { "name": "tax_category_code", "dr_ids": ["IBT-095", "IBT-102"], "mandatory": true, "asp_derived": false, "type": "Code", "format": "S, Z, E, O, AE", "description": "Adjustment VAT category", "responsibility": "ERP (Corner 1)" },
+        { "name": "vat_rate", "dr_ids": ["IBT-096", "IBT-103"], "mandatory": false, "asp_derived": false, "type": "Number", "format": "Percentage", "description": "Required except for E and O", "responsibility": "ERP (Corner 1)" },
+        { "name": "reason_code", "dr_ids": ["IBT-098", "IBT-105"], "mandatory": false, "asp_derived": false, "type": "Code", "format": "Allowance/charge reason code", "description": "Reason code; reason code or text is required", "responsibility": "ERP (Corner 1)" },
+        { "name": "reason_text", "dr_ids": ["IBT-097", "IBT-104"], "mandatory": false, "asp_derived": false, "type": "String", "format": "Free text", "description": "Reason text; reason code or text is required", "responsibility": "ERP (Corner 1)" },
+        { "name": "base_amount", "dr_ids": ["IBT-093", "IBT-100"], "mandatory": false, "asp_derived": false, "type": "Number", "format": "Decimal (2dp)", "description": "Optional calculation base; paired with percentage", "responsibility": "ERP (Corner 1)" },
+        { "name": "percentage", "dr_ids": ["IBT-094", "IBT-101"], "mandatory": false, "asp_derived": false, "type": "Number", "format": "Percentage", "description": "Optional percentage; paired with base amount", "responsibility": "ERP (Corner 1)" },
+        { "name": "exemption_reason_code", "dr_ids": ["IBT-196", "IBT-198"], "mandatory": false, "asp_derived": false, "type": "Code", "format": "AE exemption code", "description": "Exemption reason code when applicable", "responsibility": "ERP (Corner 1)" },
+        { "name": "exemption_reason_text", "dr_ids": ["IBT-197", "IBT-199"], "mandatory": false, "asp_derived": false, "type": "String", "format": "Free text", "description": "Exemption reason text when applicable", "responsibility": "ERP (Corner 1)" }
       ]
     },
     {

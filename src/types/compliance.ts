@@ -33,6 +33,21 @@ export interface DeliveryInformation {
   country_code?: string;
 }
 
+export interface DocumentLevelAdjustment {
+  adjustment_id: string;
+  kind: 'allowance' | 'charge';
+  amount: number;
+  tax_category_code: string;
+  vat_rate?: number;
+  base_amount?: number;
+  percentage?: number;
+  reason_code?: string;
+  reason_text?: string;
+  exemption_reason_code?: string;
+  exemption_reason_text?: string;
+  source_row_number?: number;
+}
+
 export interface InvoiceHeader {
   invoice_id: string;
   invoice_number: string;
@@ -82,6 +97,8 @@ export interface InvoiceHeader {
   tax_currency?: string;
   document_level_allowance_total?: number;
   document_level_charge_total?: number;
+  /** Repeatable PINT-AE document-level allowance/charge facts used to derive IBT-116/117. */
+  document_level_adjustments?: DocumentLevelAdjustment[];
   rounding_amount?: number;
   spec_id?: string;
   business_process?: string;

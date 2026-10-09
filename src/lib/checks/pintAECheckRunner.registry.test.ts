@@ -1521,7 +1521,7 @@ describe('runPintAECheck executor registry parity', () => {
       expect(result.telemetry.not_evaluated_count).toBe(1);
       expect(result.executionResults[0]).toMatchObject({
         status: 'not_evaluated',
-        reason: expect.stringContaining('P1.7 dependency'),
+        reason: expect.stringContaining('Document-adjustment dependency'),
       });
     }
   });
