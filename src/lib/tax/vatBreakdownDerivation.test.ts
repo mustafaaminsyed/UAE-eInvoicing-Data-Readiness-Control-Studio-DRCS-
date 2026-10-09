@@ -122,8 +122,8 @@ describe('P1.4 VAT breakdown derivation', () => {
       document_level_allowance_total: 20,
       document_level_charge_total: 10,
       document_level_adjustments: [
-        { adjustment_id: 'A-1', kind: 'allowance', amount: 20, tax_category_code: 'S', vat_rate: 5 },
-        { adjustment_id: 'C-1', kind: 'charge', amount: 10, tax_category_code: 'Z', vat_rate: 0 },
+        { adjustment_id: 'A-1', kind: 'allowance', amount: 20, tax_category_code: 'S', vat_rate: 5, reason_text: 'Discount' },
+        { adjustment_id: 'C-1', kind: 'charge', amount: 10, tax_category_code: 'Z', vat_rate: 0, reason_code: 'FC' },
       ],
     }), [line('L1', 100, 'S', 5), line('L2', 40, 'Z', 0)]);
 
@@ -139,7 +139,7 @@ describe('P1.4 VAT breakdown derivation', () => {
     const incomplete = deriveVatBreakdowns(header({
       document_level_allowance_total: 10,
       document_level_adjustments: [
-        { adjustment_id: 'A-1', kind: 'allowance', amount: 10, tax_category_code: '', vat_rate: 5 },
+        { adjustment_id: 'A-1', kind: 'allowance', amount: 10, tax_category_code: '', vat_rate: 5, reason_text: 'Discount' },
       ],
     }), [line('L1', 100, 'S', 5)]);
     expect(incomplete).toMatchObject({ status: 'not_evaluated' });
@@ -148,7 +148,7 @@ describe('P1.4 VAT breakdown derivation', () => {
     const unreconciled = deriveVatBreakdowns(header({
       document_level_allowance_total: 10,
       document_level_adjustments: [
-        { adjustment_id: 'A-1', kind: 'allowance', amount: 9, tax_category_code: 'S', vat_rate: 5 },
+        { adjustment_id: 'A-1', kind: 'allowance', amount: 9, tax_category_code: 'S', vat_rate: 5, reason_text: 'Discount' },
       ],
     }), [line('L1', 100, 'S', 5)]);
     expect(unreconciled).toMatchObject({ status: 'not_evaluated' });
@@ -159,8 +159,8 @@ describe('P1.4 VAT breakdown derivation', () => {
     const duplicateIds = deriveVatBreakdowns(header({
       document_level_allowance_total: 10,
       document_level_adjustments: [
-        { adjustment_id: 'A-1', kind: 'allowance', amount: 5, tax_category_code: 'S', vat_rate: 5 },
-        { adjustment_id: 'A-1', kind: 'allowance', amount: 5, tax_category_code: 'Z', vat_rate: 0 },
+        { adjustment_id: 'A-1', kind: 'allowance', amount: 5, tax_category_code: 'S', vat_rate: 5, reason_text: 'Discount' },
+        { adjustment_id: 'A-1', kind: 'allowance', amount: 5, tax_category_code: 'Z', vat_rate: 0, reason_text: 'Discount' },
       ],
     }), [line('L1', 100, 'S', 5)]);
     expect(duplicateIds).toMatchObject({ status: 'not_evaluated' });
@@ -168,7 +168,7 @@ describe('P1.4 VAT breakdown derivation', () => {
     const exemptWithRate = deriveVatBreakdowns(header({
       document_level_charge_total: 5,
       document_level_adjustments: [
-        { adjustment_id: 'C-1', kind: 'charge', amount: 5, tax_category_code: 'E', vat_rate: 5 },
+        { adjustment_id: 'C-1', kind: 'charge', amount: 5, tax_category_code: 'E', vat_rate: 5, reason_text: 'Charge' },
       ],
     }), [line('L1', 100, 'S', 5)]);
     expect(exemptWithRate).toMatchObject({ status: 'not_evaluated' });

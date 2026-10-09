@@ -14,7 +14,7 @@ are tracked in `docs/reconciliation/pint-ae-1.0.4-functional-delta-register.md`.
 
 ## Overview
 
-These three CSV templates define the **input schema** for taxpayer/ERP data required to prepare UAE-compliant e-invoices under the PINT-AE standard. They include **only fields that are the responsibility of the taxpayer's ERP system (Corner 1)** or are required as inputs for existing validation rules.
+Three core CSV templates define the taxpayer/ERP input schema. A fourth, optional document-adjustments CSV preserves repeatable PINT-AE document allowances and charges when they exist. They include **only fields that are the responsibility of the taxpayer's ERP system (Corner 1)** or are required as inputs for existing validation rules.
 
 Fields derived by the ASP (Corner 2) — such as Specification ID (IBT-024), Business Process Type (IBT-023), and tax scheme codes — are **excluded** from these templates.
 
@@ -77,6 +77,8 @@ Fields derived by the ASP (Corner 2) — such as Specification ID (IBT-024), Bus
 | 34 | `credit_note_reason_text` | SYS-CN-REASON-TEXT | Conditional | String | Free text | Credit note reason narrative, when captured by source | ERP |
 | 35 | `preceding_invoice_reference` | IBT-025 | Conditional | String | Original invoice identifier | Required for credit notes unless `credit_note_reason_code = VD` | ERP |
 | 36 | `preceding_invoice_issue_date` | IBT-026 | Optional | Date | YYYY-MM-DD | Original invoice issue date, if available | ERP |
+| 37 | `document_level_allowance_total` | IBT-107 | Conditional | Number | Decimal (2dp) | Sum of allowance detail rows; use zero to establish absence | ERP |
+| 38 | `document_level_charge_total` | IBT-108 | Conditional | Number | Decimal (2dp) | Sum of charge detail rows; use zero to establish absence | ERP |
 
 ---
 
@@ -104,6 +106,12 @@ Fields derived by the ASP (Corner 2) — such as Specification ID (IBT-024), Bus
 | 18 | `goods_service_type` | IBT-151 | Conditional | Code | Goods/services classification | Reverse-charge goods/services type when applicable | ERP |
 | 19 | `line_allowance_amount` | IBT-136 | No | Number | Decimal (2dp) | Standards-aligned line allowance amount | ERP |
 | 20 | `line_charge_amount` | IBT-141 | No | Number | Decimal (2dp) | Standards-aligned line charge amount | ERP |
+
+---
+
+## 4. Document Adjustments Template (`document_adjustments_template.csv`)
+
+Optional one-row-per-adjustment dataset for repeatable PINT-AE document allowances (IBG-20) and charges (IBG-21). Supply it when either header adjustment total is non-zero. Every row requires an amount, VAT category, and either a reason code or reason text. VAT rate is required except for categories E and O. Base amount and percentage must be supplied together. The downloadable template is intentionally header-only so it does not introduce adjustments into the standard sample invoices.
 
 ---
 

@@ -31,7 +31,7 @@ describe('public template alignment', () => {
     expect(columns).toContain('preceding_invoice_reference');
     expect(columns).toContain('preceding_invoice_issue_date');
     expect(columns).not.toContain('sum_line_net_amount');
-    expect(columns).toHaveLength(36);
+    expect(columns).toHaveLength(38);
   });
 
   it('keeps the shipped line template aligned with the current conditional line field shape', () => {
@@ -54,8 +54,8 @@ describe('public template alignment', () => {
     const expected = new Map(TEMPLATE_MANIFEST.templates.map((template) => [template.file, template.columns]));
 
     for (const [fileName, count] of expected) {
-      const rows = parseCSV(readTemplate(fileName));
-      const columns = Object.keys(rows[0] ?? {});
+      const [header = ''] = readTemplate(fileName).replace(/\r\n?/g, '\n').split('\n');
+      const columns = header.split(',');
       expect(columns).toHaveLength(count);
     }
   });

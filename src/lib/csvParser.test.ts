@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { analyzeFile } from '@/components/upload/FileAnalysis';
-import { parseBuyersFile, parseCSV, parseHeadersFile, parseLinesFile } from '@/lib/csvParser';
+import { attachDocumentAdjustments, parseBuyersFile, parseCSV, parseDocumentAdjustmentsFile, parseHeadersFile, parseLinesFile } from '@/lib/csvParser';
 import { headersNegativeSample } from '@/lib/sampleData';
 
 describe('negative headers template upload path', () => {
@@ -35,9 +35,9 @@ describe('negative headers template upload path', () => {
     const analysis = analyzeFile(rows, file, 'headers', 'AR', headersNegativeSample);
 
     expect(rows).toHaveLength(3);
-    expect(Object.keys(rows[0] ?? {})).toHaveLength(36);
+    expect(Object.keys(rows[0] ?? {})).toHaveLength(38);
     expect(analysis.rowCount).toBe(3);
-    expect(analysis.columnCount).toBe(36);
+    expect(analysis.columnCount).toBe(38);
     expect(analysis.columns).toContain('invoice_id');
     expect(analysis.columns).toContain('buyer_id');
   });
@@ -209,5 +209,23 @@ describe('negative headers template upload path', () => {
     );
     expect(line.item_name).toBe('Widget');
     expect(line.description).toBe('Widget');
+  });
+});
+
+describe('document adjustment parsing', () => {
+  it('parses repeatable PINT-AE adjustment facts and attaches them to headers', async () => {
+    const csv = `adjustment_id,invoice_id,kind,amount,tax_category_code,vat_rate,reason_code,reason_text,base_amount,percentage\nA-1,INV-1,allowance,50,S,5,95,Volume discount,1000,5`;
+    const adjustments = await parseDocumentAdjustmentsFile({ text: async () => csv } as File);
+    const headers = attachDocumentAdjustments([{ invoice_id: 'INV-1', invoice_number: '1', issue_date: '2026-01-01', seller_trn: '100000000000001', buyer_id: 'B-1', currency: 'AED' }], adjustments);
+    expect(headers[0].document_level_adjustments).toEqual([expect.objectContaining({
+      adjustment_id: 'A-1', kind: 'allowance', amount: 50, tax_category_code: 'S', vat_rate: 5,
+      base_amount: 1000, percentage: 5, source_row_number: 2,
+    })]);
+  });
+
+  it('rejects missing reasons and orphan invoice references', async () => {
+    const csv = `adjustment_id,invoice_id,kind,amount,tax_category_code,vat_rate,reason_code,reason_text\nA-1,INV-X,allowance,50,S,5,,`;
+    await expect(parseDocumentAdjustmentsFile({ text: async () => csv } as File)).rejects.toThrow('requires a reason');
+    expect(() => attachDocumentAdjustments([], [{ adjustment_id: 'A-1', invoice_id: 'INV-X', kind: 'allowance', amount: 50, tax_category_code: 'S', reason_text: 'Discount' }])).toThrow('missing invoice');
   });
 });

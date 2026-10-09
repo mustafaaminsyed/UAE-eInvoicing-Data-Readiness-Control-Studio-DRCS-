@@ -70,6 +70,8 @@ vi.mock('@/lib/csvParser', () => ({
   parseBuyersFile: vi.fn(() => buyersDeferred.promise),
   parseHeadersFile: vi.fn(() => headersDeferred.promise),
   parseLinesFile: vi.fn(() => linesDeferred.promise),
+  parseDocumentAdjustmentsFile: vi.fn(() => Promise.resolve([])),
+  attachDocumentAdjustments: vi.fn((headers) => headers),
 }));
 
 function createCsvFile(name: string, content: string) {

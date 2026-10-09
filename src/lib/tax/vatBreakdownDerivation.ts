@@ -164,12 +164,26 @@ export function deriveVatBreakdowns(
     };
   }
   if (adjustments.some((adjustment) => !adjustment.adjustment_id || !adjustment.kind || !adjustment.tax_category_code ||
-    !Number.isFinite(Number(adjustment.amount)) || Number(adjustment.amount) < 0) ||
+    !Number.isFinite(Number(adjustment.amount)) || Number(adjustment.amount) < 0 ||
+    (!adjustment.reason_code && !adjustment.reason_text) ||
+    ((adjustment.base_amount === undefined) !== (adjustment.percentage === undefined))) ||
     new Set(adjustmentIds).size !== adjustmentIds.length) {
     return {
       ...base,
       status: 'not_evaluated',
       dependencyReason: 'Document-adjustment dependency: allocation details are incomplete or invalid.',
+    };
+  }
+  const invalidCalculatedAdjustment = adjustments.find((adjustment) =>
+    adjustment.base_amount !== undefined && adjustment.percentage !== undefined &&
+    roundVatBreakdownMoney(multiplyDecimal(parseDecimal(adjustment.base_amount), percentDecimal(adjustment.percentage))) !==
+      roundVatBreakdownMoney(parseDecimal(adjustment.amount))
+  );
+  if (invalidCalculatedAdjustment) {
+    return {
+      ...base,
+      status: 'not_evaluated',
+      dependencyReason: `Document-adjustment dependency: adjustment ${invalidCalculatedAdjustment.adjustment_id} amount does not equal base amount × percentage / 100.`,
     };
   }
   const allocatedAllowanceTotal = sumAdjustments(adjustments, 'allowance');

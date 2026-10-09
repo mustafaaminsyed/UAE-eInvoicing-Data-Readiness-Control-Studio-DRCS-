@@ -39,8 +39,13 @@ export interface DocumentLevelAdjustment {
   amount: number;
   tax_category_code: string;
   vat_rate?: number;
+  base_amount?: number;
+  percentage?: number;
   reason_code?: string;
   reason_text?: string;
+  exemption_reason_code?: string;
+  exemption_reason_text?: string;
+  source_row_number?: number;
 }
 
 export interface InvoiceHeader {
