@@ -783,7 +783,11 @@ export function runPintAECheckWithTelemetry(
         }
 
         const validPrefix = allowedPrefixes.some((prefix) => resolved.startsWith(prefix));
-        if (!validPrefix) {
+        const containsWildcard = resolved.includes('*');
+        if (!validPrefix || containsWildcard) {
+          const failureReason = containsWildcard
+            ? 'must not contain the wildcard character "*"'
+            : `must start with: ${allowedPrefixes.join(' OR ')}`;
           exceptions.push(createException({
             invoiceId: header.invoice_id,
             invoiceNumber: header.invoice_number,
@@ -791,8 +795,8 @@ export function runPintAECheckWithTelemetry(
             buyerId: header.buyer_id,
             fieldName: field,
             observedValue: resolved,
-            expectedValue: `Starts with: ${allowedPrefixes.join(' OR ')}`,
-            message: `Invoice ${header.invoice_number}: Invalid specification identifier "${resolved}"`,
+            expectedValue: `Starts with an allowed prefix and contains no "*" wildcard`,
+            message: `Invoice ${header.invoice_number}: Invalid specification identifier "${resolved}"; ${failureReason}`,
           }));
         }
       });

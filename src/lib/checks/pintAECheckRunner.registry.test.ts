@@ -290,6 +290,21 @@ describe('runPintAECheck executor registry parity', () => {
     expect(exceptions).toHaveLength(0);
   });
 
+  it.each([
+    'urn:peppol:pint:billing-1@ae-1*',
+    'urn:peppol:pint:selfbilling-1@ae-1#2.*',
+  ])('fails CHK-010 when specification identifier contains a wildcard: %s', (specId) => {
+    const check = getCheck('UAE-UC1-CHK-010');
+    const data = buildDataContext({ spec_id: specId });
+
+    const exceptions = runPintAECheck(check, data);
+
+    expect(exceptions).toHaveLength(1);
+    expect(exceptions[0].check_id).toBe('UAE-UC1-CHK-010');
+    expect(exceptions[0].expected_value_or_rule).toContain('no "*" wildcard');
+    expect(exceptions[0].message).toContain('must not contain the wildcard character "*"');
+  });
+
   it('uses system default for CHK-011 when business process is missing', () => {
     const check = getCheck('UAE-UC1-CHK-011');
     const data = buildDataContext({ business_process: '' });
