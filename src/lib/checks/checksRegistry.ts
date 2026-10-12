@@ -194,7 +194,8 @@ export const checksRegistry: ComplianceCheck[] = [
     run: (data: DataContext): Exception[] => {
       const exceptions: Exception[] = [];
       data.lines.forEach(line => {
-        const expected = line.line_total_excl_vat * (line.vat_rate / 100);
+        const effectiveRate = line.vat_rate ?? 0;
+        const expected = line.line_total_excl_vat * (effectiveRate / 100);
         const diff = Math.abs(line.vat_amount - expected);
         if (diff > 0.01) {
           const header = data.headerMap.get(line.invoice_id);
@@ -203,7 +204,7 @@ export const checksRegistry: ComplianceCheck[] = [
             checkId: 'vat_calc_mismatch',
             checkName: 'VAT Calculation Mismatch',
             severity: 'High',
-            message: `Line ${line.line_number}: vat_amount (${line.vat_amount}) != line_total_excl_vat (${line.line_total_excl_vat}) * vat_rate/100 (${line.vat_rate}/100)`,
+            message: `Line ${line.line_number}: vat_amount (${line.vat_amount}) != line_total_excl_vat (${line.line_total_excl_vat}) * vat_rate/100 (${effectiveRate}/100)`,
             invoiceId: line.invoice_id,
             invoiceNumber: header?.invoice_number,
             sellerTrn: header?.seller_trn,
@@ -339,7 +340,7 @@ export const checksRegistry: ComplianceCheck[] = [
       
       data.headers.forEach(header => {
         const lines = data.linesByInvoice.get(header.invoice_id) || [];
-        const vatRates = new Set(lines.map(l => l.vat_rate));
+        const vatRates = new Set(lines.map(l => l.vat_rate).filter((rate): rate is number => rate !== undefined));
         const hasTaxableBase = lines.some(l => l.line_total_excl_vat > 0);
         
         if (vatRates.size > 1 && hasTaxableBase && (!header.vat_total || header.vat_total === 0)) {

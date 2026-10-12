@@ -71,8 +71,8 @@ Fields derived by the ASP (Corner 2) — such as Specification ID (IBT-024), Bus
 | 28 | `vat_total` | IBT-110 | Yes | Number | Decimal (2dp) | Total tax | ERP |
 | 29 | `total_incl_vat` | IBT-112 | Yes | Number | Decimal (2dp) | Total incl. tax | ERP |
 | 30 | `amount_due` | IBT-115 | Conditional | Number | Decimal (2dp) | Amount due | ERP |
-| 31 | `tax_category_code` | IBT-118 | Yes | Code | S/Z/E/RC | Tax category | ERP |
-| 32 | `tax_category_rate` | IBT-119 | Yes | Number | Percentage | Tax rate | ERP |
+| 31 | `tax_category_code` | IBT-118 | Optional compatibility | Code | S/Z/E/O/AE/N; RC accepted as AE alias | Breakdown category is derived from lines and adjustments | ERP |
+| 32 | `tax_category_rate` | IBT-119 | Optional compatibility | Number | Category-specific percentage | Breakdown rate is derived from lines and adjustments | ERP |
 | 33 | `credit_note_reason_code` | BTAE-03 | Conditional | Code | Credit note reason code | Required when `invoice_type = 381` | ERP |
 | 34 | `credit_note_reason_text` | SYS-CN-REASON-TEXT | Conditional | String | Free text | Credit note reason narrative, when captured by source | ERP |
 | 35 | `preceding_invoice_reference` | IBT-025 | Conditional | String | Original invoice identifier | Required for credit notes unless `credit_note_reason_code = VD` | ERP |
@@ -98,9 +98,9 @@ Fields derived by the ASP (Corner 2) — such as Specification ID (IBT-024), Bus
 | 10 | `price_base_quantity` | IBT-149 | Conditional | Number | Positive decimal; blank defaults to 1 | Units to which `unit_price` applies; supply for per-pack/per-100/etc. pricing | ERP / DRCS default |
 | 11 | `line_discount` | SYS-LINE-DISCOUNT | No | Number | Decimal (2dp) | Deprecated compatibility alias for line allowance; never IBT-147 | ERP |
 | 12 | `line_total_excl_vat` | IBT-131 | Yes | Number | Decimal (2dp) | Line net amount | ERP |
-| 13 | `vat_rate` | IBT-152 | Yes | Number | Percentage | VAT rate | ERP |
+| 13 | `vat_rate` | IBT-152 | Conditional | Number | S=5; Z/AE=0; omit for E/O; positive for N | VAT rate | ERP |
 | 14 | `vat_amount` | BTUAE-08 | Yes (UC1) | Number | Decimal (2dp) | VAT line amount | ERP |
-| 15 | `tax_category_code` | IBT-151 | Yes | Code | S/Z/E/RC | Item tax category | ERP |
+| 15 | `tax_category_code` | IBT-151 | Yes | Code | S/Z/E/O/AE/N; RC accepted as AE alias | Item tax category | ERP |
 | 16 | `exemption_reason_code` | IBT-151 | Conditional | Code | UAE exemption code | Exemption reason code when applicable | ERP |
 | 17 | `exemption_reason_text` | IBT-151 | Conditional | String | Free text | Exemption reason text when applicable | ERP |
 | 18 | `goods_service_type` | IBT-151 | Conditional | Code | Goods/services classification | Reverse-charge goods/services type when applicable | ERP |
@@ -111,7 +111,7 @@ Fields derived by the ASP (Corner 2) — such as Specification ID (IBT-024), Bus
 
 ## 4. Document Adjustments Template (`document_adjustments_template.csv`)
 
-Optional one-row-per-adjustment dataset for repeatable PINT-AE document allowances (IBG-20) and charges (IBG-21). Supply it when either header adjustment total is non-zero. Every row requires an amount, VAT category, and either a reason code or reason text. VAT rate is required except for categories E and O. Base amount and percentage must be supplied together. The downloadable template is intentionally header-only so it does not introduce adjustments into the standard sample invoices.
+Optional one-row-per-adjustment dataset for repeatable PINT-AE document allowances (IBG-20) and charges (IBG-21). Supply it when either header adjustment total is non-zero. Every row requires an amount, VAT category, and either a reason code or reason text. Use S=5, Z/AE/E=0, and omit the rate for O; category N is not permitted for document adjustments. Base amount and percentage must be supplied together. The downloadable template is intentionally header-only so it does not introduce adjustments into the standard sample invoices.
 
 ---
 

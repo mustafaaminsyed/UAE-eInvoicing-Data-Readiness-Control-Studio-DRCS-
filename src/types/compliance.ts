@@ -118,7 +118,7 @@ export interface InvoiceLine {
   item_price_discount?: number;
   line_discount?: number;
   line_total_excl_vat: number;
-  vat_rate: number;
+  vat_rate?: number;
   vat_amount: number;
   // UC1 expansions
   unit_of_measure?: string;

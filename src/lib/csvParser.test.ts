@@ -127,7 +127,7 @@ describe('negative headers template upload path', () => {
 
     expect(Number.isNaN(lines[0].unit_price)).toBe(true);
     expect(Number.isNaN(lines[0].line_total_excl_vat)).toBe(true);
-    expect(Number.isNaN(lines[0].vat_rate)).toBe(true);
+    expect(lines[0].vat_rate).toBeUndefined();
     expect(Number.isNaN(lines[0].vat_amount)).toBe(true);
     expect(lines[1]).toMatchObject({ unit_price: 0, line_total_excl_vat: 0, vat_rate: 0, vat_amount: 0 });
   });
@@ -227,5 +227,35 @@ describe('document adjustment parsing', () => {
     const csv = `adjustment_id,invoice_id,kind,amount,tax_category_code,vat_rate,reason_code,reason_text\nA-1,INV-X,allowance,50,S,5,,`;
     await expect(parseDocumentAdjustmentsFile({ text: async () => csv } as File)).rejects.toThrow('requires a reason');
     expect(() => attachDocumentAdjustments([], [{ adjustment_id: 'A-1', invoice_id: 'INV-X', kind: 'allowance', amount: 50, tax_category_code: 'S', reason_text: 'Discount' }])).toThrow('missing invoice');
+  });
+
+  it.each([
+    ['S', '10', 'exactly 5%'],
+    ['AE', '5', '0%'],
+    ['E', '', 'require a VAT rate of 0%'],
+    ['O', '0', 'must omit'],
+    ['N', '5', 'cannot use VAT category N'],
+  ])('rejects invalid adjustment category/rate pair %s/%s', async (category, rate, reason) => {
+    const csv = `adjustment_id,invoice_id,kind,amount,tax_category_code,vat_rate,reason_text\nA-1,INV-1,allowance,10,${category},${rate},Discount`;
+    await expect(parseDocumentAdjustmentsFile({ text: async () => csv } as File)).rejects.toThrow(reason);
+  });
+
+  it('accepts the adjustment-specific E/0 rule and normalizes RC to AE', async () => {
+    const csv = `adjustment_id,invoice_id,kind,amount,tax_category_code,vat_rate,reason_text\nA-1,INV-1,allowance,10,E,0,Exempt allowance\nC-1,INV-1,charge,5,RC,0,Reverse-charge fee`;
+    await expect(parseDocumentAdjustmentsFile({ text: async () => csv } as File)).resolves.toMatchObject([
+      { tax_category_code: 'E', vat_rate: 0 },
+      { tax_category_code: 'AE', vat_rate: 0 },
+    ]);
+  });
+});
+
+describe('conditional line VAT rate parsing', () => {
+  it('preserves an omitted IBT-152 rate for exempt and out-of-scope lines', async () => {
+    const csv = `line_id,invoice_id,line_number,quantity,unit_price,line_total_excl_vat,vat_rate,vat_amount,tax_category_code\nL-1,INV-1,1,1,100,100,,0,E\nL-2,INV-1,2,1,50,50,,0,O`;
+    const lines = await parseLinesFile({ text: async () => csv } as File);
+    expect(lines).toMatchObject([
+      { tax_category_code: 'E', vat_rate: undefined },
+      { tax_category_code: 'O', vat_rate: undefined },
+    ]);
   });
 });

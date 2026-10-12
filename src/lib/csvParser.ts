@@ -1,5 +1,6 @@
 import { Buyer, DocumentLevelAdjustment, InvoiceHeader, InvoiceLine } from '@/types/compliance';
 import { Direction } from '@/types/direction';
+import { validateVatCategoryRate } from '@/lib/tax/vatCategoryRatePolicy';
 
 export function normalizeCSVText(text: string): string {
   return text
@@ -295,15 +296,15 @@ export async function parseDocumentAdjustmentsFile(file: File): Promise<Array<Do
     seenIds.add(adjustmentId);
     if (!reasonCode && !reasonText) throw new Error(`Document adjustment ${adjustmentId} requires a reason code or reason text.`);
     if ((baseAmount === undefined) !== (percentage === undefined)) throw new Error(`Document adjustment ${adjustmentId} must provide both base_amount and percentage, or neither.`);
-    if (!['E', 'O'].includes(category) && rate === undefined) throw new Error(`Document adjustment ${adjustmentId} requires a VAT rate for category ${category}.`);
-    if (['E', 'O'].includes(category) && rate !== undefined && rate !== 0) throw new Error(`Document adjustment ${adjustmentId} must not provide a non-zero VAT rate for category ${category}.`);
+    const vatPolicy = validateVatCategoryRate(category, rate, 'adjustment');
+    if (!vatPolicy.valid) throw new Error(`Document adjustment ${adjustmentId}: ${vatPolicy.reason}`);
     return {
       adjustment_id: adjustmentId,
       invoice_id: invoiceId,
       kind: kind as DocumentLevelAdjustment['kind'],
       amount,
-      tax_category_code: category,
-      vat_rate: rate,
+      tax_category_code: vatPolicy.category,
+      vat_rate: vatPolicy.rate ?? undefined,
       base_amount: baseAmount,
       percentage,
       reason_code: reasonCode,
@@ -351,7 +352,7 @@ export async function parseLinesFile(file: File, options: ParseOptions = {}): Pr
       item_price_discount: num(record, 'item_price_discount', 'price_discount', 'unit_price_discount'),
       line_discount: lineDiscount,
       line_total_excl_vat: requiredNum(record, 'line_total_excl_vat', 'line_net_amount'),
-      vat_rate: requiredNum(record, 'vat_rate'),
+      vat_rate: num(record, 'vat_rate'),
       vat_amount: requiredNum(record, 'vat_amount'),
       unit_of_measure: str(record, 'unit_of_measure', 'unit_code'),
       price_base_quantity: num(

@@ -350,7 +350,7 @@ export default function InvoiceDetailPage() {
                       <td className="p-4 text-right text-sm text-foreground">{pricing.itemGrossPrice?.toFixed(2) ?? '—'}</td>
                       <td className="p-4 text-right text-sm text-foreground">{(line.line_allowance_amount ?? line.line_discount ?? 0).toFixed(2)}</td>
                       <td className="p-4 text-right text-sm font-medium text-foreground">{line.line_total_excl_vat.toFixed(2)}</td>
-                      <td className="p-4 text-right text-sm text-foreground">{(line.vat_rate * 100).toFixed(0)}%</td>
+                      <td className="p-4 text-right text-sm text-foreground">{line.vat_rate === undefined ? '—' : `${line.vat_rate}%`}</td>
                       <td className="p-4 text-right text-sm text-foreground">{line.vat_amount.toFixed(2)}</td>
                       <td className="p-4 text-center">
                         {hasError ? (

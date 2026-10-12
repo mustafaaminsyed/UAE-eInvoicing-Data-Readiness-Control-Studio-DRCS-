@@ -8,6 +8,7 @@ import { decodeTransactionTypeCode } from '@/modules/scenarioContext/transaction
 import { Direction } from '@/types/direction';
 import { ValidationExecutionEvidence } from '@/types/validationExecution';
 import { DerivedVatBreakdown, deriveVatBreakdowns, sumVatBreakdownTax } from '@/lib/tax/vatBreakdownDerivation';
+import { validateVatCategoryRate } from '@/lib/tax/vatCategoryRatePolicy';
 import { resolvePricingSemantics } from '@/lib/pricing/pricingSemantics';
 
 export interface PintAECheckTelemetry {
@@ -537,19 +538,9 @@ function recordMatchesConditions(record: any, conditions: DependencyCondition[])
   return conditions.every((condition) => conditionMatches(record, condition));
 }
 
-function isCategoryMatch(value: unknown, candidates: string[]): boolean {
-  const token = normalizeToken(value);
-  return candidates.map(normalizeToken).includes(token);
-}
-
 function isZeroWithinTolerance(value: unknown, tolerance: number): boolean {
   const numeric = Number(value);
   return Number.isFinite(numeric) && Math.abs(numeric) <= tolerance;
-}
-
-function isPositiveBeyondTolerance(value: unknown, tolerance: number): boolean {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) && numeric > tolerance;
 }
 
 function conditionMatches(record: any, condition: DependencyCondition): boolean {
@@ -1769,17 +1760,14 @@ export function runPintAECheckWithTelemetry(
 
     case 'UAE-UC1-CHK-053': {
       const tolerance = Number(params.tolerance ?? 0.01);
-      const standardCategories = getStringArray(params.standard_categories);
-      const zeroRateCategories = getStringArray(params.zero_rate_categories);
 
       data.lines.forEach(line => {
         executionCount++;
         const header = data.headerMap.get(line.invoice_id);
-        const category = normalizeToken(line.tax_category_code);
-        const rate = Number(line.vat_rate);
+        const policy = validateVatCategoryRate(line.tax_category_code, line.vat_rate, 'line');
         const amount = Number(line.vat_amount);
 
-        if (isCategoryMatch(category, standardCategories) && !isPositiveBeyondTolerance(rate, tolerance)) {
+        if (!policy.valid) {
           exceptions.push(createException({
             invoiceId: line.invoice_id,
             invoiceNumber: header?.invoice_number,
@@ -1788,26 +1776,12 @@ export function runPintAECheckWithTelemetry(
             lineId: line.line_id,
             fieldName: 'vat_rate',
             observedValue: String(line.vat_rate),
-            expectedValue: 'Positive VAT rate for standard-rated category',
-            message: `Invoice ${header?.invoice_number || line.invoice_id}, Line ${line.line_number}: Standard VAT category "${line.tax_category_code}" cannot use a zero or missing VAT rate`,
+            expectedValue: policy.reason,
+            message: `Invoice ${header?.invoice_number || line.invoice_id}, Line ${line.line_number}: ${policy.reason}`,
           }));
         }
 
-        if (isCategoryMatch(category, zeroRateCategories)) {
-          if (!isZeroWithinTolerance(rate, tolerance)) {
-            exceptions.push(createException({
-              invoiceId: line.invoice_id,
-              invoiceNumber: header?.invoice_number,
-              sellerTrn: header?.seller_trn,
-              buyerId: header?.buyer_id,
-              lineId: line.line_id,
-              fieldName: 'vat_rate',
-              observedValue: String(line.vat_rate),
-              expectedValue: 'VAT rate of 0 for exempt/zero-rated/reverse-charge treatment',
-              message: `Invoice ${header?.invoice_number || line.invoice_id}, Line ${line.line_number}: VAT category "${line.tax_category_code}" requires a zero VAT rate`,
-            }));
-          }
-
+        if (policy.expectsZeroTaxAmount) {
           if (!isZeroWithinTolerance(amount, tolerance)) {
             exceptions.push(createException({
               invoiceId: line.invoice_id,
