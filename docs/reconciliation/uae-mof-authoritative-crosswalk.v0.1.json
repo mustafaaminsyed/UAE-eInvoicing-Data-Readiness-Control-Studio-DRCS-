@@ -473,40 +473,40 @@
       "document_type": "tax",
       "mof_field_id": 35,
       "mof_business_term": "Tax category taxable amount",
-      "source_template": "invoice_lines_template.csv|invoice_headers_template.csv",
-      "source_column": "line_total_excl_vat|tax_category_code|vat_rate|document_level_allowance_total|document_level_charge_total",
+      "source_template": "invoice_lines_template.csv|invoice_headers_template.csv|document_adjustments_template.csv",
+      "source_column": "line_total_excl_vat|tax_category_code|vat_rate|document_level_allowance_total|document_level_charge_total|kind|amount|base_amount|percentage",
       "internal_field_key": "derived_vat_breakdowns.taxableAmount",
       "dr_id": "IBT-116",
       "classification": "derived",
-      "transformation_rule": "Group IBT-131 by normalized category and applicable significant rate; return not_evaluated unless document adjustments are positively absent",
-      "status": "partially_covered",
-      "notes": "P1.7 is required for categorized document allowances/charges; IBT-116 is not a taxpayer-source field."
+      "transformation_rule": "Group IBT-131 by normalized category and applicable significant rate; allocate reconciled categorized document adjustments; return not_evaluated when adjustment detail is incomplete or mismatched",
+      "status": "covered",
+      "notes": "IBT-116 is derived rather than taxpayer-sourced; repeatable adjustment detail and source-row lineage are governed by the optional adjustments dataset."
     },
     {
       "document_type": "tax",
       "mof_field_id": 36,
       "mof_business_term": "Tax category tax amount",
-      "source_template": "invoice_headers_template.csv|invoice_lines_template.csv",
-      "source_column": "line_total_excl_vat|tax_category_code|vat_rate|vat_total",
+      "source_template": "invoice_lines_template.csv|invoice_headers_template.csv|document_adjustments_template.csv",
+      "source_column": "line_total_excl_vat|tax_category_code|vat_rate|vat_total|kind|amount",
       "internal_field_key": "derived_vat_breakdowns.taxAmount",
       "dr_id": "IBT-117",
       "classification": "derived",
       "transformation_rule": "Calculate in invoice currency from IBT-116 and category treatment; reconcile rounded sum to IBT-110",
       "status": "partially_covered",
-      "notes": "Do not aggregate AED-oriented BTUAE-08; P1.7 dependency is explicitly not_evaluated."
+      "notes": "Do not aggregate AED-oriented BTUAE-08; governed adjustment ingestion is complete, while current category-rate rule parity remains pending."
     },
     {
       "document_type": "tax",
       "mof_field_id": 37,
       "mof_business_term": "Tax category code",
-      "source_template": "invoice_lines_template.csv",
+      "source_template": "invoice_lines_template.csv|document_adjustments_template.csv",
       "source_column": "tax_category_code",
       "internal_field_key": "derived_vat_breakdowns.category",
       "dr_id": "IBT-118",
       "classification": "derived",
       "transformation_rule": "Normalize IBT-151 and emit one IBT-118 value for each category and applicable-rate group",
       "status": "partially_covered",
-      "notes": "Repeatable output is derived; the optional header tax_category_code is compatibility metadata only. P1.7 is required when document adjustments are not positively absent."
+      "notes": "Repeatable output is derived from line and adjustment categories; the optional header tax_category_code is compatibility metadata only."
     },
     {
       "document_type": "tax",
@@ -1136,40 +1136,40 @@
       "document_type": "commercial",
       "mof_field_id": 35,
       "mof_business_term": "Tax category taxable amount",
-      "source_template": "invoice_lines_template.csv|invoice_headers_template.csv",
-      "source_column": "line_total_excl_vat|tax_category_code|vat_rate|document_level_allowance_total|document_level_charge_total",
+      "source_template": "invoice_lines_template.csv|invoice_headers_template.csv|document_adjustments_template.csv",
+      "source_column": "line_total_excl_vat|tax_category_code|vat_rate|document_level_allowance_total|document_level_charge_total|kind|amount|base_amount|percentage",
       "internal_field_key": "derived_vat_breakdowns.taxableAmount",
       "dr_id": "IBT-116",
       "classification": "derived",
-      "transformation_rule": "Group IBT-131 by normalized category and applicable significant rate; return not_evaluated unless document adjustments are positively absent",
-      "status": "partially_covered",
-      "notes": "P1.7 is required for categorized document allowances/charges; IBT-116 is not a taxpayer-source field."
+      "transformation_rule": "Group IBT-131 by normalized category and applicable significant rate; allocate reconciled categorized document adjustments; return not_evaluated when adjustment detail is incomplete or mismatched",
+      "status": "covered",
+      "notes": "IBT-116 is derived rather than taxpayer-sourced; repeatable adjustment detail and source-row lineage are governed by the optional adjustments dataset."
     },
     {
       "document_type": "commercial",
       "mof_field_id": 36,
       "mof_business_term": "Tax category tax amount",
-      "source_template": "invoice_headers_template.csv|invoice_lines_template.csv",
-      "source_column": "line_total_excl_vat|tax_category_code|vat_rate|vat_total",
+      "source_template": "invoice_lines_template.csv|invoice_headers_template.csv|document_adjustments_template.csv",
+      "source_column": "line_total_excl_vat|tax_category_code|vat_rate|vat_total|kind|amount",
       "internal_field_key": "derived_vat_breakdowns.taxAmount",
       "dr_id": "IBT-117",
       "classification": "derived",
       "transformation_rule": "Calculate in invoice currency from IBT-116 and category treatment; reconcile rounded sum to IBT-110",
       "status": "partially_covered",
-      "notes": "Do not aggregate AED-oriented BTUAE-08; P1.7 dependency is explicitly not_evaluated."
+      "notes": "Do not aggregate AED-oriented BTUAE-08; governed adjustment ingestion is complete, while current category-rate rule parity remains pending."
     },
     {
       "document_type": "commercial",
       "mof_field_id": 37,
       "mof_business_term": "Tax category code",
-      "source_template": "invoice_lines_template.csv",
+      "source_template": "invoice_lines_template.csv|document_adjustments_template.csv",
       "source_column": "tax_category_code",
       "internal_field_key": "derived_vat_breakdowns.category",
       "dr_id": "IBT-118",
       "classification": "derived",
       "transformation_rule": "Normalize IBT-151 and emit one IBT-118 value for each category and applicable-rate group",
       "status": "partially_covered",
-      "notes": "Repeatable output is derived; the optional header tax_category_code is compatibility metadata only. P1.7 is required when document adjustments are not positively absent."
+      "notes": "Repeatable output is derived from line and adjustment categories; the optional header tax_category_code is compatibility metadata only."
     },
     {
       "document_type": "commercial",
