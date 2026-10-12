@@ -42,6 +42,7 @@ export default function UploadPage() {
     buyers: null, headers: null, lines: null,
   });
   const [adjustmentsFile, setAdjustmentsFile] = useState<File | null>(null);
+  const [adjustmentsStats, setAdjustmentsStats] = useState<FileStats | null>(null);
   const [stats, setStats] = useState<{ buyers: FileStats | null; headers: FileStats | null; lines: FileStats | null }>({
     buyers: null, headers: null, lines: null,
   });
@@ -51,7 +52,8 @@ export default function UploadPage() {
     buyers: Record<string, string>[] | null;
     headers: Record<string, string>[] | null;
     lines: Record<string, string>[] | null;
-  }>({ buyers: null, headers: null, lines: null });
+    adjustments: Record<string, string>[] | null;
+  }>({ buyers: null, headers: null, lines: null, adjustments: null });
   const [loadStartedAt, setLoadStartedAt] = useState<number | null>(null);
   const [loadElapsedSeconds, setLoadElapsedSeconds] = useState(0);
   const [sampleScenario, setSampleScenario] = useState<SampleScenario>('positive');
@@ -66,7 +68,8 @@ export default function UploadPage() {
   const totalSelectedRows =
     (stats.buyers?.rowCount ?? 0) +
     (stats.headers?.rowCount ?? 0) +
-    (stats.lines?.rowCount ?? 0);
+    (stats.lines?.rowCount ?? 0) +
+    (adjustmentsStats?.rowCount ?? 0);
   const loadElapsedLabel = formatElapsedTime(loadElapsedSeconds);
 
   // Compute blocking reasons
@@ -77,11 +80,12 @@ export default function UploadPage() {
   if (stats.buyers?.requiredMissing.length) blockingReasons.push(`Buyers: missing columns (${stats.buyers.requiredMissing.join(', ')})`);
   if (stats.headers?.requiredMissing.length) blockingReasons.push(`Headers: missing columns (${stats.headers.requiredMissing.join(', ')})`);
   if (stats.lines?.requiredMissing.length) blockingReasons.push(`Lines: missing columns (${stats.lines.requiredMissing.join(', ')})`);
+  if (adjustmentsStats?.requiredMissing.length) blockingReasons.push(`Adjustments: missing columns (${adjustmentsStats.requiredMissing.join(', ')})`);
 
-  const hasStructuralErrors = [stats.buyers, stats.headers, stats.lines].some(
+  const hasStructuralErrors = [stats.buyers, stats.headers, stats.lines, adjustmentsStats].some(
     (s) => s && s.requiredMissing.length > 0
   );
-  const canProceed = allFilesSelected && !hasStructuralErrors;
+  const canProceed = allFilesSelected && !hasStructuralErrors && (!adjustmentsFile || adjustmentsStats !== null);
   const hasCreditNoteHeaders = (parsedRows.headers ?? []).some((row) => {
     const invoiceType = (row.invoice_type_code || row.invoice_type || '').trim().toUpperCase();
     return invoiceType.startsWith('381') || invoiceType.includes('CREDIT');
@@ -112,6 +116,23 @@ export default function UploadPage() {
     }
   }, [datasetType, toast]);
 
+  const handleAdjustmentsFileSelect = useCallback(async (file: File | null) => {
+    setAdjustmentsFile(file);
+    if (!file) {
+      setAdjustmentsStats(null);
+      setParsedRows((prev) => ({ ...prev, adjustments: null }));
+      return;
+    }
+    try {
+      const text = await file.text();
+      const rows = parseCSV(text);
+      setAdjustmentsStats(analyzeFile(rows, file, 'adjustments', datasetType, text));
+      setParsedRows((prev) => ({ ...prev, adjustments: rows }));
+    } catch {
+      toast({ title: 'Error reading file', description: 'Could not parse the document adjustments CSV file.', variant: 'destructive' });
+    }
+  }, [datasetType, toast]);
+
   // Relational integrity checks
   useEffect(() => {
     const checks: RelationalCheck[] = [];
@@ -137,6 +158,17 @@ export default function UploadPage() {
         matchPct: lineInvoiceIds.length > 0 ? (matched.length / lineInvoiceIds.length) * 100 : 100,
         unmatchedCount: unmatched,
         total: lineInvoiceIds.length,
+      });
+    }
+    if (parsedRows.adjustments && parsedRows.headers) {
+      const invoiceIds = new Set(parsedRows.headers.map((r) => r.invoice_id));
+      const adjustmentInvoiceIds = parsedRows.adjustments.map((r) => r.invoice_id).filter(Boolean);
+      const matched = adjustmentInvoiceIds.filter((id) => invoiceIds.has(id));
+      checks.push({
+        label: 'adjustments.invoice_id -> headers.invoice_id',
+        matchPct: adjustmentInvoiceIds.length > 0 ? (matched.length / adjustmentInvoiceIds.length) * 100 : 100,
+        unmatchedCount: adjustmentInvoiceIds.length - matched.length,
+        total: adjustmentInvoiceIds.length,
       });
     }
     setRelationalChecks(checks);
@@ -212,6 +244,16 @@ export default function UploadPage() {
               requiredMissing: stats.lines.requiredMissing,
               nullWarnings: stats.lines.nullWarnings,
             },
+            ...(adjustmentsFile && adjustmentsStats ? [{
+              dataset: 'adjustments' as const,
+              ingestionStatus: 'accepted' as const,
+              fileName: adjustmentsStats.fileName,
+              fileSize: adjustmentsStats.fileSize,
+              rowCount: adjustments.length,
+              columnCount: adjustmentsStats.columnCount,
+              requiredMissing: adjustmentsStats.requiredMissing,
+              nullWarnings: adjustmentsStats.nullWarnings,
+            }] : []),
           ],
           relationalChecks: relationalChecks.map((check) => ({
             label: check.label,
@@ -239,8 +281,9 @@ export default function UploadPage() {
   const handleClearAll = () => {
     setFiles({ buyers: null, headers: null, lines: null });
     setStats({ buyers: null, headers: null, lines: null });
-    setParsedRows({ buyers: null, headers: null, lines: null });
+    setParsedRows({ buyers: null, headers: null, lines: null, adjustments: null });
     setAdjustmentsFile(null);
+    setAdjustmentsStats(null);
     clearData();
   };
 
@@ -459,7 +502,7 @@ export default function UploadPage() {
                   type="file"
                   accept=".csv,text/csv"
                   className="mt-2 block w-full text-sm text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-xs file:font-medium file:text-primary-foreground"
-                  onChange={(event) => setAdjustmentsFile(event.target.files?.[0] ?? null)}
+                  onChange={(event) => handleAdjustmentsFileSelect(event.target.files?.[0] ?? null)}
                 />
                 {adjustmentsFile && <p className="mt-2 text-xs text-foreground">Selected: {adjustmentsFile.name}</p>}
               </div>

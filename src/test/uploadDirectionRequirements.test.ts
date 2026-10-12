@@ -2,6 +2,22 @@ import { describe, expect, it } from 'vitest';
 import { analyzeFile } from '@/components/upload/FileAnalysis';
 
 describe('upload structural requirements by direction', () => {
+  it('captures the required identity and tax columns for document adjustments', () => {
+    const rows = [{
+      adjustment_id: 'A1',
+      invoice_id: 'INV1',
+      kind: 'allowance',
+      amount: '10.00',
+      tax_category_code: 'S',
+    }];
+    const file = new File(['adjustment_id,invoice_id,kind,amount,tax_category_code\nA1,INV1,allowance,10.00,S'], 'adjustments.csv');
+
+    const analysis = analyzeFile(rows, file, 'adjustments', 'AR');
+
+    expect(analysis.requiredMissing).toEqual([]);
+    expect(analysis.inferredPK).toBe('adjustment_id');
+  });
+
   it('requires supplier_id on AP header files', () => {
     const rows = [
       {

@@ -155,10 +155,17 @@ export default function UploadAuditPage() {
                     <MetricPill label="Lines" value={log.linesCount} />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
                     {log.datasets.map((dataset) => (
                       <div key={`${log.id}-${dataset.dataset}`} className="rounded-md border bg-muted/20 p-2.5">
-                        <p className="text-xs font-medium text-foreground capitalize">{dataset.dataset}</p>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-medium text-foreground capitalize">{dataset.dataset}</p>
+                          {dataset.ingestionStatus === "accepted" && (
+                            <Badge variant="outline" className="text-[10px] border-[hsl(var(--success))]/30 text-[hsl(var(--success))]">
+                              Accepted
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-[11px] text-muted-foreground truncate mt-1">{dataset.fileName}</p>
                         <p className="text-[11px] text-muted-foreground mt-1">
                           {dataset.rowCount} rows | {dataset.columnCount} cols

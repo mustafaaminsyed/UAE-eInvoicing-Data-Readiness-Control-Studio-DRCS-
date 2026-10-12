@@ -1,7 +1,8 @@
-export type UploadAuditDatasetType = "buyers" | "headers" | "lines";
+export type UploadAuditDatasetType = "buyers" | "headers" | "lines" | "adjustments";
 
 export interface UploadAuditDatasetMeta {
   dataset: UploadAuditDatasetType;
+  ingestionStatus?: "accepted";
   fileName: string;
   fileSize: number;
   rowCount: number;

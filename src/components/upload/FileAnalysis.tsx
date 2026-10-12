@@ -6,19 +6,26 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import { normalizeCSVText } from '@/lib/csvParser';
-import { downloadSampleCSV, getSampleData, SampleScenario } from '@/lib/sampleData';
+import { documentAdjustmentsSample, downloadSampleCSV, getSampleData, SampleScenario } from '@/lib/sampleData';
 import { getMandatoryColumnsForDataset } from '@/lib/registry/drRegistry';
 import { Direction } from '@/types/direction';
 
 // Expected customer-provided columns, derived from the downloadable sample templates.
-function getManifestColumns(type: 'buyers' | 'headers' | 'lines', direction: Direction): string[] {
-  const sample = getSampleData(type, 'positive', direction)?.content ?? '';
+type AnalyzableDatasetType = 'buyers' | 'headers' | 'lines' | 'adjustments';
+
+function getManifestColumns(type: AnalyzableDatasetType, direction: Direction): string[] {
+  const sample = type === 'adjustments'
+    ? documentAdjustmentsSample
+    : getSampleData(type, 'positive', direction)?.content ?? '';
   const header = sample.split(/\r?\n/)[0] ?? '';
   return header.split(',').map((c) => c.trim()).filter(Boolean);
 }
 
 // Spec-driven: mandatory UC1 columns per dataset, from DR registry (used for gating)
-const getRequiredColumns = (type: 'buyers' | 'headers' | 'lines', direction: Direction): string[] => {
+const getRequiredColumns = (type: AnalyzableDatasetType, direction: Direction): string[] => {
+  if (type === 'adjustments') {
+    return ['adjustment_id', 'invoice_id', 'kind', 'amount', 'tax_category_code'];
+  }
   if (type === 'buyers') {
     return direction === 'AP' ? ['supplier_id', 'supplier_name', 'supplier_trn'] : ['buyer_id', 'buyer_name', 'buyer_trn'];
   }
@@ -59,7 +66,8 @@ function parseHeaderColumns(line: string): string[] {
   return result.filter(Boolean);
 }
 
-function getPkCandidate(type: 'buyers' | 'headers' | 'lines', direction: Direction): string {
+function getPkCandidate(type: AnalyzableDatasetType, direction: Direction): string {
+  if (type === 'adjustments') return 'adjustment_id';
   if (type === 'buyers') return direction === 'AP' ? 'supplier_id' : 'buyer_id';
   if (type === 'headers') return 'invoice_id';
   return 'line_id';
@@ -83,7 +91,7 @@ export interface FileStats {
 export function analyzeFile(
   rows: Record<string, string>[],
   file: File,
-  type: 'buyers' | 'headers' | 'lines',
+  type: AnalyzableDatasetType,
   direction: Direction = 'AR',
   rawText?: string
 ): FileStats {
