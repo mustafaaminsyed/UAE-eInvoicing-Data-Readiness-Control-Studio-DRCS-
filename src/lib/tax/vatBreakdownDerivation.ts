@@ -1,4 +1,7 @@
 import { DocumentLevelAdjustment, InvoiceHeader, InvoiceLine } from '@/types/compliance';
+import { normalizeVatCategory, validateVatCategoryRate } from './vatCategoryRatePolicy';
+
+export { normalizeVatCategory } from './vatCategoryRatePolicy';
 
 export type VatBreakdownEvaluationStatus = 'evaluated' | 'not_evaluated' | 'failed';
 
@@ -99,37 +102,6 @@ function canonicalDecimal(value: number): string {
   return scale === 0 ? `${sign}${digits}` : `${sign}${digits.slice(0, -scale)}.${digits.slice(-scale)}`;
 }
 
-export function normalizeVatCategory(value: unknown): { category: string; normalization?: string } {
-  const source = String(value ?? '').trim().toUpperCase();
-  if (source === 'RC' || source === 'REVERSE_CHARGE') {
-    return { category: 'AE', normalization: `${source}->AE` };
-  }
-  const aliases: Record<string, string> = {
-    STANDARD_RATE: 'S',
-    ZERO_RATED: 'Z',
-    ZERO_RATED_SUPPLY: 'Z',
-    EXEMPT: 'E',
-    EXEMPT_FROM_VAT: 'E',
-    OUT_OF_SCOPE: 'O',
-  };
-  const category = aliases[source] ?? source;
-  return { category, normalization: category !== source ? `${source}->${category}` : undefined };
-}
-
-function rateForLine(line: InvoiceLine, category: string): number | null {
-  if (category === 'E' || category === 'O') return null;
-  return line.vat_rate === undefined || line.vat_rate === null || !Number.isFinite(Number(line.vat_rate))
-    ? null
-    : Number(line.vat_rate);
-}
-
-function adjustmentRate(adjustment: DocumentLevelAdjustment, category: string): number | null {
-  if (category === 'E' || category === 'O') return null;
-  return adjustment.vat_rate === undefined || adjustment.vat_rate === null || !Number.isFinite(Number(adjustment.vat_rate))
-    ? null
-    : Number(adjustment.vat_rate);
-}
-
 function sumAdjustments(adjustments: DocumentLevelAdjustment[], kind: DocumentLevelAdjustment['kind']): number {
   const exact = adjustments
     .filter((adjustment) => adjustment.kind === kind)
@@ -207,26 +179,10 @@ export function deriveVatBreakdowns(
   }>();
 
   for (const line of lines) {
-    const normalized = normalizeVatCategory(line.tax_category_code);
-    if (!normalized.category) {
-      return { ...base, status: 'failed', failureReason: `Line ${line.line_id} is missing its VAT category.` };
-    }
-    if (!['S', 'Z', 'E', 'O', 'AE', 'N'].includes(normalized.category)) {
-      return { ...base, status: 'failed', failureReason: `Line ${line.line_id} uses unsupported VAT category ${normalized.category}.` };
-    }
-    const rate = rateForLine(line, normalized.category);
-    if (!['E', 'O'].includes(normalized.category) && rate === null) {
-      return { ...base, status: 'failed', failureReason: `Line ${line.line_id} is missing an applicable VAT rate.` };
-    }
-    if ((normalized.category === 'S' || normalized.category === 'AE' || normalized.category === 'N') && Number(rate) <= 0) {
-      return { ...base, status: 'failed', failureReason: `Line ${line.line_id} requires a positive VAT rate for category ${normalized.category}.` };
-    }
-    if (normalized.category === 'Z' && rate !== 0) {
-      return { ...base, status: 'failed', failureReason: `Line ${line.line_id} requires a zero VAT rate for category Z.` };
-    }
-    if ((normalized.category === 'E' || normalized.category === 'O') && Number(line.vat_rate ?? 0) !== 0) {
-      return { ...base, status: 'failed', failureReason: `Line ${line.line_id} must not supply a non-zero VAT rate for category ${normalized.category}.` };
-    }
+    const policy = validateVatCategoryRate(line.tax_category_code, line.vat_rate, 'line');
+    if (!policy.valid) return { ...base, status: 'failed', failureReason: `Line ${line.line_id}: ${policy.reason}` };
+    const normalized = policy;
+    const rate = policy.rate;
     if (!Number.isFinite(Number(line.line_total_excl_vat))) {
       return { ...base, status: 'failed', failureReason: `Line ${line.line_id} has an invalid IBT-131 amount.` };
     }
@@ -248,13 +204,10 @@ export function deriveVatBreakdowns(
 
 
   for (const adjustment of adjustments) {
-    const normalized = normalizeVatCategory(adjustment.tax_category_code);
-    const rate = adjustmentRate(adjustment, normalized.category);
-    if (!['S', 'Z', 'E', 'O', 'AE', 'N'].includes(normalized.category) ||
-      (!['E', 'O'].includes(normalized.category) && rate === null) ||
-      ((normalized.category === 'S' || normalized.category === 'AE' || normalized.category === 'N') && Number(rate) <= 0) ||
-      (normalized.category === 'Z' && rate !== 0) ||
-      (['E', 'O'].includes(normalized.category) && Number(adjustment.vat_rate ?? 0) !== 0)) {
+    const policy = validateVatCategoryRate(adjustment.tax_category_code, adjustment.vat_rate, 'adjustment');
+    const normalized = policy;
+    const rate = policy.rate;
+    if (!policy.valid) {
       return {
         ...base,
         status: 'not_evaluated',

@@ -44,11 +44,11 @@ describe('P1.4 VAT breakdown derivation', () => {
     const result = deriveVatBreakdowns(header(), [
       line('L1', 100, 'S', 5),
       line('L2', 100, 'S', 5.00),
-      line('L3', 100, 'S', 10),
+      line('L3', 100, 'N', 10),
       line('L4', 100, 'Z', 0),
     ]);
     expect(result.breakdowns.map(({ groupingKey, taxableAmount }) => [groupingKey, taxableAmount])).toEqual([
-      ['S|10', 100], ['S|5', 200], ['Z|0', 100],
+      ['N|10', 100], ['S|5', 200], ['Z|0', 100],
     ]);
   });
 
@@ -67,7 +67,7 @@ describe('P1.4 VAT breakdown derivation', () => {
     ['Z', 0, 'Z', 0],
     ['E', undefined, 'E', null],
     ['O', undefined, 'O', null],
-    ['AE', 5, 'AE', 5],
+    ['AE', 0, 'AE', 0],
     ['N', 5, 'N', 5],
   ] as const)('applies pinned zero-tax treatment for %s without inventing a rate', (source, rate, category, expectedRate) => {
     const result = deriveVatBreakdowns(header(), [line('L1', 125, source, rate)]);
@@ -75,13 +75,13 @@ describe('P1.4 VAT breakdown derivation', () => {
   });
 
   it('normalizes the RC ingestion alias to official AE and records the normalization', () => {
-    const result = deriveVatBreakdowns(header(), [line('L1', 100, 'RC', 5)]);
-    expect(result.breakdowns[0]).toMatchObject({ category: 'AE', groupingKey: 'AE|5', taxAmount: 0, normalizations: ['RC->AE'] });
+    const result = deriveVatBreakdowns(header(), [line('L1', 100, 'RC', 0)]);
+    expect(result.breakdowns[0]).toMatchObject({ category: 'AE', groupingKey: 'AE|0', taxAmount: 0, normalizations: ['RC->AE'] });
   });
 
   it('normalizes the REVERSE_CHARGE ingestion alias to official AE', () => {
-    const result = deriveVatBreakdowns(header(), [line('L1', 100, 'REVERSE_CHARGE', 5)]);
-    expect(result.breakdowns[0]).toMatchObject({ category: 'AE', groupingKey: 'AE|5', normalizations: ['REVERSE_CHARGE->AE'] });
+    const result = deriveVatBreakdowns(header(), [line('L1', 100, 'REVERSE_CHARGE', 0)]);
+    expect(result.breakdowns[0]).toMatchObject({ category: 'AE', groupingKey: 'AE|0', normalizations: ['REVERSE_CHARGE->AE'] });
   });
 
   it('groups multiple rate-inapplicable E/O lines without inventing IBT-119', () => {
@@ -178,6 +178,9 @@ describe('P1.4 VAT breakdown derivation', () => {
   it('fails invalid grouping inputs deterministically', () => {
     expect(deriveVatBreakdowns(header(), [line('L1', 100, '', 5)]).status).toBe('failed');
     expect(deriveVatBreakdowns(header(), [line('L1', 100, 'S', undefined)]).status).toBe('failed');
+    expect(deriveVatBreakdowns(header(), [line('L1', 100, 'S', 10)]).status).toBe('failed');
+    expect(deriveVatBreakdowns(header(), [line('L1', 100, 'AE', 5)]).status).toBe('failed');
+    expect(deriveVatBreakdowns(header(), [line('L1', 100, 'E', 0)]).status).toBe('failed');
   });
 
   it('returns no derived breakdown for an empty line set and rejects a negative applicable rate', () => {
@@ -186,7 +189,7 @@ describe('P1.4 VAT breakdown derivation', () => {
   });
 
   it('rounds the sum of derived IBT-117 breakdowns for IBT-110 reconciliation', () => {
-    const result = deriveVatBreakdowns(header(), [line('L1', 100, 'S', 5), line('L2', 100, 'S', 10)]);
-    expect(sumVatBreakdownTax(result.breakdowns)).toBe(15);
+    const result = deriveVatBreakdowns(header(), [line('L1', 100, 'S', 5), line('L2', 100, 'N', 10)]);
+    expect(sumVatBreakdownTax(result.breakdowns)).toBe(5);
   });
 });

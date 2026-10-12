@@ -1441,6 +1441,25 @@ describe('runPintAECheck executor registry parity', () => {
       }
     );
 
+    const standardWrongRate = buildDataContext(
+      {},
+      {
+        lines: [
+          {
+            line_id: 'L-1',
+            invoice_id: 'INV-1',
+            line_number: 1,
+            quantity: 1,
+            unit_price: 100,
+            line_total_excl_vat: 100,
+            vat_rate: 10,
+            vat_amount: 10,
+            tax_category_code: 'S',
+          },
+        ],
+      }
+    );
+
     const reverseChargeMismatch = buildDataContext(
       {},
       {
@@ -1462,6 +1481,7 @@ describe('runPintAECheck executor registry parity', () => {
 
     expect(runPintAECheck(check, exemptMismatch)).toHaveLength(2);
     expect(runPintAECheck(check, standardZero)).toHaveLength(1);
+    expect(runPintAECheck(check, standardWrongRate)).toHaveLength(1);
     expect(runPintAECheck(check, reverseChargeMismatch)).toHaveLength(2);
   });
 
