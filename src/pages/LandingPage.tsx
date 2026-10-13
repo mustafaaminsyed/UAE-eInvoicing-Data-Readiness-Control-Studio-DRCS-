@@ -1,1449 +1,328 @@
-﻿import { useEffect, useMemo, useState, type ComponentType } from "react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 import { Link } from "react-router-dom";
-import {
-  ArrowRight,
-  ArrowUpRight,
-  CheckCircle2,
-  Database,
-  Moon,
-  ShieldCheck,
-  Sun,
-  Wand2,
-} from "lucide-react";
-import { useTheme } from "next-themes";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { useCompliance } from "@/context/ComplianceContext";
-import { fetchActiveTemplates } from "@/lib/api/mappingApi";
-import { fetchCases } from "@/lib/api/casesApi";
-import { analyzeCoverage } from "@/lib/mapping/coverageAnalyzer";
-import { cn } from "@/lib/utils";
-import daribaLogo from "@/assets/Clean_DaribaTech_logo_transparent.png";
-import dcsLandingDashboardMockup from "@/assets/DCS Landing Page Image - Mock-up of Dashboard.png";
-import dcsLandingDashboardLight from "@/assets/dcs-landing-dashboard-transparent-light.png";
-import type { MappingTemplate } from "@/types/fieldMapping";
-import type { Case } from "@/types/cases";
+import { AlertTriangle, ArrowRight, BarChart3, Bell, Check, ChevronDown, CircleAlert, Database, ExternalLink, FileCheck2, FileSearch, FileText, Folder, Globe2, Home, Link2, Menu, Play, Route, Search, ShieldCheck, Users, X } from "lucide-react";
+import daribaLogo from "@/assets/brand/dariba-drcs-light-lockup.png";
+import heroBackdrop from "@/assets/landing/drcs-dubai-hero-background.png";
+import mofEmblem from "@/assets/regulatory/uae-ministry-of-finance-emblem.png";
+import ftaLogo from "@/assets/regulatory/uae-federal-tax-authority-logo.png";
+import peppolLogo from "@/assets/regulatory/peppol-logo-transparent.png";
 
 type ClientEnvironment = "DEV" | "PROD";
-
 const ENVIRONMENT_STORAGE_KEY = "drcs.preview_environment_v1";
 
-const heroNavLinks = [
-  { label: "Upload Audit", path: "/upload-audit" },
-  { label: "Mapping", path: "/mapping" },
-  { label: "Traceability", path: "/traceability" },
-  { label: "Check Registry", path: "/check-registry" },
+const navItems = [
+  { label: "Product", href: "#product" }, { label: "Capabilities", href: "#capabilities" },
+  { label: "Regulatory coverage", href: "#regulatory" }, { label: "Workflow", href: "#workflow" },
 ];
 
-const activeRegionScope = {
-  label: "UAE",
-  country: "United Arab Emirates",
-  detail: "Current regulatory scope",
-};
+const PINT_PLAYBOOK_URL = "https://claude.ai/artifact/NDJhTZAmgYoDaLU46UYZUU";
 
-const heroRegulatoryMeta = [
-  { label: "Standard", value: "PINT-AE v1.0" },
-  { label: "Scope", value: "United Arab Emirates" },
-  { label: "Evidence", value: "Traceability retained" },
+const capabilities: Array<{ icon: ComponentType<{ className?: string }>; title: string; description: string }> = [
+  { icon: Database, title: "Validate source data", description: "Assess completeness, quality and structure at scale." },
+  { icon: Link2, title: "Align to UAE standards", description: "Map to PINT-AE and canonical invoice structures." },
+  { icon: ShieldCheck, title: "Run compliance checks", description: "Identify gaps with clear exceptions and severity." },
+  { icon: FileSearch, title: "Control and remediate", description: "Manage cases, evidence and end-to-end traceability." },
 ];
 
-type WorkflowStageDefinition = {
-  stage: "01" | "02" | "03" | "04";
-  verb: string;
-  title: string;
-  description: string;
-  panelType: "metrics" | "mapping" | "checks" | "evidence";
-  outputLabel: string;
-  actionLabel: string;
-  path: string;
-  icon: ComponentType<{ className?: string; "aria-hidden"?: boolean | "true" | "false" }>;
-};
-
-type WorkflowArtifactRow = {
-  label: string;
-  value: string;
-  tone?: "neutral" | "success" | "warning" | "info";
-};
-
-type WorkflowStage = WorkflowStageDefinition & {
-  status: string;
-  artifactRows: WorkflowArtifactRow[];
-};
-
-type ControlSurfaceDefinition = {
-  label: string;
-  title: string;
-  description: string;
-  ctaLabel: string;
-  path: string;
-  panelType: "mapping" | "traceability" | "registry" | "audit";
-};
-
-const workflowStageDefinitions: WorkflowStageDefinition[] = [
-  {
-    stage: "01",
-    verb: "Ingest",
-    title: "Profile source data on arrival.",
-    description:
-      "Connect ERP extracts, assess completeness, and fingerprint the dataset before it enters the governed workspace.",
-    panelType: "metrics",
-    outputLabel: "Source readiness",
-    actionLabel: "Open intake",
-    path: "/upload",
-    icon: Database,
-  },
-  {
-    stage: "02",
-    verb: "Map",
-    title: "Bind fields to the PINT-AE model.",
-    description:
-      "Create reversible, reviewable field mappings so every source column lands in a canonical UAE eInvoice term.",
-    panelType: "mapping",
-    outputLabel: "Mapping manifest",
-    actionLabel: "Open mapping",
-    path: "/mapping",
-    icon: Wand2,
-  },
-  {
-    stage: "03",
-    verb: "Verify",
-    title: "Run the check registry, get evidence.",
-    description:
-      "Execute the active rule pack, classify failures by severity, and surface the records needing remediation first.",
-    panelType: "checks",
-    outputLabel: "Pass rate Â· Severity",
-    actionLabel: "Open validation",
-    path: "/run",
-    icon: CheckCircle2,
-  },
-  {
-    stage: "04",
-    verb: "Remediate",
-    title: "Close findings with one audit trail.",
-    description:
-      "Carry exceptions, ownership, traceability, and evidence outputs through one connected remediation record.",
-    panelType: "evidence",
-    outputLabel: "Open findings Â· Evidence",
-    actionLabel: "Open evidence",
-    path: "/evidence-pack",
-    icon: ShieldCheck,
-  },
+const workflow = [
+  { icon: Database, title: "Ingest data", description: "Bring in AR/AP invoice datasets from your ERP and other sources.", path: "/upload" },
+  { icon: Route, title: "Map to schema", description: "Align to the UAE canonical invoice structure and field mappings.", path: "/mapping" },
+  { icon: FileCheck2, title: "Execute checks", description: "Run validation packs and surface non-conformant records.", path: "/run" },
+  { icon: BarChart3, title: "Control and resolve", description: "Manage exceptions, remediation actions and audit-ready evidence.", path: "/exceptions" },
 ];
 
-const controlSurfaceDefinitions: ControlSurfaceDefinition[] = [
-  {
-    label: "Mapping",
-    title: "Bind your data to PINT-AE, reversibly.",
-    description:
-      "Every source field lands in a versioned mapping manifest. Reviewers see intent, transforms, and downstream impact before anything ships.",
-    ctaLabel: "Explore mapping",
-    path: "/mapping",
-    panelType: "mapping",
-  },
-  {
-    label: "Traceability",
-    title: "Every value, tracked from source to submission.",
-    description:
-      "Click any figure on any invoice and see the exact upstream field, transform, and reviewer. No black boxes, no orphaned numbers.",
-    ctaLabel: "See the graph",
-    path: "/traceability",
-    panelType: "traceability",
-  },
-  {
-    label: "Check Registry",
-    title: "A living library of every UAE rule.",
-    description:
-      "PINT-AE business rules, FTA policy checks, and your own internal controls stay versioned, testable, and execution-ready for every batch.",
-    ctaLabel: "Browse the registry",
-    path: "/check-registry",
-    panelType: "registry",
-  },
-  {
-    label: "Audit",
-    title: "Evidence, generated, not assembled.",
-    description:
-      "Every action, value, and signature is chained into a tamper-evident record so the evidence pack reflects the latest governed state.",
-    ctaLabel: "See audit trail",
-    path: "/evidence-pack",
-    panelType: "audit",
-  },
+const previewDomains: Array<[string, number]> = [
+  ["Mandatory fields", 88], ["Seller identity", 96], ["Buyer identity", 72], ["Invoice references", 79],
+  ["Tax information", 94], ["Payment information", 56], ["Line-level data", 86], ["Code lists", 89],
 ];
 
-const environmentOptions: Array<{
-  key: ClientEnvironment;
-  label: string;
-  caption: string;
-}> = [
-  {
-    key: "DEV",
-    label: "Dev",
-    caption: "Sandbox client access lane",
-  },
-  {
-    key: "PROD",
-    label: "Prod",
-    caption: "Production client access lane",
-  },
+const previewFindings = [
+  ["Critical", "Buyer Endpoint ID missing", "1,428", "Investigate"],
+  ["Critical", "Invoice number duplicated", "892", "Resolve"],
+  ["High", "Buyer TRN format invalid", "654", "Review"],
+  ["High", "Credit note reference absent", "412", "Review"],
+  ["Medium", "UOM mapping unresolved", "308", "Map"],
+];
+
+const regulatoryBodies = [
+  { name: "MoF", sub: "Ministry of Finance", logo: mofEmblem, alt: "UAE Ministry of Finance emblem" },
+  { name: "FTA", sub: "Federal Tax Authority", logo: ftaLogo, alt: "UAE Federal Tax Authority logo" },
+  { name: "Peppol", sub: "Peppol interoperability framework", logo: peppolLogo, alt: "Peppol logo" },
 ];
 
 export default function LandingPage() {
-  const { resolvedTheme, setTheme } = useTheme();
-  const { isDataLoaded, isChecksRun, headers } = useCompliance();
-  const [activeTemplates, setActiveTemplates] = useState<MappingTemplate[]>([]);
-  const [cases, setCases] = useState<Case[]>([]);
-  const [currentTime, setCurrentTime] = useState(() => new Date());
-  const [clientEnvironment, setClientEnvironment] = useState<ClientEnvironment>(() => {
-    try {
-      const stored = localStorage.getItem(ENVIRONMENT_STORAGE_KEY);
-      return stored === "PROD" ? "PROD" : "DEV";
-    } catch {
-      return "DEV";
-    }
-  });
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [resourcesOpen, setResourcesOpen] = useState(false);
+  const [mobileResourcesOpen, setMobileResourcesOpen] = useState(false);
+  const resourcesMenuRef = useRef<HTMLDivElement>(null);
+  const resourcesButtonRef = useRef<HTMLButtonElement>(null);
+  const resourcesLinkRef = useRef<HTMLAnchorElement>(null);
 
   useEffect(() => {
-    fetchActiveTemplates().then(setActiveTemplates);
-    fetchCases().then(setCases);
+    const closeResourcesOnOutsideClick = (event: PointerEvent) => {
+      if (!resourcesMenuRef.current?.contains(event.target as Node)) setResourcesOpen(false);
+    };
+    document.addEventListener("pointerdown", closeResourcesOnOutsideClick);
+    return () => document.removeEventListener("pointerdown", closeResourcesOnOutsideClick);
   }, []);
 
-  useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      setCurrentTime(new Date());
-    }, 30000);
-
-    return () => window.clearInterval(intervalId);
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(ENVIRONMENT_STORAGE_KEY, clientEnvironment);
-    } catch {
-      // Ignore local preference persistence issues.
-    }
-  }, [clientEnvironment]);
-
-  const isDark = resolvedTheme === "dark";
-  const heroPreviewStyle = isDark
-    ? undefined
-    : {
-        WebkitMaskImage:
-          "radial-gradient(ellipse 88% 84% at 50% 50%, rgba(0,0,0,1) 68%, rgba(0,0,0,0.82) 80%, rgba(0,0,0,0.28) 92%, transparent 100%)",
-        maskImage:
-          "radial-gradient(ellipse 88% 84% at 50% 50%, rgba(0,0,0,1) 68%, rgba(0,0,0,0.82) 80%, rgba(0,0,0,0.28) 92%, transparent 100%)",
-      };
-  const hasActiveMapping = activeTemplates.length > 0;
-  const activeTemplate = activeTemplates[0];
-  const coverage = activeTemplate ? analyzeCoverage(activeTemplate.mappings) : null;
-  const mandatoryCoverage = coverage?.mandatoryCoverage ?? 0;
-  const blockingGaps = coverage?.unmappedMandatory.length ?? 0;
-  const openCases = cases.filter((c) => c.status === "Open" || c.status === "In Progress");
-  const criticalCases = openCases.filter((c) => c.severity === "Critical");
-
-  const operatingContext = useMemo(() => {
-    const timeZone = "Asia/Dubai";
-    return {
-      timezoneLabel: "GST / UTC+04:00",
-      time: new Intl.DateTimeFormat("en-AE", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-        timeZone,
-      }).format(currentTime),
-    };
-  }, [currentTime]);
-
-  const readinessSignal = mandatoryCoverage >= 95 ? "Strong alignment" : mandatoryCoverage >= 80 ? "Watch list" : "Remediation first";
-  const workspaceStatusItems = [
-    {
-      label: "Data intake",
-      value: isDataLoaded ? "Loaded" : "Pending",
-      active: isDataLoaded,
-    },
-    {
-      label: "Mapping",
-      value: hasActiveMapping ? "Active" : "Pending",
-      active: hasActiveMapping,
-    },
-    {
-      label: "Checks",
-      value: isChecksRun ? "Executed" : "Pending",
-      active: isChecksRun,
-    },
-  ];
-  const workflowStages = useMemo<WorkflowStage[]>(
-    () => [
-      {
-        ...workflowStageDefinitions[0],
-        status: isDataLoaded ? "Profiled" : "Pending",
-        artifactRows: [
-          { label: "Source", value: isDataLoaded ? "AR invoice extract" : "Awaiting upload" },
-          { label: "Rows scanned", value: headers.length.toLocaleString("en-AE") },
-          {
-            label: "Coverage",
-            value: `${Math.round(mandatoryCoverage)}% mandatory`,
-            tone: mandatoryCoverage >= 95 ? "success" : mandatoryCoverage >= 80 ? "info" : "warning",
-          },
-          { label: "Fingerprint", value: isDataLoaded ? "Versioned" : "Pending" },
-        ],
-      },
-      {
-        ...workflowStageDefinitions[1],
-        status: hasActiveMapping ? "Controlled" : "Pending",
-        artifactRows: [
-          { label: "invoice_number", value: "IBT-001" },
-          { label: "issue_date", value: "IBT-002" },
-          { label: "amount_due", value: "IBT-115" },
-          {
-            label: "Manifest",
-            value: hasActiveMapping ? `${activeTemplates.length} active template${activeTemplates.length === 1 ? "" : "s"}` : "Draft pending",
-            tone: hasActiveMapping ? "success" : "info",
-          },
-        ],
-      },
-      {
-        ...workflowStageDefinitions[2],
-        status: isChecksRun ? "Executed" : "Pending",
-        artifactRows: [
-          {
-            label: "PINT-AE mandatory",
-            value: isChecksRun && blockingGaps === 0 ? "PASS" : isChecksRun ? "REVIEW" : "PENDING",
-            tone: isChecksRun && blockingGaps === 0 ? "success" : isChecksRun ? "warning" : "info",
-          },
-          {
-            label: "Critical blockers",
-            value: isChecksRun ? String(criticalCases.length) : "Pending",
-            tone: criticalCases.length > 0 ? "warning" : "success",
-          },
-          {
-            label: "Open cases",
-            value: isChecksRun ? String(openCases.length) : "Pending",
-            tone: openCases.length > 0 ? "info" : "success",
-          },
-          {
-            label: "Rule execution",
-            value: isChecksRun ? "Executed" : "Awaiting run",
-            tone: isChecksRun ? "success" : "neutral",
-          },
-        ],
-      },
-      {
-        ...workflowStageDefinitions[3],
-        status: isChecksRun ? (openCases.length > 0 ? "Open" : "Ready") : "Awaiting run",
-        artifactRows: [
-          {
-            label: "Exceptions",
-            value: isChecksRun ? `${openCases.length} open` : "Awaiting run",
-            tone: openCases.length > 0 ? "warning" : "success",
-          },
-          {
-            label: "Traceability",
-            value: hasActiveMapping ? "Retained" : "Awaiting mapping",
-            tone: hasActiveMapping ? "success" : "info",
-          },
-          {
-            label: "Evidence pack",
-            value: isChecksRun ? "Ready" : "Pending",
-            tone: isChecksRun ? "success" : "neutral",
-          },
-          {
-            label: "Owner state",
-            value: openCases.length > 0 ? "Assigned" : "Clear",
-            tone: openCases.length > 0 ? "info" : "success",
-          },
-        ],
-      },
-    ],
-    [
-      activeTemplates.length,
-      blockingGaps,
-      criticalCases.length,
-      hasActiveMapping,
-      headers.length,
-      isChecksRun,
-      isDataLoaded,
-      mandatoryCoverage,
-      openCases.length,
-    ]
-  );
-
-  const heroPreviewRows = useMemo<Array<{
-    invoiceNumber: string;
-    counterparty: string;
-    amount: string;
-    status: string;
-    tone: "warning" | "success" | "info" | "neutral";
-  }>>(() => {
-    const amountFormatter = new Intl.NumberFormat("en-AE", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-
-    const baseStatus = !isDataLoaded
-      ? "Pending"
-      : !hasActiveMapping
-        ? "Mapping"
-        : !isChecksRun
-          ? "Checking"
-          : openCases.length > 0
-            ? "Review"
-            : "Verified";
-
-    return headers.slice(0, 5).map((header, index) => ({
-      invoiceNumber: header.invoice_number || header.invoice_id || `INV-${index + 1}`,
-      counterparty: header.seller_name || header.seller_trn || "Counterparty pending",
-      amount:
-        typeof header.total_incl_vat === "number"
-          ? `${header.currency || "AED"} ${amountFormatter.format(header.total_incl_vat)}`
-          : typeof header.amount_due === "number"
-            ? `${header.currency || "AED"} ${amountFormatter.format(header.amount_due)}`
-            : header.currency || "AED",
-      status:
-        isChecksRun && openCases.length > 0 && index === 0
-          ? "Priority"
-          : baseStatus,
-      tone:
-        isChecksRun && openCases.length > 0 && index === 0
-          ? "warning"
-          : isChecksRun
-            ? "success"
-            : hasActiveMapping
-              ? "info"
-              : "neutral",
-    }));
-  }, [hasActiveMapping, headers, isChecksRun, isDataLoaded, openCases.length]);
-
-  return (
-    <div className="min-h-screen">
-      <div className="container mx-auto max-w-[1320px] px-4 py-6 sm:px-5 md:px-6 md:py-8 xl:px-8 xl:py-10">
-        <div className="sticky top-4 z-40 mb-5">
-          <div className="surface-glass rounded-[var(--surface-radius-lg)] px-4 py-3 md:px-5 md:py-4">
-            <div className="flex flex-col gap-3.5">
-              <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center md:gap-4">
-                  <div className="inline-flex w-[260px] items-center overflow-hidden rounded-[var(--surface-radius-md)] border border-border/70 bg-background/96 px-4 py-2.5 shadow-sm md:w-[300px] md:px-4 md:py-3">
-                    <img
-                      src={daribaLogo}
-                      alt="Daribatech"
-                      className="block h-[62px] w-auto max-w-full object-contain md:h-[68px]"
-                    />
-                  </div>
-                  <div className="min-w-0 flex-1 md:min-w-[240px]">
-                    <p className="font-display text-xl font-semibold tracking-tight text-foreground">
-                      Controls Studio
-                    </p>
-                    <p className="text-sm font-medium text-muted-foreground">
-                      UAE eInvoicing Compliance
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2.5 xl:justify-end">
-                  <div className="flex min-h-11 items-center gap-3 rounded-full border border-border/70 bg-background/92 px-3.5 py-2 shadow-sm">
-                    <UaeFlagMark />
-                    <div className="leading-tight">
-                      <p className="text-sm font-semibold text-foreground">{activeRegionScope.country}</p>
-                      <p className="text-[12px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                        Current scope
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 rounded-full border border-border/70 bg-background/92 p-1.5 shadow-sm">
-                    <EnvironmentAccessToggle value={clientEnvironment} onChange={setClientEnvironment} />
-
-                    <div className="flex h-9 items-center gap-2 rounded-full border border-border/70 bg-background px-3 shadow-sm">
-                      <Sun className={cn("h-3.5 w-3.5", !isDark ? "text-amber-500" : "text-muted-foreground")} />
-                      <Switch
-                        checked={isDark}
-                        onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
-                        aria-label={isDark ? "Dark mode enabled" : "Light mode enabled"}
-                      />
-                      <Moon className={cn("h-3.5 w-3.5", isDark ? "text-primary" : "text-muted-foreground")} />
-                    </div>
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    className="h-11 rounded-full border-primary/18 bg-background/92 px-4 text-sm font-semibold text-primary shadow-sm hover:bg-primary/5 dark:border-primary/25 dark:bg-background/86"
-                  >
-                    Compliance Command Center
-                  </Button>
-                </div>
-              </div>
-
-              <div className="border-t border-border/60 pt-3">
-                <nav className="flex flex-wrap items-center gap-2 lg:justify-center">
-                  {heroNavLinks.map((item) => (
-                    <Link
-                      key={item.path}
-                      to={item.path}
-                      className="inline-flex min-h-9 items-center rounded-full px-3.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-950/[0.04] hover:text-slate-950 dark:text-emerald-50/85 dark:hover:bg-emerald-500/[0.08] dark:hover:text-emerald-50"
-                    >
-                      {item.label}
-                    </Link>
-                  ))}
-                </nav>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <section className="surface-glass relative overflow-hidden rounded-[var(--surface-radius-lg)] px-5 py-6 md:px-6 md:py-7 lg:px-8 lg:py-8 xl:px-10">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_8%_18%,rgba(102,208,255,0.08),transparent_24%),radial-gradient(circle_at_86%_18%,rgba(73,173,134,0.08),transparent_26%),linear-gradient(180deg,rgba(255,255,255,0.985),rgba(249,251,252,0.985))] dark:bg-[radial-gradient(circle_at_12%_14%,rgba(47,153,95,0.10),transparent_24%),radial-gradient(circle_at_88%_12%,rgba(29,92,72,0.10),transparent_24%),linear-gradient(180deg,rgba(13,21,19,0.985),rgba(10,16,15,0.995))]" />
-	          <div className="relative z-10 grid items-center gap-10 lg:grid-cols-[minmax(0,0.98fr)_minmax(0,1.02fr)] xl:gap-12">
-	            <div className="max-w-[43rem] pt-2">
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-background/94 px-4 py-2 text-[12px] font-semibold text-primary shadow-sm">
-                <span className="h-2.5 w-2.5 rounded-full bg-accent" />
-                UAE eInvoicing readiness workspace
-              </div>
-
-	              <h1 className="mt-6 max-w-[11.2ch] font-display text-[3.55rem] font-semibold leading-[0.92] tracking-[-0.05em] text-foreground md:text-[4.2rem] lg:text-[4.55rem] xl:text-[4.95rem]">
-                Invoice data, engineered for{" "}
-                <span className="font-serif text-primary italic tracking-[-0.02em]">e-invoicing compliance.</span>
-              </h1>
-
-              <p className="mt-5 max-w-[35rem] text-[1.08rem] leading-8 text-slate-600 dark:text-emerald-50/76">
-                One controlled workspace to profile source data, validate PINT-AE readiness, resolve
-                exceptions, and produce evidence-grade traceability before the FTA ever asks.
-              </p>
-
-              <div className="mt-7 flex flex-wrap items-center gap-3">
-                <Button asChild size="lg" className="h-12 rounded-full px-6 shadow-sm">
-                  <Link to="/upload">
-                    Start readiness assessment
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </Button>
-                <Button
-                  asChild
-                  size="lg"
-                  variant="outline"
-                  className="h-12 rounded-full border-border/80 bg-background/94 px-6 text-foreground shadow-sm hover:bg-slate-950/[0.03] dark:bg-background/82 dark:text-emerald-50"
-                >
-                  <Link to="/traceability">
-                    Explore traceability
-                    <ArrowUpRight className="h-4 w-4" />
-                  </Link>
-                </Button>
-              </div>
-
-              <div className="mt-8 border-t border-border/60 pt-6">
-                <dl className="grid gap-4 sm:grid-cols-3">
-                  {heroRegulatoryMeta.map((item) => (
-                    <div key={item.label}>
-                      <dt className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                        {item.label}
-                      </dt>
-                      <dd className="mt-2 text-xl font-semibold text-foreground">{item.value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </div>
-            </div>
-
-		            <div className="mx-auto w-full max-w-[780px]">
-		              <div className="relative px-2 pt-4 lg:px-4">
-			                <div className="absolute inset-x-[14%] bottom-[10%] h-[18%] rounded-full bg-primary/12 blur-3xl" />
-			                <img
-			                  src={isDark ? dcsLandingDashboardMockup : dcsLandingDashboardLight}
-			                  alt="Controls Studio dashboard mock-up"
-			                  style={heroPreviewStyle}
-			                  className={cn(
-			                    "relative z-10 h-auto w-full object-contain",
-			                    isDark
-			                      ? "mix-blend-normal opacity-[0.92] drop-shadow-[0_30px_48px_rgba(15,23,42,0.18)]"
-			                      : "mix-blend-normal opacity-[0.99] drop-shadow-[0_18px_30px_rgba(148,163,184,0.12)]"
-			                  )}
-			                />
-                <div className="hidden rounded-[28px] border border-emerald-900/70 bg-[linear-gradient(180deg,rgba(8,25,18,0.98),rgba(5,17,12,0.99))] p-5 text-emerald-50 md:p-6">
-                  <div className="flex flex-wrap items-start justify-between gap-4 border-b border-emerald-900/70 pb-5">
-                    <div>
-                      <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-emerald-200/55">
-                        Live compliance ledger
-                      </p>
-                      <p className="mt-2 text-[1.75rem] font-semibold leading-none text-emerald-50">
-                        {clientEnvironment} Â· Batch 2026-Q3
-                      </p>
-                      <p className="mt-2 text-sm text-emerald-100/58">
-                        {activeRegionScope.country} Â· {operatingContext.time} {operatingContext.timezoneLabel}
-                      </p>
-                    </div>
-
-                    <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-sm font-semibold text-emerald-300">
-                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                      {isChecksRun ? "LIVE" : "IN PREP"}
-                    </div>
-                  </div>
-
-                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                    <DarkHeroMetric
-                      title="Coverage"
-                      value={`${Math.round(mandatoryCoverage)}%`}
-                      detail={blockingGaps > 0 ? `${blockingGaps} blocking gap(s)` : "No blocking gaps"}
-                    />
-                    <DarkHeroMetric
-                      title="Open cases"
-                      value={String(openCases.length)}
-                      detail={criticalCases.length > 0 ? `${criticalCases.length} critical` : "Queue controlled"}
-                    />
-                    <DarkHeroMetric
-                      title="Invoices"
-                      value={String(headers.length)}
-                      detail={isDataLoaded ? "Dataset loaded" : "Awaiting upload"}
-                    />
-                    <DarkHeroMetric
-                      title="Evidence"
-                      value={isChecksRun ? "Ready" : "Pending"}
-                      detail={hasActiveMapping ? "Mapping active" : "Mapping pending"}
-                      valueSize="label"
-                    />
-                  </div>
-
-                  <div className="mt-5 grid gap-3 md:grid-cols-3">
-                    {workspaceStatusItems.map((item) => (
-                      <div
-                        key={item.label}
-                        className="rounded-2xl border border-emerald-900/70 bg-white/[0.02] px-4 py-3.5"
-                      >
-                        <div className="flex min-h-[88px] flex-col justify-between gap-3">
-                          <div className="flex min-w-0 items-start gap-2.5">
-                            <span
-                              className={cn(
-                                "mt-1 h-2.5 w-2.5 shrink-0 rounded-full",
-                                item.active ? "bg-emerald-400" : "bg-emerald-100/30"
-                              )}
-                            />
-                            <span className="text-base font-semibold leading-tight text-emerald-50">{item.label}</span>
-                          </div>
-                          <span className="inline-flex h-8 w-fit items-center rounded-full border border-emerald-900/70 bg-white/[0.03] px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-100/55">
-                            {item.value}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="mt-5 rounded-[26px] border border-emerald-900/70 bg-black/12 p-4 md:p-5">
-                    <div className="grid grid-cols-[1.2fr_1.35fr_0.95fr_auto] gap-3 border-b border-emerald-900/60 px-2 pb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-100/42">
-                      <span>Invoice</span>
-                      <span>Counterparty</span>
-                      <span>Amount</span>
-                      <span>Status</span>
-                    </div>
-
-                    <div className="mt-1 space-y-1.5">
-                      {heroPreviewRows.length > 0 ? (
-                        heroPreviewRows.map((row) => (
-                          <HeroLedgerRow key={row.invoiceNumber} row={row} />
-                        ))
-                      ) : (
-                        <div className="rounded-2xl border border-dashed border-emerald-900/70 bg-white/[0.015] px-5 py-7 text-center text-[15px] leading-7 text-emerald-100/58">
-                          Upload invoices to populate the live compliance ledger preview.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section
-          className="mt-12 rounded-[36px] border border-border/80 bg-card px-6 py-8 shadow-[0_22px_46px_-36px_rgba(15,23,42,0.16)] md:px-7 md:py-9 xl:px-8"
-          aria-labelledby="landing-workflow-heading"
-        >
-          <div className="grid gap-8 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,0.72fr)] xl:items-end">
-            <div>
-              <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-primary">
-                How it works
-              </p>
-              <h2
-                id="landing-workflow-heading"
-                className="mt-5 max-w-[11ch] font-display text-[2.6rem] font-semibold leading-[0.98] tracking-[-0.04em] text-foreground md:text-[3.2rem] xl:text-[3.75rem]"
-              >
-                Four controlled phases,
-                <span className="mt-2 block font-serif text-primary italic tracking-[-0.02em]">
-                  one auditable trail.
-                </span>
-              </h2>
-            </div>
-
-            <p className="max-w-[34rem] text-[1.05rem] leading-9 text-slate-600 dark:text-emerald-50/72 xl:justify-self-end">
-              Every invoice moves through the same governed pipeline. Nothing progresses without
-              evidence, and nothing leaves the workspace without traceable control context.
-            </p>
-          </div>
-
-          <div className="mt-8 rounded-[28px] border border-border/70 bg-muted/20 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] dark:shadow-none">
-            <div className="relative">
-              <div className="pointer-events-none absolute left-[8%] right-[8%] top-1/2 hidden h-px -translate-y-1/2 bg-[linear-gradient(90deg,rgba(148,163,184,0.0),rgba(148,163,184,0.35),rgba(148,163,184,0.0))] xl:block" />
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {workflowStages.map((stage) => {
-                const accent = getWorkflowStageAccent(stage.stage);
-                const statusTone = getWorkflowStatusTone(stage.status);
-
-                return (
-                  <div
-                    key={`workflow-summary-${stage.stage}`}
-                    className="rounded-[22px] border border-border/70 bg-background/88 px-4 py-3.5"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2.5">
-                        <span className={cn("inline-flex h-9 min-w-9 items-center justify-center rounded-full border px-2.5 text-[11px] font-semibold tracking-[0.16em]", accent.badge)}>
-                          {stage.stage}
-                        </span>
-                        <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                          {stage.verb}
-                        </span>
-                      </div>
-                      <span className={cn("inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]", statusTone.badge)}>
-                        {stage.status}
-                      </span>
-                    </div>
-                    <p className="mt-3 text-sm font-medium text-foreground">{stage.actionLabel}</p>
-                  </div>
-                );
-              })}
-              </div>
-            </div>
-          </div>
-
-          <ol className="mt-8 grid gap-5 xl:grid-cols-2">
-            {workflowStages.map((stage) => (
-              <li key={stage.stage} className="relative">
-                <WorkflowStageCard stage={stage} />
-              </li>
-            ))}
-          </ol>
-        </section>
-
-        <section
-          className="mt-8 rounded-[36px] border border-border/80 bg-[linear-gradient(180deg,rgba(255,252,247,0.98),rgba(255,255,255,0.98))] px-6 py-8 shadow-[0_22px_46px_-36px_rgba(15,23,42,0.14)] md:px-7 md:py-9 xl:px-8 dark:bg-[linear-gradient(180deg,rgba(17,24,22,0.98),rgba(13,18,17,0.98))]"
-          aria-labelledby="landing-surfaces-heading"
-        >
-          <div className="grid gap-8 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,0.8fr)] xl:items-start">
-            <div>
-              <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-primary">
-                The product
-              </p>
-              <h2
-                id="landing-surfaces-heading"
-                className="mt-5 max-w-[10ch] font-display text-[2.6rem] font-semibold leading-[0.98] tracking-[-0.04em] text-foreground md:text-[3.15rem] xl:text-[3.6rem]"
-              >
-                Four surfaces,
-                <span className="mt-2 block font-serif text-primary italic tracking-[-0.02em]">
-                  one control plane.
-                </span>
-              </h2>
-            </div>
-
-            <p className="max-w-[34rem] text-[1.05rem] leading-9 text-slate-600 dark:text-emerald-50/72 xl:justify-self-end">
-              Mapping, Traceability, the Check Registry, and Audit each give specialists the
-              surface built for their phase, while the whole workspace continues to speak the same
-              evidence model.
-            </p>
-          </div>
-
-          <div className="mt-10 grid gap-5 xl:grid-cols-2">
-            {controlSurfaceDefinitions.map((surface) => (
-              <SurfaceCapabilityCard key={surface.label} surface={surface} />
-            ))}
-          </div>
-        </section>
-
-        <section className="mt-10 rounded-[30px] border border-primary/16 bg-primary/[0.04] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] md:p-8 dark:bg-primary/[0.08] dark:shadow-none">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-3xl">
-              <h2 className="max-w-[18ch] font-display text-[2rem] font-semibold leading-[1.04] text-foreground md:text-[2.45rem]">
-                Ready to assess your UAE eInvoicing data?
-              </h2>
-              <p className="mt-3 max-w-[58ch] text-base leading-8 text-muted-foreground">
-                Upload a source extract to establish your PINT-AE readiness baseline, identify
-                priority remediation areas, and generate evidence-ready outputs.
-              </p>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row lg:justify-end">
-              <Button asChild size="lg" className="min-w-[252px] rounded-full px-6">
-                <Link to="/upload">Start readiness assessment</Link>
-              </Button>
-              <Button
-                asChild
-                variant="outline"
-                size="lg"
-                className="min-w-[214px] rounded-full border-border/80 bg-card px-6"
-              >
-                <Link to="/evidence-pack">View sample report</Link>
-              </Button>
-            </div>
-          </div>
-        </section>
-      </div>
-    </div>
-  );
-}
-
-function WorkflowStageCard({
-  stage,
-}: {
-  stage: WorkflowStage;
-}) {
-  const Icon = stage.icon;
-  const accent = getWorkflowStageAccent(stage.stage);
-  const statusTone = getWorkflowStatusTone(stage.status);
-
-  return (
-    <Link
-      to={stage.path}
-      className="group block h-full rounded-[30px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-      aria-label={`${stage.stage} ${stage.title}: ${stage.actionLabel}`}
-    >
-      <article className="grid h-full gap-6 rounded-[32px] border border-border/80 bg-card/98 p-6 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.16)] transition-all duration-200 group-hover:-translate-y-0.5 group-hover:border-primary/28 group-hover:shadow-[0_24px_50px_-32px_rgba(15,23,42,0.18)] motion-reduce:transition-none md:p-7 lg:grid-cols-[minmax(0,1fr)_minmax(250px,0.9fr)]">
-        <div className="flex min-w-0 flex-col">
-          <div className="flex items-start justify-between gap-4">
-            <div className="inline-flex items-center gap-3">
-              <span className={cn("inline-flex min-w-[56px] items-center justify-center rounded-full border px-3 py-1.5 text-[12px] font-semibold tracking-[0.16em]", accent.badge)}>
-                {stage.stage}
-              </span>
-              <div className={cn("inline-flex h-12 w-12 items-center justify-center rounded-[18px] border", accent.iconWrap)}>
-                <Icon className="h-5 w-5" aria-hidden={true} />
-              </div>
-            </div>
-            <span className={cn("inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]", statusTone.badge)}>
-              {stage.status}
-            </span>
-          </div>
-
-          <p className="sr-only">
-            Step {stage.stage} / {stage.verb}
-          </p>
-          <p className={cn("mt-6 text-[12px] font-semibold uppercase tracking-[0.24em]", accent.eyebrow)}>
-            Step {stage.stage} / {stage.verb}
-          </p>
-
-          <div className="mt-5 flex flex-1 flex-col">
-            <h3 className="max-w-[12ch] font-serif text-[2.05rem] leading-[1.02] tracking-[-0.025em] text-foreground md:text-[2.2rem]">
-              {stage.title}
-            </h3>
-            <p className="mt-4 max-w-[30ch] text-[15px] leading-8 text-muted-foreground">
-              {stage.description}
-            </p>
-
-            <div className="mt-auto pt-6">
-              <span className={cn("inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition-colors", accent.actionPill)}>
-                {stage.actionLabel}
-                <ArrowRight
-                  className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none"
-                  aria-hidden="true"
-                />
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className={cn("rounded-[28px] border p-4 md:p-5", accent.panelShell)}>
-          <div className="flex h-full min-h-[320px] flex-col rounded-[22px] border border-border/70 bg-background/92 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] dark:shadow-none">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                {formatWorkflowOutputLabel(stage.outputLabel)}
-              </p>
-              <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]", statusTone.badge)}>
-                {stage.status}
-              </span>
-            </div>
-
-            <WorkflowArtifactPanel stage={stage} />
-
-            <div className="mt-auto border-t border-border/60 pt-4">
-              <div className="flex items-center justify-between gap-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                <span>Workflow control</span>
-                <span className="text-foreground">{stage.verb}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </article>
-    </Link>
-  );
-}
-
-function WorkflowArtifactPanel({
-  stage,
-}: {
-  stage: WorkflowStage;
-}) {
-  if (stage.panelType === "metrics") {
-    const coverageValue = stage.artifactRows.find((row) => row.label === "Coverage")?.value ?? "0% mandatory";
-    const coverageMatch = coverageValue.match(/(\d+)/);
-    const coveragePct = coverageMatch ? Number(coverageMatch[1]) : 0;
-    const sourceValue = stage.artifactRows.find((row) => row.label === "Source")?.value ?? "Awaiting upload";
-    const rowCount = stage.artifactRows.find((row) => row.label === "Rows scanned")?.value ?? "0";
-    const fingerprint = stage.artifactRows.find((row) => row.label === "Fingerprint")?.value ?? "Pending";
-
-    return (
-      <div className="mt-4 space-y-3">
-        <div className="rounded-[20px] border border-border/70 bg-card px-4 py-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                Source
-              </p>
-              <p className="mt-2 text-base font-semibold text-foreground">{sourceValue}</p>
-            </div>
-            <span className="rounded-full bg-primary/[0.08] px-3 py-1 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-primary">
-              Profiled
-            </span>
-          </div>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-[18px] border border-border/70 bg-card px-4 py-3.5">
-            <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Rows scanned
-            </p>
-            <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">{rowCount}</p>
-          </div>
-          <div className="rounded-[18px] border border-border/70 bg-card px-4 py-3.5">
-            <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Fingerprint
-            </p>
-            <p className="mt-2 text-sm font-semibold text-foreground">{fingerprint}</p>
-          </div>
-        </div>
-
-        <div className="rounded-[18px] border border-border/70 bg-card px-4 py-3.5">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Mandatory coverage
-            </p>
-            <span className="text-sm font-semibold text-foreground">{coverageValue}</span>
-          </div>
-          <div className="mt-3 h-2.5 rounded-full bg-muted/80">
-            <div
-              className={cn(
-                "h-full rounded-full transition-all",
-                coveragePct >= 95
-                  ? "bg-primary"
-                  : coveragePct >= 80
-                    ? "bg-sky-500"
-                    : "bg-amber-500"
-              )}
-              style={{ width: `${Math.max(8, Math.min(coveragePct, 100))}%` }}
-            />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (stage.panelType === "mapping") {
-    return (
-      <div className="mt-4 space-y-2.5">
-        {stage.artifactRows.map((row) => (
-          <div
-            key={`${stage.stage}-${row.label}`}
-            className="grid grid-cols-[minmax(0,1fr)_18px_minmax(0,1fr)] items-center gap-2 rounded-2xl border border-border/70 bg-card px-3 py-3"
-          >
-            <span className="truncate rounded-xl border border-border/70 bg-background px-2.5 py-1.5 font-mono text-[11.5px] text-foreground">
-              {formatMappingToken(row.label)}
-            </span>
-            <span className="text-center text-primary" aria-hidden="true">&rarr;</span>
-            <span className="truncate rounded-xl border border-primary/14 bg-primary/[0.06] px-2.5 py-1.5 font-mono text-[11.5px] text-foreground">
-              {formatMappingToken(row.value)}
-            </span>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (stage.panelType === "checks") {
-    const primaryRows = stage.artifactRows.slice(0, 2);
-    const secondaryRows = stage.artifactRows.slice(2);
-
-    return (
-      <div className="mt-4 space-y-3">
-        <div className="grid gap-3 sm:grid-cols-2">
-          {primaryRows.map((row) => (
-            <div
-              key={`${stage.stage}-${row.label}`}
-              className="rounded-[20px] border border-border/70 bg-card px-4 py-4"
-            >
-              <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                {row.label}
-              </p>
-              <div className="mt-3 flex items-end justify-between gap-3">
-                <span className="text-[1.7rem] font-semibold leading-none tracking-tight text-foreground">
-                  {row.value}
-                </span>
-                <span
-                  className={cn(
-                    "inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]",
-                    row.tone === "success" && "bg-primary/[0.1] text-primary",
-                    row.tone === "warning" && "bg-amber-500/12 text-amber-700 dark:text-amber-300",
-                    row.tone === "info" && "bg-sky-500/10 text-sky-700 dark:text-sky-300",
-                    (!row.tone || row.tone === "neutral") && "bg-background text-foreground"
-                  )}
-                >
-                  {row.tone ?? "neutral"}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="space-y-2.5 rounded-[20px] border border-border/70 bg-card p-3.5">
-          {secondaryRows.map((row) => (
-            <div
-              key={`${stage.stage}-${row.label}`}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-background/88 px-3 py-2.5"
-            >
-              <span className="text-[11.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                {row.label}
-              </span>
-              <span
-                className={cn(
-                  "inline-flex rounded-full px-2.5 py-1 text-[10.5px] font-semibold",
-                  row.tone === "success" && "bg-primary/[0.1] text-primary",
-                  row.tone === "warning" && "bg-amber-500/12 text-amber-700 dark:text-amber-300",
-                  row.tone === "info" && "bg-sky-500/10 text-sky-700 dark:text-sky-300",
-                  (!row.tone || row.tone === "neutral") && "bg-card text-foreground"
-                )}
-              >
-                {row.value}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (stage.panelType === "evidence") {
-    return (
-      <div className="mt-4 space-y-3">
-        <div className="rounded-[20px] border border-border/70 bg-card px-4 py-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                Remediation posture
-              </p>
-              <p className="mt-2 text-lg font-semibold text-foreground">{stage.status}</p>
-            </div>
-            <span className="rounded-full bg-primary/[0.08] px-3 py-1 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-primary">
-              Audit trail
-            </span>
-          </div>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          {stage.artifactRows.map((row) => (
-            <div
-              key={`${stage.stage}-${row.label}`}
-              className="rounded-[18px] border border-border/70 bg-card px-3.5 py-3.5"
-            >
-              <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                {row.label}
-              </p>
-              <span
-                className={cn(
-                  "mt-3 inline-flex min-h-8 max-w-full items-center rounded-full px-3 py-1 text-[11px] font-semibold",
-                  row.tone === "success" && "bg-primary/[0.1] text-primary",
-                  row.tone === "warning" && "bg-amber-500/12 text-amber-700 dark:text-amber-300",
-                  row.tone === "info" && "bg-sky-500/10 text-sky-700 dark:text-sky-300",
-                  (!row.tone || row.tone === "neutral") && "bg-background text-foreground"
-                )}
-              >
-                {row.value}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mt-4 space-y-2.5">
-      {stage.artifactRows.map((row) => (
-        <div
-          key={`${stage.stage}-${row.label}`}
-          className="rounded-2xl border border-border/70 bg-card px-3.5 py-3"
-        >
-          <span className="text-[11.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            {row.label}
-          </span>
-          <span
-            className={cn(
-              "mt-2 inline-flex min-h-8 max-w-full items-center self-start whitespace-normal break-words rounded-full px-3 py-1 text-[11.5px] font-semibold leading-5",
-              row.tone === "success" && "bg-primary/[0.1] text-primary",
-              row.tone === "warning" && "bg-amber-500/12 text-amber-700 dark:text-amber-300",
-              row.tone === "info" && "bg-sky-500/10 text-sky-700 dark:text-sky-300",
-              (!row.tone || row.tone === "neutral") && "bg-background text-foreground"
-            )}
-          >
-            {row.value}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function formatWorkflowOutputLabel(label: string) {
-  return label.replace(/[Â]?·/g, " / ");
-}
-
-function formatMappingToken(value: string) {
-  return value.replace(/_/g, " ");
-}
-
-function SurfaceCapabilityCard({
-  surface,
-}: {
-  surface: ControlSurfaceDefinition;
-}) {
-  return (
-    <Link
-      to={surface.path}
-      className="group block h-full rounded-[32px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-      aria-label={`${surface.label}: ${surface.ctaLabel}`}
-    >
-      <article className="grid h-full gap-6 rounded-[32px] border border-border/80 bg-card/98 p-6 shadow-[0_18px_38px_-34px_rgba(15,23,42,0.18)] transition-all duration-200 group-hover:-translate-y-0.5 group-hover:border-primary/24 group-hover:shadow-[0_24px_48px_-34px_rgba(15,23,42,0.18)] md:p-7 2xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.82fr)]">
-        <div className="flex flex-col">
-          <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-primary">
-            {surface.label}
-          </p>
-          <h3 className="mt-5 max-w-[11ch] font-serif text-[2rem] leading-[1.02] tracking-[-0.025em] text-foreground md:text-[2.2rem]">
-            {surface.title}
-          </h3>
-          <p className="mt-4 max-w-[32ch] text-[15px] leading-8 text-muted-foreground">
-            {surface.description}
-          </p>
-          <span className="mt-6 inline-flex items-center gap-1 text-sm font-semibold text-primary">
-            {surface.ctaLabel}
-            <ArrowUpRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 motion-reduce:transition-none" />
-          </span>
-        </div>
-
-        <SurfaceCapabilityVisual panelType={surface.panelType} />
-      </article>
-    </Link>
-  );
-}
-
-function getWorkflowStageAccent(stage: WorkflowStage["stage"]) {
-  switch (stage) {
-    case "01":
-      return {
-        badge: "border-emerald-500/18 bg-emerald-500/8 text-emerald-700 dark:text-emerald-300",
-        iconWrap: "border-emerald-500/18 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-        eyebrow: "text-emerald-700 dark:text-emerald-300",
-        actionPill:
-          "border-emerald-500/18 bg-emerald-500/8 text-emerald-700 hover:bg-emerald-500/12 dark:text-emerald-300",
-        panelShell: "border-emerald-500/12 bg-[linear-gradient(180deg,rgba(24,196,126,0.06),rgba(255,255,255,0.7))] dark:bg-[linear-gradient(180deg,rgba(24,196,126,0.08),rgba(15,23,20,0.68))]",
-      };
-    case "02":
-      return {
-        badge: "border-sky-500/18 bg-sky-500/8 text-sky-700 dark:text-sky-300",
-        iconWrap: "border-sky-500/18 bg-sky-500/10 text-sky-700 dark:text-sky-300",
-        eyebrow: "text-sky-700 dark:text-sky-300",
-        actionPill:
-          "border-sky-500/18 bg-sky-500/8 text-sky-700 hover:bg-sky-500/12 dark:text-sky-300",
-        panelShell: "border-sky-500/12 bg-[linear-gradient(180deg,rgba(56,189,248,0.06),rgba(255,255,255,0.7))] dark:bg-[linear-gradient(180deg,rgba(56,189,248,0.08),rgba(15,23,20,0.68))]",
-      };
-    case "03":
-      return {
-        badge: "border-amber-500/20 bg-amber-500/8 text-amber-700 dark:text-amber-300",
-        iconWrap: "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300",
-        eyebrow: "text-amber-700 dark:text-amber-300",
-        actionPill:
-          "border-amber-500/20 bg-amber-500/8 text-amber-700 hover:bg-amber-500/12 dark:text-amber-300",
-        panelShell: "border-amber-500/14 bg-[linear-gradient(180deg,rgba(245,158,11,0.06),rgba(255,255,255,0.7))] dark:bg-[linear-gradient(180deg,rgba(245,158,11,0.08),rgba(15,23,20,0.68))]",
-      };
-    default:
-      return {
-        badge: "border-primary/18 bg-primary/8 text-primary",
-        iconWrap: "border-primary/18 bg-primary/10 text-primary",
-        eyebrow: "text-primary",
-        actionPill: "border-primary/18 bg-primary/8 text-primary hover:bg-primary/12",
-        panelShell: "border-primary/12 bg-[linear-gradient(180deg,rgba(47,153,95,0.06),rgba(255,255,255,0.7))] dark:bg-[linear-gradient(180deg,rgba(47,153,95,0.08),rgba(15,23,20,0.68))]",
-      };
-  }
-}
-
-function getWorkflowStatusTone(status: string) {
-  const normalized = status.toLowerCase();
-
-  if (normalized.includes("pending") || normalized.includes("awaiting")) {
-    return {
-      badge: "border border-border/70 bg-background text-muted-foreground",
-    };
-  }
-
-  if (normalized.includes("open") || normalized.includes("review") || normalized.includes("watch")) {
-    return {
-      badge: "bg-amber-500/12 text-amber-700 dark:text-amber-300",
-    };
-  }
-
-  return {
-    badge: "bg-primary/[0.1] text-primary",
+  const closeDesktopResources = () => {
+    setResourcesOpen(false);
+    resourcesButtonRef.current?.focus();
   };
-}
 
-function SurfaceCapabilityVisual({
-  panelType,
-}: {
-  panelType: ControlSurfaceDefinition["panelType"];
-}) {
-  if (panelType === "mapping") {
-    return (
-      <div className="rounded-[28px] border border-border/75 bg-muted/20 p-5">
-        <div className="space-y-3">
-          {[
-            ["SRC", "inv_no", "PINT", "cbc:ID"],
-            ["SRC", "issue_dt", "PINT", "cbc:IssueDate"],
-            ["SRC", "vat_id", "PINT", "PINTPartyTaxScheme"],
-            ["SRC", "total_gross", "PINT", "PINTPayableAmount"],
-          ].map(([sourceTag, sourceValue, targetTag, targetValue]) => (
-            <div
-              key={`${sourceValue}-${targetValue}`}
-              className="grid grid-cols-[minmax(0,1fr)_20px_minmax(0,1.1fr)] items-center gap-2.5 rounded-2xl border border-border/70 bg-background/94 px-3.5 py-3"
-            >
-              <div className="min-w-0">
-                <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  {sourceTag}
-                </span>
-                <p className="truncate font-mono text-[12px] text-foreground">{sourceValue}</p>
-              </div>
-              <span className="text-center text-primary" aria-hidden="true">
-                &rarr;
-              </span>
-              <div className="min-w-0 rounded-xl border border-primary/12 bg-primary/[0.05] px-3 py-2.5">
-                <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary/80">
-                  {targetTag}
-                </span>
-                <p className="truncate font-mono text-[12px] text-foreground">{targetValue}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  return (
+    <main className="min-h-screen bg-[#f7faf9] text-[#071527]">
+      <section id="product" className="relative overflow-hidden bg-[#062d27] text-white">
+        <img src={heroBackdrop} alt="" className="absolute inset-0 h-full w-full object-cover object-center" aria-hidden="true" />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(3,36,31,0.32)_0%,rgba(3,36,31,0.08)_52%,rgba(3,36,31,0.02)_100%)]" />
 
-  if (panelType === "traceability") {
-    return (
-      <div className="rounded-[28px] border border-border/75 bg-muted/20 p-5">
-        <div className="grid min-h-[268px] place-items-center rounded-[22px] border border-border/70 bg-background/90 px-5 py-6">
-          <div className="flex w-full max-w-[240px] flex-col items-center">
-            <div className="grid w-full gap-2.5">
-              {["sap.header", "oracle.tax", "pos.retail"].map((item) => (
-                <div
-                  key={item}
-                  className="mx-auto w-full max-w-[132px] rounded-full border border-border/70 bg-background px-3 py-2 text-center text-[10.5px] leading-5 text-muted-foreground shadow-sm"
+        <div className="relative mx-auto max-w-[1480px] px-5 sm:px-8 lg:px-12">
+          <header className="flex h-24 items-center justify-between gap-8">
+            <Link to="/" className="flex min-w-0 items-center gap-4" aria-label="DRCS home">
+              <img src={daribaLogo} alt="Dariba DRCS" className="h-14 w-[154px] object-contain object-left" />
+              <span className="hidden h-10 w-px bg-white/20 sm:block" />
+              <span className="hidden text-[11px] font-semibold uppercase leading-5 tracking-[0.13em] text-emerald-50/85 sm:block">UAE e-invoicing<br />Data Readiness Control Studio</span>
+            </Link>
+            <nav className="hidden items-center gap-8 xl:flex" aria-label="Main navigation">
+              {navItems.map((item) => <a key={item.label} href={item.href} className="text-sm font-semibold text-white/88 transition hover:text-emerald-300">{item.label}</a>)}
+              <div ref={resourcesMenuRef} className="relative" onKeyDown={(event) => {
+                if (event.key === "Escape" && resourcesOpen) {
+                  event.preventDefault();
+                  closeDesktopResources();
+                }
+              }}>
+                <button
+                  ref={resourcesButtonRef}
+                  type="button"
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-white/88 transition hover:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#56eda4] focus-visible:ring-offset-4 focus-visible:ring-offset-[#062d27]"
+                  aria-haspopup="menu"
+                  aria-expanded={resourcesOpen}
+                  aria-controls="desktop-resources-menu"
+                  onClick={() => setResourcesOpen((value) => !value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "ArrowDown") {
+                      event.preventDefault();
+                      setResourcesOpen(true);
+                      window.requestAnimationFrame(() => resourcesLinkRef.current?.focus());
+                    }
+                  }}
                 >
-                  {item}
-                </div>
-              ))}
-            </div>
-
-            <div className="relative flex h-[96px] items-center justify-center">
-              <div className="absolute left-1/2 top-0 h-[18px] w-px -translate-x-1/2 bg-primary/22" />
-              <div className="absolute left-1/2 top-[18px] h-[18px] w-px -translate-x-[22px] rotate-[28deg] bg-primary/22" />
-              <div className="absolute left-1/2 top-[18px] h-[18px] w-px -translate-x-1/2 bg-primary/22" />
-              <div className="absolute left-1/2 top-[18px] h-[18px] w-px translate-x-[22px] rotate-[-28deg] bg-primary/22" />
-
-              <div className="z-10 flex h-[76px] w-[76px] items-center justify-center rounded-full border border-primary/18 bg-primary/[0.08] px-2 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-primary shadow-sm">
-                PINT-AE
+                  Resources <ChevronDown className={`h-3.5 w-3.5 transition-transform ${resourcesOpen ? "rotate-180" : ""}`} />
+                </button>
+                {resourcesOpen && <div id="desktop-resources-menu" role="menu" className="absolute right-0 top-full z-30 mt-4 w-[390px] rounded-2xl border border-emerald-200/20 bg-[#06231f]/[0.98] p-2 shadow-[0_24px_70px_rgba(0,0,0,0.38)] backdrop-blur-xl">
+                  <a ref={resourcesLinkRef} role="menuitem" href={PINT_PLAYBOOK_URL} target="_blank" rel="noopener noreferrer" className="group block rounded-xl border border-transparent p-4 transition hover:border-emerald-300/20 hover:bg-emerald-300/10 focus-visible:border-[#56eda4] focus-visible:bg-emerald-300/10 focus-visible:outline-none">
+                    <span className="flex items-start justify-between gap-4"><span className="font-display text-base font-bold text-white">PINT Data Requirements Playbook</span><ExternalLink className="mt-0.5 h-4 w-4 shrink-0 text-[#56eda4]" aria-hidden="true" /></span>
+                    <span className="mt-2 block text-sm leading-6 text-emerald-50/75">Interactive UAE PINT-AE and Oman PINT-OM field requirements, validation rules and regulatory relationships.</span>
+                    <span className="mt-3 block border-t border-white/10 pt-3 text-xs leading-5 text-emerald-100/60">External reference resource; separate from the DRCS production validation engine.</span>
+                  </a>
+                </div>}
               </div>
-
-              <div className="absolute bottom-0 left-1/2 h-[18px] w-px -translate-x-1/2 bg-primary/22" />
-              <div className="absolute bottom-[18px] left-1/2 h-[18px] w-px -translate-x-[18px] rotate-[24deg] bg-primary/22" />
-              <div className="absolute bottom-[18px] left-1/2 h-[18px] w-px translate-x-[18px] rotate-[-24deg] bg-primary/22" />
+            </nav>
+            <div className="hidden items-center gap-3 xl:flex">
+              <button type="button" className="flex h-11 items-center gap-2 px-2 text-sm font-medium text-white/90" aria-label="Language: English"><Globe2 className="h-4 w-4" /> EN <ChevronDown className="h-3.5 w-3.5" /></button>
+              <Link to="/dashboard" className="inline-flex h-11 items-center rounded-xl border border-white/35 px-5 text-sm font-semibold transition hover:bg-white/10">Sign in</Link>
+              <Link to="/upload" className="inline-flex h-11 items-center gap-3 rounded-xl bg-[#56eda4] px-5 text-sm font-bold text-[#04261f] shadow-[0_10px_30px_rgba(70,235,158,0.25)] transition hover:bg-[#73f1b5]">Get started <ArrowRight className="h-4 w-4" /></Link>
             </div>
+            <button type="button" onClick={() => setMenuOpen((value) => !value)} className="rounded-lg border border-white/20 p-2 xl:hidden" aria-label="Toggle navigation" aria-expanded={menuOpen}>{menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</button>
+          </header>
 
-            <div className="grid w-full gap-2.5">
-              {["cbc:ID", "Payable Amt"].map((item) => (
-                <div
-                  key={item}
-                  className="mx-auto w-full max-w-[136px] rounded-full border border-primary/15 bg-primary/[0.05] px-3 py-2 text-center text-[10.5px] leading-5 text-primary shadow-sm"
-                >
-                  {item}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (panelType === "registry") {
-    return (
-      <div className="rounded-[28px] border border-border/75 bg-muted/20 p-5">
-        <div className="space-y-3">
-          {[
-            ["BR-CO-10", "Sum of line amounts = InvoiceTotal", "High"],
-            ["AE-VAT-01", "TRN 15-digit format", "High"],
-            ["AE-CUR-03", "FX rate at date of issue", "Med"],
-            ["BR-52", "Buyer legal identifier present", "Med"],
-            ["INT-04", "Vendor allow-list check", "Low"],
-          ].map(([ruleId, description, severity]) => (
-            <div
-              key={ruleId}
-              className="grid grid-cols-[84px_minmax(0,1fr)_56px] items-center gap-3 rounded-2xl border border-border/70 bg-background/94 px-3 py-2.5"
-            >
-              <span className="font-mono text-[11px] text-primary">{ruleId}</span>
-              <span className="truncate text-[12px] text-foreground">{description}</span>
-              <span
-                className={cn(
-                  "inline-flex justify-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em]",
-                  severity === "High" && "bg-rose-500/12 text-rose-700 dark:text-rose-300",
-                  severity === "Med" && "bg-amber-500/12 text-amber-700 dark:text-amber-300",
-                  severity === "Low" && "bg-primary/[0.1] text-primary"
-                )}
-              >
-                {severity}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="rounded-[28px] border border-border/75 bg-muted/20 p-5">
-      <div className="space-y-3 rounded-[22px] border border-border/70 bg-background/94 px-4 py-3.5">
-        {[
-          ["14:02:11", "a.mansoori approved mapping v4.1"],
-          ["14:04:37", "system executed AE-VAT-01 (28,411 rows)"],
-          ["14:04:41", "system flagged 14 exceptions"],
-          ["14:12:03", "f.alnaqbi resolved AE-CUR-03 · INV-2026-04813"],
-          ["14:18:55", "system sealed batch 2026-Q3-B04"],
-        ].map(([time, event]) => (
-          <div
-            key={`${time}-${event}`}
-            className="grid grid-cols-[78px_minmax(0,1fr)] gap-3 border-b border-border/55 pb-2.5 last:border-b-0 last:pb-0"
-          >
-            <span className="font-mono text-[11px] text-muted-foreground">{time}</span>
-            <span className="text-[11.5px] leading-6 text-foreground">{event}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function DarkHeroMetric({
-  title,
-  value,
-  detail,
-  valueSize = "numeric",
-}: {
-  title: string;
-  value: string;
-  detail: string;
-  valueSize?: "numeric" | "label";
-}) {
-  return (
-    <div className="rounded-[22px] border border-emerald-900/70 bg-white/[0.02] p-4 md:p-5">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-100/42">{title}</p>
-      <p
-        className={cn(
-          "mt-4 font-semibold text-emerald-50",
-          valueSize === "label"
-            ? "text-[2rem] leading-[1.02] md:text-[2.2rem]"
-            : "text-[2.35rem] leading-none md:text-[2.55rem]"
-        )}
-      >
-        {value}
-      </p>
-      <p className="mt-3 max-w-[15ch] text-[15px] leading-7 text-emerald-300/78">{detail}</p>
-    </div>
-  );
-}
-
-function HeroLedgerRow({
-  row,
-}: {
-  row: {
-    invoiceNumber: string;
-    counterparty: string;
-    amount: string;
-    status: string;
-    tone: "warning" | "success" | "info" | "neutral";
-  };
-}) {
-  const toneClass =
-    row.tone === "warning"
-      ? "border-amber-500/20 bg-amber-500/12 text-amber-200"
-      : row.tone === "success"
-        ? "border-emerald-500/20 bg-emerald-500/12 text-emerald-300"
-        : row.tone === "info"
-          ? "border-sky-500/20 bg-sky-500/12 text-sky-200"
-          : "border-emerald-900/80 bg-white/[0.03] text-emerald-100/70";
-
-  return (
-    <div className="grid grid-cols-[1.15fr_1.4fr_0.95fr_auto] items-center gap-3 rounded-2xl px-2 py-3.5">
-      <div className="flex items-center gap-3">
-        <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/85" />
-        <span className="truncate text-sm font-semibold text-emerald-50">{row.invoiceNumber}</span>
-      </div>
-      <span className="truncate pr-2 text-sm text-emerald-50/74">{row.counterparty}</span>
-      <span className="truncate text-right text-sm font-medium tabular-nums text-emerald-50/86">{row.amount}</span>
-      <span className={cn("inline-flex h-8 items-center justify-center rounded-full border px-3 text-sm font-semibold whitespace-nowrap", toneClass)}>
-        {row.status}
-      </span>
-    </div>
-  );
-}
-
-function UaeFlagMark() {
-  return (
-    <div className="flex h-8 w-12 overflow-hidden rounded-md border border-primary/15 shadow-sm dark:border-emerald-700/30">
-      <div className="w-3 bg-[#D71920]" />
-      <div className="flex flex-1 flex-col">
-        <div className="flex-1 bg-[#009A49]" />
-        <div className="flex-1 bg-white dark:bg-slate-100" />
-        <div className="flex-1 bg-black dark:bg-slate-950" />
-      </div>
-    </div>
-  );
-}
-
-function EnvironmentAccessToggle({
-  value,
-  onChange,
-}: {
-  value: ClientEnvironment;
-  onChange: (next: ClientEnvironment) => void;
-}) {
-  return (
-    <div className="rounded-full">
-      <div className="flex items-center gap-1">
-        {environmentOptions.map((option) => {
-          const isActive = option.key === value;
-          return (
-            <button
-              key={option.key}
-              type="button"
-              onClick={() => onChange(option.key)}
-              aria-pressed={isActive}
-              className={cn(
-                "inline-flex h-9 min-w-[74px] items-center justify-center rounded-full px-3 text-center transition-all",
-                isActive
-                  ? "bg-primary text-primary-foreground shadow-[0_12px_24px_-18px_hsl(var(--primary))]"
-                  : "text-slate-500 hover:bg-slate-950/[0.04] hover:text-slate-900 dark:text-emerald-100/55 dark:hover:bg-emerald-500/[0.08] dark:hover:text-emerald-50"
-              )}
-            >
-              <span className="block text-[11px] font-semibold uppercase tracking-[0.16em]">{option.key}</span>
+          {menuOpen && <nav className="mb-5 grid gap-2 rounded-2xl border border-white/15 bg-[#06231f]/95 p-4 xl:hidden" aria-label="Mobile navigation">
+            {navItems.map((item) => <a key={item.label} href={item.href} className="rounded-lg px-3 py-2 text-sm font-semibold">{item.label}</a>)}
+            <button type="button" className="flex items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#56eda4]" aria-expanded={mobileResourcesOpen} aria-controls="mobile-resources-menu" onClick={() => setMobileResourcesOpen((value) => !value)}>
+              Resources <ChevronDown className={`h-4 w-4 transition-transform ${mobileResourcesOpen ? "rotate-180" : ""}`} />
             </button>
-          );
-        })}
+            {mobileResourcesOpen && <div id="mobile-resources-menu" className="rounded-xl border border-emerald-200/15 bg-emerald-300/[0.07] p-2">
+              <a href={PINT_PLAYBOOK_URL} target="_blank" rel="noopener noreferrer" className="block rounded-lg p-3 transition hover:bg-emerald-300/10 focus-visible:bg-emerald-300/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#56eda4]">
+                <span className="flex items-start justify-between gap-3"><span className="font-display text-sm font-bold">PINT Data Requirements Playbook</span><ExternalLink className="mt-0.5 h-4 w-4 shrink-0 text-[#56eda4]" aria-hidden="true" /></span>
+                <span className="mt-2 block text-xs leading-5 text-emerald-50/75">Interactive UAE PINT-AE and Oman PINT-OM field requirements, validation rules and regulatory relationships.</span>
+                <span className="mt-2 block border-t border-white/10 pt-2 text-[11px] leading-4 text-emerald-100/60">External reference resource; separate from the DRCS production validation engine.</span>
+              </a>
+            </div>}
+            <Link to="/upload" className="mt-2 rounded-lg bg-[#56eda4] px-3 py-3 text-center text-sm font-bold text-[#04261f]">Get started</Link>
+          </nav>}
+
+          <div className="grid items-center gap-10 pb-0 pt-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-12 lg:pt-14">
+            <div className="max-w-[650px] pb-14 lg:pb-20" data-testid="hero-copy">
+              <div className="inline-flex rounded-full border border-emerald-300/15 bg-emerald-400/20 px-4 py-2 text-xs font-semibold text-emerald-200">Built for UAE e-invoicing</div>
+              <h1 className="mt-6 font-display text-[clamp(3rem,3.75vw,4rem)] font-bold leading-[1.04] tracking-[-0.045em]">From source data<br />to <span className="text-[#55eba2]">regulatory readiness</span></h1>
+              <p className="mt-6 max-w-[610px] text-lg leading-8 text-emerald-50/80 lg:text-xl">DRCS helps enterprises validate, align, and control their invoice data so it is ready for UAE e-invoicing (PINT-AE) — with audit-ready traceability and continuous governance.</p>
+              <div className="mt-8 flex flex-wrap gap-4">
+                <Link to="/upload" className="inline-flex h-14 min-w-48 items-center justify-center gap-3 rounded-xl bg-[#56eda4] px-7 text-base font-bold text-[#04261f] transition hover:bg-[#73f1b5]">Get started <ArrowRight className="h-4 w-4" /></Link>
+                <a href="#workflow" className="inline-flex h-14 min-w-48 items-center justify-center gap-3 rounded-xl border border-white/55 px-7 text-base font-semibold transition hover:bg-white/10"><Play className="h-5 w-5" /> See how it works</a>
+              </div>
+              <div className="mt-10 flex flex-wrap gap-x-7 gap-y-3 text-sm text-emerald-50/85">
+                {["UAE PINT-AE aligned", "Enterprise grade", "Audit-ready evidence", "Works with your ERP"].map((item) => <span key={item} className="inline-flex items-center gap-2"><span className="grid h-5 w-5 place-items-center rounded-full bg-[#56eda4] text-[#063128]"><Check className="h-3.5 w-3.5" /></span>{item}</span>)}
+              </div>
+            </div>
+
+            <DashboardPreview />
+          </div>
+        </div>
+      </section>
+
+      <section id="capabilities" className="border-b border-slate-200 bg-white">
+        <div className="mx-auto grid max-w-[1480px] gap-6 px-5 py-8 sm:px-8 md:grid-cols-2 lg:grid-cols-4 lg:px-12">
+          {capabilities.map(({ icon: Icon, title, description }, index) => <div key={title} className={`flex gap-4 lg:px-6 ${index ? "lg:border-l lg:border-slate-200" : ""}`}><span className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-[#dcfaeb] text-[#092b36]"><Icon className="h-7 w-7" /></span><div className="pt-1"><h2 className="font-display text-base font-bold">{title}</h2><p className="mt-1 text-sm leading-6 text-[#53729a]">{description}</p></div></div>)}
+        </div>
+      </section>
+
+      <section id="workflow" className="scroll-mt-6 bg-[#f8fbfb] py-10 lg:scroll-mt-8 lg:py-14">
+        <div className="mx-auto max-w-[1480px] px-5 sm:px-8 lg:px-12">
+          <div className="grid overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_20px_60px_rgba(11,42,52,0.05)] lg:grid-cols-[2.25fr_1fr]">
+            <div className="p-7 lg:p-10">
+              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start"><div><h2 className="font-display text-2xl font-bold tracking-tight lg:text-3xl">A controlled path to e-invoicing readiness</h2><p className="mt-2 max-w-3xl text-base leading-7 text-[#53729a]">DRCS combines data diagnostics, canonical alignment, check orchestration and control intelligence into one integrated workflow.</p></div><a href="#workflow" className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-[#163b68] transition hover:border-emerald-400 hover:bg-emerald-50">Explore the workflow <ArrowRight className="h-4 w-4" /></a></div>
+              <div className="mt-9 grid gap-8 sm:grid-cols-2 xl:grid-cols-4">
+                {workflow.map(({ icon: Icon, title, description, path }, index) => <Link key={title} to={path} className="group relative block"><div className="flex items-center gap-3"><span className="grid h-8 w-8 place-items-center rounded-full bg-[#56eda4] text-sm font-bold text-[#063128]">{index + 1}</span><span className="grid h-16 w-16 place-items-center rounded-full bg-[#dcfaeb] transition group-hover:bg-[#c8f7df]"><Icon className="h-7 w-7" /></span></div>{index < workflow.length - 1 && <span className="pointer-events-none absolute -right-5 top-6 hidden items-center text-slate-300 xl:flex" aria-hidden="true"><span className="h-px w-7 bg-slate-200" /><ArrowRight className="-ml-1 h-4 w-4" /></span>}<h3 className="mt-4 font-display text-base font-bold">{title}</h3><p className="mt-1 text-sm leading-6 text-[#53729a]">{description}</p></Link>)}
+              </div>
+            </div>
+            <RegulatoryPanel />
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function DashboardPreview() {
+  return (
+    <div className="min-w-0 self-center pb-10 lg:pb-16" data-testid="hero-dashboard-preview">
+      <div className="mb-3 inline-flex rounded-full border border-amber-200/25 bg-[#071d22]/85 px-3 py-1.5 text-[8px] font-semibold uppercase tracking-[0.13em] text-amber-100 shadow-lg backdrop-blur-sm sm:text-[9px]">Illustrative sample metrics</div>
+      <div className="relative mx-auto aspect-[1.64/1] w-full max-w-[760px] overflow-hidden rounded-[22px] border border-slate-400/65 bg-[#061824] shadow-[0_30px_70px_rgba(0,0,0,0.48),inset_0_1px_0_rgba(255,255,255,0.08)] [transform:perspective(1400px)_rotateY(-1.25deg)_rotateX(0.5deg)]">
+        <div className="flex h-full text-white">
+          <aside className="flex w-[22%] shrink-0 flex-col border-r border-white/10 bg-[#04131d] p-[2.4%]">
+            <div className="font-display text-[clamp(8px,1.05vw,15px)] font-bold leading-tight">DARIBA <span className="block text-[#55eba2]">DRCS</span></div>
+            <div className="mt-[15%] flex items-center gap-2 rounded-md bg-emerald-500/20 p-[8%] text-[clamp(6px,0.72vw,10px)] font-semibold text-emerald-200"><Home className="h-[1.2em] w-[1.2em]" /> Control Centre</div>
+            <PreviewNavGroup label="Data" items={[[Database, "Data Sources"], [Route, "Mapping"], [FileText, "Validation"]]} />
+            <PreviewNavGroup label="Controls" items={[[AlertTriangle, "Exceptions"], [Folder, "Cases"], [Users, "Reconciliation"]]} />
+            <PreviewNavGroup label="Governance" items={[[FileCheck2, "Requirements"], [FileText, "Evidence"], [Route, "Traceability"]]} />
+          </aside>
+
+          <div className="min-w-0 flex-1 p-[2.4%]">
+            <div className="flex items-center gap-3">
+              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-white/5 bg-white/[0.045] px-[2.5%] py-[1.7%] text-[clamp(5px,0.65vw,9px)] text-white/40"><Search className="h-[1.2em] w-[1.2em]" /> Search invoices, fields, rules, or cases...</div>
+              <span className="hidden items-center gap-1 text-[clamp(5px,0.65vw,9px)] text-white/65 sm:flex">🇦🇪 UAE / PINT-AE</span>
+              <Bell className="h-[clamp(9px,1.1vw,15px)] w-[clamp(9px,1.1vw,15px)] text-white/55" />
+            </div>
+            <div className="mt-[2.5%] flex items-end justify-between gap-3">
+              <div><h2 className="font-display text-[clamp(9px,1.5vw,21px)] font-bold leading-none">UAE e-Invoicing Readiness</h2><p className="mt-1 text-[clamp(5px,0.68vw,9px)] text-white/58">UAE Enterprise &nbsp; • &nbsp; Production &nbsp; • &nbsp; 128,450 invoices analysed</p></div>
+              <span className="rounded-md bg-[#55eba2] px-[2.8%] py-[1.4%] text-[clamp(5px,0.68vw,9px)] font-bold text-[#052820]">Run checks</span>
+            </div>
+
+            <div className="mt-[2.5%] grid grid-cols-4 gap-[1.5%]">
+              <PreviewMetric label="Readiness score" value="78%" detail="↑ +8%" tone="emerald" />
+              <PreviewMetric label="Mandatory coverage" value="91%" detail="312 of 342 fields" tone="emerald" />
+              <PreviewMetric label="Critical gaps" value="12" detail="↑ +3" tone="red" />
+              <PreviewMetric label="Open cases" value="37" detail="↑ +11" tone="amber" />
+            </div>
+
+            <div className="mt-[2%] grid min-h-0 grid-cols-[1.05fr_0.95fr] gap-[1.7%]">
+              <section className="rounded-lg border border-white/10 bg-white/[0.025] p-[3.5%]">
+                <h3 className="text-[clamp(7px,0.82vw,12px)] font-bold text-white/95">Readiness by control domain</h3>
+                <div className="mt-[4%] space-y-[2.4%]">{previewDomains.map(([label, value]) => <div key={label} className="grid grid-cols-[38%_1fr_10%] items-center gap-[2%] text-[clamp(5px,0.6vw,9px)]"><span className="truncate font-medium text-white/82">{label}</span><span className="h-[clamp(3px,0.45vw,6px)] overflow-hidden rounded-full bg-white/12 shadow-inner"><span className={`block h-full rounded-full shadow-[0_0_8px_rgba(77,232,157,0.2)] ${value < 75 ? "bg-amber-300" : "bg-[#4de89d]"}`} style={{ width: `${value}%` }} /></span><span className="text-right font-bold text-white/90">{value}%</span></div>)}</div>
+              </section>
+              <section className="rounded-lg border border-white/10 bg-white/[0.025] p-[3.5%]">
+                <h3 className="text-[clamp(7px,0.82vw,12px)] font-bold text-white/95">Top issues requiring attention</h3>
+                <div className="mt-[4%] space-y-[2.2%]">{previewFindings.map(([severity, issue, affected, action]) => <div key={issue} className="grid grid-cols-[22%_1fr_16%_22%] items-center gap-[2%] border-b border-white/[0.08] pb-[2%] text-[clamp(5px,0.56vw,8.5px)]"><span className={`rounded px-1 py-[0.2em] text-center font-semibold ${severity === "Critical" ? "bg-red-500/30 text-red-200" : "bg-amber-400/25 text-amber-100"}`}>{severity}</span><span className="truncate font-medium text-white/88">{issue}</span><span className="text-right text-white/72">{affected}</span><span className="truncate text-right font-semibold text-sky-300">{action}</span></div>)}</div>
+              </section>
+            </div>
+          </div>
+        </div>
+        <span className="sr-only">Readiness dashboard</span>
       </div>
     </div>
+  );
+}
+
+function PreviewNavGroup({ label, items }: { label: string; items: Array<[typeof Database, string]> }) {
+  return <div className="mt-[12%]"><p className="text-[clamp(4px,0.52vw,7px)] font-semibold uppercase tracking-[0.15em] text-sky-200/55">{label}</p><div className="mt-[5%] space-y-[2%]">{items.map(([Icon, item]) => <div key={item} className="flex items-center gap-2 py-[2.5%] text-[clamp(5px,0.62vw,9px)] text-white/68"><Icon className="h-[1.1em] w-[1.1em] shrink-0" />{item}</div>)}</div></div>;
+}
+
+function PreviewMetric({ label, value, detail, tone }: { label: string; value: string; detail: string; tone: "emerald" | "red" | "amber" }) {
+  const tones = { emerald: "text-[#55eba2]", red: "text-red-300", amber: "text-amber-200" };
+  const surfaces = { emerald: "bg-emerald-400/[0.055]", red: "bg-red-500/[0.12]", amber: "bg-amber-400/[0.10]" };
+  return <div className={`min-w-0 rounded-lg border border-white/10 p-[9%] shadow-[0_8px_18px_rgba(0,0,0,0.16),inset_0_1px_0_rgba(255,255,255,0.045)] ${surfaces[tone]}`}><p className="truncate text-[clamp(5px,0.62vw,9px)] font-semibold text-white/82">{label}</p><p className="mt-[5%] font-display text-[clamp(11px,1.45vw,21px)] font-bold leading-none text-white">{value}</p><p className={`mt-[7%] truncate text-[clamp(5px,0.57vw,8px)] font-semibold ${tones[tone]}`}>{detail}</p></div>;
+}
+
+/* Legacy coded preview retained temporarily in this uncommitted design iteration.
+function LegacyDashboardPreview({ readiness, invoiceCount, caseCount, illustrative, environment, onEnvironmentChange }: { readiness: number; invoiceCount: number; caseCount: number; illustrative: boolean; environment: ClientEnvironment; onEnvironmentChange: (value: ClientEnvironment) => void }) {
+  return <div className="relative min-h-[565px] self-end lg:translate-x-5"><div className="absolute inset-x-0 bottom-0 top-4 rotate-[2.5deg] overflow-hidden rounded-t-[28px] border border-emerald-200/35 bg-[#061a25] shadow-[0_36px_80px_rgba(0,0,0,0.42)]"><div className="flex h-full">
+    <aside className="hidden w-[142px] shrink-0 border-r border-white/8 bg-[#05141d] p-4 sm:block"><p className="font-display text-base font-bold text-white">DARIBA <span className="block text-xs text-[#55eba2]">DRCS</span></p><p className="mt-8 text-[9px] font-semibold uppercase tracking-[0.18em] text-white/35">Data</p>{["Control centre", "Data sources", "Mapping", "Validation"].map((item, index) => <div key={item} className={`mt-2 rounded-lg px-2 py-2 text-[10px] ${index === 0 ? "bg-emerald-400/15 text-emerald-300" : "text-white/56"}`}>{item}</div>)}<p className="mt-6 text-[9px] font-semibold uppercase tracking-[0.18em] text-white/35">Controls</p>{["Exceptions", "Cases", "Evidence", "Traceability"].map((item) => <div key={item} className="mt-1 px-2 py-2 text-[10px] text-white/56">{item}</div>)}</aside>
+    <div className="min-w-0 flex-1 p-4 sm:p-6"><div className="flex items-start justify-between gap-4"><div><p className="text-[10px] uppercase tracking-[0.15em] text-emerald-300/70">UAE e-invoicing</p><h2 className="mt-1 font-display text-xl font-bold sm:text-2xl">Readiness dashboard</h2><p className="mt-1 text-[10px] text-white/45">{invoiceCount.toLocaleString("en-AE")} invoices analysed</p></div><EnvironmentToggle value={environment} onChange={onEnvironmentChange} /></div>
+      {illustrative && <div className="mt-3 inline-flex rounded-full border border-amber-300/20 bg-amber-300/10 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-amber-200">Illustrative sample metrics</div>}
+      <div className="mt-4 grid grid-cols-2 gap-2 xl:grid-cols-4"><Metric label="Ready" value={`${readiness}%`} tone="emerald" /><Metric label="Mandatory coverage" value="91%" tone="emerald" /><Metric label="Critical gaps" value="12" tone="red" /><Metric label="Open cases" value={String(caseCount)} tone="amber" /></div>
+      <div className="mt-3 grid gap-3 xl:grid-cols-[1.1fr_0.9fr]"><div className="rounded-xl border border-white/8 bg-white/[0.035] p-4"><div className="flex justify-between text-[10px]"><span className="font-semibold">Readiness by control domain</span><span className="text-emerald-300">View all →</span></div><div className="mt-4 space-y-3">{readinessDomains.map(([label, value]) => <div key={label} className="grid grid-cols-[105px_1fr_28px] items-center gap-2 text-[9px]"><span className="truncate text-white/65">{label}</span><span className="h-1.5 overflow-hidden rounded-full bg-white/8"><span className={`block h-full rounded-full ${value < 70 ? "bg-amber-300" : "bg-[#4de89d]"}`} style={{ width: `${value}%` }} /></span><span className="text-right font-semibold">{value}%</span></div>)}</div></div>
+        <div className="rounded-xl border border-white/8 bg-white/[0.035] p-4"><div className="flex justify-between text-[10px]"><span className="font-semibold">Top issues</span><span className="text-emerald-300">View all →</span></div><div className="mt-3 space-y-2">{[["Critical", "Buyer endpoint ID missing"], ["Critical", "Invoice number duplicated"], ["High", "Buyer TRN format invalid"], ["High", "Credit note reference absent"]].map(([severity, issue]) => <div key={issue} className="flex items-center gap-2 border-b border-white/5 pb-2 text-[8.5px]"><span className={`rounded px-1.5 py-1 font-semibold ${severity === "Critical" ? "bg-red-500/20 text-red-300" : "bg-amber-400/20 text-amber-200"}`}>{severity}</span><span className="truncate text-white/62">{issue}</span></div>)}</div></div></div>
+    </div>
+  </div></div></div>;
+}
+
+function Metric({ label, value, tone }: { label: string; value: string; tone: "emerald" | "red" | "amber" }) {
+  const tones = { emerald: "text-[#55eba2]", red: "text-red-300", amber: "text-amber-200" };
+  return <div className="rounded-xl border border-white/8 bg-white/[0.035] p-3"><p className="text-[9px] text-white/45">{label}</p><p className={`mt-2 font-display text-2xl font-bold ${tones[tone]}`}>{value}</p></div>;
+}
+
+*/
+function EnvironmentToggle({ value, onChange }: { value: ClientEnvironment; onChange: (value: ClientEnvironment) => void }) {
+  return <div className="flex rounded-lg border border-white/10 bg-white/5 p-1" aria-label="Preview environment">{(["DEV", "PROD"] as const).map((option) => <button key={option} type="button" aria-pressed={value === option} onClick={() => onChange(option)} className={`rounded-md px-2 py-1 text-[9px] font-bold ${value === option ? "bg-[#55eba2] text-[#052820]" : "text-white/48"}`}>{option}</button>)}</div>;
+}
+
+function RegulatoryPanel() {
+  return <aside id="regulatory" className="border-t border-emerald-100 bg-[linear-gradient(145deg,#e9fbf3,#dff8ec)] p-7 lg:border-l lg:border-t-0 lg:p-9"><h2 className="font-display text-xl font-bold">Regulatory alignment</h2><p className="mt-2 text-sm leading-6 text-[#53729a]">Designed for UAE e-invoicing readiness and alignment to published standards.</p><div className="mt-7 grid grid-cols-3 gap-3">{regulatoryBodies.map((item) => <div key={item.name} className="flex min-h-32 flex-col items-center rounded-xl border border-emerald-900/10 bg-white/60 p-3 text-center"><div className="flex h-16 w-full items-center justify-center"><img src={item.logo} alt={item.alt} className="max-h-14 w-full object-contain" /></div><p className="mt-2 min-h-8 text-[9px] leading-4 text-[#53729a]">{item.sub}</p></div>)}</div><div className="mt-6 flex flex-wrap gap-2">{["PINT-AE", "UAE e-invoicing", "MoF publications", "Peppol specifications"].map((item) => <span key={item} className="rounded-full bg-emerald-700/5 px-3 py-1.5 text-[10px] font-medium text-[#397160]">{item}</span>)}</div><div className="mt-6 flex gap-2 border-t border-emerald-900/15 pt-5 text-[11px] font-medium leading-5 text-[#345d74]"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-[#397160]" /><p>References indicate standards alignment only. DRCS is not endorsed by, affiliated with, or acting on behalf of the UAE Ministry of Finance, Federal Tax Authority, or OpenPeppol.</p></div></aside>;
+}
+
+const PHASE_ONE_GO_LIVE = new Date("2027-01-01T00:00:00+04:00").getTime();
+
+function getMandateCountdown() {
+  const remaining = Math.max(0, PHASE_ONE_GO_LIVE - Date.now());
+  return {
+    expired: remaining === 0,
+    days: Math.floor(remaining / 86_400_000),
+    hours: Math.floor((remaining / 3_600_000) % 24),
+    minutes: Math.floor((remaining / 60_000) % 60),
+    seconds: Math.floor((remaining / 1_000) % 60),
+  };
+}
+
+function MandateCountdown() {
+  const [remaining, setRemaining] = useState(getMandateCountdown);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setRemaining(getMandateCountdown()), 1_000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  return (
+    <a
+      href="https://mof.gov.ae/en/news/ministry-of-finance-announces-targeted-amendments-to-einvoicing-system-decisions/"
+      target="_blank"
+      rel="noreferrer"
+      aria-label="UAE eInvoicing Phase 1 mandatory implementation countdown. View the official Ministry of Finance announcement."
+      className="relative z-20 mt-2 flex items-center justify-between gap-4 rounded-2xl border border-emerald-200/20 bg-[#041f1c]/88 px-4 py-3 shadow-xl backdrop-blur-md transition hover:border-emerald-300/45 sm:ml-auto sm:w-fit lg:absolute lg:right-12 lg:top-[96px] lg:mt-0"
+    >
+      <div className="min-w-0">
+        <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-emerald-300">UAE eInvoicing · Phase 1</p>
+        <p className="mt-1 text-[11px] font-medium text-white/76">≥ AED 50m revenue · 1 Jan 2027</p>
+      </div>
+      {remaining.expired ? (
+        <span className="rounded-lg bg-emerald-400/15 px-3 py-2 text-xs font-bold text-emerald-300">Now live</span>
+      ) : (
+        <div className="flex gap-2 font-display tabular-nums" aria-label={`${remaining.days} days, ${remaining.hours} hours, ${remaining.minutes} minutes and ${remaining.seconds} seconds remaining`}>
+          <CountdownUnit value={remaining.days} label="days" />
+          <CountdownUnit value={remaining.hours} label="hrs" />
+          <CountdownUnit value={remaining.minutes} label="min" />
+          <CountdownUnit value={remaining.seconds} label="sec" />
+        </div>
+      )}
+    </a>
+  );
+}
+
+function CountdownUnit({ value, label }: { value: number; label: string }) {
+  return (
+    <span className="min-w-8 text-center">
+      <span className="block text-base font-bold leading-none text-white">{String(value).padStart(2, "0")}</span>
+      <span className="mt-1 block text-[7px] font-semibold uppercase tracking-[0.13em] text-emerald-200/55">{label}</span>
+    </span>
   );
 }

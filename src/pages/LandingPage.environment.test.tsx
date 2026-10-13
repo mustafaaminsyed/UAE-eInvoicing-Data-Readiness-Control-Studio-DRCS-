@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import LandingPage from '@/pages/LandingPage';
 
 vi.mock('@/context/ComplianceContext', () => ({
@@ -26,34 +26,52 @@ vi.mock('next-themes', () => ({
   }),
 }));
 
-describe('LandingPage environment selector', () => {
-  beforeEach(() => {
-    window.localStorage.clear();
-  });
-
-  it('renders DEV/PROD access toggle and switches the active preview route', async () => {
+describe('LandingPage public dashboard preview', () => {
+  it('renders the illustrative dashboard without private controls', () => {
     render(
       <MemoryRouter>
         <LandingPage />
       </MemoryRouter>
     );
 
-    await waitFor(() => {
-      expect(screen.getByText('Current scope')).toBeInTheDocument();
-    });
+    expect(screen.getByText('Readiness dashboard')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /uae e-invoicing readiness/i })).toBeInTheDocument();
+    expect(screen.getByText('Mandatory coverage')).toBeInTheDocument();
+    expect(screen.getByText('Readiness score')).toBeInTheDocument();
+    expect(screen.getByText(/UAE Enterprise/)).toBeInTheDocument();
+    expect(screen.getByText('Top issues requiring attention')).toBeInTheDocument();
+    expect(screen.getByText('Illustrative sample metrics')).toBeInTheDocument();
+    expect(screen.getByText('Peppol interoperability framework')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /uae ministry of finance emblem/i })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /uae federal tax authority logo/i })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /peppol logo/i })).toBeInTheDocument();
+    expect(screen.getByText(/not endorsed by/i)).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /get started/i })[0]).toHaveAttribute('href', '/upload');
+    expect(screen.getByRole('link', { name: /see how it works/i })).toHaveAttribute('href', '#workflow');
+    expect(screen.getByRole('link', { name: /explore the workflow/i })).toHaveAttribute('href', '#workflow');
+    expect(screen.queryByRole('button', { name: /dev/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /prod/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /phase 1 mandatory implementation countdown/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Engro/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/IBR-\d+/i)).not.toBeInTheDocument();
+  });
 
-    expect(screen.getAllByText('United Arab Emirates').length).toBeGreaterThan(0);
-    expect(screen.getByText('Current scope')).toBeInTheDocument();
-    expect(screen.getAllByText(/UTC\+04:00/).length).toBeGreaterThan(0);
+  it('opens the external PINT playbook from the Resources menu', () => {
+    render(
+      <MemoryRouter>
+        <LandingPage />
+      </MemoryRouter>
+    );
 
-    const devButton = screen.getByRole('button', { name: /dev/i });
-    const prodButton = screen.getByRole('button', { name: /prod/i });
+    const resourcesButton = screen.getByRole('button', { name: /resources/i });
+    expect(resourcesButton).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(resourcesButton);
 
-    expect(devButton).toHaveAttribute('aria-pressed', 'true');
-
-    fireEvent.click(prodButton);
-
-    expect(prodButton).toHaveAttribute('aria-pressed', 'true');
-    expect(window.localStorage.getItem('drcs.preview_environment_v1')).toBe('PROD');
+    const playbook = screen.getByRole('menuitem', { name: /pint data requirements playbook/i });
+    expect(resourcesButton).toHaveAttribute('aria-expanded', 'true');
+    expect(playbook).toHaveAttribute('href', 'https://claude.ai/artifact/NDJhTZAmgYoDaLU46UYZUU');
+    expect(playbook).toHaveAttribute('target', '_blank');
+    expect(playbook).toHaveAttribute('rel', expect.stringContaining('noopener'));
+    expect(screen.getByText(/separate from the DRCS production validation engine/i)).toBeInTheDocument();
   });
 });
