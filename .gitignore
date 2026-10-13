@@ -34,4 +34,4 @@ playwright-report/
 e2e/artifacts/
 transformed/
 tmp_*.xlsx
-.git-worktree-route-fix/
+.git-worktree-*/
