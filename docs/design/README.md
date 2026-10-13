@@ -1,6 +1,6 @@
 # DRCS design reference library
 
-This directory stores design inputs and historical references. Files here are not
+Use this directory for design inputs and historical references. Files stored here are not
 automatically shipped with the application.
 
 ## Upload locations
@@ -19,5 +19,4 @@ For externally sourced assets, record the source, date, usage permission, and in
 use in the nearest folder README. Keep MoF, FTA, Peppol, and other third-party marks as
 references until their use has been reviewed and approved.
 
-Production assets actually imported by React should remain under `src/assets/`.
-
+Production assets imported by React should remain under `src/assets/`.
