@@ -152,7 +152,8 @@ describe('UploadPage processing feedback', () => {
     fireEvent.change(screen.getByLabelText('Buyers File CSV upload'), { target: { files: [createCsvFile('buyers.csv', 'buyer_id\nB1')] } });
     fireEvent.change(screen.getByLabelText('Invoice Headers File CSV upload'), { target: { files: [createCsvFile('headers.csv', 'invoice_id,buyer_id\nINV1,B1')] } });
     fireEvent.change(screen.getByLabelText('Invoice Lines File CSV upload'), { target: { files: [createCsvFile('lines.csv', 'line_id,invoice_id\nL1,INV1')] } });
-    fireEvent.change(screen.getByLabelText('Document Adjustments File CSV upload'), {
+    fireEvent.click(screen.getByText('Document adjustments'));
+    fireEvent.change(screen.getByLabelText('Document Adjustments CSV upload'), {
       target: { files: [createCsvFile('adjustments.csv', 'adjustment_id,invoice_id,kind,amount,tax_category_code\nA1,INV1,allowance,10.00,S')] },
     });
 
