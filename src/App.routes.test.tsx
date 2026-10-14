@@ -21,9 +21,12 @@ vi.mock('@/context/ComplianceContext', () => ({
   ComplianceProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-vi.mock('@/components/Navigation', () => ({
-  Navigation: () => <div>Navigation Mock</div>,
-}));
+vi.mock('@/components/Navigation', async () => {
+  const reactRouterDom = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return {
+    Navigation: () => reactRouterDom.useLocation().pathname === '/' ? null : <div>Navigation Mock</div>,
+  };
+});
 
 vi.mock('@/components/dashboard/WorkspaceShell', async () => {
   const reactRouterDom = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
@@ -118,6 +121,7 @@ describe('App route wiring', () => {
 
     expect(await screen.findByText('Data Twin Mock')).toBeInTheDocument();
     expect(screen.queryByText('Not Found Mock')).not.toBeInTheDocument();
+    expect(screen.getByText('Navigation Mock')).toBeInTheDocument();
   });
 
   it('renders the live exceptions workspace route', async () => {
@@ -127,5 +131,15 @@ describe('App route wiring', () => {
 
     expect(await screen.findByText('Exceptions Mock')).toBeInTheDocument();
     expect(screen.queryByText('Not Found Mock')).not.toBeInTheDocument();
+    expect(screen.getByText('Navigation Mock')).toBeInTheDocument();
+  });
+
+  it('preserves the landing route navigation composition', async () => {
+    window.history.pushState({}, '', '/');
+
+    render(<App />);
+
+    expect(await screen.findByText('Landing Mock')).toBeInTheDocument();
+    expect(screen.queryByText('Navigation Mock')).not.toBeInTheDocument();
   });
 });

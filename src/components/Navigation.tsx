@@ -5,7 +5,7 @@ import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import { useCompliance } from '@/context/ComplianceContext';
 import { Switch } from '@/components/ui/switch';
-import daribaLogo from '@/assets/Clean_DaribaTech_logo_transparent.png';
+import daribaLogo from '@/assets/brand/dariba-drcs-light-lockup.png';
 import { FEATURE_FLAGS } from '@/config/features';
 import {
   DropdownMenu,
@@ -73,46 +73,41 @@ function NavigationContent() {
   }, [isDark, mounted]);
 
   return (
-    <header className="app-topbar sticky top-0 z-50 w-full border-b border-border/80 bg-background/95 backdrop-blur-xl">
-      <div className="container flex flex-col gap-2 py-2 md:py-2.5">
-        <div className="flex flex-wrap items-center justify-between gap-2.5 md:flex-nowrap md:gap-3">
-          <Link to="/" className="flex min-w-0 shrink-0 items-center gap-3">
-            <div className="surface-glass w-[188px] overflow-hidden rounded-xl px-3 py-1.5 md:w-[224px] md:px-3.5 md:py-2">
-              <img
-                src={daribaLogo}
-                alt="Daribatech"
-                className="block h-9 w-auto max-w-full object-contain md:h-10"
-              />
-            </div>
-            <div className="hidden min-w-[220px] md:block">
-              <p className="font-display text-sm font-semibold leading-none text-foreground">Controls Studio</p>
-              <p className="mt-1 text-[11px] text-muted-foreground">UAE eInvoicing Compliance</p>
+    <header className="app-topbar sticky top-0 z-50 w-full border-b border-white/15 bg-[#062d27]/90 text-white shadow-[0_12px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl">
+      <div className="container mx-auto flex max-w-[1480px] flex-col gap-2 px-5 py-2.5 sm:px-8 xl:flex-row xl:items-center xl:gap-6 xl:px-12">
+        <div className="flex flex-wrap items-center justify-between gap-3 xl:contents">
+          <Link to="/" className="order-1 flex min-w-0 shrink-0 items-center gap-3 xl:gap-4">
+            <img src={daribaLogo} alt="Dariba DRCS" className="block h-10 w-[130px] shrink-0 object-contain object-left md:w-[150px]" />
+            <span className="hidden h-9 w-px bg-white/25 sm:block" />
+            <div className="hidden min-w-0 md:block">
+              <p className="font-display text-sm font-semibold leading-none text-white">UAE e-Invoicing</p>
+              <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.12em] text-emerald-50/70">Data Readiness Control Studio</p>
             </div>
           </Link>
 
-          <div className="flex shrink-0 items-center gap-2 self-start md:self-auto">
-            <span className="hidden rounded-full border border-primary/15 bg-primary/6 px-2.5 py-1 text-[11px] font-medium text-primary 2xl:inline-flex">
+          <div className="order-3 flex shrink-0 items-center gap-2 xl:order-3">
+            <span className="hidden rounded-full border border-emerald-100/20 bg-white/5 px-3 py-1.5 text-[11px] font-medium text-emerald-50/85 2xl:inline-flex">
               Command Center
             </span>
-            <div className="flex items-center gap-2 rounded-full border border-border/70 bg-card/80 px-2 py-1">
-              <Sun className={cn('h-3.5 w-3.5', !isDark ? 'text-amber-500' : 'text-muted-foreground')} aria-hidden="true" />
+            <div className="flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-2 py-1">
+              <Sun className={cn('h-3.5 w-3.5', !isDark ? 'text-amber-300' : 'text-white/50')} aria-hidden="true" />
               <Switch
                 checked={mounted ? isDark : false}
                 onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
                 aria-label={themeLabel}
               />
-              <Moon className={cn('h-3.5 w-3.5', isDark ? 'text-sky-400' : 'text-muted-foreground')} aria-hidden="true" />
+              <Moon className={cn('h-3.5 w-3.5', isDark ? 'text-sky-300' : 'text-white/50')} aria-hidden="true" />
             </div>
           </div>
         </div>
 
-        <div className="min-w-0">
+        <div className="order-2 min-w-0 xl:flex-1">
           <nav
             ref={navRef}
-            className="flex flex-col items-stretch gap-2 rounded-2xl surface-glass px-3 py-2 sm:flex-row sm:items-start sm:justify-between xl:items-center"
+            className="flex flex-col items-stretch gap-2 rounded-xl border border-white/10 bg-white/[0.035] px-2 py-1.5 sm:flex-row sm:items-center sm:justify-between xl:justify-center"
             aria-label="Primary navigation"
           >
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 sm:gap-1 xl:flex-nowrap xl:overflow-x-auto xl:overflow-y-hidden xl:scroll-smooth xl:[scrollbar-width:none] xl:[&::-webkit-scrollbar]:hidden">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1 xl:flex-nowrap xl:overflow-x-auto xl:overflow-y-hidden xl:scroll-smooth xl:[scrollbar-width:none] xl:[&::-webkit-scrollbar]:hidden">
               {primaryNavItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
@@ -124,12 +119,12 @@ function NavigationContent() {
                     to={state === 'disabled' ? '#' : item.path}
                     data-active={isActive ? 'true' : 'false'}
                     className={cn(
-                      'flex min-h-11 items-center gap-2 whitespace-nowrap rounded-full px-3 py-2 text-[13px] font-medium transition-all sm:px-3.5 sm:text-sm',
+                      'flex min-h-10 items-center gap-2 whitespace-nowrap rounded-full px-3 py-2 text-[12px] font-medium transition-all sm:px-3 sm:text-[13px]',
                       isActive
-                        ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
+                        ? 'bg-[#56eda4] text-[#04261f] shadow-sm shadow-emerald-950/20'
                         : state === 'disabled'
-                        ? 'cursor-not-allowed text-muted-foreground/45'
-                        : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+                        ? 'cursor-not-allowed text-white/40'
+                        : 'text-white/80 hover:bg-white/10 hover:text-white'
                     )}
                     onClick={(e) => state === 'disabled' && e.preventDefault()}
                   >
@@ -147,10 +142,10 @@ function NavigationContent() {
                 <button
                   type="button"
                   className={cn(
-                    'inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-full border px-3.5 text-sm font-medium transition-colors sm:w-auto',
+                    'inline-flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-full border px-3 text-sm font-medium transition-colors sm:w-auto',
                     isOverflowActive
-                      ? 'border-primary/20 bg-primary/8 text-primary'
-                      : 'border-border/70 bg-background/80 text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+                      ? 'border-emerald-200/30 bg-white/10 text-emerald-100'
+                      : 'border-white/15 bg-white/5 text-white/75 hover:bg-white/10 hover:text-white'
                   )}
                   aria-label="Open more navigation"
                 >
