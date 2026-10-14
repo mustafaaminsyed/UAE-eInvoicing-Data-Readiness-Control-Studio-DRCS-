@@ -22,8 +22,8 @@ describe('UploadPage interactions', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText('Supported Document Scenarios')).toBeInTheDocument();
-    expect(screen.getByText('Credit Note Requirements')).toBeInTheDocument();
+    expect(screen.getByText('Supported document scenarios')).toBeInTheDocument();
+    expect(screen.getByText('Credit note requirements')).toBeInTheDocument();
   });
 
   it('does not open file picker when switching AR/AP and sample scenario toggles', () => {
