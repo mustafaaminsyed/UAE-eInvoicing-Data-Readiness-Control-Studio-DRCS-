@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, FileSpreadsheet, AlertCircle, CheckCircle2, Link2, ArrowRightCircle, RefreshCw } from 'lucide-react';
+import { ArrowRight, FileSpreadsheet, AlertCircle, CheckCircle2, Link2, RefreshCw, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -9,7 +9,6 @@ import { useCompliance } from '@/context/ComplianceContext';
 import { attachDocumentAdjustments, parseBuyersFile, parseDocumentAdjustmentsFile, parseHeadersFile, parseLinesFile, parseCSV } from '@/lib/csvParser';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { WorkflowNavigator, buildWorkflowItems } from '@/components/shared/WorkflowNavigator';
 import { WorkflowPageHeader } from '@/components/shared/WorkflowPageHeader';
 import { FileDropZone, FileSummaryCard, analyzeFile, FileStats } from '@/components/upload/FileAnalysis';
 import { documentAdjustmentsSample, downloadSampleCSV, SampleScenario } from '@/lib/sampleData';
@@ -17,6 +16,7 @@ import { addUploadAuditLog } from '@/lib/uploadAudit';
 import { DatasetType } from '@/types/datasets';
 import { formatElapsedTime, yieldToBrowser } from '@/lib/processingFeedback';
 import { WORKFLOW_MICRO_BADGE_CLASS } from '@/lib/workflowShellStyles';
+import '@/components/upload/upload-ingestion.css';
 
 type StepKey = 'upload' | 'validation' | 'mapping';
 
@@ -288,53 +288,35 @@ export default function UploadPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)]">
-      <div className="container max-w-4xl py-8 md:py-10">
-        {/* Step Indicator */}
-        <div className="mb-8 flex flex-wrap items-center justify-center gap-2">
-          {STEPS.map((step, i) => (
-            <div key={step.key} className="flex items-center gap-2">
-              <div className={cn(
-                'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-center text-xs font-medium transition-colors',
-                step.key === currentStep
-                  ? 'bg-primary text-primary-foreground'
-                  : (STEPS.findIndex(s => s.key === currentStep) > i
-                    ? 'bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]'
-                    : 'bg-muted text-muted-foreground')
-              )}>
-                {STEPS.findIndex(s => s.key === currentStep) > i && <CheckCircle2 className="w-3 h-3" />}
-                {step.label}
-              </div>
-              {i < STEPS.length - 1 && <ArrowRightCircle className="w-4 h-4 text-muted-foreground/40" />}
-            </div>
-          ))}
+    <div className="upload-ingestion min-h-[calc(100vh-4rem)]">
+      <div className="upload-ingestion-content mx-auto w-full max-w-[1480px] px-3 py-3 md:px-5 md:py-4 xl:px-7">
+        <div className="upload-ingestion-heading mb-3 flex flex-col gap-3 rounded-2xl border border-border/70 bg-card/85 px-4 py-3 shadow-sm backdrop-blur sm:flex-row sm:items-center sm:justify-between">
+          <WorkflowPageHeader
+            title="Upload invoice data"
+            description="Add source files to begin your UAE e-Invoicing readiness assessment."
+            icon={<FileSpreadsheet className="h-5 w-5" />}
+            className="min-w-0"
+            descriptionClassName="text-xs leading-5"
+          />
+          <ol className="upload-ingestion-steps flex shrink-0 items-center gap-2" aria-label="Ingestion progress">
+            {STEPS.map((step, index) => {
+              const active = step.key === currentStep;
+              const complete = STEPS.findIndex((item) => item.key === currentStep) > index;
+              return <li key={step.key} className={cn('upload-ingestion-step', active && 'is-active', complete && 'is-complete')}>
+                <span>{complete ? <CheckCircle2 className="h-3.5 w-3.5" /> : index + 1}</span>{step.label}
+              </li>;
+            })}
+          </ol>
         </div>
 
-        <WorkflowPageHeader
-          title="Upload Your Invoice Data"
-          description="Upload your invoice datasets to begin readiness and structural validation."
-          icon={<FileSpreadsheet className="h-7 w-7" />}
-          align="center"
-          className="mb-6 animate-fade-in"
-          descriptionClassName="max-w-xl"
-        />
-
-        <WorkflowNavigator
-          current="upload"
-          fallbackPath="/"
-          className="mb-5 animate-fade-in"
-          helperText="Move through the ingestion workflow without losing context as you progress into mapping and validation."
-          items={buildWorkflowItems(['upload', 'mapping', 'run', 'validation', 'dashboard'])}
-        />
-
-        <div className="space-y-5 animate-slide-up">
-          <div className="surface-glass rounded-2xl border border-white/70 p-3.5 shadow-sm md:p-4">
-            <div className="mb-3.5">
-              <p className="text-sm font-semibold text-foreground">Dataset Type</p>
-              <p className="mb-2 text-xs text-muted-foreground">
-                Select whether these uploads are outbound AR invoices or inbound AP invoices.
-              </p>
-              <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Dataset type">
+        <div className="upload-ingestion-content-stack animate-slide-up">
+          <section className="upload-ingestion-setup grid gap-3 lg:grid-cols-[1.15fr_0.85fr]" aria-label="Dataset setup">
+            <div className="upload-ingestion-panel surface-glass rounded-2xl border border-white/70 p-3.5 shadow-sm md:p-4">
+              <div className="mb-2">
+                <p className="text-sm font-semibold text-foreground">Dataset direction</p>
+                <p className="text-xs text-muted-foreground">Choose which side of the invoice flow these files represent.</p>
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Dataset type">
                 <Button
                   size="sm"
                   variant={datasetType === 'AR' ? 'default' : 'outline'}
@@ -355,14 +337,12 @@ export default function UploadPage() {
                 </Button>
               </div>
             </div>
-            <div className="flex flex-col gap-3.5 md:flex-row md:items-center md:justify-between">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-foreground">Sample Testing Mode</p>
-                <p className="text-xs text-muted-foreground">
-                  Choose positive samples for baseline pass testing, or negative samples to simulate exceptions.
-                </p>
+            <div className="upload-ingestion-panel surface-glass flex flex-col justify-center rounded-2xl border border-white/70 p-3.5 shadow-sm md:p-4">
+              <div className="mb-2 min-w-0">
+                <p className="text-sm font-semibold text-foreground">Test scenario</p>
+                <p className="text-xs text-muted-foreground">Choose clean samples or files designed to surface exceptions.</p>
               </div>
-              <div className="flex flex-wrap items-center gap-2 md:justify-end">
+              <div className="grid grid-cols-2 gap-2">
                 <Button
                   size="sm"
                   variant={sampleScenario === 'positive' ? 'default' : 'outline'}
@@ -381,61 +361,31 @@ export default function UploadPage() {
                 </Button>
               </div>
             </div>
-          </div>
-
-          <div className="surface-glass rounded-2xl border border-white/70 p-3.5 shadow-sm md:p-4">
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <p className="text-sm font-semibold text-foreground">Supported Document Scenarios</p>
-              <Badge variant="outline" className={`${WORKFLOW_MICRO_BADGE_CLASS} uppercase tracking-wide`}>UC1</Badge>
-            </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-xl border bg-background/70 p-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <Badge variant="secondary" className={WORKFLOW_MICRO_BADGE_CLASS}>380</Badge>
-                  <span className="text-sm font-medium text-foreground">Standard Invoice</span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Baseline supported in current readiness, structural, and validation checks.
-                </p>
+            <details className="upload-ingestion-reference lg:col-span-2">
+              <summary><span><Badge variant="outline" className={`${WORKFLOW_MICRO_BADGE_CLASS} uppercase tracking-wide`}>UC1</Badge> Supported document scenarios</span><ChevronDown className="h-4 w-4" /></summary>
+              <div className="upload-ingestion-scenario-grid">
+                <div><Badge variant="secondary" className={WORKFLOW_MICRO_BADGE_CLASS}>380</Badge><span><strong>Standard invoice</strong><small>Baseline readiness, structural and validation checks.</small></span></div>
+                <div><Badge variant="secondary" className={WORKFLOW_MICRO_BADGE_CLASS}>381</Badge><span><strong>Credit note</strong><small>Requires reason code/text and, except reason VD, the preceding invoice reference/date.</small></span></div>
               </div>
-              <div className="rounded-xl border bg-background/70 p-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <Badge variant="secondary" className={WORKFLOW_MICRO_BADGE_CLASS}>381</Badge>
-                  <span className="text-sm font-medium text-foreground">Credit Note</span>
-                </div>
-                <div className="space-y-2 text-xs text-muted-foreground">
-                  <p>Supported with additional header fields:</p>
-                  <div className="flex flex-wrap gap-2">
-                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] break-all">credit_note_reason_code</code>
-                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] break-all">credit_note_reason_text</code>
-                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] break-all">preceding_invoice_reference</code>
-                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] break-all">preceding_invoice_issue_date</code>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+            </details>
+          </section>
 
           {/* File Cards */}
-          <div className="surface-glass rounded-2xl border border-white/70 shadow-sm p-6">
-            <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-              <span>
-                Upload progress: <span className="font-semibold text-foreground">{validFileCount}/3</span> files structurally valid
-              </span>
-              <span className="hidden text-muted-foreground/60 sm:inline">|</span>
-              <span>
-                <span className="font-medium">{selectedFileCount}/3</span> files selected
-              </span>
+          <section className="upload-ingestion-panel surface-glass rounded-2xl border border-white/70 p-3.5 shadow-sm md:p-4" aria-label="Upload source files">
+            <div className="upload-ingestion-files-heading mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div><h2 className="text-sm font-semibold text-foreground">Source files</h2><p className="text-xs text-muted-foreground">CSV format · Select one file for each required dataset.</p></div>
+              <div className="flex items-center gap-2 rounded-full border bg-background/75 px-3 py-1.5 text-xs text-muted-foreground" role="status">
+                <span className={cn('h-2 w-2 rounded-full', validFileCount === 3 ? 'bg-[hsl(var(--success))]' : 'bg-amber-500')} />
+                <span><strong className="text-foreground">{validFileCount}/3</strong> valid</span><span className="text-border">·</span><span>{selectedFileCount}/3 selected</span>
+              </div>
             </div>
-            <div className="grid gap-6">
+            <div className="upload-ingestion-file-grid grid gap-3 xl:grid-cols-3">
               {/* Buyers */}
               {stats.buyers ? (
                 <FileSummaryCard stats={stats.buyers} type="buyers" direction={datasetType} onRemove={() => handleFileSelect('buyers', null)} />
               ) : (
                 <FileDropZone label="Buyers File" description="buyer_id, buyer_name, buyer_trn, buyer_address, buyer_country" sampleType="buyers" sampleScenario={sampleScenario} direction={datasetType} onFileSelect={(f) => handleFileSelect('buyers', f)} />
               )}
-
-              <div className="border-t" />
 
               {/* Headers */}
               {stats.headers ? (
@@ -444,39 +394,6 @@ export default function UploadPage() {
                 <FileDropZone label="Invoice Headers File" description="invoice_id, invoice_number, issue_date, invoice_type, seller_trn, buyer_id, currency, ... Credit notes (381) require additional credit note fields." sampleType="headers" sampleScenario={sampleScenario} direction={datasetType} onFileSelect={(f) => handleFileSelect('headers', f)} />
               )}
 
-              <div className="rounded-xl border bg-muted/20 px-4 py-3">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <p className="text-xs font-semibold text-foreground">Credit Note Requirements</p>
-                  {hasCreditNoteHeaders && (
-                    <Badge variant="outline" className={WORKFLOW_MICRO_BADGE_CLASS}>Credit note rows detected</Badge>
-                  )}
-                </div>
-                <div className="space-y-2 text-xs text-muted-foreground">
-                  <p>
-                    Scenario-specific validation is driven by <code className="font-mono">invoice_type</code>.
-                  </p>
-                  <p>
-                    When <code className="font-mono">invoice_type = 381</code>, provide:
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <code className="rounded bg-background px-1.5 py-0.5 font-mono text-[11px] break-all">credit_note_reason_code</code>
-                    <code className="rounded bg-background px-1.5 py-0.5 font-mono text-[11px] break-all">credit_note_reason_text</code>
-                  </div>
-                  <p>
-                    Unless the reason code is <code className="font-mono">VD</code>, also provide the <code className="font-mono">IBG-03</code> preceding invoice group using:
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <code className="rounded bg-background px-1.5 py-0.5 font-mono text-[11px] break-all">preceding_invoice_reference</code>
-                    <code className="rounded bg-background px-1.5 py-0.5 font-mono text-[11px] break-all">preceding_invoice_issue_date</code>
-                  </div>
-                  <p>
-                    <code className="font-mono">preceding_invoice_issue_date</code> represents the original invoice issue date and should be in <code className="font-mono">YYYY-MM-DD</code> format when supplied.
-                  </p>
-                </div>
-              </div>
-
-              <div className="border-t" />
-
               {/* Lines */}
               {stats.lines ? (
                 <FileSummaryCard stats={stats.lines} type="lines" direction={datasetType} onRemove={() => handleFileSelect('lines', null)} />
@@ -484,30 +401,41 @@ export default function UploadPage() {
                 <FileDropZone label="Invoice Lines File" description="line_id, invoice_id, line_number, quantity, unit_price, vat_rate, ..." sampleType="lines" sampleScenario={sampleScenario} direction={datasetType} onFileSelect={(f) => handleFileSelect('lines', f)} />
               )}
 
-              <div className="border-t" />
+              <details className="upload-ingestion-reference upload-ingestion-credit-note xl:col-span-3">
+                <summary><span><strong>Credit note requirements</strong>{hasCreditNoteHeaders && <Badge variant="outline" className={WORKFLOW_MICRO_BADGE_CLASS}>381 detected</Badge>}</span><ChevronDown className="h-4 w-4" /></summary>
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <p className="text-xs text-muted-foreground">Scenario-specific validation is driven by <code className="font-mono">invoice_type</code>.</p>
+                </div>
+                <div className="grid gap-2 text-xs text-muted-foreground md:grid-cols-2">
+                  <p>
+                    When <code className="font-mono">invoice_type = 381</code>, provide:
+                    {' '}<code className="font-mono">credit_note_reason_code</code> and <code className="font-mono">credit_note_reason_text</code>.
+                  </p>
+                  <p>
+                    Unless the reason code is <code className="font-mono">VD</code>, also provide the <code className="font-mono">IBG-03</code> preceding invoice group using:
+                    {' '}<code className="font-mono">preceding_invoice_reference</code> and <code className="font-mono">preceding_invoice_issue_date</code>.
+                  </p>
+                  <p className="md:col-span-2">
+                    <code className="font-mono">preceding_invoice_issue_date</code> represents the original invoice issue date and should be in <code className="font-mono">YYYY-MM-DD</code> format when supplied.
+                  </p>
+                </div>
+              </details>
 
-              <div className="rounded-xl border bg-muted/20 p-4">
+              <details className="upload-ingestion-reference upload-ingestion-adjustments xl:col-span-3">
+                <summary><span><strong>Document adjustments</strong><Badge variant="outline" className={WORKFLOW_MICRO_BADGE_CLASS}>Optional</Badge>{adjustmentsFile ? <span className="text-xs text-[hsl(var(--success))]">{adjustmentsFile.name}</span> : null}</span><ChevronDown className="h-4 w-4" /></summary>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-sm font-semibold">Document Adjustments <span className="font-normal text-muted-foreground">(optional)</span></p>
                     <p className="text-xs text-muted-foreground">One row per document-level allowance or charge. Required only when header adjustment totals are non-zero.</p>
                   </div>
                   <Button type="button" size="sm" variant="outline" onClick={() => downloadSampleCSV('document_adjustments_template.csv', documentAdjustmentsSample)}>
                     Download template
                   </Button>
                 </div>
-                <Label htmlFor="document-adjustments-upload" className="mt-3 block text-xs font-medium">Document Adjustments File CSV upload</Label>
-                <input
-                  id="document-adjustments-upload"
-                  type="file"
-                  accept=".csv,text/csv"
-                  className="mt-2 block w-full text-sm text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-xs file:font-medium file:text-primary-foreground"
-                  onChange={(event) => handleAdjustmentsFileSelect(event.target.files?.[0] ?? null)}
-                />
-                {adjustmentsFile && <p className="mt-2 text-xs text-foreground">Selected: {adjustmentsFile.name}</p>}
-              </div>
+                <Label htmlFor="document-adjustments-upload" className="mt-3 block text-xs font-medium">Document Adjustments CSV upload</Label>
+                <input id="document-adjustments-upload" type="file" accept=".csv,text/csv" className="mt-2 block w-full text-sm text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-xs file:font-medium file:text-primary-foreground" onChange={(event) => handleAdjustmentsFileSelect(event.target.files?.[0] ?? null)} />
+              </details>
             </div>
-          </div>
+          </section>
 
           {/* Relational Integrity */}
           {relationalChecks.length > 0 && (
@@ -598,7 +526,7 @@ export default function UploadPage() {
           )}
 
           {/* Actions */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="upload-ingestion-actions sticky bottom-3 z-20 flex flex-col gap-2 rounded-2xl border border-border/70 bg-background/90 p-2.5 shadow-lg backdrop-blur-md sm:flex-row sm:items-center sm:justify-between">
             <Button variant="outline" onClick={handleClearAll} disabled={!files.buyers && !files.headers && !files.lines && !adjustmentsFile}>
               Clear All
             </Button>
@@ -606,7 +534,8 @@ export default function UploadPage() {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span>
+
+                      <span>
 	                    <Button
 	                      onClick={handleLoadData}
 	                      disabled={!canProceed || isLoading}
