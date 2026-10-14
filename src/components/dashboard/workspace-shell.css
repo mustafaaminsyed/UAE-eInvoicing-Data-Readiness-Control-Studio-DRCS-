@@ -1,0 +1,122 @@
+.workspace-control-shell {
+  background-color: #f2f7f4;
+  background-image:
+    linear-gradient(180deg, rgba(242, 248, 245, 0.83), rgba(231, 242, 236, 0.94)),
+    url('../../assets/landing/drcs-dubai-hero-background.png');
+  background-position: center top;
+  background-size: cover;
+  background-attachment: fixed;
+  --sidebar-background: 150 22% 97%;
+  --sidebar-foreground: 153 31% 92%;
+  --sidebar-primary: 145 61% 38%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 166 43% 13%;
+  --sidebar-accent-foreground: 153 31% 94%;
+  --sidebar-border: 164 28% 18%;
+  --sidebar-ring: 145 61% 44%;
+  --background: 150 22% 97%;
+  --foreground: 160 31% 12%;
+  --card: 0 0% 100%;
+  --card-foreground: 160 31% 12%;
+  --border: 152 18% 84%;
+  --muted: 150 16% 92%;
+  --muted-foreground: 156 12% 39%;
+  --primary: 145 61% 34%;
+}
+
+.dark .workspace-control-shell {
+  background-color: #061a17;
+  background-image:
+    linear-gradient(180deg, rgba(5, 40, 34, 0.82), rgba(4, 20, 18, 0.94)),
+    url('../../assets/landing/drcs-dubai-hero-background.png');
+  --sidebar-background: 166 57% 8%;
+  --background: 166 61% 7%;
+  --foreground: 153 31% 94%;
+  --card: 166 48% 10%;
+  --card-foreground: 153 31% 94%;
+  --border: 164 27% 18%;
+  --muted: 164 30% 15%;
+  --muted-foreground: 157 14% 64%;
+  --primary: 145 61% 44%;
+}
+
+:root:not(.dark) .workspace-control-shell {
+  --sidebar-background: 150 22% 97%;
+  --background: 150 22% 97%;
+  --foreground: 160 31% 12%;
+  --card: 0 0% 100%;
+  --card-foreground: 160 31% 12%;
+  --border: 152 18% 84%;
+  --muted: 150 16% 92%;
+  --muted-foreground: 156 12% 39%;
+  --primary: 145 61% 34%;
+}
+
+.workspace-control-shell [data-sidebar="sidebar"] {
+  background: #08231e;
+  color: #e8f5ef;
+}
+
+.workspace-control-shell [data-sidebar="menu-button"]:hover {
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.workspace-shell-header {
+  align-items: center;
+}
+
+.workspace-shell-page-header {
+  border: 1px solid hsl(var(--border) / 0.9);
+  background: hsl(var(--card) / 0.88);
+  box-shadow: 0 12px 28px -24px rgba(0, 0, 0, 0.24);
+}
+
+.dark .workspace-shell-page-header {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #0a2822;
+  box-shadow: 0 12px 28px -24px rgba(0, 0, 0, 0.8);
+}
+
+:root:not(.dark) .workspace-control-shell .workspace-shell-page-header {
+  border-color: #d8e5dd;
+  background: rgba(255, 255, 255, 0.9);
+  color: #173026;
+  box-shadow: 0 12px 28px -24px rgba(23, 48, 38, 0.24);
+}
+
+.workspace-shell-context {
+  letter-spacing: 0.14em;
+}
+
+.workspace-shell-badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.workspace-shell-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(143, 194, 174, 0.2);
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: hsl(var(--card) / 0.86);
+  color: hsl(var(--foreground));
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.workspace-shell-badge--muted {
+  background: hsl(var(--muted) / 0.9);
+  color: hsl(var(--muted-foreground));
+}
+
+:root:not(.dark) .workspace-control-shell .workspace-shell-badge {
+  border-color: #d8e5dd;
+  background: #f4f8f5;
+  color: #52695c;
+}

@@ -35,7 +35,7 @@ export const WORKFLOW_SECTIONS: WorkflowSection[] = [
     icon: LayoutDashboard,
     eyebrow: 'Executive overview',
     description: 'Track readiness, risk, and operational posture from a single workflow-oriented command surface.',
-    status: 'Available',
+    status: 'Portfolio view',
     primaryJob: 'Surface the highest-signal readiness indicators and drive drill-down into active work.',
     modules: ['Readiness summary', 'Recent submission activity', 'Critical blockers'],
   },
@@ -49,8 +49,8 @@ export const WORKFLOW_SECTIONS: WorkflowSection[] = [
     primaryJob: 'Give operations teams one place to intake, monitor, and triage incoming submissions.',
     modules: ['Submission queue', 'Upload health', 'Source-system handoff'],
     shortcuts: [
-      { label: 'Open Upload Workspace', path: '/upload' },
-      { label: 'Open Upload Audit', path: '/upload-audit' },
+      { label: 'Upload workspace', path: '/upload' },
+      { label: 'Upload audit', path: '/upload-audit' },
     ],
   },
   {
@@ -63,8 +63,9 @@ export const WORKFLOW_SECTIONS: WorkflowSection[] = [
     primaryJob: 'Make invoice relationships and lineage understandable before exception handling or evidence assembly.',
     modules: ['Record lineage', 'Twin inspection', 'Context side panels'],
     shortcuts: [
-      { label: 'Open Traceability', path: '/traceability' },
-      { label: 'Open AP Explorer', path: '/ap-explorer' },
+      { label: 'Field mapping', path: '/mapping' },
+      { label: 'Traceability', path: '/traceability' },
+      { label: 'AP explorer', path: '/ap-explorer' },
     ],
   },
   {
@@ -77,8 +78,9 @@ export const WORKFLOW_SECTIONS: WorkflowSection[] = [
     primaryJob: 'Guide operators from pre-run readiness to deterministic validation outputs with minimal ambiguity.',
     modules: ['Run controls', 'Rule execution states', 'Validation explainability'],
     shortcuts: [
-      { label: 'Open Run Checks', path: '/run' },
-      { label: 'Open Check Registry', path: '/check-registry' },
+      { label: 'Run checks', path: '/run' },
+      { label: 'Check registry', path: '/check-registry' },
+      { label: 'Check builder', path: '/check-builder' },
     ],
   },
   {
@@ -91,8 +93,8 @@ export const WORKFLOW_SECTIONS: WorkflowSection[] = [
     primaryJob: 'Move findings from detection to accountable workflow resolution without losing traceability.',
     modules: ['Exception queue', 'Case assignment', 'Resolution history'],
     shortcuts: [
-      { label: 'Open Cases', path: '/cases' },
-      { label: 'Open Rejections', path: '/rejections' },
+      { label: 'Cases', path: '/cases' },
+      { label: 'Rejections', path: '/rejections' },
     ],
   },
   {
@@ -104,7 +106,7 @@ export const WORKFLOW_SECTIONS: WorkflowSection[] = [
     status: 'Available',
     primaryJob: 'Turn validation and exception activity into evidence outputs that are easy to review and export.',
     modules: ['Evidence timeline', 'Control narrative', 'Export packets'],
-    shortcuts: [{ label: 'Open Evidence Pack', path: '/evidence-pack' }],
+    shortcuts: [{ label: 'Evidence pack', path: '/evidence-pack' }],
   },
   {
     label: 'Analytics',
@@ -116,7 +118,7 @@ export const WORKFLOW_SECTIONS: WorkflowSection[] = [
     placeholder: true,
     primaryJob: 'Translate workflow activity into trends that leaders can use for prioritization and governance.',
     modules: ['Trend snapshots', 'Entity risk views', 'Program performance'],
-    shortcuts: [{ label: 'Open Controls Dashboard', path: '/controls' }],
+    shortcuts: [{ label: 'Controls dashboard', path: '/controls' }],
   },
   {
     label: 'Settings',
@@ -128,12 +130,27 @@ export const WORKFLOW_SECTIONS: WorkflowSection[] = [
     placeholder: true,
     primaryJob: 'Provide a single configuration home for shell behavior, preferences, and governed workspace options.',
     modules: ['Environment settings', 'Workflow preferences', 'Access and policy'],
-    shortcuts: [{ label: 'Open Controls Dashboard', path: '/controls' }],
   },
 ];
 
 export function getWorkflowSection(pathname: string): WorkflowSection | undefined {
-  return WORKFLOW_SECTIONS.find(
+  const primarySection = WORKFLOW_SECTIONS.find(
     (section) => pathname === section.path || pathname.startsWith(`${section.path}/`)
   );
+
+  if (primarySection) return primarySection;
+
+  const shortcutSection = WORKFLOW_SECTIONS.find((section) =>
+    section.shortcuts?.some((shortcut) => shortcut.path === pathname)
+  );
+  const shortcut = shortcutSection?.shortcuts?.find((item) => item.path === pathname);
+
+  if (shortcutSection && shortcut) return { ...shortcutSection, label: shortcut.label };
+
+  if (pathname.startsWith('/invoice/')) {
+    const dataTwinSection = WORKFLOW_SECTIONS.find((section) => section.path === '/data-twin');
+    return dataTwinSection ? { ...dataTwinSection, label: 'Invoice detail' } : undefined;
+  }
+
+  return undefined;
 }

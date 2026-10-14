@@ -8,6 +8,7 @@ const mockComplianceState = {
   isChecksRun: true,
   isDataLoaded: true,
   isRunning: false,
+  runChecks: vi.fn(),
   runSummary: {
     run_id: 'run-1',
     run_mode: 'diagnostic_mapping',
@@ -86,6 +87,7 @@ const resetMockComplianceState = () => {
       isChecksRun: true,
       isDataLoaded: true,
       isRunning: false,
+      runChecks: vi.fn(),
       runSummary: {
         run_id: 'run-1',
         run_mode: 'diagnostic_mapping',
@@ -204,35 +206,28 @@ describe('DashboardPage executive surface', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText('Executive compliance view')).toBeInTheDocument();
-    expect(screen.getByText('Source-data quality and integrity')).toBeInTheDocument();
-    expect(screen.getByText('Coverage against UAE and PINT-AE obligations')).toBeInTheDocument();
-    expect(screen.getByText('Exception breakdown and remediation focus')).toBeInTheDocument();
-
-    expect(screen.getByText('Go-Live Readiness')).toBeInTheDocument();
-    expect(screen.getByText('Diagnostic run')).toBeInTheDocument();
-    expect(screen.getByText('Mapped coverage 82%')).toBeInTheDocument();
-    expect(screen.getByText('Portfolio Scope')).toBeInTheDocument();
-    expect(screen.getAllByText('Mandatory data').length).toBeGreaterThan(0);
-    expect(screen.getByText('Compliance Readiness')).toBeInTheDocument();
-    expect(screen.getByText('Submission-ready invoices')).toBeInTheDocument();
-    expect(screen.getByText('Rule pass rate')).toBeInTheDocument();
-    expect(screen.getByText('Critical blocker outcomes')).toBeInTheDocument();
-    expect(screen.getByText('Mandatory Field Completeness')).toBeInTheDocument();
-    expect(screen.getByText('Conditional Field Completeness')).toBeInTheDocument();
-    expect(screen.getByText('Currency Mismatches')).toBeInTheDocument();
-    expect(screen.getByText('IBT Mandatory Fields')).toBeInTheDocument();
-    expect(screen.getByText('Credit-Note Scenarios')).toBeInTheDocument();
-    expect(screen.getByText('Top blocking issues')).toBeInTheDocument();
-    expect(screen.getByText('Operational interpretation')).toBeInTheDocument();
-    expect(screen.getByText('Prioritise 1 recurring blocker check')).toBeInTheDocument();
-    expect(screen.getByText(/Why is the severity distribution skewed\? ↓/i)).toBeInTheDocument();
+    expect(screen.getByText('Executive command centre')).toBeInTheDocument();
+    expect(screen.getByText('UAE e-Invoicing Readiness')).toBeInTheDocument();
+    expect(screen.getAllByText('Diagnostic run').length).toBeGreaterThan(0);
+    expect(screen.getByText('DRCS readiness score')).toBeInTheDocument();
+    expect(screen.getByText('Mandatory field supply')).toBeInTheDocument();
+    expect(screen.getByText('Blocking exposure')).toBeInTheDocument();
+    expect(screen.getByText('Regulatory evaluation coverage')).toBeInTheDocument();
+    expect(screen.getByText('Mapped source fields')).toBeInTheDocument();
+    expect(screen.getByText('Fully supplied targets')).toBeInTheDocument();
+    expect(screen.getByText('Source checks matched')).toBeInTheDocument();
+    expect(screen.getByText('Documents reviewed')).toBeInTheDocument();
+    expect(screen.getByText('Readiness by control domain')).toBeInTheDocument();
+    expect(screen.getByText('Priority findings')).toBeInTheDocument();
+    expect(screen.getByText('Assessment snapshot')).toBeInTheDocument();
+    expect(screen.getByText('Exceptions by severity')).toBeInTheDocument();
+    expect(screen.getByText('Quick actions')).toBeInTheDocument();
 
     expect(screen.getAllByText('Seller Name Present').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Buyer TRN Pattern Valid').length).toBeGreaterThan(0);
   });
 
-  it('keeps KPI cards live-truthful when no live signals exist', () => {
+  it('keeps the executive dashboard visible with empty-state placeholders when no data exists', () => {
     Object.assign(mockComplianceState, {
       isChecksRun: false,
       isDataLoaded: false,
@@ -256,9 +251,33 @@ describe('DashboardPage executive surface', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText('No validated invoice portfolio is in scope yet')).toBeInTheDocument();
-    expect(screen.getByText('Data quality KPIs appear after dataset intake')).toBeInTheDocument();
-    expect(screen.getByText('UAE coverage widgets are waiting for validated documents')).toBeInTheDocument();
+    expect(screen.getByText('Readiness by control domain')).toBeInTheDocument();
+    expect(screen.getByText('Priority findings')).toBeInTheDocument();
+    expect(screen.getByText('Quick actions')).toBeInTheDocument();
+    expect(screen.getByText('Current assessment state is not yet populated.')).toBeInTheDocument();
+    expect(screen.getAllByText('Not assessed').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Not evaluated').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Start your readiness assessment')).not.toBeInTheDocument();
+  });
+
+  it('keeps uploaded but unvalidated data explicitly not evaluated', () => {
+    Object.assign(mockComplianceState, {
+      isChecksRun: false,
+      isDataLoaded: true,
+      headers: [{ invoice_id: 'inv-1', direction: 'AR' }],
+      buyers: [],
+      lines: [],
+      checkResults: [],
+      exceptions: [],
+    });
+
+    render(<MemoryRouter><DashboardPage /></MemoryRouter>);
+
+    expect(screen.getByText('Current assessment state is not yet populated.')).toBeInTheDocument();
+    expect(screen.getAllByText('Not evaluated').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: /run validation checks/i })).toBeEnabled();
+    expect(screen.queryByText('Start your readiness assessment')).not.toBeInTheDocument();
+    expect(screen.getByText('Priority findings')).toBeInTheDocument();
   });
 
   it('does not fall back to preview exception clusters when live signals exist but no exceptions are present', () => {
@@ -294,6 +313,8 @@ describe('DashboardPage executive surface', () => {
     );
 
     expect(screen.getByText('No open exception clusters are currently surfaced for this live portfolio view.')).toBeInTheDocument();
+    expect(screen.getByText('No critical blockers detected in the latest assessment.').closest('section')).toHaveClass('is-clear');
+    expect(screen.getByText('No exceptions were recorded in the latest assessment.')).toBeInTheDocument();
     expect(screen.queryByText('Seller name completeness')).not.toBeInTheDocument();
   });
 });

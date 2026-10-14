@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { Loader2 } from "lucide-react";
 import { ComplianceProvider } from "@/context/ComplianceContext";
@@ -47,13 +47,9 @@ function RouteLoadingFallback() {
 }
 
 function AppFrame() {
-  const location = useLocation();
-  const isLandingRoute = location.pathname === "/";
-
   return (
     <div className="app-shell min-h-screen relative overflow-x-clip">
       <div className="pointer-events-none absolute inset-0 app-gradient-wash" />
-      {!isLandingRoute ? <div className="pointer-events-none absolute inset-0 app-grid-veil" /> : null}
       <Navigation />
       <main className="relative z-10">
         <Suspense fallback={<RouteLoadingFallback />}>
