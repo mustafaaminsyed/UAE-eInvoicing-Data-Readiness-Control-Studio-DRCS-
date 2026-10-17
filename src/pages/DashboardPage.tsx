@@ -17,7 +17,7 @@ const domainRows = (s: DashboardSnapshot) => [
   { label: 'Mandatory fields', value: s.mandatoryCompleteness, detail: `${formatPercent(s.headerCompleteness)} header · ${formatPercent(s.lineCompleteness)} lines`, route: '/mapping' },
   { label: 'Header & buyer data', value: Math.round((s.headerCompleteness + s.buyerCompleteness) / 2), detail: `${formatPercent(s.headerCompleteness)} header · ${formatPercent(s.buyerCompleteness)} buyer`, route: '/exceptions' },
   { label: 'Conditional requirements', value: s.conditionalCompleteness, detail: 'Applicable-field completeness', route: '/traceability' },
-  { label: 'Regulatory rule coverage', value: s.pintRuleCoverage, detail: `${formatNumber(s.currencyMismatchCount)} currency mismatches`, route: '/validation' },
+  { label: 'Runtime control coverage', value: s.pintRuleCoverage, detail: `${formatNumber(s.currencyMismatchCount)} currency mismatches`, route: '/validation' },
   { label: 'Line-level data', value: s.lineCompleteness, detail: `${formatPercent(s.nullFieldRate)} overall null-field rate`, route: '/mapping' },
   { label: 'Credit-note controls', value: s.creditNoteCount ? s.creditNoteCoverage : null, detail: 'No credit notes in scope', notInScope: !s.creditNoteCount, route: '/validation' },
 ];
@@ -102,7 +102,7 @@ export default function DashboardPage() {
 
     <section className="cc-coverage-grid" aria-label="Source mapping and review metrics">
       <CoverageMetricCard
-        label="Mapped source fields"
+        label="Source-field mapping"
         value={coverageMetrics.mappedSourceFields === null
           ? `—/${coverageMetrics.totalSourceFields ?? '—'}`
           : `${coverageMetrics.mappedSourceFields}/${coverageMetrics.totalSourceFields ?? '—'}`}
@@ -111,20 +111,20 @@ export default function DashboardPage() {
           : activeMappingProfile ? 'Active mapping profile unavailable' : 'Select an active mapping profile'}
       />
       <CoverageMetricCard
-        label="Fully supplied targets"
+        label="MoF targets fully supplied"
         value={coverageMetrics.fullySuppliedTargets === null
           ? `—/${coverageMetrics.totalTargets}`
           : `${coverageMetrics.fullySuppliedTargets}/${coverageMetrics.totalTargets}`}
         detail="MoF Tax Invoice crosswalk · all source fields mapped"
       />
       <CoverageMetricCard
-        label="Source checks matched"
+        label="Runtime checks matched"
         value={coverageMetrics.matchedChecks === null
           ? '—'
           : `${coverageMetrics.matchedChecks}/${coverageMetrics.totalChecks}`}
         detail={coverageMetrics.matchedChecks === null
           ? 'Run validation to assess source checks'
-          : `${coverageMetrics.sourceGaps} gaps · ${coverageMetrics.ambiguousChecks} applicability undetermined`}
+          : `${coverageMetrics.sourceGaps} not evaluated · ${coverageMetrics.ambiguousChecks} applicability undetermined`}
       />
       <CoverageMetricCard
         label="Documents reviewed"
@@ -168,7 +168,7 @@ export default function DashboardPage() {
     <section className="cc-workflow" aria-label="Readiness workflow">{workflow.map((step, index) => <button key={step.title} type="button" className={cn('cc-workflow-step', step.complete && 'is-complete', step.active && 'is-active')} onClick={() => navigate(step.route)}><span className="cc-step-number">{step.complete ? <Check className="h-4 w-4" /> : step.number}</span><span><strong>{step.number}. {step.title}</strong><small>{step.detail}</small></span>{index < workflow.length - 1 ? <i /> : null}</button>)}</section>
 
     <section className="cc-bottom-grid">
-      <Panel title="Assessment snapshot" action="Evidence" onAction={() => navigate('/evidence-pack')}><div className="cc-signal-grid"><Signal label="Assessment status" value={emptyState ? 'Not evaluated' : 'Portfolio view'} /><Signal label="Source records" value={emptyState ? 'Unavailable' : formatNumber(snapshot.totalInvoices)} /><Signal label="Validation coverage" value={emptyState ? 'Not evaluated' : formatPercent(snapshot.evaluationCoverage)} /><Signal label="Last run" value={emptyState ? 'Awaiting data' : runModeLabel} /></div></Panel>
+      <Panel title="Assessment snapshot" action="Evidence" onAction={() => navigate('/evidence-pack')}><div className="cc-signal-grid"><Signal label="Assessment status" value={emptyState ? 'Not evaluated' : 'Portfolio view'} /><Signal label="Source records" value={emptyState ? 'Unavailable' : formatNumber(snapshot.totalInvoices)} /><Signal label="Runtime evaluation coverage" value={emptyState ? 'Not evaluated' : formatPercent(snapshot.evaluationCoverage)} /><Signal label="Last run" value={emptyState ? 'Awaiting data' : runModeLabel} /></div></Panel>
       <Panel title="Exceptions by severity" action="Exceptions" onAction={() => navigate('/exceptions')}>
         {emptyState || snapshot.exceptionsTotal === 0
           ? <p className="cc-panel-empty">{emptyState ? 'Run validation to build a severity profile.' : 'No exceptions were recorded in the latest assessment.'}</p>
