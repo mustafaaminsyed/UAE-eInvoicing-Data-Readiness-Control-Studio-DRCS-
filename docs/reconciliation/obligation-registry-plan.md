@@ -34,6 +34,7 @@ Non-goals for this increment:
 3. Phase 2A: complete. A typed, read-only regulatory obligation registry records responsibility, applicability, acquisition, implementation state, evidence and source/rule links for BTAE-07, BTAE-03, IBT-025, IBT-026, IBT-031/032, IBT-113 and BTAE-06/IBT-022.
 4. Phase 2B: complete. A pure, non-authoritative shadow engine evaluates registered obligations as applicable, not applicable or unresolved, with reason and evidence fields. It does not affect runtime validation or readiness.
 5. Phase 2C: complete. Traceability includes a read-only invoice-level obligation review with shadow decisions, responsibility, implementation state, reasons and evidence fields. It remains outside validation and readiness enforcement.
+6. Phase 2D: complete. A non-authoritative population-level comparison separates aligned execution, applicable-but-not-evaluated gaps, execution outside shadow scope, unsupported obligations and policy-review uncertainty.
 
 ## Guardrails
 
