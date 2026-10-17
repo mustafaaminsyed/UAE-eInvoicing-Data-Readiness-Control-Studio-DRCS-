@@ -18,12 +18,12 @@ official resources does not make DRCS fully PINT AE 1.0.4 compliant.
 | Item pricing (IBT-146/147/148/149) | P1.5 separates sourced net price and optional price discount, derives gross price deterministically, and preserves governed base quantity | Complete | Preserve price discount versus line allowance separation and derived-field evidence | Implemented with one optional `item_price_discount` line field |
 | Invoice note and frequency (IBT-022 / BTAE-06) | Conditional OTH note dependency is not modeled | Open | Implement conditional rule and source responsibility assessment | To be assessed; conditional |
 | Paid amount (IBT-113) | Not represented in canonical ingestion | Open | Assess conditional payment-state input and IBT-115 equation | Likely conditional |
-| Invoice UUID (BTAE-07) | Responsibility is not conclusively assigned | Regulatory verification required | Confirm taxpayer/ASP/network responsibility before implementation | Unknown; do not add yet |
+| Invoice UUID (BTAE-07) | Responsibility is classified as ASP-generated in the term-governance registry; it is not a taxpayer source-data requirement | Responsibility resolved; output implementation remains open | Preserve the ASP hand-off obligation and add output evidence when the document-generation boundary is implemented | No taxpayer ingestion field |
 | Credit Note metadata | Current reason/reference behavior differs from current specification details | Open | Reconcile BTAE-03 and preceding-invoice conditions | No change unless source prerequisite is confirmed |
 | Line/document allowances and charges | Amount support exists but complete conditional groups are not modeled | Open | Define conditional reason/base/percentage prerequisites | Likely conditional |
 | Reverse-charge current rules | Existing behavior has not completed full 1.0.4 rule regression | Open | Reconcile IBR-166 and aligned IBRP-AE rules | No expected canonical expansion without assessment |
 | Dashboard false readiness dependencies | Some UI readiness requirements overstate source obligations | Open | Remove false dependencies in a dedicated UI/readiness task | No |
-| BTUAE/BTAE terminology | Legacy BTUAE identifiers remain in mappings and UI | Open | Controlled terminology/compatibility migration | No |
+| BTUAE/BTAE terminology | Canonical BTAE aliases and compatibility normalization are implemented; legacy IDs remain in existing persisted/runtime records pending consumer migration | In progress | Migrate consumers incrementally to `canonical_dr_id`, preserving legacy lookup aliases | No |
 
 P1.4 uses the normalized grouping key `category|significant-rate`; rate-inapplicable E/O
 groups use no invented rate. RC is accepted only as an ingestion alias and is recorded as
