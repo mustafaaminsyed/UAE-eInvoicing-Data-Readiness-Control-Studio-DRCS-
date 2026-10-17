@@ -12,6 +12,8 @@ describe('DR registry ownership classification', () => {
     expect(spec?.system_default_allowed).toBe(true);
     expect(profile?.asp_derived).toBe(false);
     expect(spec?.asp_derived).toBe(false);
+    expect(profile?.responsibility).toBe('fixed_configuration');
+    expect(spec?.responsibility).toBe('fixed_configuration');
   });
 
   it('keeps true ASP-derived technical fields as asp_derived', () => {
@@ -19,6 +21,17 @@ describe('DR registry ownership classification', () => {
     expect(sellerScheme).toBeDefined();
     expect(sellerScheme?.asp_derived).toBe(true);
     expect(sellerScheme?.system_default_allowed).toBe(false);
+    expect(sellerScheme?.responsibility).toBe('asp_generated');
+  });
+
+  it('exposes canonical BTAE identity while preserving the legacy registry key', () => {
+    const transactionType = getDREntry('BTUAE-02');
+
+    expect(transactionType).toBeDefined();
+    expect(transactionType?.dr_id).toBe('BTUAE-02');
+    expect(transactionType?.canonical_dr_id).toBe('BTAE-02');
+    expect(transactionType?.legacy_dr_id_aliases).toEqual(['BTUAE-02']);
+    expect(transactionType?.responsibility).toBe('taxpayer_source');
   });
 });
 

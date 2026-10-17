@@ -4,9 +4,17 @@
 // =============================================================================
 
 import { getRegistryFields, isMandatoryField, SpecRegistryField } from '@/lib/registry/specRegistry';
+import {
+  canonicalizePintTermId,
+  classifyRegistryResponsibility,
+  getLegacyPintTermAliases,
+  RegulatoryResponsibility,
+} from '@/lib/registry/pintTermGovernance';
 
 export interface DRRegistryEntry {
   dr_id: string;
+  canonical_dr_id: string;
+  legacy_dr_id_aliases: string[];
   business_term: string;
   dataset_file: 'buyers' | 'headers' | 'lines' | null;
   internal_column_names: string[];
@@ -17,6 +25,7 @@ export interface DRRegistryEntry {
   category: string;
   vat_law_status: string;
   data_responsibility: string;
+  responsibility: RegulatoryResponsibility;
   pint_ae_reference: string; // UBL XML path or PINT-AE reference
   asp_derived: boolean;
   system_default_allowed: boolean;
@@ -129,6 +138,8 @@ export function buildDRRegistry(): DRRegistryEntry[] {
     const aspDerived = aspDerivedIds.has(field.dr_id) || (field.data_responsibility.includes('ASP') && !systemDefaultAllowed);
     return {
       dr_id: field.dr_id,
+      canonical_dr_id: canonicalizePintTermId(field.dr_id),
+      legacy_dr_id_aliases: getLegacyPintTermAliases(field.dr_id),
       business_term: field.business_term,
       dataset_file: mapping?.dataset ?? null,
       internal_column_names: mapping?.columns ?? [],
@@ -139,6 +150,10 @@ export function buildDRRegistry(): DRRegistryEntry[] {
       category: field.category,
       vat_law_status: field.vat_law_status,
       data_responsibility: field.data_responsibility,
+      responsibility: classifyRegistryResponsibility(field.data_responsibility, {
+        derived: aspDerived && !field.data_responsibility.includes('ASP'),
+        fixedConfiguration: systemDefaultAllowed,
+      }),
       pint_ae_reference: field.ubl_xml_path || '',
       asp_derived: aspDerived,
       system_default_allowed: systemDefaultAllowed,
