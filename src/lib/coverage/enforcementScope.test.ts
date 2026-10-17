@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { BTUAE_02_ENFORCEMENT_SCOPE, getEnforcementScopeProfile } from './enforcementScope';
+import { BTAE_02_ENFORCEMENT_SCOPE, BTUAE_02_ENFORCEMENT_SCOPE, getEnforcementScopeProfile } from './enforcementScope';
 
 describe('enforcement scope metadata', () => {
   it('describes only the currently established BTUAE-02 enforcement', () => {
-    expect(getEnforcementScopeProfile('BTUAE-02')).toEqual(BTUAE_02_ENFORCEMENT_SCOPE);
+    expect(getEnforcementScopeProfile('BTUAE-02')).toEqual(BTAE_02_ENFORCEMENT_SCOPE);
+    expect(getEnforcementScopeProfile('BTAE-02')).toEqual(BTAE_02_ENFORCEMENT_SCOPE);
+    expect(BTUAE_02_ENFORCEMENT_SCOPE).toBe(BTAE_02_ENFORCEMENT_SCOPE);
     expect(BTUAE_02_ENFORCEMENT_SCOPE.dimensions).toEqual({
       field: { status: 'enforced', ruleIds: ['UAE-UC1-CHK-059'] },
       structure: { status: 'enforced', ruleIds: ['UAE-UC1-CHK-060'] },

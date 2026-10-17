@@ -29,6 +29,7 @@ import { FEATURE_FLAGS } from '@/config/features';
 import { PARSER_KNOWN_COLUMNS } from '@/lib/registry/drRegistry';
 import { defaultMoFReadinessRunner } from '@/engine/runners/mof';
 import { getAffectedDRIdsForRule } from '@/lib/rules/ruleTraceability';
+import { canonicalizePintTermId } from '@/lib/registry/pintTermGovernance';
 import { analyzeCoverage } from '@/lib/mapping/coverageAnalyzer';
 import { formatElapsedTime, yieldToBrowser } from '@/lib/processingFeedback';
 import {
@@ -901,8 +902,8 @@ export default function RunChecksPage() {
                             Reference terms <span className="text-muted-foreground/80">(metadata only)</span>
                           </p>
                           <div className="flex gap-1 mt-1 flex-wrap">
-                            {check.pint_reference_terms.slice(0, 3).map((term, idx) => (
-                              <Badge key={idx} variant="secondary" className="text-xs">
+                            {Array.from(new Set(check.pint_reference_terms.map(canonicalizePintTermId))).slice(0, 3).map((term) => (
+                              <Badge key={term} variant="secondary" className="text-xs">
                                 {term}
                               </Badge>
                             ))}

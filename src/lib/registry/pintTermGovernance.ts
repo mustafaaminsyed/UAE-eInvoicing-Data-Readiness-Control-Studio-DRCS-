@@ -28,6 +28,11 @@ export function getLegacyPintTermAliases(termId: string): string[] {
   return legacy ? [legacy] : [];
 }
 
+export function getCompatiblePintTermIds(termId: string): string[] {
+  const canonical = canonicalizePintTermId(termId);
+  return [canonical, ...getLegacyPintTermAliases(canonical)];
+}
+
 export function pintTermIdsEqual(left: string, right: string): boolean {
   return canonicalizePintTermId(left) === canonicalizePintTermId(right);
 }

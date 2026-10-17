@@ -7,6 +7,7 @@ import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
 import { getValidationDRTargets } from '@/lib/registry/validationToDRMap';
 import { getShadowApplicabilityDefinitions } from '@/modules/scenarioContext/shadowApplicability';
 import { ExecutionLayer, RuleType } from '@/types/pintAE';
+import { canonicalizePintTermId, pintTermIdsEqual } from '@/lib/registry/pintTermGovernance';
 
 export interface RuleTraceEntry {
   rule_id: string;
@@ -20,14 +21,18 @@ export interface RuleTraceEntry {
   applies_when?: string;
 }
 
+function canonicalTerms(termIds: string[]): string[] {
+  return Array.from(new Set(termIds.map(canonicalizePintTermId)));
+}
+
 export function buildRuleTraceability(): RuleTraceEntry[] {
   const runtimeEntries = UAE_UC1_CHECK_PACK.map((check) => ({
     rule_id: check.check_id,
     rule_name: check.check_name,
-    affected_dr_ids: getValidationDRTargets(check.check_id).map((target) => target.dr_id),
-    referenced_dr_ids: getValidationDRTargets(check.check_id, { includeReferenceOnly: true }).map(
+    affected_dr_ids: canonicalTerms(getValidationDRTargets(check.check_id).map((target) => target.dr_id)),
+    referenced_dr_ids: canonicalTerms(getValidationDRTargets(check.check_id, { includeReferenceOnly: true }).map(
       (target) => target.dr_id
-    ),
+    )),
     rule_type: check.rule_type,
     execution_layer: check.execution_layer,
     severity: check.severity,
@@ -40,10 +45,10 @@ export function buildRuleTraceability(): RuleTraceEntry[] {
     .map((definition) => ({
       rule_id: definition.ruleId,
       rule_name: definition.title,
-      affected_dr_ids: getValidationDRTargets(definition.ruleId).map((target) => target.dr_id),
-      referenced_dr_ids: getValidationDRTargets(definition.ruleId, { includeReferenceOnly: true }).map(
+      affected_dr_ids: canonicalTerms(getValidationDRTargets(definition.ruleId).map((target) => target.dr_id)),
+      referenced_dr_ids: canonicalTerms(getValidationDRTargets(definition.ruleId, { includeReferenceOnly: true }).map(
         (target) => target.dr_id
-      ),
+      )),
       rule_type: 'dependency_rule' as RuleType,
       execution_layer: 'dependency_rule' as ExecutionLayer,
       severity: 'Critical',
@@ -60,8 +65,8 @@ export function getIndirectRuleTraceability(): RuleTraceEntry[] {
     .map((definition) => ({
       rule_id: definition.ruleId,
       rule_name: definition.title,
-      affected_dr_ids: definition.linkedDrIds,
-      referenced_dr_ids: definition.linkedDrIds,
+      affected_dr_ids: canonicalTerms(definition.linkedDrIds),
+      referenced_dr_ids: canonicalTerms(definition.linkedDrIds),
       rule_type: 'dependency_rule' as RuleType,
       execution_layer: 'dependency_rule' as ExecutionLayer,
       severity: 'Critical',
@@ -90,11 +95,11 @@ export function getReferencedDRIdsForRule(ruleId: string): string[] {
 }
 
 export function getRulesForDR(drId: string): RuleTraceEntry[] {
-  return getRuleTraceability().filter((rule) => rule.affected_dr_ids.includes(drId));
+  return getRuleTraceability().filter((rule) => rule.affected_dr_ids.some((id) => pintTermIdsEqual(id, drId)));
 }
 
 export function getIndirectRulesForDR(drId: string): RuleTraceEntry[] {
-  return getIndirectRuleTraceability().filter((rule) => rule.affected_dr_ids.includes(drId));
+  return getIndirectRuleTraceability().filter((rule) => rule.affected_dr_ids.some((id) => pintTermIdsEqual(id, drId)));
 }
 
 export function getDRsWithRules(): Set<string> {
@@ -105,5 +110,5 @@ export function getDRsWithRules(): Set<string> {
 
 export function getDRsWithoutRules(allDrIds: string[]): string[] {
   const withRules = getDRsWithRules();
-  return allDrIds.filter((id) => !withRules.has(id));
+  return allDrIds.filter((id) => !Array.from(withRules).some((coveredId) => pintTermIdsEqual(coveredId, id)));
 }
