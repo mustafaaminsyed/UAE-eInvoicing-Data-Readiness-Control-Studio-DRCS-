@@ -30,6 +30,8 @@ describe('ObligationApplicabilityPanel', () => {
     expect(screen.getByText('Shadow · non-authoritative')).toBeInTheDocument();
     expect(screen.getAllByRole('row')).toHaveLength(10); // one header row plus nine obligations
     expect(screen.getByText(/do not affect validation, readiness, or upload blocking/i)).toBeInTheDocument();
+    expect(screen.getByText('Shadow/runtime comparison')).toBeInTheDocument();
+    expect(screen.getByText(/Runtime evidence is aggregated by rule/i)).toBeInTheDocument();
   });
 
   it('recomputes decisions when the reviewer changes invoice context', () => {

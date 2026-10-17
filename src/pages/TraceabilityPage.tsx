@@ -232,7 +232,7 @@ function DatasetBadge({ dataset }: { dataset: string | null }) {
 }
 
 export default function TraceabilityPage() {
-  const { buyers, headers, lines, isDataLoaded, pintAEExceptions } = useCompliance();
+  const { buyers, headers, lines, isDataLoaded, pintAEExceptions, validationExecutions } = useCompliance();
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
@@ -566,8 +566,10 @@ export default function TraceabilityPage() {
           <div className="mb-6 animate-slide-up">
             <ObligationApplicabilityPanel
               invoices={scenarioInvoicesInSelection}
+              comparisonInvoices={scenarioInvoices}
               buyers={buyers}
               preferredInvoiceId={twinInvoice}
+              validationExecutions={validationExecutions}
             />
           </div>
         )}

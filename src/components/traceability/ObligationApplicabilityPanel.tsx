@@ -8,14 +8,21 @@ import {
   type ObligationImplementationState,
 } from '@/lib/registry/regulatoryObligationRegistry';
 import { buildObligationApplicabilityReport } from '@/modules/scenarioContext/obligationApplicability';
+import {
+  buildObligationRuntimeComparison,
+  type ObligationRuntimeComparisonStatus,
+} from '@/modules/scenarioContext/obligationRuntimeComparison';
 import type { ScenarioLensInvoice } from '@/modules/scenarioLens/types';
 import type { Buyer } from '@/types/compliance';
+import type { ValidationExecutionEvidence } from '@/types/validationExecution';
 import { cn } from '@/lib/utils';
 
 interface ObligationApplicabilityPanelProps {
   invoices: ScenarioLensInvoice[];
   buyers: Buyer[];
   preferredInvoiceId?: string | null;
+  comparisonInvoices?: ScenarioLensInvoice[];
+  validationExecutions?: ValidationExecutionEvidence[];
 }
 
 const STATE_STYLE = {
@@ -35,6 +42,8 @@ export function ObligationApplicabilityPanel({
   invoices,
   buyers,
   preferredInvoiceId,
+  comparisonInvoices = invoices,
+  validationExecutions = [],
 }: ObligationApplicabilityPanelProps) {
   const initialInvoiceId = preferredInvoiceId && invoices.some((invoice) => invoice.invoiceId === preferredInvoiceId)
     ? preferredInvoiceId
@@ -68,6 +77,17 @@ export function ObligationApplicabilityPanel({
   const obligationById = useMemo(
     () => new Map(getRegulatoryObligations().map((entry) => [entry.termId, entry])),
     []
+  );
+  const runtimeComparison = useMemo(
+    () => buildObligationRuntimeComparison(
+      comparisonInvoices.map((invoice) => ({
+        header: invoice.header,
+        lines: invoice.lines,
+        buyer: buyers.find((candidate) => candidate.buyer_id === invoice.buyerId) ?? null,
+      })),
+      validationExecutions
+    ),
+    [buyers, comparisonInvoices, validationExecutions]
   );
 
   return (
@@ -158,6 +178,35 @@ export function ObligationApplicabilityPanel({
                 </tbody>
               </table>
             </div>
+            <div className="space-y-3 rounded-lg border bg-muted/10 p-4" data-testid="runtime-comparison">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Shadow/runtime comparison</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Population-level comparison across {runtimeComparison.invoiceCount} loaded invoice(s). Runtime evidence is aggregated by rule, so this does not assert invoice-level causality.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {(Object.entries(runtimeComparison.summary) as Array<[ObligationRuntimeComparisonStatus, number]>).map(([status, count]) => (
+                  <Badge key={status} variant="outline" className={cn('text-xs', comparisonClass(status))}>
+                    {comparisonLabel(status)}: {count}
+                  </Badge>
+                ))}
+              </div>
+              <div className="space-y-2">
+                {runtimeComparison.rows.filter((row) => row.status !== 'aligned').map((row) => (
+                  <div key={row.termId} className="flex flex-col gap-1 rounded-md border bg-background p-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <span className="font-semibold text-foreground">{row.termId}</span>
+                      <span className="ml-2 text-muted-foreground">{row.businessTerm}</span>
+                      <p className="mt-1 text-muted-foreground">{row.reason}</p>
+                    </div>
+                    <Badge variant="outline" className={cn('w-fit whitespace-nowrap', comparisonClass(row.status))}>
+                      {comparisonLabel(row.status)}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
           </>
         )}
       </CardContent>
@@ -177,4 +226,21 @@ function Summary({ label, value, className }: { label: string; value: number; cl
 function formatToken(value?: string): string {
   if (!value) return 'Unknown';
   return value.split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+}
+
+function comparisonLabel(status: ObligationRuntimeComparisonStatus): string {
+  const labels: Record<ObligationRuntimeComparisonStatus, string> = {
+    aligned: 'Aligned',
+    applicable_not_evaluated: 'Applicable · not evaluated',
+    not_applicable_but_evaluated: 'Outside shadow scope · evaluated',
+    unsupported: 'No runtime rule',
+    policy_review: 'Policy review',
+  };
+  return labels[status];
+}
+
+function comparisonClass(status: ObligationRuntimeComparisonStatus): string {
+  if (status === 'aligned') return 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700';
+  if (status === 'policy_review') return 'border-blue-500/25 bg-blue-500/10 text-blue-700';
+  return 'border-amber-500/25 bg-amber-500/10 text-amber-700';
 }
