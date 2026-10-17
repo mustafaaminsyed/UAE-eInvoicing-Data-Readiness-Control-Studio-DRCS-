@@ -17,6 +17,7 @@ import { computeAllDatasetPopulations } from '@/lib/coverage/populationCoverage'
 import { CONFORMANCE_CONFIG } from '@/config/conformance';
 import { DrillDownDialog } from '@/components/traceability/DrillDownDialog';
 import { ScenarioLensPanel } from '@/components/traceability/ScenarioLensPanel';
+import { ObligationApplicabilityPanel } from '@/components/traceability/ObligationApplicabilityPanel';
 import { WorkflowNavigator, buildWorkflowItems } from '@/components/shared/WorkflowNavigator';
 import { WorkflowPageHeader } from '@/components/shared/WorkflowPageHeader';
 import { exportTraceabilityReport } from '@/lib/coverage/regulatoryExport';
@@ -557,6 +558,16 @@ export default function TraceabilityPage() {
               showConfidenceFilter={showScenarioConfidenceFilter}
               onFilterChange={handleScenarioFilterChange}
               onResetFilters={resetScenarioFilters}
+            />
+          </div>
+        )}
+
+        {FEATURE_FLAGS.scenarioLens && (
+          <div className="mb-6 animate-slide-up">
+            <ObligationApplicabilityPanel
+              invoices={scenarioInvoicesInSelection}
+              buyers={buyers}
+              preferredInvoiceId={twinInvoice}
             />
           </div>
         )}
