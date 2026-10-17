@@ -18,6 +18,7 @@ import {
   countRuntimeCodelistDomains,
 } from "@/lib/pintAE/codelistGovernanceSummary";
 import { getAffectedDRIdsForRule } from "@/lib/rules/ruleTraceability";
+import { canonicalizePintTermId } from "@/lib/registry/pintTermGovernance";
 
 type RegistrySource = "Built-in" | "UAE UC1" | "Custom";
 
@@ -248,7 +249,7 @@ function normalizeRows(customChecks: CustomCheckConfig[]): RegistryRow[] {
     suggestedFix: check.suggested_fix,
     evidenceRequired: check.evidence_required,
     authoritativeMappings: getAffectedDRIdsForRule(check.check_id),
-    references: check.pint_reference_terms ?? [],
+    references: Array.from(new Set((check.pint_reference_terms ?? []).map(canonicalizePintTermId))),
     enabled: check.is_enabled,
     passExample: check.pass_condition ?? "Invoice data passes the expected condition.",
     failExample: check.fail_condition ?? "Invoice data fails the expected condition.",

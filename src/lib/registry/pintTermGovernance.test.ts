@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   canonicalizePintTermId,
   classifyRegistryResponsibility,
+  getCompatiblePintTermIds,
   getLegacyPintTermAliases,
   getResponsibilityProfile,
   pintTermIdsEqual,
@@ -21,6 +22,7 @@ describe('PINT term governance', () => {
   it('supports legacy identifiers without making them canonical', () => {
     expect(getLegacyPintTermAliases('BTAE-02')).toEqual(['BTUAE-02']);
     expect(pintTermIdsEqual('BTUAE-02', 'BTAE-02')).toBe(true);
+    expect(getCompatiblePintTermIds('BTUAE-02')).toEqual(['BTAE-02', 'BTUAE-02']);
   });
 
   it('classifies BTAE-07 as an ASP-generated output rather than taxpayer source data', () => {

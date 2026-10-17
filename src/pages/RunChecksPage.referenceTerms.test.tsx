@@ -143,6 +143,7 @@ describe('RunChecksPage reference-term labeling', () => {
     expect(screen.getByText('Structural Rule')).toBeInTheDocument();
     expect(screen.getByText('Schema')).toBeInTheDocument();
     expect(screen.getAllByText('IBT-003').length).toBeGreaterThan(0);
-    expect(screen.getByText('BTUAE-02')).toBeInTheDocument();
+    expect(screen.getByText('BTAE-02')).toBeInTheDocument();
+    expect(screen.queryByText('BTUAE-02')).not.toBeInTheDocument();
   });
 });

@@ -4,6 +4,7 @@
 // =============================================================================
 
 import { getRuleTraceability, RuleTraceEntry } from '@/lib/rules/ruleTraceability';
+import { pintTermIdsEqual } from '@/lib/registry/pintTermGovernance';
 
 export type ControlType = 'preventive' | 'detective';
 
@@ -202,7 +203,7 @@ export function getControlsRegistry(): ControlEntry[] {
 
 /** Get all controls that cover a given DR ID */
 export function getControlsForDR(drId: string): ControlEntry[] {
-  return getControlsRegistry().filter(c => c.covered_dr_ids.includes(drId));
+  return getControlsRegistry().filter(c => c.covered_dr_ids.some((id) => pintTermIdsEqual(id, drId)));
 }
 
 /** Get all controls that cover a given rule ID */

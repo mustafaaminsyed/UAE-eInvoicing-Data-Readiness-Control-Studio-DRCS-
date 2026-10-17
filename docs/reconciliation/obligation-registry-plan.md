@@ -29,7 +29,7 @@ Non-goals for this increment:
 
 ## Next increments
 
-1. Phase 1B: migrate read-only traceability and coverage consumers to canonical IDs while retaining legacy lookup.
+1. Phase 1B: complete. Read-only traceability, coverage, check-registry and run-check surfaces use canonical IDs while retaining legacy lookup and historical aggregation.
 2. Phase 1C: separate MoF source coverage, runtime control coverage, and unsupported-applicable coverage labels.
 3. Phase 2A: introduce the typed regulatory obligation registry, seeded with BTAE-07, BTAE-03, IBT-025, IBT-026, IBT-031/032, IBT-113 and BTAE-06/IBT-022.
 4. Phase 2B: add a pure scenario applicability/scope engine.
