@@ -59,6 +59,10 @@ export interface GapsSummary {
   drsWithNoRules: number;
   drsWithNoControls: number;
   drsCovered: number;
+  /** Registry terms with no direct or indirect runtime rule. This does not infer scenario applicability. */
+  notEvaluatedByDcs: number;
+  /** Registry terms backed by a direct rule and linked control. */
+  runtimeControlled: number;
   totalDRs: number;
   mandatoryDRs: number;
   populationThreshold: number;
@@ -173,6 +177,8 @@ export function computeTraceabilityMatrix(
       drsWithNoRules,
       drsWithNoControls,
       drsCovered,
+      notEvaluatedByDcs: drsWithNoRules,
+      runtimeControlled: drsCovered,
       totalDRs: registry.length,
       mandatoryDRs,
       populationThreshold: CONFORMANCE_CONFIG.populationWarningThreshold,

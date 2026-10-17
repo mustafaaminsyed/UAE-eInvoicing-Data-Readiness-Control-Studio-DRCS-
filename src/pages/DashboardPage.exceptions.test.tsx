@@ -213,9 +213,9 @@ describe('DashboardPage executive surface', () => {
     expect(screen.getByText('Mandatory field supply')).toBeInTheDocument();
     expect(screen.getByText('Blocking exposure')).toBeInTheDocument();
     expect(screen.getByText('Regulatory evaluation coverage')).toBeInTheDocument();
-    expect(screen.getByText('Mapped source fields')).toBeInTheDocument();
-    expect(screen.getByText('Fully supplied targets')).toBeInTheDocument();
-    expect(screen.getByText('Source checks matched')).toBeInTheDocument();
+    expect(screen.getByText('Source-field mapping')).toBeInTheDocument();
+    expect(screen.getByText('MoF targets fully supplied')).toBeInTheDocument();
+    expect(screen.getByText('Runtime checks matched')).toBeInTheDocument();
     expect(screen.getByText('Documents reviewed')).toBeInTheDocument();
     expect(screen.getByText('Readiness by control domain')).toBeInTheDocument();
     expect(screen.getByText('Priority findings')).toBeInTheDocument();

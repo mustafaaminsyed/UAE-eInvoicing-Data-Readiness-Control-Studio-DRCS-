@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { cn } from '@/lib/utils';
 import { useCompliance } from '@/context/ComplianceContext';
 import { computeTraceabilityMatrix, TraceabilityRow, GapsSummary, CoverageStatus } from '@/lib/coverage/conformanceEngine';
+import { COVERAGE_DIMENSIONS, COVERAGE_STATUS_LABELS } from '@/lib/coverage/coverageSemantics';
 import { computeAllDatasetPopulations } from '@/lib/coverage/populationCoverage';
 import { CONFORMANCE_CONFIG } from '@/config/conformance';
 import { DrillDownDialog } from '@/components/traceability/DrillDownDialog';
@@ -128,11 +129,11 @@ function readOption<T extends readonly string[]>(
 
 function CoverageStatusBadge({ status }: { status: CoverageStatus }) {
   const config: Record<CoverageStatus, { label: string; cls: string }> = {
-    COVERED: { label: 'Covered', cls: 'bg-[hsl(var(--success))]/10 text-[hsl(var(--success))] border-[hsl(var(--success))]/20' },
-    INDIRECT_RULE: { label: 'Indirect Rule', cls: 'bg-primary/10 text-primary border-primary/20' },
-    NO_CONTROL: { label: 'No Control', cls: 'bg-accent/10 text-accent-foreground border-accent/20' },
-    NO_RULE: { label: 'No Rule', cls: 'bg-destructive/10 text-destructive border-destructive/20' },
-    NOT_IN_TEMPLATE: { label: 'Not in Template', cls: 'bg-muted text-muted-foreground border-muted-foreground/20' },
+    COVERED: { label: COVERAGE_STATUS_LABELS.COVERED, cls: 'bg-[hsl(var(--success))]/10 text-[hsl(var(--success))] border-[hsl(var(--success))]/20' },
+    INDIRECT_RULE: { label: COVERAGE_STATUS_LABELS.INDIRECT_RULE, cls: 'bg-primary/10 text-primary border-primary/20' },
+    NO_CONTROL: { label: COVERAGE_STATUS_LABELS.NO_CONTROL, cls: 'bg-accent/10 text-accent-foreground border-accent/20' },
+    NO_RULE: { label: COVERAGE_STATUS_LABELS.NO_RULE, cls: 'bg-destructive/10 text-destructive border-destructive/20' },
+    NOT_IN_TEMPLATE: { label: COVERAGE_STATUS_LABELS.NOT_IN_TEMPLATE, cls: 'bg-muted text-muted-foreground border-muted-foreground/20' },
   };
   const c = config[status];
   return <Badge variant="outline" className={cn('text-xs', c.cls)}>{c.label}</Badge>;
@@ -141,7 +142,7 @@ function CoverageStatusBadge({ status }: { status: CoverageStatus }) {
 function GapsPanel({ gaps, specVersion }: { gaps: GapsSummary; specVersion: string }) {
   const cards = [
     {
-      label: 'Not in Templates',
+      label: 'Mandatory source unavailable',
       value: gaps.mandatoryNotInTemplate,
       total: gaps.mandatoryDRs,
       icon: XCircle,
@@ -149,15 +150,15 @@ function GapsPanel({ gaps, specVersion }: { gaps: GapsSummary; specVersion: stri
       bg: gaps.mandatoryNotInTemplate > 0 ? 'bg-destructive/10' : 'bg-[hsl(var(--success))]/10',
     },
     {
-      label: 'No Rules',
-      value: gaps.drsWithNoRules,
+      label: 'Not evaluated by DCS',
+      value: gaps.notEvaluatedByDcs,
       total: gaps.totalDRs,
       icon: Database,
       color: gaps.drsWithNoRules > 0 ? 'text-accent-foreground' : 'text-[hsl(var(--success))]',
       bg: gaps.drsWithNoRules > 0 ? 'bg-accent/10' : 'bg-[hsl(var(--success))]/10',
     },
     {
-      label: 'No Controls',
+      label: 'Rules without controls',
       value: gaps.drsWithNoControls,
       total: gaps.totalDRs,
       icon: Lock,
@@ -165,8 +166,8 @@ function GapsPanel({ gaps, specVersion }: { gaps: GapsSummary; specVersion: stri
       bg: gaps.drsWithNoControls > 0 ? 'bg-accent/10' : 'bg-[hsl(var(--success))]/10',
     },
     {
-      label: 'Fully Covered',
-      value: gaps.drsCovered,
+      label: 'Runtime controlled',
+      value: gaps.runtimeControlled,
       total: gaps.totalDRs,
       icon: CheckCircle2,
       color: 'text-[hsl(var(--success))]',
@@ -185,7 +186,7 @@ function GapsPanel({ gaps, specVersion }: { gaps: GapsSummary; specVersion: stri
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-foreground">Coverage Gaps</h2>
+        <h2 className="text-lg font-semibold text-foreground">Runtime control coverage</h2>
         <Badge variant="outline" className="text-xs">{specVersion}</Badge>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -457,10 +458,10 @@ export default function TraceabilityPage() {
     { key: 'mandatory', label: 'Mandatory', count: rows.filter(r => r.mandatory).length },
     { key: 'pint-new', label: 'PINT New', count: rows.filter(r => r.isNewPintField).length },
     { key: 'pint-legacy', label: 'PINT Legacy', count: rows.filter(r => !r.isNewPintField).length },
-    { key: 'covered', label: 'Covered', count: rows.filter(r => r.coverageStatus === 'COVERED').length },
+    { key: 'covered', label: 'Runtime controlled', count: rows.filter(r => r.coverageStatus === 'COVERED').length },
     { key: 'unmapped', label: 'Not in Template', count: rows.filter(r => !r.inTemplate).length },
-    { key: 'no-rules', label: 'No Rules', count: rows.filter(r => r.coverageStatus === 'NO_RULE').length },
-    { key: 'no-controls', label: 'No Controls', count: rows.filter(r => r.controlIds.length === 0).length },
+    { key: 'no-rules', label: 'Not evaluated', count: rows.filter(r => r.coverageStatus === 'NO_RULE').length },
+    { key: 'no-controls', label: 'Without controls', count: rows.filter(r => r.controlIds.length === 0).length },
     { key: 'low-population', label: 'Low Pop.', count: rows.filter(r => r.populationPct !== null && r.populationPct < CONFORMANCE_CONFIG.populationWarningThreshold).length },
   ];
 
@@ -488,8 +489,8 @@ export default function TraceabilityPage() {
     <div className="min-h-[calc(100vh-4rem)] bg-background">
       <div className="container py-8 max-w-7xl">
         <WorkflowPageHeader
-          title="DR Coverage & Traceability"
-          description="Full regulatory traceability: UAE DR -> templates -> validation rules -> controls -> exceptions"
+          title="PINT Runtime Coverage & Traceability"
+          description="Implementation traceability: UAE terms -> source templates -> runtime rules -> controls -> exceptions"
           icon={<Shield className="h-7 w-7" />}
           align="center"
           className="mb-6 animate-fade-in"
@@ -512,9 +513,9 @@ export default function TraceabilityPage() {
           <CardContent className="p-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
-                <h2 className="text-sm font-semibold text-foreground">Coverage Basis</h2>
+                <h2 className="text-sm font-semibold text-foreground">Coverage meanings</h2>
                 <p className="text-xs text-muted-foreground mt-1 max-w-3xl">
-                  DR coverage and exception attribution now come from explicit validation-to-DR mappings. Reference terms shown elsewhere are diagnostic context only and do not determine covered status.
+                  <strong>{COVERAGE_DIMENSIONS.source.label}</strong> measures source-to-crosswalk supply. <strong>{COVERAGE_DIMENSIONS.runtime.label}</strong> measures implemented rules and controls. <strong>{COVERAGE_DIMENSIONS.unsupported.label}</strong> identifies implementation gaps only; it does not assert that a term applies to every invoice.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -692,7 +693,7 @@ export default function TraceabilityPage() {
                     colSpan={showScenarioApplicabilityColumn ? 5 : 4}
                     className="h-9 px-4 text-left align-middle text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
                   >
-                    Coverage & Controls
+                    Runtime Coverage & Controls
                   </th>
                 </tr>
                 <tr className="border-b bg-card">
@@ -713,7 +714,7 @@ export default function TraceabilityPage() {
                       Scenario Applicability
                     </th>
                   )}
-                  <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground whitespace-nowrap">Coverage</th>
+                  <th className="h-12 px-4 text-center align-middle text-xs font-medium text-muted-foreground whitespace-nowrap">Runtime status</th>
                 </tr>
               </thead>
               <tbody className="[&_tr:last-child]:border-0">
