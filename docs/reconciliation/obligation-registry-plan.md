@@ -31,7 +31,7 @@ Non-goals for this increment:
 
 1. Phase 1B: complete. Read-only traceability, coverage, check-registry and run-check surfaces use canonical IDs while retaining legacy lookup and historical aggregation.
 2. Phase 1C: complete. Product labels now separate MoF source supply, runtime control implementation, and terms not evaluated by DCS. Missing rules are not presented as proof of universal applicability.
-3. Phase 2A: introduce the typed regulatory obligation registry, seeded with BTAE-07, BTAE-03, IBT-025, IBT-026, IBT-031/032, IBT-113 and BTAE-06/IBT-022.
+3. Phase 2A: complete. A typed, read-only regulatory obligation registry records responsibility, applicability, acquisition, implementation state, evidence and source/rule links for BTAE-07, BTAE-03, IBT-025, IBT-026, IBT-031/032, IBT-113 and BTAE-06/IBT-022.
 4. Phase 2B: add a pure scenario applicability/scope engine.
 
 ## Guardrails
