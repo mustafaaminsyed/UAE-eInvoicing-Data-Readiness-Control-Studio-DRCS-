@@ -67,11 +67,11 @@ describe("TraceabilityPage", () => {
       </MemoryRouter>
     );
 
-	    expect(await screen.findByText("DR Coverage & Traceability")).toBeInTheDocument();
-	    expect(await screen.findByText("Coverage Basis")).toBeInTheDocument();
+	    expect(await screen.findByText("PINT Runtime Coverage & Traceability")).toBeInTheDocument();
+	    expect(await screen.findByText("Coverage meanings")).toBeInTheDocument();
 	    expect(screen.getAllByText("Requirement").length).toBeGreaterThan(0);
 	    expect(screen.getByText("Source Mapping")).toBeInTheDocument();
-	    expect(screen.getByText("Coverage & Controls")).toBeInTheDocument();
+	    expect(screen.getByText("Runtime Coverage & Controls")).toBeInTheDocument();
 	    expect(screen.getByText("PINT Status")).toBeInTheDocument();
 	    expect(screen.getByText("Source Field(s)")).toBeInTheDocument();
 	    expect(screen.getByText("In Template")).toBeInTheDocument();

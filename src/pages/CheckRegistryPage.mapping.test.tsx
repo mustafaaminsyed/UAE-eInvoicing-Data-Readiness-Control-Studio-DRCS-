@@ -22,6 +22,7 @@ describe('CheckRegistryPage DR linkage display', () => {
       within(card).getByText('Metadata only. These terms do not determine runtime DR coverage.')
     ).toBeInTheDocument();
     expect(within(card).getAllByText('IBT-003').length).toBeGreaterThan(0);
-    expect(within(card).getByText('BTUAE-02')).toBeInTheDocument();
+    expect(within(card).getByText('BTAE-02')).toBeInTheDocument();
+    expect(within(card).queryByText('BTUAE-02')).not.toBeInTheDocument();
   });
 });

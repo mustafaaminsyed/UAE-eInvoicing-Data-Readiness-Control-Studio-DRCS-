@@ -8,6 +8,7 @@ import { getIndirectRulesForDR, getRulesForDR, getRuleTraceability } from '@/lib
 import { getControlsForDR } from '@/lib/registry/controlsRegistry';
 import { DatasetPopulation, getColumnPopulationPct } from '@/lib/coverage/populationCoverage';
 import { CONFORMANCE_CONFIG } from '@/config/conformance';
+import { getCompatiblePintTermIds } from '@/lib/registry/pintTermGovernance';
 
 // Part G: Coverage Classification
 export type CoverageStatus = 'NOT_IN_TEMPLATE' | 'NO_RULE' | 'INDIRECT_RULE' | 'NO_CONTROL' | 'COVERED';
@@ -58,6 +59,10 @@ export interface GapsSummary {
   drsWithNoRules: number;
   drsWithNoControls: number;
   drsCovered: number;
+  /** Registry terms with no direct or indirect runtime rule. This does not infer scenario applicability. */
+  notEvaluatedByDcs: number;
+  /** Registry terms backed by a direct rule and linked control. */
+  runtimeControlled: number;
   totalDRs: number;
   mandatoryDRs: number;
   populationThreshold: number;
@@ -108,8 +113,11 @@ export function computeTraceabilityMatrix(
     let lastRunPassRate: number | null = null;
     let exceptionCount = 0;
     if (exceptionCountsByDR) {
-      const counts = exceptionCountsByDR.get(entry.dr_id);
-      if (counts) {
+      const counts = getCompatiblePintTermIds(entry.canonical_dr_id)
+        .map((id) => exceptionCountsByDR.get(id))
+        .filter((value): value is { pass: number; fail: number } => value !== undefined)
+        .reduce((total, value) => ({ pass: total.pass + value.pass, fail: total.fail + value.fail }), { pass: 0, fail: 0 });
+      if (counts.pass > 0 || counts.fail > 0) {
         const total = counts.pass + counts.fail;
         lastRunPassRate = total > 0 ? (counts.pass / total) * 100 : 100;
         exceptionCount = counts.fail;
@@ -132,7 +140,7 @@ export function computeTraceabilityMatrix(
     if (coverageStatus === 'COVERED') drsCovered++;
 
     return {
-      dr_id: entry.dr_id,
+      dr_id: entry.canonical_dr_id,
       business_term: entry.business_term,
       mandatory: entry.mandatory_for_default_use_case,
       vatLawStatus: entry.vat_law_status,
@@ -169,6 +177,8 @@ export function computeTraceabilityMatrix(
       drsWithNoRules,
       drsWithNoControls,
       drsCovered,
+      notEvaluatedByDcs: drsWithNoRules,
+      runtimeControlled: drsCovered,
       totalDRs: registry.length,
       mandatoryDRs,
       populationThreshold: CONFORMANCE_CONFIG.populationWarningThreshold,
