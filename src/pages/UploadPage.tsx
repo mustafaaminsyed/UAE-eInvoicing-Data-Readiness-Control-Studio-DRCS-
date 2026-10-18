@@ -18,12 +18,12 @@ import { formatElapsedTime, yieldToBrowser } from '@/lib/processingFeedback';
 import { WORKFLOW_MICRO_BADGE_CLASS } from '@/lib/workflowShellStyles';
 import '@/components/upload/upload-ingestion.css';
 
-type StepKey = 'upload' | 'validation' | 'mapping';
+type StepKey = 'upload' | 'validation' | 'run';
 
 const STEPS: { key: StepKey; label: string }[] = [
   { key: 'upload', label: 'Upload' },
   { key: 'validation', label: 'Structural Validation' },
-  { key: 'mapping', label: 'Mapping' },
+  { key: 'run', label: 'Run Checks' },
 ];
 
 interface RelationalCheck {
@@ -94,7 +94,7 @@ export default function UploadPage() {
   // Determine current step
   let currentStep: StepKey = 'upload';
   if (allFilesSelected && allStats) {
-    currentStep = canProceed ? 'mapping' : 'validation';
+    currentStep = canProceed ? 'run' : 'validation';
   }
 
   // Analyze file on upload
@@ -302,7 +302,7 @@ export default function UploadPage() {
             {STEPS.map((step, index) => {
               const active = step.key === currentStep;
               const complete = STEPS.findIndex((item) => item.key === currentStep) > index;
-              return <li key={step.key} className={cn('upload-ingestion-step', active && 'is-active', complete && 'is-complete')}>
+              return <li key={step.key} aria-current={active ? 'step' : undefined} className={cn('upload-ingestion-step', active && 'is-active', complete && 'is-complete')}>
                 <span>{complete ? <CheckCircle2 className="h-3.5 w-3.5" /> : index + 1}</span>{step.label}
               </li>;
             })}
@@ -373,11 +373,20 @@ export default function UploadPage() {
           {/* File Cards */}
           <section className="upload-ingestion-panel surface-glass rounded-2xl border border-white/70 p-3.5 shadow-sm md:p-4" aria-label="Upload source files">
             <div className="upload-ingestion-files-heading mb-3 flex flex-wrap items-center justify-between gap-3">
-              <div><h2 className="text-sm font-semibold text-foreground">Source files</h2><p className="text-xs text-muted-foreground">CSV format · Select one file for each required dataset.</p></div>
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">Canonical DRCS CSV templates</h2>
+                <p className="text-xs text-muted-foreground">Select one canonical CSV template for each required dataset.</p>
+              </div>
               <div className="flex items-center gap-2 rounded-full border bg-background/75 px-3 py-1.5 text-xs text-muted-foreground" role="status">
                 <span className={cn('h-2 w-2 rounded-full', validFileCount === 3 ? 'bg-[hsl(var(--success))]' : 'bg-amber-500')} />
                 <span><strong className="text-foreground">{validFileCount}/3</strong> valid</span><span className="text-border">·</span><span>{selectedFileCount}/3 selected</span>
               </div>
+            </div>
+            <div className="mb-3 flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
+              <span>Using non-canonical ERP/source extracts, aliased columns, or a combined export?</span>
+              <Button variant="link" className="h-auto p-0 text-xs" onClick={() => navigate('/mapping?tab=create')}>
+                Open Mapping Studio first
+              </Button>
             </div>
             <div className="upload-ingestion-file-grid grid gap-3 xl:grid-cols-3">
               {/* Buyers */}
@@ -492,8 +501,8 @@ export default function UploadPage() {
             <div className="flex items-start gap-2 rounded-lg border border-[hsl(var(--success))]/20 bg-[hsl(var(--success))]/5 p-4 text-sm">
               <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--success))]" />
               <span className="font-medium text-[hsl(var(--success))]">
-                All files uploaded and validated for {datasetType === 'AR' ? 'AR (Outbound)' : 'AP (Inbound)'}.
-                Ready to proceed.
+                All canonical files are structurally validated for {datasetType === 'AR' ? 'AR (Outbound)' : 'AP (Inbound)'}.
+                Mapping is unnecessary for these already-canonical files. Next: Run Checks.
               </span>
             </div>
           )}
@@ -542,7 +551,7 @@ export default function UploadPage() {
 	                      size="lg"
 	                      className="w-full gap-2 sm:w-auto"
 	                    >
-                      {isLoading ? `Processing data... ${loadElapsedLabel}` : 'Load Data & Continue'}
+                      {isLoading ? `Processing data... ${loadElapsedLabel}` : 'Load Data & Continue to Run Checks'}
                       <ArrowRight className="w-4 h-4" />
                     </Button>
                   </span>

@@ -110,7 +110,11 @@ describe('UploadPage processing feedback', () => {
     fireEvent.change(screen.getByLabelText('Invoice Headers File CSV upload'), { target: { files: [headersFile] } });
     fireEvent.change(screen.getByLabelText('Invoice Lines File CSV upload'), { target: { files: [linesFile] } });
 
-    const loadButton = await screen.findByRole('button', { name: 'Load Data & Continue' });
+    const loadButton = await screen.findByRole('button', { name: 'Load Data & Continue to Run Checks' });
+    const runChecksStep = screen.getByText('Run Checks').closest('li');
+    expect(runChecksStep).toHaveAttribute('aria-current', 'step');
+    expect(runChecksStep).not.toHaveClass('is-complete');
+    expect(screen.getByText(/Mapping is unnecessary for these already-canonical files/i)).toBeInTheDocument();
     fireEvent.click(loadButton);
 
     expect(screen.getByText('Processing uploaded datasets')).toBeInTheDocument();
@@ -157,7 +161,7 @@ describe('UploadPage processing feedback', () => {
       target: { files: [createCsvFile('adjustments.csv', 'adjustment_id,invoice_id,kind,amount,tax_category_code\nA1,INV1,allowance,10.00,S')] },
     });
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Load Data & Continue' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Load Data & Continue to Run Checks' }));
     buyersDeferred.resolve([{ buyer_id: 'B1' }]);
     headersDeferred.resolve([{ invoice_id: 'INV1', buyer_id: 'B1' }]);
     linesDeferred.resolve([{ line_id: 'L1', invoice_id: 'INV1' }]);

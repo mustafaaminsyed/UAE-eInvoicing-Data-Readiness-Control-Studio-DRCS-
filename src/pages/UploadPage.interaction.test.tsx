@@ -26,6 +26,25 @@ describe('UploadPage interactions', () => {
     expect(screen.getByText('Credit note requirements')).toBeInTheDocument();
   });
 
+  it('describes the canonical upload path and directs source extracts to Mapping Studio', () => {
+    render(
+      <MemoryRouter>
+        <ComplianceProvider>
+          <UploadPage />
+        </ComplianceProvider>
+      </MemoryRouter>
+    );
+
+    const progress = screen.getByRole('list', { name: 'Ingestion progress' });
+    expect(progress).toHaveTextContent('Upload');
+    expect(progress).toHaveTextContent('Structural Validation');
+    expect(progress).toHaveTextContent('Run Checks');
+    expect(progress).not.toHaveTextContent('Mapping');
+    expect(screen.getByText('Canonical DRCS CSV templates')).toBeInTheDocument();
+    expect(screen.getByText(/non-canonical ERP\/source extracts, aliased columns, or a combined export/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open Mapping Studio first' })).toBeInTheDocument();
+  });
+
   it('does not open file picker when switching AR/AP and sample scenario toggles', () => {
     const clickSpy = vi.spyOn(HTMLInputElement.prototype, 'click');
 
