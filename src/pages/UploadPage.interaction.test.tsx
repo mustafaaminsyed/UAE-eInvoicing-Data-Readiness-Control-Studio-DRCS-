@@ -41,6 +41,9 @@ describe('UploadPage interactions', () => {
     expect(progress).toHaveTextContent('Run Checks');
     expect(progress).not.toHaveTextContent('Mapping');
     expect(screen.getByText('Canonical DRCS CSV templates')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('0/3 structurally valid');
+    expect(screen.getByText(/Structural validity checks file structure, not full PINT-AE conformance/i)).toBeInTheDocument();
+    expect(screen.getByText(/Applicable regulatory rules are assessed in Run Checks/i)).toBeInTheDocument();
     expect(screen.getByText(/non-canonical ERP\/source extracts, aliased columns, or a combined export/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Open Mapping Studio first' })).toBeInTheDocument();
   });
