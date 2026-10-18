@@ -2,8 +2,11 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+// Keep client construction non-fatal so the application can render its
+// existing configuration guidance and environment gates when variables are missing.
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://drcs-unconfigured.invalid';
+const SUPABASE_PUBLISHABLE_KEY =
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'drcs-unconfigured-publishable-key';
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";

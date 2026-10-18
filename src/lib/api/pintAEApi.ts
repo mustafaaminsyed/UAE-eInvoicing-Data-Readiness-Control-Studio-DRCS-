@@ -372,6 +372,8 @@ export async function seedUC1CheckPack(forceUpsert = false): Promise<{ success: 
 export async function saveExceptions(runId: string, exceptions: PintAEException[], direction?: Direction): Promise<boolean> {
   if (exceptions.length === 0) return true;
 
+  if (shouldUseLocalDevFallback()) return false;
+
   if (exceptions.some((exception) => !exception.dataset_type && !direction)) {
     console.error('Cannot persist PINT-AE exceptions without an explicit dataset direction.');
     return false;
@@ -470,6 +472,8 @@ export async function fetchExceptionsByRun(runId: string): Promise<PintAEExcepti
 // ============ Run Summary ============
 
 export async function saveRunSummary(summary: Omit<RunSummary, 'id'>): Promise<boolean> {
+  if (shouldUseLocalDevFallback()) return false;
+
   const { error } = await supabase
     .from('run_summaries')
     .insert({
@@ -517,6 +521,8 @@ export async function fetchLatestRunSummary(): Promise<RunSummary | null> {
 
 export async function saveClientRiskScores(runId: string, scores: Omit<ClientRiskScore, 'id' | 'run_id'>[]): Promise<boolean> {
   if (scores.length === 0) return true;
+
+  if (shouldUseLocalDevFallback()) return false;
 
   const scoresToInsert = scores.map(s => ({
     run_id: runId,

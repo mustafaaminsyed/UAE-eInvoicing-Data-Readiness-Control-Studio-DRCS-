@@ -151,4 +151,63 @@ describe('pintAEApi legacy schema compatibility', () => {
     expect(result).toBe(true);
     expect(insert).toHaveBeenCalledWith([expect.objectContaining({ dataset_type: 'AP' })]);
   });
+
+  it('reports persistence as unavailable without calling Supabase in local fallback mode', async () => {
+    envState.configured = false;
+    envState.localFallbackEnabled = true;
+    envState.shouldUseFallback = true;
+
+    const { saveExceptions, saveClientRiskScores, saveRunSummary } = await import('@/lib/api/pintAEApi');
+    const exceptionResult = await saveExceptions('local-run-1', [{
+      id: 'exception-1', timestamp: '2026-10-01T00:00:00.000Z', check_id: 'UAE-UC1-CHK-001',
+      check_name: 'Invoice Number Present', severity: 'Critical', pint_reference_terms: ['IBT-001'],
+      message: 'missing', root_cause_category: 'Unclassified', owner_team: 'Client Finance',
+      sla_target_hours: 4, case_status: 'Open', dataset_type: 'AR',
+    }]);
+    const scoreResult = await saveClientRiskScores('local-run-1', [{
+      seller_trn: '100000000000003', client_name: 'Seller LLC', risk_score: 25, health_score: 75,
+      critical_count: 1, high_count: 0, medium_count: 0, low_count: 0, total_exceptions: 1,
+      total_invoices: 1,
+    }]);
+    const summaryResult = await saveRunSummary({
+      run_id: 'local-run-1', total_invoices_tested: 1, total_exceptions: 1, pass_rate_percent: 0,
+      exceptions_by_severity: { Critical: 1, High: 0, Medium: 0, Low: 0 },
+      top_10_failing_checks: [], top_10_clients_by_risk: [],
+    });
+
+    expect(exceptionResult).toBe(false);
+    expect(scoreResult).toBe(false);
+    expect(summaryResult).toBe(false);
+    expect(fromMock).not.toHaveBeenCalled();
+  });
+
+  it('preserves Supabase persistence when configuration is valid', async () => {
+    const insert = vi.fn().mockResolvedValue({ error: null });
+    fromMock.mockReturnValue({ insert });
+
+    const { saveExceptions, saveClientRiskScores, saveRunSummary } = await import('@/lib/api/pintAEApi');
+    const exceptionResult = await saveExceptions('run-1', [{
+      id: 'exception-1', timestamp: '2026-10-01T00:00:00.000Z', check_id: 'UAE-UC1-CHK-001',
+      check_name: 'Invoice Number Present', severity: 'Critical', pint_reference_terms: ['IBT-001'],
+      message: 'missing', root_cause_category: 'Unclassified', owner_team: 'Client Finance',
+      sla_target_hours: 4, case_status: 'Open', dataset_type: 'AR',
+    }]);
+    const scoreResult = await saveClientRiskScores('run-1', [{
+      seller_trn: '100000000000003', client_name: 'Seller LLC', risk_score: 25, health_score: 75,
+      critical_count: 1, high_count: 0, medium_count: 0, low_count: 0, total_exceptions: 1,
+      total_invoices: 1,
+    }]);
+    const summaryResult = await saveRunSummary({
+      run_id: 'run-1', total_invoices_tested: 1, total_exceptions: 1, pass_rate_percent: 0,
+      exceptions_by_severity: { Critical: 1, High: 0, Medium: 0, Low: 0 },
+      top_10_failing_checks: [], top_10_clients_by_risk: [],
+    });
+
+    expect(exceptionResult).toBe(true);
+    expect(scoreResult).toBe(true);
+    expect(summaryResult).toBe(true);
+    expect(fromMock).toHaveBeenCalledWith('check_exceptions');
+    expect(fromMock).toHaveBeenCalledWith('client_risk_scores');
+    expect(fromMock).toHaveBeenCalledWith('run_summaries');
+  });
 });
