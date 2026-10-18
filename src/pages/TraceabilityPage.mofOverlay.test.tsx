@@ -67,7 +67,7 @@ describe('TraceabilityPage MoF overlay', () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByText('DR Coverage & Traceability')).toBeInTheDocument();
+    expect(await screen.findByText('PINT Runtime Coverage & Traceability')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'MoF Overlay View' }));
 
     await waitFor(() => {
