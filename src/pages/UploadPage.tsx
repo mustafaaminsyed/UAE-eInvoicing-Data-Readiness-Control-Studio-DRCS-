@@ -379,9 +379,12 @@ export default function UploadPage() {
               </div>
               <div className="flex items-center gap-2 rounded-full border bg-background/75 px-3 py-1.5 text-xs text-muted-foreground" role="status">
                 <span className={cn('h-2 w-2 rounded-full', validFileCount === 3 ? 'bg-[hsl(var(--success))]' : 'bg-amber-500')} />
-                <span><strong className="text-foreground">{validFileCount}/3</strong> valid</span><span className="text-border">·</span><span>{selectedFileCount}/3 selected</span>
+                <span><strong className="text-foreground">{validFileCount}/3</strong> structurally valid</span><span className="text-border">·</span><span>{selectedFileCount}/3 selected</span>
               </div>
             </div>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Structural validity checks file structure, not full PINT-AE conformance. Applicable regulatory rules are assessed in Run Checks.
+            </p>
             <div className="mb-3 flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
               <span>Using non-canonical ERP/source extracts, aliased columns, or a combined export?</span>
               <Button variant="link" className="h-auto p-0 text-xs" onClick={() => navigate('/mapping?tab=create')}>
@@ -535,7 +538,7 @@ export default function UploadPage() {
           )}
 
           {/* Actions */}
-          <div className="upload-ingestion-actions sticky bottom-3 z-20 flex flex-col gap-2 rounded-2xl border border-border/70 bg-background/90 p-2.5 shadow-lg backdrop-blur-md sm:flex-row sm:items-center sm:justify-between">
+          <div className="upload-ingestion-actions flex flex-col gap-2 rounded-2xl border border-border/70 bg-background/90 p-2.5 shadow-lg backdrop-blur-md sm:flex-row sm:items-center sm:justify-between">
             <Button variant="outline" onClick={handleClearAll} disabled={!files.buyers && !files.headers && !files.lines && !adjustmentsFile}>
               Clear All
             </Button>

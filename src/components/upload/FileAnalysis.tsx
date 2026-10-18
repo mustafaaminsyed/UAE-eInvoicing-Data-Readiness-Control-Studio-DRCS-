@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { FileText, Check, X, AlertTriangle, ChevronDown, ChevronUp, Key, Download } from 'lucide-react';
+import { FileText, Check, X, Minus, AlertTriangle, ChevronDown, ChevronUp, Key, Download } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -246,8 +246,11 @@ export function FileSummaryCard({ stats, type, direction = 'AR', onRemove }: Fil
           {(() => {
             const manifestColsByDirection = getManifestColumns(type, direction);
             const uploadedCols = new Set(stats.columns);
+            const requiredMissing = new Set(stats.requiredMissing);
             const present = manifestColsByDirection.filter((c) => uploadedCols.has(c));
             const missing = manifestColsByDirection.filter((c) => !uploadedCols.has(c));
+            const missingRequired = missing.filter((c) => requiredMissing.has(c));
+            const notSupplied = missing.filter((c) => !requiredMissing.has(c));
             return (
               <>
                 {present.map((col) => (
@@ -255,9 +258,14 @@ export function FileSummaryCard({ stats, type, direction = 'AR', onRemove }: Fil
                     <Check className="w-3 h-3" /> {col}
                   </Badge>
                 ))}
-                {missing.map((col) => (
-                  <Badge key={col} variant="outline" className="text-xs gap-1 border-destructive/30 text-destructive">
-                    <X className="w-3 h-3" /> {col}
+                {missingRequired.map((col) => (
+                  <Badge key={col} variant="outline" aria-label={`${col}: required column missing`} className="text-xs gap-1 border-destructive/30 text-destructive">
+                    <X className="w-3 h-3" /> {col} · Required
+                  </Badge>
+                ))}
+                {notSupplied.map((col) => (
+                  <Badge key={col} variant="outline" aria-label={`${col}: Not supplied`} className="gap-1 border-border/70 text-xs text-muted-foreground">
+                    <Minus className="h-3 w-3" /> {col} · Not supplied
                   </Badge>
                 ))}
               </>
@@ -265,10 +273,12 @@ export function FileSummaryCard({ stats, type, direction = 'AR', onRemove }: Fil
           })()}
         </div>
         {stats.nullWarnings.length > 0 && (
-          <div className="space-y-1 mt-2">
+          <div className="mt-2 space-y-1" role="status">
+            <p className="flex items-center gap-1 text-xs font-medium text-accent-foreground">
+              <AlertTriangle className="h-3 w-3" /> Non-blocking null-rate warning
+            </p>
             {stats.nullWarnings.map((w) => (
-              <p key={w.column} className="text-xs text-accent-foreground flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3" />
+              <p key={w.column} className="pl-4 text-xs text-accent-foreground">
                 {w.column}: {(w.nullRate * 100).toFixed(0)}% null rate
               </p>
             ))}
