@@ -20,7 +20,7 @@ let runChecksDeferred = deferred<void>();
 const runChecks = vi.fn(() => runChecksDeferred.promise);
 
 const complianceState = {
-  direction: 'AR',
+  direction: 'AR' as 'AR' | 'AP',
   buyers: [{ buyer_id: 'B-1', buyer_name: 'Acme LLC' }],
   headers: [
     {
@@ -37,7 +37,7 @@ const complianceState = {
   isRunning: false,
   runChecks,
   exceptions: [],
-  lastChecksRunAt: null,
+  lastChecksRunAt: null as string | null,
   lastChecksRunDatasetType: null,
   activeMappingProfileByDirection: { AR: null, AP: null },
   setActiveMappingProfileForDirection,
@@ -56,6 +56,7 @@ const enabledChecks = [
     owner_team_default: 'ASP Ops',
     is_enabled: true,
     parameters: { field: 'invoice_type' },
+    applicability: { directions: ['AR', 'AP'] },
   },
 ];
 
@@ -142,6 +143,9 @@ describe('RunChecksPage processing feedback', () => {
     setActiveMappingProfileForDirection.mockReset();
     runChecks.mockClear();
     runChecksDeferred = deferred<void>();
+    complianceState.isChecksRun = false;
+    complianceState.lastChecksRunAt = null;
+    complianceState.direction = 'AR';
   });
 
   it('shows elapsed validation feedback while checks are running', async () => {
@@ -151,12 +155,23 @@ describe('RunChecksPage processing feedback', () => {
       </MemoryRouter>
     );
 
-    const runButton = await screen.findByRole('button', { name: /Run All Checks \(1\)/i });
+    expect(await screen.findByRole('heading', { name: 'Validation Control Centre' })).toBeInTheDocument();
+    expect(screen.getByText('Ready to validate')).toBeInTheDocument();
+    expect(screen.getByText('Registered')).toBeInTheDocument();
+    expect(screen.getByText('Applicable')).toBeInTheDocument();
+    expect(screen.getByText('Executable')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Expand included controls' })).toHaveAttribute('aria-expanded', 'false');
+
+    const runButton = screen.getByRole('button', { name: /Run Validation Checks \(1\)/i });
     fireEvent.click(runButton);
 
     await waitFor(() => {
-      expect(runChecks).toHaveBeenCalled();
+      expect(runChecks).toHaveBeenCalledTimes(1);
     }, { timeout: 3000 });
+
+    expect(runButton).toBeDisabled();
+    fireEvent.click(runButton);
+    expect(runChecks).toHaveBeenCalledTimes(1);
 
     const statusBanner = screen.getByRole('status');
     expect(screen.getByText('Validation run in progress')).toBeInTheDocument();
@@ -168,5 +183,50 @@ describe('RunChecksPage processing feedback', () => {
     await waitFor(() => {
       expect(navigate).toHaveBeenCalledWith('/dashboard');
     }, { timeout: 3000 });
+  });
+
+  it('shows completed actions without changing the results route', async () => {
+    complianceState.isChecksRun = true;
+    complianceState.lastChecksRunAt = '2026-10-19T00:00:00.000Z';
+
+    render(
+      <MemoryRouter>
+        <RunChecksPage />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText('Validation completed')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Re-run Checks' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'View Results' }));
+    expect(navigate).toHaveBeenCalledWith('/dashboard');
+  });
+
+  it('preserves AP direction and its applicable execution count', async () => {
+    complianceState.direction = 'AP';
+
+    render(
+      <MemoryRouter>
+        <RunChecksPage />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText('Direction: AP')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Run Validation Checks (1)' })).toBeEnabled();
+  });
+
+  it('restores the execution action after a failed run', async () => {
+    runChecks.mockImplementationOnce(async () => { throw new Error('run failed'); });
+
+    render(
+      <MemoryRouter>
+        <RunChecksPage />
+      </MemoryRouter>
+    );
+
+    const runButton = await screen.findByRole('button', { name: /Run Validation Checks \(1\)/i });
+    fireEvent.click(runButton);
+
+    await waitFor(() => expect(runButton).toBeEnabled());
+    expect(navigate).not.toHaveBeenCalledWith('/dashboard');
   });
 });

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -132,6 +132,7 @@ describe('RunChecksPage reference-term labeling', () => {
       </MemoryRouter>
     );
 
+    fireEvent.click(await screen.findByRole('button', { name: 'Expand included controls' }));
     expect(await screen.findByText('Invoice type presence')).toBeInTheDocument();
 
     await waitFor(() => {

@@ -1,6 +1,6 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import RunChecksPage from '@/pages/RunChecksPage';
 import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
@@ -8,6 +8,7 @@ import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
 const navigate = vi.fn();
 const runChecks = vi.fn();
 const setActiveMappingProfileForDirection = vi.fn();
+let readinessCanRun = true;
 
 const complianceState = {
   direction: 'AR',
@@ -108,7 +109,10 @@ vi.mock('@/lib/pintAE/specCatalog', () => ({
 }));
 
 vi.mock('@/lib/coverage/conformanceEngine', () => ({
-  checkRunReadiness: () => ({ canRun: true, reasons: [] }),
+  checkRunReadiness: () => ({
+    canRun: readinessCanRun,
+    reasons: readinessCanRun ? [] : [{ message: 'Canonical readiness is incomplete.', link: '/mapping', linkLabel: 'Open Mapping Studio' }],
+  }),
 }));
 
 vi.mock('@/components/run/LastRunContextBanner', () => ({
@@ -131,6 +135,10 @@ vi.mock('@/engine/runners/mof', () => ({
 }));
 
 describe('RunChecksPage local fallback fetch resilience', () => {
+  beforeEach(() => {
+    readinessCanRun = true;
+  });
+
   it('does not surface mapping template fetch failures when local fallback is enabled', async () => {
     render(
       <MemoryRouter>
@@ -138,7 +146,9 @@ describe('RunChecksPage local fallback fetch resilience', () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByText('Checks Library (1 checks)')).toBeInTheDocument();
+    const controlsButton = await screen.findByRole('button', { name: 'Expand included controls' });
+    expect(screen.queryByText('Invoice Number Present')).not.toBeInTheDocument();
+    fireEvent.click(controlsButton);
 
     await waitFor(() => {
       expect(screen.queryByText(/Mapping templates unavailable:/i)).not.toBeInTheDocument();
@@ -147,5 +157,19 @@ describe('RunChecksPage local fallback fetch resilience', () => {
     expect(screen.getByText(/No active mapping template found\./i)).toBeInTheDocument();
     expect(screen.getByText('Invoice Number Present')).toBeInTheDocument();
     expect(screen.getByText('Local Fallback')).toBeInTheDocument();
+  });
+
+  it('shows a blocked state and disables execution when readiness fails', async () => {
+    readinessCanRun = false;
+
+    render(
+      <MemoryRouter>
+        <RunChecksPage />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText('Resolve readiness blockers before execution')).toBeInTheDocument();
+    expect(screen.getByText('Canonical readiness is incomplete.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Run Validation Checks/i })).toBeDisabled();
   });
 });
