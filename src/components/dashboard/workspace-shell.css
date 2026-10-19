@@ -1,11 +1,8 @@
 .workspace-control-shell {
   background-color: #f2f7f4;
   background-image:
-    linear-gradient(180deg, rgba(242, 248, 245, 0.83), rgba(231, 242, 236, 0.94)),
-    url('../../assets/landing/drcs-dubai-hero-background.png');
-  background-position: center top;
-  background-size: cover;
-  background-attachment: fixed;
+    radial-gradient(circle at 12% 0%, rgba(37, 121, 73, 0.055), transparent 34%),
+    linear-gradient(180deg, #f2f7f4, #e9f2ed);
   --sidebar-background: 150 22% 97%;
   --sidebar-foreground: 153 31% 92%;
   --sidebar-primary: 145 61% 38%;
@@ -27,8 +24,8 @@
 .dark .workspace-control-shell {
   background-color: #061a17;
   background-image:
-    linear-gradient(180deg, rgba(5, 40, 34, 0.82), rgba(4, 20, 18, 0.94)),
-    url('../../assets/landing/drcs-dubai-hero-background.png');
+    radial-gradient(circle at 12% 0%, rgba(55, 170, 109, 0.09), transparent 34%),
+    linear-gradient(180deg, #061a17, #041412);
   --sidebar-background: 166 57% 8%;
   --background: 166 61% 7%;
   --foreground: 153 31% 94%;

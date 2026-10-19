@@ -73,11 +73,12 @@ export default function ExceptionsPage() {
   }, [isChecksRun, navigate]);
 
   useEffect(() => {
+    if (!isChecksRun) return;
     if (searchParams.get('dataset') === datasetFilter) return;
     const next = new URLSearchParams(searchParams);
     next.set('dataset', datasetFilter);
     setSearchParams(next, { replace: true });
-  }, [datasetFilter, searchParams, setSearchParams]);
+  }, [datasetFilter, isChecksRun, searchParams, setSearchParams]);
 
   useEffect(() => {
     const requestedRuleId = searchParams.get('ruleId')?.trim() || 'all';
@@ -86,6 +87,7 @@ export default function ExceptionsPage() {
   }, [checkFilter, searchParams]);
 
   useEffect(() => {
+    if (!isChecksRun) return;
     const currentRuleId = searchParams.get('ruleId')?.trim() || 'all';
     if (currentRuleId === checkFilter) return;
     const next = new URLSearchParams(searchParams);
@@ -95,7 +97,7 @@ export default function ExceptionsPage() {
       next.set('ruleId', checkFilter);
     }
     setSearchParams(next, { replace: true });
-  }, [checkFilter, searchParams, setSearchParams]);
+  }, [checkFilter, isChecksRun, searchParams, setSearchParams]);
 
   const filteredExceptions = useMemo(() => {
     return exceptions.filter((exception) => {
