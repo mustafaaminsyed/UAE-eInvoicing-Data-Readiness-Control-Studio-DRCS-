@@ -73,7 +73,7 @@ function NavigationContent() {
   }, [isDark, mounted]);
 
   return (
-    <header className="app-topbar sticky top-0 z-50 w-full border-b border-white/15 bg-[#062d27]/90 text-white shadow-[0_12px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl">
+    <header className="app-topbar relative z-50 w-full border-b border-white/15 bg-[#062d27]/90 text-white shadow-[0_12px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl sm:sticky sm:top-0">
       <div className="container mx-auto flex max-w-[1480px] flex-col gap-2 px-5 py-2.5 sm:px-8 xl:flex-row xl:items-center xl:gap-6 xl:px-12">
         <div className="flex flex-wrap items-center justify-between gap-3 xl:contents">
           <Link to="/" className="order-1 flex min-w-0 shrink-0 items-center gap-3 xl:gap-4">

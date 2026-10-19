@@ -184,6 +184,6 @@ describe('RunChecksPage diagnostic mode', () => {
       expect(screen.queryByText(/Cannot run checks - conformance gate failed/i)).not.toBeInTheDocument();
     });
 
-    expect(screen.getByRole('button', { name: /Run All Checks/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /Run Validation Checks/i })).toBeEnabled();
   });
 });

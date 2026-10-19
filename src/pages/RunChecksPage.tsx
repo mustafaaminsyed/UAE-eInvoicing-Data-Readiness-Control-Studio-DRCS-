@@ -1,6 +1,6 @@
 ﻿import { useNavigate } from 'react-router-dom';
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Play, CheckCircle, FileText, Users, List, ArrowRight, RotateCcw, Database, RefreshCw, ChevronDown, AlertCircle, Settings, Map, AlertTriangle, Shield } from 'lucide-react';
+import { Play, CheckCircle, ArrowLeft, ArrowRight, RotateCcw, Database, RefreshCw, ChevronDown, AlertCircle, Settings, Map, AlertTriangle, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -9,7 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { useCompliance } from '@/context/ComplianceContext';
 import { SeverityBadge } from '@/components/SeverityBadge';
-import { StatsCard } from '@/components/StatsCard';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { fetchEnabledPintAEChecks, getChecksDiagnostics, seedUC1CheckPack, ChecksDiagnostics } from '@/lib/api/pintAEApi';
 import { fetchActiveTemplates } from '@/lib/api/mappingApi';
@@ -23,7 +22,6 @@ import { UAE_UC1_CHECK_PACK } from '@/lib/checks/uaeUC1CheckPack';
 import { getSupabaseEnvStatus, isLocalDevFallbackEnabled, shouldUseLocalDevFallback } from '@/lib/api/supabaseEnv';
 import { supabase } from '@/integrations/supabase/client';
 import { LastRunContextBanner } from '@/components/run/LastRunContextBanner';
-import { WorkflowNavigator, buildWorkflowItems } from '@/components/shared/WorkflowNavigator';
 import { WorkflowPageHeader } from '@/components/shared/WorkflowPageHeader';
 import { FEATURE_FLAGS } from '@/config/features';
 import { PARSER_KNOWN_COLUMNS } from '@/lib/registry/drRegistry';
@@ -35,7 +33,6 @@ import { formatElapsedTime, yieldToBrowser } from '@/lib/processingFeedback';
 import {
   WORKFLOW_CARD_HEADER_COMPACT_CLASS,
   WORKFLOW_UTILITY_BADGE_CLASS,
-  WORKFLOW_UTILITY_BUTTON_CLASS,
 } from '@/lib/workflowShellStyles';
 
 type ConnectionTestStatus = 'idle' | 'running' | 'passed' | 'failed';
@@ -98,6 +95,7 @@ export default function RunChecksPage() {
   const [isSeeding, setIsSeeding] = useState(false);
   const [lastSeedResult, setLastSeedResult] = useState<string | null>(null);
   const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState(false);
+  const [isControlsOpen, setIsControlsOpen] = useState(false);
   const [connectionTest, setConnectionTest] = useState<ConnectionTestResult>({
     status: 'idle',
     message: '',
@@ -441,6 +439,21 @@ export default function RunChecksPage() {
   const isBlocked = isLocalFallbackMode
     ? !readiness.canRun
     : (!isSupabaseConfigured || hasSetupBlockers || !readiness.canRun || hasMoFPreGateBlockers);
+  const executionState = isRunProcessing
+    ? 'Running'
+    : isChecksRun
+      ? 'Completed'
+      : isBlocked
+        ? 'Blocked'
+        : 'Ready';
+  const inputMode = diagnosticRunEnabled
+    ? 'Diagnostic mapping'
+    : hasSelectedMappingProfile
+      ? 'Governed mapping'
+      : canRunWithoutMapping
+        ? 'Canonical input'
+        : 'Mapping required';
+  const executableControlCount = isBlocked ? 0 : directionApplicablePintCount;
 
   useEffect(() => {
     if (!isRunProcessing || runStartedAt === null) {
@@ -588,30 +601,30 @@ export default function RunChecksPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)]">
-      <div className="container max-w-5xl py-8 md:py-10">
+    <div className="min-h-[calc(100vh-4rem)] bg-background/90">
+      <div className="container max-w-6xl py-5 md:py-7">
         <WorkflowPageHeader
-          title="Run Compliance Checks"
+          title="Validation Control Centre"
           description={
             <>
-              Execute layered UAE eInvoicing controls across your uploaded data: MoF mandatory baseline readiness and
-              PINT-AE technical conformance checks. This will validate {headers.length} invoices across{' '}
-              {isLoadingChecks ? '...' : directionApplicablePintCount} direction-applicable PINT-AE controls ({pintAEChecks.length} registered).
+              Prepare and execute the direction-applicable validation controls for the loaded invoice dataset.
             </>
           }
-          icon={<Play className="h-8 w-8" />}
-          align="center"
-          className="mb-8 animate-fade-in"
-          descriptionClassName="max-w-xl"
-          meta={<Badge variant="outline">Direction: {direction}</Badge>}
-        />
-
-        <WorkflowNavigator
-          current="run"
-          fallbackPath="/mapping"
+          icon={<Shield className="h-6 w-6" />}
+          align="split"
           className="mb-5 animate-fade-in"
-          helperText="Move through the ingestion workflow without losing context as you progress into mapping and validation."
-          items={buildWorkflowItems(['mapping', 'run', 'validation', 'dashboard', 'exceptions'])}
+          meta={
+            <>
+              <Badge variant={isBlocked ? 'destructive' : 'outline'}>{executionState}</Badge>
+              <Badge variant="outline">Direction: {direction}</Badge>
+            </>
+          }
+          actions={
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => navigate('/upload')}>
+              <ArrowLeft className="h-4 w-4" />
+              Back to Upload
+            </Button>
+          }
         />
 
         <LastRunContextBanner
@@ -619,6 +632,92 @@ export default function RunChecksPage() {
           datasetType={lastChecksRunDatasetType || direction}
           exceptionsCount={exceptions.length}
         />
+
+        <section aria-label="Validation readiness summary" className="mb-5 grid gap-3 lg:grid-cols-[1.05fr_1.2fr_1fr]">
+          <Card className="surface-glass border-border/70 shadow-sm">
+            <CardContent className="p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Loaded data</p>
+              <div className="mt-3 grid grid-cols-3 gap-3">
+                <div><p className="text-2xl font-semibold">{buyers.length}</p><p className="text-xs text-muted-foreground">Buyers</p></div>
+                <div><p className="text-2xl font-semibold">{headers.length}</p><p className="text-xs text-muted-foreground">Headers</p></div>
+                <div><p className="text-2xl font-semibold">{lines.length}</p><p className="text-xs text-muted-foreground">Lines</p></div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="surface-glass border-border/70 shadow-sm">
+            <CardContent className="p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Input mode</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Badge variant={diagnosticRunEnabled ? 'secondary' : 'outline'}>{inputMode}</Badge>
+                {selectedTemplate ? <Badge variant="outline">v{selectedTemplate.version}</Badge> : null}
+              </div>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {selectedTemplate
+                  ? selectedTemplate.templateName
+                  : canRunWithoutMapping
+                    ? 'Canonical DRCS fields detected; mapping is unnecessary.'
+                    : 'Select or create a mapping profile before execution.'}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="surface-glass border-border/70 shadow-sm">
+            <CardContent className="p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Assessment scope</p>
+              <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                <div><p className="text-2xl font-semibold">{isLoadingChecks ? '—' : pintAEChecks.length}</p><p className="text-xs text-muted-foreground">Registered</p></div>
+                <div><p className="text-2xl font-semibold">{isLoadingChecks ? '—' : directionApplicablePintCount}</p><p className="text-xs text-muted-foreground">Applicable</p></div>
+                <div><p className="text-2xl font-semibold">{isLoadingChecks ? '—' : executableControlCount}</p><p className="text-xs text-muted-foreground">Executable</p></div>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+
+        <Card className="mb-5 border-primary/20 bg-card shadow-sm" aria-label="Execution readiness">
+          <CardContent className="flex flex-col gap-4 p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant={isBlocked ? 'destructive' : 'outline'}>{executionState}</Badge>
+                <span className="font-semibold">{isBlocked ? 'Resolve readiness blockers before execution' : isChecksRun ? 'Validation completed' : isRunProcessing ? 'Validation is running' : 'Ready to validate'}</span>
+              </div>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {isChecksRun
+                  ? `${exceptions.length} exception${exceptions.length === 1 ? '' : 's'} found in the last run.`
+                  : `${headers.length.toLocaleString()} invoices · ${directionApplicablePintCount.toLocaleString()} direction-applicable controls.`}
+              </p>
+              {isBlocked && gateReasons.length > 0 ? (
+                <ul className="mt-3 space-y-1 text-sm text-destructive">
+                  {gateReasons.map((reason, index) => (
+                    <li key={index} className="flex flex-wrap items-center gap-2">
+                      <span>{reason.message}</span>
+                      <Link to={reason.link} className="font-medium text-primary underline underline-offset-2">
+                        {reason.linkLabel}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+            <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+              {isChecksRun ? (
+                <>
+                  <Button variant="outline" onClick={handleRunChecks} disabled={isRunning || isSyncingChecks || pintAEChecks.length === 0 || isBlocked} className="gap-2">
+                    <RotateCcw className="h-4 w-4" /> Re-run Checks
+                  </Button>
+                  <Button onClick={() => navigate('/dashboard')} className="gap-2">
+                    View Results <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </>
+              ) : (
+                <Button onClick={handleRunChecks} disabled={isRunProcessing || isSyncingChecks || pintAEChecks.length === 0 || isBlocked} size="lg" className="gap-2">
+                  {isRunProcessing ? <RefreshCw className="h-5 w-5 animate-spin" /> : <Play className="h-5 w-5" />}
+                  {isRunProcessing ? `Running Checks… ${runElapsedLabel}` : `Run Validation Checks (${directionApplicablePintCount})`}
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         {!isSupabaseConfigured && !isLocalFallbackMode && (
           <Alert variant="destructive" className="mb-8">
@@ -641,14 +740,14 @@ export default function RunChecksPage() {
         )}
 
         {/* Mapping Template Selector */}
-        <Card className="mb-8 animate-slide-up surface-glass rounded-2xl border border-white/70">
+        <Card className="mb-5 animate-slide-up surface-glass rounded-2xl border border-white/70">
           <CardHeader className={WORKFLOW_CARD_HEADER_COMPACT_CLASS}>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Map className="h-5 w-5" />
-              Mapping Template
+              Input mode & mapping
             </CardTitle>
             <CardDescription>
-              Select a mapping template to transform your ERP data before running checks
+              Canonical files can run directly; select a governed profile for non-canonical source data.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -739,35 +838,21 @@ export default function RunChecksPage() {
           </CardContent>
         </Card>
 
-        {/* Data Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 animate-slide-up">
-          <StatsCard
-            title="Buyers"
-            value={buyers.length}
-            icon={<Users className="w-5 h-5" />}
-            variant="default"
-          />
-          <StatsCard
-            title="Invoice Headers"
-            value={headers.length}
-            icon={<FileText className="w-5 h-5" />}
-            variant="default"
-          />
-          <StatsCard
-            title="Invoice Lines"
-            value={lines.length}
-            icon={<List className="w-5 h-5" />}
-            variant="default"
-          />
-        </div>
-
         {/* Checks Library */}
-	        <div className="surface-glass rounded-2xl border border-white/70 shadow-sm mb-8 animate-slide-up">
+        <Collapsible open={isControlsOpen} onOpenChange={setIsControlsOpen} className="mb-5">
+	        <div className="surface-glass overflow-hidden rounded-2xl border border-white/70 shadow-sm animate-slide-up">
+	          <CollapsibleTrigger asChild>
+	            <Button variant="ghost" className="h-auto w-full justify-between rounded-none p-5 text-left sm:p-6" aria-label={`${isControlsOpen ? 'Collapse' : 'Expand'} included controls`}>
+	              <span className="font-semibold">Review included controls ({isLoadingChecks ? '...' : pintAEChecks.length})</span>
+	              <ChevronDown className={`h-5 w-5 shrink-0 transition-transform ${isControlsOpen ? 'rotate-180' : ''}`} />
+	            </Button>
+	          </CollapsibleTrigger>
+	          <CollapsibleContent>
 	          <div className="flex flex-col gap-3 border-b p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6">
 	            <div>
 	              <div className="flex items-center gap-2">
 	                <h2 className="text-lg font-semibold text-foreground">
-                  Checks Library ({isLoadingChecks ? '...' : `${pintAEChecks.length} checks`})
+                  Included controls ({isLoadingChecks ? '...' : `${pintAEChecks.length} checks`})
 	                </h2>
 	                {diagnostics?.dataSource === 'supabase' && (
 		                  <Badge variant="outline" className={`gap-1 ${WORKFLOW_UTILITY_BADGE_CLASS}`}>
@@ -788,28 +873,6 @@ export default function RunChecksPage() {
               <p className="text-xs text-muted-foreground mt-2">
                 Authoritative DR coverage is mapping-driven. Reference terms remain metadata context only.
               </p>
-            </div>
-	            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-	              <Button
-	                variant="outline"
-	                size="sm"
-	                onClick={handleTestConnection}
-	                disabled={connectionTest.status === 'running'}
-		                className={WORKFLOW_UTILITY_BUTTON_CLASS}
-	              >
-	                <Database className={`w-4 h-4 ${connectionTest.status === 'running' ? 'animate-pulse' : ''}`} />
-	                Test Connection
-	              </Button>
-	              <Button
-	                variant="outline"
-	                size="sm"
-	                onClick={handleRefreshChecks}
-	                disabled={isLoadingChecks}
-		                className={WORKFLOW_UTILITY_BUTTON_CLASS}
-	              >
-	                <RefreshCw className={`w-4 h-4 ${isLoadingChecks ? 'animate-spin' : ''}`} />
-	                Refresh
-              </Button>
             </div>
           </div>
 
@@ -868,8 +931,8 @@ export default function RunChecksPage() {
               pintAEChecks.map((check) => {
                 const mappedDrIds = getAffectedDRIdsForRule(check.check_id);
                 return (
-                <div key={check.check_id} className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
-                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                <div key={check.check_id} className="flex flex-col gap-3 p-4 transition-colors hover:bg-muted/30 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center sm:gap-4">
                     <CheckCircle className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -878,7 +941,7 @@ export default function RunChecksPage() {
                           {check.check_id}
                         </code>
                       </div>
-                      <p className="text-sm text-muted-foreground truncate">{check.description}</p>
+                      <p className="text-sm text-muted-foreground sm:truncate">{check.description}</p>
                       {mappedDrIds.length > 0 && (
                         <div className="mt-1">
                           <p className="text-[11px] text-muted-foreground">Authoritative coverage</p>
@@ -917,7 +980,7 @@ export default function RunChecksPage() {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:justify-end">
                     <Badge variant="outline" className="text-xs">
                       {check.scope}
                     </Badge>
@@ -933,7 +996,9 @@ export default function RunChecksPage() {
               )})
             )}
           </div>
+          </CollapsibleContent>
         </div>
+        </Collapsible>
 
         {/* Mapping Prerequisite Warning */}
         {!hasSelectedMappingProfile && !canRunWithoutMapping && (
@@ -987,31 +1052,6 @@ export default function RunChecksPage() {
           </Alert>
         )}
 
-        {/* Conformance Gate Banner */}
-        {isBlocked && (
-          <Alert className="mb-8 bg-destructive/5 border-destructive/20">
-            <Shield className="h-4 w-4 text-destructive" />
-            <AlertTitle className="text-destructive">Cannot run checks - conformance gate failed</AlertTitle>
-            <AlertDescription className="text-destructive/80">
-              <ul className="list-disc list-inside mt-2 space-y-1">
-                {gateReasons.map((reason, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span>{reason.message}</span>
-                    <Link to={reason.link} className="text-primary underline text-sm whitespace-nowrap">
-                      {reason.linkLabel}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-3">
-                <Link to="/traceability?filter=mandatory" className="text-primary underline text-sm">
-                  View full traceability matrix {'->'}
-                </Link>
-              </div>
-            </AlertDescription>
-          </Alert>
-        )}
-
         {diagnosticRunEnabled && (
           <Alert className="mb-8 border-amber-500/30 bg-amber-500/10">
             <AlertTriangle className="h-4 w-4 text-amber-600" />
@@ -1032,58 +1072,6 @@ export default function RunChecksPage() {
               Elapsed time: <strong>{runElapsedLabel}</strong>. Larger datasets may keep the browser busy while core rules execute.
             </AlertDescription>
           </Alert>
-        )}
-
-        {/* Action Buttons */}
-        <div className="flex items-center justify-center gap-4">
-          {isChecksRun ? (
-            <>
-              <Button
-                variant="outline"
-              onClick={handleRunChecks}
-              disabled={isRunning || isSyncingChecks || pintAEChecks.length === 0 || isBlocked}
-              className="gap-2"
-            >
-                <RotateCcw className="w-4 h-4" />
-                Re-run Checks
-              </Button>
-              <Button
-                onClick={() => navigate('/dashboard')}
-                size="lg"
-                className="gap-2"
-              >
-                View Results
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-            </>
-          ) : (
-            <Button
-              onClick={handleRunChecks}
-              disabled={isRunning || isSyncingChecks || pintAEChecks.length === 0 || isBlocked}
-              size="lg"
-              className="gap-2 px-8"
-            >
-              {isRunning ? (
-                <>
-                  <RefreshCw className="w-5 h-5 animate-spin" />
-                  Running Checks... {runElapsedLabel}
-                </>
-              ) : (
-                <>
-                  <Play className="w-5 h-5" />
-                  Run All Checks ({directionApplicablePintCount})
-                </>
-              )}
-            </Button>
-          )}
-        </div>
-
-        {isChecksRun && (
-          <div className="mt-6 text-center animate-fade-in">
-            <p className="text-muted-foreground">
-              Last run completed: {exceptions.length} exception{exceptions.length !== 1 ? 's' : ''} found
-            </p>
-          </div>
         )}
 
         {/* Diagnostics Panel */}

@@ -1,14 +1,14 @@
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { VariantProps, cva } from "class-variance-authority";
-import { PanelLeft } from "lucide-react";
+import { PanelLeft, X } from "lucide-react";
 
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetClose, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -25,6 +25,7 @@ type SidebarContext = {
   setOpen: (open: boolean) => void;
   openMobile: boolean;
   setOpenMobile: (open: boolean) => void;
+  mobileTriggerRef: React.MutableRefObject<HTMLButtonElement | null>;
   isMobile: boolean;
   toggleSidebar: () => void;
 };
@@ -50,6 +51,7 @@ const SidebarProvider = React.forwardRef<
 >(({ defaultOpen = true, open: openProp, onOpenChange: setOpenProp, className, style, children, ...props }, ref) => {
   const isMobile = useIsMobile();
   const [openMobile, setOpenMobile] = React.useState(false);
+  const mobileTriggerRef = React.useRef<HTMLButtonElement | null>(null);
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
@@ -100,6 +102,7 @@ const SidebarProvider = React.forwardRef<
       isMobile,
       openMobile,
       setOpenMobile,
+      mobileTriggerRef,
       toggleSidebar,
     }),
     [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar],
@@ -136,7 +139,7 @@ const Sidebar = React.forwardRef<
     collapsible?: "offcanvas" | "icon" | "none";
   }
 >(({ side = "left", variant = "sidebar", collapsible = "offcanvas", className, children, ...props }, ref) => {
-  const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
+  const { isMobile, state, openMobile, setOpenMobile, mobileTriggerRef } = useSidebar();
 
   if (collapsible === "none") {
     return (
@@ -163,7 +166,21 @@ const Sidebar = React.forwardRef<
             } as React.CSSProperties
           }
           side={side}
+          aria-describedby={undefined}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            mobileTriggerRef.current?.focus();
+          }}
         >
+          <SheetTitle className="sr-only">Application navigation</SheetTitle>
+          <div className="absolute right-3 top-3 z-20">
+            <SheetClose
+              aria-label="Close navigation"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-sidebar-foreground transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
+            >
+              <X className="h-5 w-5" aria-hidden="true" />
+            </SheetClose>
+          </div>
           <div className="flex h-full w-full flex-col">{children}</div>
         </SheetContent>
       </Sheet>
@@ -218,7 +235,7 @@ Sidebar.displayName = "Sidebar";
 
 const SidebarTrigger = React.forwardRef<React.ElementRef<typeof Button>, React.ComponentProps<typeof Button>>(
   ({ className, onClick, ...props }, ref) => {
-    const { toggleSidebar } = useSidebar();
+    const { isMobile, mobileTriggerRef, toggleSidebar } = useSidebar();
 
     return (
       <Button
@@ -229,6 +246,7 @@ const SidebarTrigger = React.forwardRef<React.ElementRef<typeof Button>, React.C
         className={cn("h-7 w-7", className)}
         onClick={(event) => {
           onClick?.(event);
+          if (isMobile) mobileTriggerRef.current = event.currentTarget;
           toggleSidebar();
         }}
         {...props}
