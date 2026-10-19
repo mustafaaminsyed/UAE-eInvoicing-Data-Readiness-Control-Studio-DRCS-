@@ -6,13 +6,24 @@ import { getWorkflowSection } from '@/components/dashboard/workflowSections';
 import { Sidebar, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { useIsMobile } from '@/hooks/use-mobile';
 
+const complianceState = {
+  isDataLoaded: false,
+  isChecksRun: false,
+};
+
 vi.mock('@/hooks/use-mobile', () => ({
   useIsMobile: vi.fn(() => false),
+}));
+
+vi.mock('@/context/ComplianceContext', () => ({
+  useCompliance: () => complianceState,
 }));
 
 describe('SidebarNav', () => {
   beforeEach(() => {
     vi.mocked(useIsMobile).mockReturnValue(false);
+    complianceState.isDataLoaded = false;
+    complianceState.isChecksRun = false;
   });
 
   it('renders the workflow sections in the new workspace order', () => {
@@ -56,11 +67,30 @@ describe('SidebarNav', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByRole('link', { name: /upload workspace/i })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: /upload data/i })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: /upload audit/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /field mapping/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /mapping studio/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /ap explorer/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /check builder/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /rejections/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /evidence pack/i })).toBeInTheDocument();
+  });
+
+  it('preserves workflow restrictions until their prerequisites are available', () => {
+    render(
+      <MemoryRouter initialEntries={['/upload']}>
+        <SidebarProvider>
+          <Sidebar collapsible="none">
+            <SidebarNav />
+          </Sidebar>
+        </SidebarProvider>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole('link', { name: 'Run checks' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('link', { name: 'Exceptions' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('link', { name: 'Traceability' })).not.toHaveAttribute('aria-disabled');
   });
 
   it('provides a route-aware shell title for operational subpages', () => {
@@ -92,5 +122,26 @@ describe('SidebarNav', () => {
 
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Close navigation' })).not.toBeInTheDocument());
     expect(trigger).toHaveFocus();
+  });
+
+  it('closes the mobile drawer when an enabled destination is selected', async () => {
+    vi.mocked(useIsMobile).mockReturnValue(true);
+
+    render(
+      <MemoryRouter initialEntries={['/upload']}>
+        <SidebarProvider>
+          <SidebarTrigger />
+          <Sidebar>
+            <SidebarNav />
+          </Sidebar>
+        </SidebarProvider>
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle Sidebar' }));
+    expect(await screen.findByRole('button', { name: 'Close navigation' })).toBeVisible();
+    fireEvent.click(screen.getByRole('link', { name: 'Traceability' }));
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Close navigation' })).not.toBeInTheDocument());
   });
 });

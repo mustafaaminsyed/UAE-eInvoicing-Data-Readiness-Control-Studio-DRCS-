@@ -1,10 +1,9 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import ExceptionsPage from '@/pages/ExceptionsPage';
 
-vi.mock('@/context/ComplianceContext', () => ({
-  useCompliance: () => ({
+const complianceState = {
     isChecksRun: true,
     exceptions: [
       {
@@ -31,7 +30,10 @@ vi.mock('@/context/ComplianceContext', () => ({
     direction: 'AR',
     lastChecksRunAt: '2026-03-13T00:00:00.000Z',
     lastChecksRunDatasetType: 'AR',
-  }),
+};
+
+vi.mock('@/context/ComplianceContext', () => ({
+  useCompliance: () => complianceState,
 }));
 
 vi.mock('@/lib/api/validationExplainApi', () => ({
@@ -77,5 +79,21 @@ describe('ExceptionsPage heatmap drill-down', () => {
 
     expect(screen.getAllByText('VAT Calculation Mismatch').length).toBeGreaterThan(0);
     expect(screen.queryByText('Buyer TRN Invalid Format')).not.toBeInTheDocument();
+  });
+
+  it('keeps direct access blocked when no validation run exists', async () => {
+    complianceState.isChecksRun = false;
+
+    render(
+      <MemoryRouter initialEntries={['/exceptions']}>
+        <Routes>
+          <Route path="/" element={<div>Landing route</div>} />
+          <Route path="/exceptions" element={<ExceptionsPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(screen.getByText('Landing route')).toBeInTheDocument());
+    complianceState.isChecksRun = true;
   });
 });

@@ -3,12 +3,14 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { SidebarNav } from '@/components/dashboard/SidebarNav';
 import { getWorkflowSection } from '@/components/dashboard/workflowSections';
 import { Sidebar, SidebarInset, SidebarProvider, SidebarRail, SidebarTrigger } from '@/components/ui/sidebar';
+import { useCompliance } from '@/context/ComplianceContext';
 import { cn } from '@/lib/utils';
 import './workspace-shell.css';
 
 export function WorkspaceShell() {
   const location = useLocation();
   const section = getWorkflowSection(location.pathname);
+  const { activeDatasetType } = useCompliance();
 
   return (
     <SidebarProvider defaultOpen className="workspace-control-shell relative z-10 min-h-svh">
@@ -42,7 +44,7 @@ export function WorkspaceShell() {
                 </div>
 
                 <div className="workspace-shell-badges flex items-center gap-2">
-                  <span className="workspace-shell-badge workspace-shell-badge--muted">AR</span>
+                  <span className="workspace-shell-badge workspace-shell-badge--muted">{activeDatasetType}</span>
                   <span className="workspace-shell-badge workspace-shell-badge--muted">Portfolio view</span>
                   <span className={cn(
                     'workspace-shell-badge',
