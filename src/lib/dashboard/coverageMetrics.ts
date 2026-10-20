@@ -24,9 +24,9 @@ export interface DashboardCoverageMetrics {
   uncertainMappedSourceFields: number;
   fullySuppliedTargets: number | null;
   totalTargets: number;
-  matchedChecks: number | null;
+  evaluatedControls: number | null;
   totalChecks: number;
-  sourceGaps: number;
+  applicableNotEvaluatedControls: number;
   ambiguousChecks: number;
   notApplicableChecks: number;
   documentsReviewed: number | null;
@@ -106,11 +106,11 @@ export function computeDashboardCoverageMetrics(
         (execution) => execution.controlClass === 'regulatory' && execution.direction === input.direction
       )
     : [];
-  const matchedExecutions = executions.filter((execution) => execution.evaluation === 'evaluated').length;
+  const evaluatedControls = executions.filter((execution) => execution.evaluation === 'evaluated').length;
   const ambiguousChecks = executions.filter((execution) => execution.applicability === 'undetermined').length;
   const notApplicableChecks = executions.filter((execution) => execution.outcome === 'not_applicable').length;
-  const sourceGaps = executions.filter(
-    (execution) => execution.evaluation === 'not_evaluated' && execution.applicability !== 'undetermined'
+  const applicableNotEvaluatedControls = executions.filter(
+    (execution) => execution.evaluation === 'not_evaluated' && execution.applicability === 'applicable'
   ).length;
   const isCreditNote = (header: InvoiceHeader) => String(header.invoice_type ?? '').trim() === '381';
   const creditNotesReviewed = input.hasCompletedRun ? input.headers.filter(isCreditNote).length : 0;
@@ -126,9 +126,9 @@ export function computeDashboardCoverageMetrics(
     totalSourceFields: input.uploadColumnCount,
     fullySuppliedTargets: targetMetrics.count,
     totalTargets: targetMetrics.total,
-    matchedChecks: input.hasCompletedRun ? matchedExecutions : null,
+    evaluatedControls: input.hasCompletedRun ? evaluatedControls : null,
     totalChecks: executions.length,
-    sourceGaps,
+    applicableNotEvaluatedControls,
     ambiguousChecks,
     notApplicableChecks,
     documentsReviewed: input.hasCompletedRun ? input.headers.length : null,

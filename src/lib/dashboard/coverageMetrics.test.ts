@@ -78,7 +78,7 @@ describe('computeDashboardCoverageMetrics', () => {
     expect(metrics.directMappedSourceFields).toBe(1);
     expect(metrics.transformedMappedSourceFields).toBe(1);
     expect(metrics.uncertainMappedSourceFields).toBe(1);
-    expect(metrics.matchedChecks).toBeNull();
+    expect(metrics.evaluatedControls).toBeNull();
     expect(metrics.documentsReviewed).toBeNull();
   });
 
@@ -99,7 +99,7 @@ describe('computeDashboardCoverageMetrics', () => {
     expect(metrics.totalTargets).toBe(51);
   });
 
-  it('reports evaluated, gap, undetermined, and reviewed-document counts for the active completed run', () => {
+  it('reports evaluated, applicable-not-evaluated, undetermined, and reviewed-document counts for the active completed run', () => {
     const metrics = computeDashboardCoverageMetrics({
       direction: 'AR',
       mappingTemplate: null,
@@ -115,15 +115,17 @@ describe('computeDashboardCoverageMetrics', () => {
         makeExecution(),
         makeExecution({ ruleId: 'RULE-2', evaluation: 'not_evaluated', outcome: 'not_evaluated', evaluatedCount: 0, passedCount: 0, notEvaluatedCount: 1 }),
         makeExecution({ ruleId: 'RULE-3', applicability: 'undetermined', evaluation: 'not_evaluated', outcome: 'not_evaluated', applicableCount: 0, evaluatedCount: 0, passedCount: 0, notEvaluatedCount: 1 }),
+        makeExecution({ ruleId: 'RULE-6', applicability: 'not_applicable', evaluation: 'not_evaluated', outcome: 'not_applicable', applicableCount: 0, notApplicableCount: 1, evaluatedCount: 0, passedCount: 0, notEvaluatedCount: 0 }),
         makeExecution({ ruleId: 'RULE-4', direction: 'AP' }),
         makeExecution({ ruleId: 'RULE-5', controlClass: 'supplementary_data_readiness' }),
       ],
     });
 
-    expect(metrics.matchedChecks).toBe(1);
-    expect(metrics.totalChecks).toBe(3);
-    expect(metrics.sourceGaps).toBe(1);
+    expect(metrics.evaluatedControls).toBe(1);
+    expect(metrics.totalChecks).toBe(4);
+    expect(metrics.applicableNotEvaluatedControls).toBe(1);
     expect(metrics.ambiguousChecks).toBe(1);
+    expect(metrics.notApplicableChecks).toBe(1);
     expect(metrics.documentsReviewed).toBe(2);
     expect(metrics.invoicesReviewed).toBe(1);
     expect(metrics.creditNotesReviewed).toBe(1);
