@@ -17,7 +17,7 @@ const domainRows = (s: DashboardSnapshot) => [
   { label: 'Mandatory fields', value: s.mandatoryCompleteness, detail: `${formatPercent(s.headerCompleteness)} header · ${formatPercent(s.lineCompleteness)} lines`, route: '/mapping' },
   { label: 'Header & buyer data', value: Math.round((s.headerCompleteness + s.buyerCompleteness) / 2), detail: `${formatPercent(s.headerCompleteness)} header · ${formatPercent(s.buyerCompleteness)} buyer`, route: '/exceptions' },
   { label: 'Conditional requirements', value: s.conditionalCompleteness, detail: 'Applicable-field completeness', route: '/traceability' },
-  { label: 'Runtime control coverage', value: s.pintRuleCoverage, detail: `${formatNumber(s.currencyMismatchCount)} currency mismatches`, route: '/validation' },
+  { label: 'Evaluated outcome pass rate', value: s.pintRuleCoverage, detail: `${formatNumber(s.currencyMismatchCount)} currency mismatches`, route: '/validation' },
   { label: 'Line-level data', value: s.lineCompleteness, detail: `${formatPercent(s.nullFieldRate)} overall null-field rate`, route: '/mapping' },
   { label: 'Credit-note controls', value: s.creditNoteCount ? s.creditNoteCoverage : null, detail: 'No credit notes in scope', notInScope: !s.creditNoteCount, route: '/validation' },
 ];
@@ -96,7 +96,7 @@ export default function DashboardPage() {
       <article className="cc-kpi cc-kpi-readiness"><div className="cc-ring" style={{ '--score': `${Math.max(0, Math.min(100, readiness)) * 3.6}deg` } as React.CSSProperties}><div><strong>{emptyState ? '—' : formatPercent(snapshot.goLiveReadiness)}</strong><span>overall</span></div></div><div><span className="cc-label">DRCS readiness score</span><strong>{emptyState ? 'Awaiting data' : (snapshot.goLiveReadiness === null ? 'Awaiting data' : snapshot.goLiveReadiness >= 90 ? 'Ready' : snapshot.goLiveReadiness >= 75 ? 'Watch' : 'Blocked')}</strong><small>{emptyState ? 'Assessment pending' : 'Weighted control posture'}</small></div></article>
       <KpiCard icon={<FileCheck2 />} label="Mandatory field supply" value={emptyState ? 'Pending' : formatPercent(snapshot.mandatoryCompleteness)} detail={emptyState ? 'Awaiting source coverage' : `${formatPercent(snapshot.headerCompleteness)} header · ${formatPercent(snapshot.lineCompleteness)} lines`} tone="good" />
       <KpiCard icon={<ShieldAlert />} label="Blocking exposure" value={emptyState ? 'Not assessed' : formatNumber(snapshot.criticalIssues)} detail={emptyState ? 'No blocker count yet' : `${formatNumber(snapshot.criticalBlockerDocumentCount)} invoices affected`} tone="risk" />
-      <KpiCard icon={<ListChecks />} label="Regulatory evaluation coverage" value={emptyState ? 'Pending' : formatPercent(snapshot.evaluationCoverage)} detail={emptyState ? 'Validation not started' : `${formatNumber(snapshot.executedRuleOutcomes)} outcomes`} tone="watch" />
+      <KpiCard icon={<ListChecks />} label="Applicable outcomes evaluated" value={emptyState ? 'Pending' : formatPercent(snapshot.evaluationCoverage)} detail={emptyState ? 'Validation not started' : `${formatNumber(snapshot.executedRuleOutcomes)} evaluated outcomes`} tone="watch" />
       <KpiCard icon={<Database />} label="Invoices analysed" value={emptyState ? 'No source data' : formatNumber(snapshot.totalInvoices)} detail={emptyState ? 'Awaiting upload' : `${formatNumber(snapshot.submissionReadyCount)} submission-ready`} tone="info" />
     </section>
 
@@ -118,13 +118,13 @@ export default function DashboardPage() {
         detail="MoF Tax Invoice crosswalk · all source fields mapped"
       />
       <CoverageMetricCard
-        label="Runtime checks matched"
-        value={coverageMetrics.matchedChecks === null
+        label="Registered controls evaluated"
+        value={coverageMetrics.evaluatedControls === null
           ? '—'
-          : `${coverageMetrics.matchedChecks}/${coverageMetrics.totalChecks}`}
-        detail={coverageMetrics.matchedChecks === null
-          ? 'Run validation to assess source checks'
-          : `${coverageMetrics.sourceGaps} not evaluated · ${coverageMetrics.ambiguousChecks} applicability undetermined`}
+          : `${coverageMetrics.evaluatedControls}/${coverageMetrics.totalChecks}`}
+        detail={coverageMetrics.evaluatedControls === null
+          ? 'Run validation to assess registered controls'
+          : `${coverageMetrics.applicableNotEvaluatedControls} applicable not evaluated · ${coverageMetrics.notApplicableChecks} not applicable · ${coverageMetrics.ambiguousChecks} applicability undetermined`}
       />
       <CoverageMetricCard
         label="Documents reviewed"
@@ -134,6 +134,10 @@ export default function DashboardPage() {
           : `${coverageMetrics.invoicesReviewed} invoices · ${coverageMetrics.creditNotesReviewed} credit notes${coverageMetrics.otherDocumentsReviewed ? ` · ${coverageMetrics.otherDocumentsReviewed} other` : ''}`}
       />
     </section>
+
+    <p className="cc-assessment-scope">
+      DRCS readiness is an internal data-readiness assessment. Evaluation metrics cover the implemented executable DRCS control scope and do not establish complete PINT-AE conformity.
+    </p>
 
     <section className={cn('cc-alert', emptyState && 'is-neutral', !emptyState && !hasCriticalBlockers && 'is-clear')} role={hasCriticalBlockers ? 'alert' : 'status'}>
       {hasCriticalBlockers ? <AlertTriangle className="h-6 w-6" /> : emptyState ? <CircleDot className="h-6 w-6" /> : <Check className="h-6 w-6" />}
@@ -168,7 +172,7 @@ export default function DashboardPage() {
     <section className="cc-workflow" aria-label="Readiness workflow">{workflow.map((step, index) => <button key={step.title} type="button" className={cn('cc-workflow-step', step.complete && 'is-complete', step.active && 'is-active')} onClick={() => navigate(step.route)}><span className="cc-step-number">{step.complete ? <Check className="h-4 w-4" /> : step.number}</span><span><strong>{step.number}. {step.title}</strong><small>{step.detail}</small></span>{index < workflow.length - 1 ? <i /> : null}</button>)}</section>
 
     <section className="cc-bottom-grid">
-      <Panel title="Assessment snapshot" action="Evidence" onAction={() => navigate('/evidence-pack')}><div className="cc-signal-grid"><Signal label="Assessment status" value={emptyState ? 'Not evaluated' : 'Portfolio view'} /><Signal label="Source records" value={emptyState ? 'Unavailable' : formatNumber(snapshot.totalInvoices)} /><Signal label="Runtime evaluation coverage" value={emptyState ? 'Not evaluated' : formatPercent(snapshot.evaluationCoverage)} /><Signal label="Last run" value={emptyState ? 'Awaiting data' : runModeLabel} /></div></Panel>
+      <Panel title="Assessment snapshot" action="Evidence" onAction={() => navigate('/evidence-pack')}><div className="cc-signal-grid"><Signal label="Assessment status" value={emptyState ? 'Not evaluated' : 'Portfolio view'} /><Signal label="Source records" value={emptyState ? 'Unavailable' : formatNumber(snapshot.totalInvoices)} /><Signal label="Applicable outcomes evaluated" value={emptyState ? 'Not evaluated' : formatPercent(snapshot.evaluationCoverage)} /><Signal label="Last run" value={emptyState ? 'Awaiting data' : runModeLabel} /></div></Panel>
       <Panel title="Exceptions by severity" action="Exceptions" onAction={() => navigate('/exceptions')}>
         {emptyState || snapshot.exceptionsTotal === 0
           ? <p className="cc-panel-empty">{emptyState ? 'Run validation to build a severity profile.' : 'No exceptions were recorded in the latest assessment.'}</p>

@@ -80,6 +80,21 @@ const mockComplianceState = {
   buyers: [],
   headers: [{ invoice_id: 'inv-1', direction: 'AR' }],
   lines: [],
+  lastChecksRunDatasetType: 'AR',
+  lastChecksRunAt: '2026-10-20T10:00:00.000Z',
+  activeMappingProfileByDirection: { AR: null, AP: null },
+  validationExecutions: [
+    {
+      ruleId: 'RULE-1', ruleName: 'Evaluated rule', controlClass: 'regulatory', layer: 'pint_ae', direction: 'AR', registered: true,
+      candidateCount: 1, applicableCount: 1, notApplicableCount: 0, evaluatedCount: 1, passedCount: 1, failedCount: 0, notEvaluatedCount: 0,
+      applicability: 'applicable', evaluation: 'evaluated', outcome: 'pass', executionSource: 'runtime',
+    },
+    {
+      ruleId: 'RULE-2', ruleName: 'Not applicable rule', controlClass: 'regulatory', layer: 'pint_ae', direction: 'AR', registered: true,
+      candidateCount: 0, applicableCount: 0, notApplicableCount: 1, evaluatedCount: 0, passedCount: 0, failedCount: 0, notEvaluatedCount: 0,
+      applicability: 'not_applicable', evaluation: 'not_evaluated', outcome: 'not_applicable', executionSource: 'runtime',
+    },
+  ],
 };
 
 const resetMockComplianceState = () => {
@@ -101,6 +116,8 @@ const resetMockComplianceState = () => {
         top_10_clients_by_risk: [],
       },
       activeDatasetType: 'AR',
+      lastChecksRunDatasetType: 'AR',
+      lastChecksRunAt: '2026-10-20T10:00:00.000Z',
     setActiveDatasetType: vi.fn(),
     getDashboardStats: () => ({
       totalInvoices: 3,
@@ -212,10 +229,15 @@ describe('DashboardPage executive surface', () => {
     expect(screen.getByText('DRCS readiness score')).toBeInTheDocument();
     expect(screen.getByText('Mandatory field supply')).toBeInTheDocument();
     expect(screen.getByText('Blocking exposure')).toBeInTheDocument();
-    expect(screen.getByText('Regulatory evaluation coverage')).toBeInTheDocument();
+    expect(screen.getAllByText('Applicable outcomes evaluated').length).toBeGreaterThan(0);
     expect(screen.getByText('Source-field mapping')).toBeInTheDocument();
     expect(screen.getByText('MoF targets fully supplied')).toBeInTheDocument();
-    expect(screen.getByText('Runtime checks matched')).toBeInTheDocument();
+    expect(screen.getByText('Registered controls evaluated')).toBeInTheDocument();
+    expect(screen.getByText('1/2')).toBeInTheDocument();
+    expect(screen.getByText(/0 applicable not evaluated · 1 not applicable · 0 applicability undetermined/)).toBeInTheDocument();
+    expect(screen.getByText('Evaluated outcome pass rate')).toBeInTheDocument();
+    expect(screen.getByText(/internal data-readiness assessment/)).toBeInTheDocument();
+    expect(screen.getByText(/do not establish complete PINT-AE conformity/)).toBeInTheDocument();
     expect(screen.getByText('Documents reviewed')).toBeInTheDocument();
     expect(screen.getByText('Readiness by control domain')).toBeInTheDocument();
     expect(screen.getByText('Priority findings')).toBeInTheDocument();

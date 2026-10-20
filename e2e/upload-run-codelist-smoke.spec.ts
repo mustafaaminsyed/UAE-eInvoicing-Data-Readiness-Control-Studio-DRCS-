@@ -22,11 +22,11 @@ CN003,UAE-2025-CN-0003,2025-01-22,381,100000000000001,Dariba Tax Technologies LL
 const INVALID_TRANSACTION_TYPE_HEADERS = `invoice_id,invoice_number,issue_date,invoice_type,seller_trn,seller_name,seller_address,seller_city,seller_country,seller_subdivision,seller_electronic_address,seller_legal_reg_id,seller_legal_reg_id_type,buyer_id,currency,transaction_type_code,principal_id,invoicing_period_start_date,invoicing_period_end_date,deliver_to_address_line_1,deliver_to_city,deliver_to_country_subdivision,deliver_to_country_code,payment_due_date,payment_means_code,fx_rate,total_excl_vat,vat_total,total_incl_vat,amount_due,tax_category_code,tax_category_rate,credit_note_reason_code,credit_note_reason_text,preceding_invoice_reference,preceding_invoice_issue_date
 TT001,UAE-2025-INV-0001,2025-01-24,380,100000000000001,Dariba Tax Technologies LLC,Al Sila Tower ADGM,Abu Dhabi,AE,AE-AZ,dariba@peppol.ae,TL-123456,TL,B001,AED,EXPORT,,,,,,,,2025-02-23,30,1.000000,500.00,25.00,525.00,525.00,S,5.00,,,,`;
 
-const CREDIT_NOTE_LINES = `line_id,invoice_id,line_number,description,quantity,unit_of_measure,unit_price,line_discount,line_total_excl_vat,vat_rate,vat_amount,tax_category_code
-LCN001,CN001,1,Credit adjustment for consulting services,5,EA,100.00,0.00,500.00,5.00,25.00,S`;
+const CREDIT_NOTE_LINES = `line_id,invoice_id,line_number,description,item_name,quantity,unit_of_measure,unit_price,item_price_discount,price_base_quantity,line_discount,line_total_excl_vat,vat_rate,vat_amount,tax_category_code
+LCN001,CN001,1,Credit adjustment for consulting services,Consulting Credit Adjustment,5,EA,100.00,,,0.00,500.00,5.00,25.00,S`;
 
-const STANDARD_LINES = `line_id,invoice_id,line_number,description,quantity,unit_of_measure,unit_price,line_discount,line_total_excl_vat,vat_rate,vat_amount,tax_category_code
-LTT001,TT001,1,Standard consulting services,5,EA,100.00,0.00,500.00,5.00,25.00,S`;
+const STANDARD_LINES = `line_id,invoice_id,line_number,description,item_name,quantity,unit_of_measure,unit_price,item_price_discount,price_base_quantity,line_discount,line_total_excl_vat,vat_rate,vat_amount,tax_category_code
+LTT001,TT001,1,Standard consulting services,Consulting Services,5,EA,100.00,,,0.00,500.00,5.00,25.00,S`;
 
 async function uploadAndRunChecks(
   page: Parameters<typeof test>[1] extends never ? never : any,
@@ -43,9 +43,9 @@ async function uploadAndRunChecks(
   await loadButton.click();
 
   await expect(page).toHaveURL(/\/run$/);
-  await expect(page.getByRole('heading', { name: 'Run Compliance Checks' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Validation Control Centre' })).toBeVisible();
 
-  const runButton = page.getByRole('button', { name: /Run All Checks \(/ });
+  const runButton = page.getByRole('button', { name: /Run Validation Checks \(/ });
   await expect(runButton).toBeEnabled();
   await runButton.click();
 
@@ -56,10 +56,10 @@ test('smoke: upload -> run checks -> exceptions shows codelist failures', async 
   await uploadAndRunChecks(page, FIXTURES);
 
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
-  await expect(page.getByText('Executive compliance view')).toBeVisible();
-  await expect(page.getByText('Source-data quality and integrity')).toBeVisible();
-  await expect(page.getByText('Coverage against UAE and PINT-AE obligations')).toBeVisible();
-  await expect(page.getByText('Exception breakdown and remediation focus')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'UAE e-Invoicing Readiness' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Readiness by control domain' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Priority findings' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Assessment snapshot' })).toBeVisible();
 
   await page.getByRole('link', { name: 'Exceptions' }).first().click();
   await expect(page).toHaveURL(/\/exceptions/);
@@ -108,13 +108,8 @@ test('smoke: credit-note dashboard widget reflects the new readiness fields', as
     },
   });
 
-  const creditNoteCard = page.locator('section').filter({ hasText: 'Credit-Note Scenarios' }).first();
-  await expect(creditNoteCard.getByText('Credit-Note Scenarios')).toBeVisible();
-  await expect(creditNoteCard.getByText('Reason-code completeness 100%')).toBeVisible();
-  await expect(creditNoteCard.getByText('Reason-text completeness 0%')).toBeVisible();
-  await expect(creditNoteCard.getByText('Preceding reference completeness 100%')).toBeVisible();
-  await expect(creditNoteCard.getByText('Preceding issue-date completeness 0%')).toBeVisible();
-  await expect(creditNoteCard.getByText('Overall scenario coverage 0%')).toBeVisible();
+  await expect(page.getByText('0 invoices · 1 credit notes')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Credit-note controls 0%/ })).toBeVisible();
 });
 
 test('smoke: invalid credit note shows new credit-note validation failures', async ({ page }) => {
